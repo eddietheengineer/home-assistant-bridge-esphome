@@ -223,8 +223,8 @@ void GeappliancesBridge::publish_ha_discovery_()
     heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL));
   if (!this->ha_fetch_task_stack_ || !this->ha_fetch_task_tcb_) {
     ESP_LOGE(TAG, "HA discovery: failed to allocate task stack/TCB (OOM)");
-    if (this->ha_fetch_task_stack_) { free(this->ha_fetch_task_stack_); this->ha_fetch_task_stack_ = nullptr; }
-    if (this->ha_fetch_task_tcb_)   { free(this->ha_fetch_task_tcb_);   this->ha_fetch_task_tcb_   = nullptr; }
+    if (this->ha_fetch_task_stack_) { heap_caps_free(this->ha_fetch_task_stack_); this->ha_fetch_task_stack_ = nullptr; }
+    if (this->ha_fetch_task_tcb_)   { heap_caps_free(this->ha_fetch_task_tcb_);   this->ha_fetch_task_tcb_   = nullptr; }
     vQueueDelete(this->ha_discovery_queue_);
     this->ha_discovery_queue_               = nullptr;
     this->ha_discovery_publish_in_progress_ = false;
@@ -235,8 +235,8 @@ void GeappliancesBridge::publish_ha_discovery_()
     this->ha_fetch_task_stack_, this->ha_fetch_task_tcb_);
   if (!this->ha_fetch_task_handle_) {
     ESP_LOGE(TAG, "HA discovery: xTaskCreateStatic failed");
-    free(this->ha_fetch_task_stack_);  this->ha_fetch_task_stack_ = nullptr;
-    free(this->ha_fetch_task_tcb_);    this->ha_fetch_task_tcb_   = nullptr;
+    heap_caps_free(this->ha_fetch_task_stack_);  this->ha_fetch_task_stack_ = nullptr;
+    heap_caps_free(this->ha_fetch_task_tcb_);    this->ha_fetch_task_tcb_   = nullptr;
     vQueueDelete(this->ha_discovery_queue_);
     this->ha_discovery_queue_               = nullptr;
     this->ha_fetch_task_handle_             = nullptr;
@@ -281,8 +281,8 @@ void GeappliancesBridge::publish_next_ha_discovery_entity_()
       vQueueDelete(this->ha_discovery_queue_);
       this->ha_discovery_queue_   = nullptr;
       this->ha_fetch_task_handle_ = nullptr;
-      if (this->ha_fetch_task_stack_) { free(this->ha_fetch_task_stack_); this->ha_fetch_task_stack_ = nullptr; }
-      if (this->ha_fetch_task_tcb_)   { free(this->ha_fetch_task_tcb_);   this->ha_fetch_task_tcb_   = nullptr; }
+      if (this->ha_fetch_task_stack_) { heap_caps_free(this->ha_fetch_task_stack_); this->ha_fetch_task_stack_ = nullptr; }
+      if (this->ha_fetch_task_tcb_)   { heap_caps_free(this->ha_fetch_task_tcb_);   this->ha_fetch_task_tcb_   = nullptr; }
     } else {
       mqtt_client->publish(item->topic, item->payload, 0, true);  // QoS 0, retain
       ESP_LOGD(TAG, "HA discovery: published %s", item->topic.c_str());
