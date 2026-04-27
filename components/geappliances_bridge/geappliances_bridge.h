@@ -277,6 +277,14 @@ class GeappliancesBridge : public Component {
 
   QueueHandle_t ha_discovery_queue_{nullptr};   // carries HaDiscoveryItem* (nullptr = sentinel)
   TaskHandle_t  ha_fetch_task_handle_{nullptr};
+  // Heap-allocated stack and TCB for xTaskCreateStatic().  Using static
+  // allocation prevents FreeRTOS from freeing the task's stack inside
+  // prvCheckTasksWaitingTermination() in the idle task — if a stack overflow
+  // corrupted heap metadata, that free would crash the idle task (the exact
+  // crash pattern observed on ESP32-C3/C6).  The main loop frees these
+  // buffers after the task signals completion via the queue sentinel.
+  StackType_t*  ha_fetch_task_stack_{nullptr};
+  StaticTask_t* ha_fetch_task_tcb_{nullptr};
 
   static void ha_fetch_task_fn_(void* param);
   void        fetch_ha_definitions_();

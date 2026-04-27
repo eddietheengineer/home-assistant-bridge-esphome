@@ -147,10 +147,36 @@ void GeappliancesBridge::publish_ha_discovery_()
   //   heap_caps_calloc failure inside esp_phy_enable_wrapper → WiFi crash).
   static constexpr size_t HA_FETCH_MIN_FREE_HEAP = 110 * 1024;  // 110 KB
   size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-  ESP_LOGI(TAG, "HA discovery: free heap before fetch task = %zu bytes", free_heap);
+  size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+  ESP_LOGI(TAG, "HA discovery: free heap = %zu bytes, largest block = %zu bytes",
+           free_heap, largest_block);
   if (free_heap < HA_FETCH_MIN_FREE_HEAP) {
     ESP_LOGW(TAG, "HA discovery: insufficient free heap (%zu < %zu bytes), skipping",
              free_heap, HA_FETCH_MIN_FREE_HEAP);
+    this->ha_discovery_pending_             = false;
+    this->ha_discovery_publish_in_progress_ = false;
+    this->ha_discovery_published_           = true;
+    return;
+  }
+
+  // Stack size 48 KB – mbedTLS certificate-chain verification during the TLS
+  // handshake requires deep call stacks; esp_crt_bundle_attach pushes peak
+  // usage above 32 KB on ESP32-C3 and ESP32-C6 (single-core devices).
+  // Priority 1: below IDF MQTT task (5) so MQTT events are not starved while
+  // the fetch task is parsing JSONL lines and filling the queue.
+  static constexpr uint32_t HA_FETCH_STACK_SIZE = 49152;  // 48 KB
+
+  // heap_caps_get_free_size() reports total free bytes across all fragments.
+  // On a fragmented heap this can be well above 110 KB even though no single
+  // block is large enough for the 48 KB task stack.  Check the largest
+  // contiguous block to avoid xTaskCreate / xTaskCreateStatic succeeding with
+  // a stack allocation that is immediately adjacent to other live objects —
+  // if TLS then pushes peak usage a little above 48 KB the overflow silently
+  // corrupts nearby heap metadata.
+  if (largest_block < HA_FETCH_STACK_SIZE) {
+    ESP_LOGW(TAG, "HA discovery: largest free block (%zu) < stack size (%u), skipping "
+                  "(heap fragmentation)",
+             largest_block, HA_FETCH_STACK_SIZE);
     this->ha_discovery_pending_             = false;
     this->ha_discovery_publish_in_progress_ = false;
     this->ha_discovery_published_           = true;
@@ -174,20 +200,43 @@ void GeappliancesBridge::publish_ha_discovery_()
   ESP_LOGI(TAG, "HA discovery: starting — %zu ERDs registered, launching fetch task",
            this->ha_registered_erds_snapshot_.size());
 
-  // Stack size 48 KB – mbedTLS certificate-chain verification during the TLS
-  // handshake requires deep call stacks; esp_crt_bundle_attach pushes peak
-  // usage above 32 KB on ESP32-C3 and ESP32-C6 (single-core devices that were
-  // observed crashing in prvCheckTasksWaitingTermination at 12 KB, 24 KB, and
-  // 32 KB).  Stack overflow corrupts heap metadata, causing the FreeRTOS idle
-  // task to fault when it tries to free the terminated task's stack.  48 KB
-  // gives ~16 KB headroom above the observed 32 KB peak.
-  // Priority 1: below IDF MQTT task (5) so MQTT events are not starved while
-  // the fetch task is parsing JSONL lines and filling the queue.
-  static constexpr uint32_t HA_FETCH_STACK_SIZE = 49152;  // 48 KB
-  BaseType_t rc = xTaskCreate(ha_fetch_task_fn_, "ha_fetch", HA_FETCH_STACK_SIZE, this, 1,
-                              &this->ha_fetch_task_handle_);
-  if (rc != pdPASS) {
-    ESP_LOGE(TAG, "HA discovery: failed to create fetch task (rc=%d)", static_cast<int>(rc));
+  // Use xTaskCreateStatic() so that FreeRTOS does NOT free the task's stack
+  // and TCB inside prvCheckTasksWaitingTermination() in the idle task.
+  //
+  // Previously xTaskCreate() was used; when the fetch task self-deleted via
+  // vTaskDelete(nullptr), the idle task would later call
+  // prvCheckTasksWaitingTermination() → vPortFree() to release the stack.
+  // If a stack overflow (even a minor one during TLS peak usage) had
+  // corrupted the heap block header adjacent to the stack allocation, the
+  // vPortFree() in the idle task would fault — producing the exact crash
+  // seen on ESP32-C3/C6: "Fault - Unknown" at esp_cpu_wait_for_intr with
+  // prvCheckTasksWaitingTermination on the stack.
+  //
+  // With xTaskCreateStatic() the stack and TCB are caller-owned.  When
+  // vTaskDelete(nullptr) runs, FreeRTOS removes the task from the scheduler
+  // but does NOT add it to the termination cleanup list.  The main loop()
+  // frees the buffers after receiving the queue sentinel, so no heap free
+  // ever happens inside the idle task for this memory.
+  this->ha_fetch_task_stack_ = static_cast<StackType_t*>(
+    heap_caps_malloc(HA_FETCH_STACK_SIZE * sizeof(StackType_t), MALLOC_CAP_INTERNAL));
+  this->ha_fetch_task_tcb_ = static_cast<StaticTask_t*>(
+    heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL));
+  if (!this->ha_fetch_task_stack_ || !this->ha_fetch_task_tcb_) {
+    ESP_LOGE(TAG, "HA discovery: failed to allocate task stack/TCB (OOM)");
+    if (this->ha_fetch_task_stack_) { free(this->ha_fetch_task_stack_); this->ha_fetch_task_stack_ = nullptr; }
+    if (this->ha_fetch_task_tcb_)   { free(this->ha_fetch_task_tcb_);   this->ha_fetch_task_tcb_   = nullptr; }
+    vQueueDelete(this->ha_discovery_queue_);
+    this->ha_discovery_queue_               = nullptr;
+    this->ha_discovery_publish_in_progress_ = false;
+    return;
+  }
+  this->ha_fetch_task_handle_ = xTaskCreateStatic(
+    ha_fetch_task_fn_, "ha_fetch", HA_FETCH_STACK_SIZE, this, 1,
+    this->ha_fetch_task_stack_, this->ha_fetch_task_tcb_);
+  if (!this->ha_fetch_task_handle_) {
+    ESP_LOGE(TAG, "HA discovery: xTaskCreateStatic failed");
+    free(this->ha_fetch_task_stack_);  this->ha_fetch_task_stack_ = nullptr;
+    free(this->ha_fetch_task_tcb_);    this->ha_fetch_task_tcb_   = nullptr;
     vQueueDelete(this->ha_discovery_queue_);
     this->ha_discovery_queue_               = nullptr;
     this->ha_fetch_task_handle_             = nullptr;
@@ -219,13 +268,21 @@ void GeappliancesBridge::publish_next_ha_discovery_entity_()
   HaDiscoveryItem* item = nullptr;
   if (xQueueReceive(this->ha_discovery_queue_, &item, 0) == pdTRUE) {
     if (item == nullptr) {
-      // nullptr sentinel: fetch task has finished.
+      // nullptr sentinel: fetch task has finished (and already called
+      // vTaskDelete(nullptr)).  Free the statically-allocated stack and
+      // TCB that were passed to xTaskCreateStatic().  Because the task
+      // used static allocation, FreeRTOS did NOT add it to the idle
+      // task's termination-cleanup list, so no free() happens inside
+      // prvCheckTasksWaitingTermination() — this avoids the heap
+      // corruption crash that occurred with xTaskCreate().
       ESP_LOGI(TAG, "HA discovery: complete — all entities published");
       this->ha_discovery_publish_in_progress_ = false;
       this->ha_discovery_published_           = true;
       vQueueDelete(this->ha_discovery_queue_);
       this->ha_discovery_queue_   = nullptr;
       this->ha_fetch_task_handle_ = nullptr;
+      if (this->ha_fetch_task_stack_) { free(this->ha_fetch_task_stack_); this->ha_fetch_task_stack_ = nullptr; }
+      if (this->ha_fetch_task_tcb_)   { free(this->ha_fetch_task_tcb_);   this->ha_fetch_task_tcb_   = nullptr; }
     } else {
       mqtt_client->publish(item->topic, item->payload, 0, true);  // QoS 0, retain
       ESP_LOGD(TAG, "HA discovery: published %s", item->topic.c_str());
