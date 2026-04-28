@@ -401,7 +401,12 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
     }
 
     case signal_mqtt_disconnected:
-      tiny_hsm_transition(&self->hsm, state_identify_appliance);
+      // MQTT broker lost connection; the appliance is still on the GEA bus
+      // and already identified.  Continue polling — ERD values are queued in
+      // pending_updates and flushed to MQTT when the broker reconnects.
+      // Transitioning to state_identify_appliance here would unnecessarily
+      // broadcast to 0xFF and re-register all ERDs, causing multi-second
+      // delays and spurious re-registrations on every MQTT blip.
       break;
 
     case tiny_hsm_signal_exit:
