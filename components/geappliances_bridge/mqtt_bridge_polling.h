@@ -67,6 +67,28 @@ void mqtt_bridge_polling_init(
   bool only_publish_on_change);
 
 /*!
+ * Initialize the MQTT polling bridge with a pre-known host address.
+ *
+ * Unlike mqtt_bridge_polling_init(), this variant skips the broadcast
+ * identification step (reading ERD 0x0008 from 0xFF) because the appliance
+ * address is already known.  If api_list is non-NULL the bridge goes directly
+ * to state_polling; otherwise it runs the full ERD discovery chain starting at
+ * state_add_common_erds.  Use this when starting a secondary (custom-ERD-only)
+ * polling bridge alongside a subscription bridge that has already identified
+ * the appliance.
+ */
+void mqtt_bridge_polling_init_at_address(
+  mqtt_bridge_polling_t* self,
+  tiny_timer_group_t* timer_group,
+  i_tiny_gea3_erd_client_t* erd_client,
+  i_mqtt_client_t* mqtt_client,
+  uint32_t polling_interval_ms,
+  bool only_publish_on_change,
+  uint8_t known_host_address,
+  const tiny_erd_t* api_list,
+  uint16_t api_list_count);
+
+/*!
  * Destroy the MQTT polling bridge.
  */
 void mqtt_bridge_polling_destroy(

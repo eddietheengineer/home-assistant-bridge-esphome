@@ -697,31 +697,25 @@ TEST(mqtt_bridge_polling_custom_erds, should_ignore_spurious_read_completed_duri
 }
 
 // When the polling bridge is used only for custom ERDs alongside a subscription bridge
-// (subscribe/auto mode), it is configured with api_parsed_list = custom ERDs. This
-// means discovery is skipped and only the custom ERDs are polled each cycle.
+// (subscribe/auto mode), it is initialized with a pre-known host address and
+// api_parsed_list = custom ERDs.  The bridge must NOT broadcast to 0xFF; it
+// goes directly to state_polling and begins polling the custom ERDs immediately.
 TEST(mqtt_bridge_polling_custom_erds, should_poll_only_custom_erds_when_used_alongside_subscribe_bridge)
 {
-  // Bridge init: configured with api_parsed_list = custom ERDs only (no separate custom_erd_list).
-  // This mirrors how geappliances_bridge initializes custom_erd_bridge_ in subscribe mode.
-  should_request_read(0xFF, 0x0008);
+  // During init, state_polling entry fires immediately (no 0xFF broadcast).
+  // Custom ERDs are registered synchronously.
+  should_register_erd(custom_erd_1);
+  should_register_erd(custom_erd_2);
 
-  mqtt_bridge_polling_init(
+  mqtt_bridge_polling_init_at_address(
     &self,
     &timer_group.timer_group,
     &erd_client.interface,
     &mqtt_client.interface,
     polling_interval,
-    false);
-  self.api_parsed_list = custom_list;
-  self.api_parsed_list_count = 2;
-
-  // Appliance identified: bridge transitions to state_add_appliance_api_feature_erds.
-  // Skip feature ERD discovery and state_polling entry (registrations under mock disabled).
-  mock().disable();
-  uint8_t appliance_type = 0x03;
-  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
-  after(retry_delay * applianceApiFeatureErdCount);
-  mock().enable();
+    false,
+    0xC0,     // pre-known host address — no 0xFF broadcast
+    custom_list, 2);
 
   // Polling timer fires: start first cycle with custom ERDs
   should_request_read(0xC0, custom_erd_1);

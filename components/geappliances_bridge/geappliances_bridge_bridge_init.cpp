@@ -192,18 +192,20 @@ void GeappliancesBridge::start_custom_erd_polling_()
   if (this->custom_erd_polling_active_ || this->custom_erds_vec_.empty()) {
     return;
   }
-  mqtt_bridge_polling_init(
+  // Use the pre-known host address so the custom ERD bridge goes directly to
+  // state_polling without broadcasting to 0xFF or re-reading feature ERDs.
+  // The subscription bridge has already identified the appliance; there is no
+  // need to re-identify here.
+  mqtt_bridge_polling_init_at_address(
     &this->custom_erd_bridge_,
     &this->timer_group_,
     this->active_erd_client_,
     &this->mqtt_client_adapter_.interface,
     this->polling_interval_ms_,
-    this->polling_only_publish_on_change_);
-  // Reuse the api_parsed_list path so the secondary polling bridge skips the
-  // full discovery ERD list and polls only the configured custom ERDs.
-  this->custom_erd_bridge_.api_parsed_list       = this->custom_erds_vec_.data();
-  this->custom_erd_bridge_.api_parsed_list_count =
-    static_cast<uint16_t>(this->custom_erds_vec_.size());
+    this->polling_only_publish_on_change_,
+    this->host_address_,
+    this->custom_erds_vec_.data(),
+    static_cast<uint16_t>(this->custom_erds_vec_.size()));
   this->custom_erd_polling_active_ = true;
   ESP_LOGI(TAG, "Started custom-only ERD polling (%zu ERD(s)) after subscription settled",
            this->custom_erds_vec_.size());

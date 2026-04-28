@@ -146,6 +146,9 @@ static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
     } break;
 
     case signal_appliance_lost:
+      // Force a broadcast re-identify: clear the address so state_identify_appliance
+      // knows it must broadcast to 0xFF to re-discover the appliance.
+      self->erd_host_address = tiny_gea_broadcast_address;
       tiny_hsm_transition(hsm, state_identify_appliance);
       break;
 
@@ -163,9 +166,21 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
 
   switch (signal) {
     case tiny_hsm_signal_entry:
-      self->erd_host_address = tiny_gea_broadcast_address;
       self->polling_list_complete = false;
       self->current_state_name = "identify_appliance";
+      // If the caller pre-initialized the host address (via
+      // mqtt_bridge_polling_init_at_address), skip the broadcast and transition
+      // directly to the appropriate state.  This is used by the custom ERD bridge
+      // (start_custom_erd_polling_) which already knows the appliance address and
+      // supplies an api_parsed_list (the custom ERDs), so full discovery and
+      // feature-bit reads are unnecessary.
+      if (self->erd_host_address != tiny_gea_broadcast_address) {
+        tiny_hsm_state_t next = (self->api_parsed_list != nullptr)
+          ? state_polling
+          : state_add_common_erds;
+        tiny_hsm_transition(hsm, next);
+        break;
+      }
       __attribute__((fallthrough));
 
     case signal_timer_expired:
@@ -442,24 +457,34 @@ static const tiny_hsm_configuration_t poll_hsm_configuration = {
 // Polling bridge — public API
 // ============================================================================
 
-void mqtt_bridge_polling_init(
+// Shared initialization helper.  Sets self->erd_host_address = initial_host_address
+// and self->api_parsed_list BEFORE calling tiny_hsm_init(), so that
+// state_identify_appliance's entry signal can inspect them and skip the
+// broadcast when the host is already known.
+static void mqtt_bridge_polling_init_impl(
   mqtt_bridge_polling_t*    self,
   tiny_timer_group_t*       timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t*          mqtt_client,
   uint32_t                  polling_interval_ms,
-  bool                      only_publish_on_change)
+  bool                      only_publish_on_change,
+  uint8_t                   initial_host_address,
+  const tiny_erd_t*         api_parsed_list,
+  uint16_t                  api_parsed_list_count)
 {
-  self->timer_group          = timer_group;
-  self->erd_client           = erd_client;
-  self->mqtt_client          = mqtt_client;
-  self->polling_interval_ms  = polling_interval_ms;
+  self->timer_group            = timer_group;
+  self->erd_client             = erd_client;
+  self->mqtt_client            = mqtt_client;
+  self->polling_interval_ms    = polling_interval_ms;
   self->only_publish_on_change = only_publish_on_change;
-  // Optional lists — set by the caller after init when needed.
-  self->api_parsed_list       = nullptr;
-  self->api_parsed_list_count = 0;
-  self->custom_erd_list       = nullptr;
-  self->custom_erd_list_count = 0;
+  // Must be set before tiny_hsm_init() so state_identify_appliance entry
+  // can decide whether to broadcast or skip straight to discovery/polling.
+  self->erd_host_address       = initial_host_address;
+  self->api_parsed_list        = api_parsed_list;
+  self->api_parsed_list_count  = api_parsed_list_count;
+  self->custom_erd_list        = nullptr;
+  self->custom_erd_list_count  = 0;
+  self->polling_list_count     = 0;
   self->erd_set   = reinterpret_cast<void*>(new set<tiny_erd_t>());
   self->erd_cache = reinterpret_cast<void*>(new map<tiny_erd_t, vector<uint8_t>>());
 
@@ -487,6 +512,35 @@ void mqtt_bridge_polling_init(
   setup_disconnect_subscription(self, mqtt_client);
 
   tiny_hsm_init(&self->hsm, &poll_hsm_configuration, state_identify_appliance);
+}
+
+void mqtt_bridge_polling_init(
+  mqtt_bridge_polling_t*    self,
+  tiny_timer_group_t*       timer_group,
+  i_tiny_gea3_erd_client_t* erd_client,
+  i_mqtt_client_t*          mqtt_client,
+  uint32_t                  polling_interval_ms,
+  bool                      only_publish_on_change)
+{
+  mqtt_bridge_polling_init_impl(
+    self, timer_group, erd_client, mqtt_client, polling_interval_ms, only_publish_on_change,
+    tiny_gea_broadcast_address, nullptr, 0);
+}
+
+void mqtt_bridge_polling_init_at_address(
+  mqtt_bridge_polling_t*    self,
+  tiny_timer_group_t*       timer_group,
+  i_tiny_gea3_erd_client_t* erd_client,
+  i_mqtt_client_t*          mqtt_client,
+  uint32_t                  polling_interval_ms,
+  bool                      only_publish_on_change,
+  uint8_t                   known_host_address,
+  const tiny_erd_t*         api_list,
+  uint16_t                  api_list_count)
+{
+  mqtt_bridge_polling_init_impl(
+    self, timer_group, erd_client, mqtt_client, polling_interval_ms, only_publish_on_change,
+    known_host_address, api_list, api_list_count);
 }
 
 void mqtt_bridge_polling_destroy(mqtt_bridge_polling_t* self)
