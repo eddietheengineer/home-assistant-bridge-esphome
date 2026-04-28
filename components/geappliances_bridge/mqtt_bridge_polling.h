@@ -53,6 +53,12 @@ typedef struct {
   // discovery mode and api_parsed_list mode.
   const tiny_erd_t* custom_erd_list;
   uint16_t custom_erd_list_count;
+  // When mqtt_bridge_polling_init_at_address() is used this stores the
+  // pre-known appliance address so that the bridge never broadcasts to 0xFF
+  // on re-identification (e.g. after appliance_lost_timer fires).  Zero means
+  // "no pre-known address — use broadcast discovery" (the default from
+  // mqtt_bridge_polling_init()).
+  uint8_t known_host_address;
 } mqtt_bridge_polling_t;
 
 /*!

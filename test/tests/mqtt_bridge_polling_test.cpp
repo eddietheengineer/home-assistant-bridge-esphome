@@ -734,3 +734,54 @@ TEST(mqtt_bridge_polling_custom_erds, should_poll_only_custom_erds_when_used_alo
   should_request_read(0xC0, custom_erd_1);
   after(polling_interval);
 }
+
+// When the custom ERD bridge (init_at_address) loses contact with the appliance
+// (appliance_lost_timer fires after 60 s of no read completions), it must resume
+// polling at the pre-known address WITHOUT broadcasting to 0xFF.  This regression
+// was triggered by transient GEA3 read failures (e.g. a WiFi/MQTT blip lasting
+// ~1 minute) causing the appliance_lost_timer to expire.
+TEST(mqtt_bridge_polling_custom_erds, should_resume_polling_at_known_address_after_appliance_lost)
+{
+  // Init: go directly to state_polling (no 0xFF broadcast).
+  should_register_erd(custom_erd_1);
+  should_register_erd(custom_erd_2);
+
+  mqtt_bridge_polling_init_at_address(
+    &self,
+    &timer_group.timer_group,
+    &erd_client.interface,
+    &mqtt_client.interface,
+    polling_interval,
+    false,
+    0xC0,
+    custom_list, 2);
+
+  // Normal polling cycle so the appliance_lost_timer is running.
+  should_request_read(0xC0, custom_erd_1);
+  after(polling_interval);
+
+  should_update_erd(custom_erd_1, uint8_t(0xAA));
+  should_request_read(0xC0, custom_erd_2);
+  when_a_poll_read_completes(0xC0, custom_erd_1, uint8_t(0xAA));
+
+  should_update_erd(custom_erd_2, uint8_t(0xBB));
+  when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xBB));
+
+  // Simulate 60 s with no read completions (appliance_lost_timer expires).
+  // The bridge must NOT broadcast to 0xFF — it should re-enter state_polling
+  // at 0xC0 and start a new cycle immediately.
+  mock().disable();
+  after(60000);  // appliance_lost_timeout
+  mock().enable();
+
+  // Polling timer fires: confirm reads target 0xC0 (not 0xFF).
+  should_request_read(0xC0, custom_erd_1);
+  after(polling_interval);
+
+  should_update_erd(custom_erd_1, uint8_t(0xCC));
+  should_request_read(0xC0, custom_erd_2);
+  when_a_poll_read_completes(0xC0, custom_erd_1, uint8_t(0xCC));
+
+  should_update_erd(custom_erd_2, uint8_t(0xDD));
+  when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xDD));
+}

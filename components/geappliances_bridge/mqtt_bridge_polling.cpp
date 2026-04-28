@@ -146,9 +146,14 @@ static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
     } break;
 
     case signal_appliance_lost:
-      // Force a broadcast re-identify: clear the address so state_identify_appliance
-      // knows it must broadcast to 0xFF to re-discover the appliance.
-      self->erd_host_address = tiny_gea_broadcast_address;
+      // When a pre-known host address was supplied at init (custom ERD bridge
+      // alongside a subscription bridge), preserve it on re-identification so
+      // that state_identify_appliance skips the 0xFF broadcast and resumes
+      // polling directly at the correct address.  For a normal polling bridge
+      // (known_host_address == 0) fall back to broadcast discovery as usual.
+      self->erd_host_address = (self->known_host_address != 0)
+        ? self->known_host_address
+        : static_cast<uint8_t>(tiny_gea_broadcast_address);
       tiny_hsm_transition(hsm, state_identify_appliance);
       break;
 
@@ -480,6 +485,11 @@ static void mqtt_bridge_polling_init_impl(
   // Must be set before tiny_hsm_init() so state_identify_appliance entry
   // can decide whether to broadcast or skip straight to discovery/polling.
   self->erd_host_address       = initial_host_address;
+  // Store the pre-known address so that signal_appliance_lost can restore it
+  // after a transient read failure instead of falling back to 0xFF broadcast.
+  // Zero means "unknown — use broadcast" (set by mqtt_bridge_polling_init()).
+  self->known_host_address     = (initial_host_address != tiny_gea_broadcast_address)
+    ? initial_host_address : 0;
   self->api_parsed_list        = api_parsed_list;
   self->api_parsed_list_count  = api_parsed_list_count;
   self->custom_erd_list        = nullptr;
