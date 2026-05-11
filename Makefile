@@ -39,7 +39,16 @@ CPPFLAGS += $(SANITIZE_FLAGS) -fno-omit-frame-pointer
 CPPFLAGS += $(INC_FLAGS) -MMD -MP -g -Wall -Wextra -Wcast-qual -Werror
 CXXFLAGS += -std=c++17
 LDFLAGS := $(SANITIZE_FLAGS)
-LDLIBS := -lstdc++ -lCppUTest -lCppUTestExt -lm
+
+ifeq ($(shell uname -s),Darwin)
+CPPUTEST_PREFIX ?= $(shell brew --prefix cpputest 2>/dev/null)
+ifneq ($(CPPUTEST_PREFIX),)
+CPPFLAGS += -isystem $(CPPUTEST_PREFIX)/include
+LDFLAGS += -L$(CPPUTEST_PREFIX)/lib
+endif
+endif
+
+LDLIBS := -lCppUTest -lCppUTestExt -lm
 
 BUILD_DEPS += $(MAKEFILE_LIST)
 
@@ -68,7 +77,7 @@ test: $(BUILD_DIR)/$(TARGET)
 $(BUILD_DIR)/$(TARGET): $(OBJS)
 	@echo Linking $@...
 	@mkdir -p $(dir $@)
-	@$(CC) $(LDFLAGS) $(OBJS) -o $@ $(LDLIBS)
+	@$(CXX) $(LDFLAGS) $(OBJS) -o $@ $(LDLIBS)
 
 $(BUILD_DIR)/%.s.o: %.s $(BUILD_DEPS)
 	@echo Assembling $<...

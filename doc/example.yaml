@@ -56,8 +56,6 @@ uart:
     tx_pin: GPIO9  # D9 on Xiao ESP32-C3
     rx_pin: GPIO10  # D10 on Xiao ESP32-C3
     baud_rate: 19200
-    rx_full_threshold: 1
-    rx_timeout: 1
 
 # GE Appliances Bridge component
 geappliances_bridge:
