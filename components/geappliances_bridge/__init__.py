@@ -2,7 +2,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins
-from esphome.components import uart, mqtt
+from esphome.components import esp32, uart, mqtt
 from esphome.const import (
     CONF_ID,
 )
@@ -296,25 +296,21 @@ async def to_code(config):
     """Generate C++ code for the component."""
     # Add library dependencies
     cg.add_library("https://github.com/ryanplusplus/tiny", None)
-    local_tiny_gea_api = os.path.normpath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "lib", "tiny-gea-api")
-    )
-    if os.path.isfile(os.path.join(local_tiny_gea_api, "library.json")):
-        cg.add_library(None, None, repository=local_tiny_gea_api)
-    else:
-        cg.add_library("https://github.com/geappliances/tiny-gea-api#develop", None)
+    cg.add_library("https://github.com/geappliances/tiny-gea-api#develop", None)
     # Add public-appliance-api-documentation as a library dependency
     # This allows users to control the version by updating the library reference
     cg.add_library("https://github.com/joshualongenecker/public-appliance-api-documentation", None)
-
-    local_tiny_gea_api_include = os.path.normpath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "lib", "tiny-gea-api", "include")
-    )
-    if os.path.isdir(local_tiny_gea_api_include):
-        cg.add_build_flag(f"-I{local_tiny_gea_api_include}")
     
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
+
+    # The HA-discovery HTTPS fetch uses esp_http_client, which ESPHome excludes
+    # from all builds by default.  Re-enable it here for ESP32 targets so that
+    # esp_http_client.h (and its transitive dependencies like esp_crt_bundle.h)
+    # are on the include path — the same technique used by ESPHome's built-in
+    # http_request component.
+    if CORE.is_esp32:
+        esp32.include_builtin_idf_component("esp_http_client")
 
     # Get optional GEA3 UART component reference
     if CONF_GEA3_UART_ID in config:
