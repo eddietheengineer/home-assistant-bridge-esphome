@@ -149,8 +149,10 @@ void GeappliancesBridge::setup() {
   }
   // device_id_state_ stays IDLE until autodiscovery completes
 
-  // Autodiscovery starts after MQTT connects (handled in on_mqtt_connected_())
-  ESP_LOGI(TAG, "Waiting for MQTT connection before starting autodiscovery...");
+  // Start the boot stabilization delay before autodiscovery traffic.
+  this->autodiscovery_timer_start_ = millis();
+  ESP_LOGI(TAG, "Waiting %u seconds before starting autodiscovery...",
+           STARTUP_DELAY_MS / 1000);
 
   ESP_LOGCONFIG(TAG, "GE Appliances Bridge setup complete");
 }

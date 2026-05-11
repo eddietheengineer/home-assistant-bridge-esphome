@@ -140,8 +140,7 @@ class GeappliancesBridge : public Component {
   };
 
   enum AutodiscoveryState {
-    AUTODISCOVERY_WAITING_FOR_MQTT,          // Waiting for MQTT connection
-    AUTODISCOVERY_WAITING_5S,                // MQTT connected, waiting 5 seconds
+    AUTODISCOVERY_WAITING_5S,                // Waiting 5 seconds after boot
     AUTODISCOVERY_GEA3_BROADCAST_PENDING,    // About to send GEA3 broadcast
     AUTODISCOVERY_GEA3_BROADCAST_WAITING,    // Sent GEA3 broadcast, waiting 5s for responses
     AUTODISCOVERY_GEA2_BROADCAST_PENDING,    // About to send GEA2 broadcast
@@ -297,11 +296,11 @@ class GeappliancesBridge : public Component {
 
 
   // Autodiscovery state machine
-  AutodiscoveryState autodiscovery_state_{AUTODISCOVERY_WAITING_FOR_MQTT};
+  AutodiscoveryState autodiscovery_state_{AUTODISCOVERY_WAITING_5S};
   uint32_t autodiscovery_timer_start_{0};
   bool gea3_board_discovered_{false};
   bool gea2_board_discovered_{false};
-  static constexpr uint32_t STARTUP_DELAY_MS = 5000;               // 5s after MQTT connects
+  static constexpr uint32_t STARTUP_DELAY_MS = 5000;               // 5s after boot
   static constexpr uint32_t AUTODISCOVERY_BROADCAST_WINDOW_MS = 5000;  // 5s window per broadcast
 
   tiny_gea3_erd_client_request_id_t pending_request_id_;

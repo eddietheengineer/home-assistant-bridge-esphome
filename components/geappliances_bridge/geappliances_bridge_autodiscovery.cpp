@@ -47,13 +47,6 @@ void GeappliancesBridge::on_mqtt_connected_()
   // fires after 60 s (polling) or signal_subscription_host_came_online handles
   // it (subscription bridge).
 
-  // Kick off the 5-second pre-autodiscovery delay (only on first connection).
-  if (this->autodiscovery_state_ == AUTODISCOVERY_WAITING_FOR_MQTT) {
-    ESP_LOGI(TAG, "MQTT connected, waiting %u seconds before autodiscovery",
-             STARTUP_DELAY_MS / 1000);
-    this->autodiscovery_timer_start_ = millis();
-    this->autodiscovery_state_ = AUTODISCOVERY_WAITING_5S;
-  }
 }
 
 void GeappliancesBridge::notify_mqtt_disconnected_()
@@ -66,10 +59,6 @@ void GeappliancesBridge::notify_mqtt_disconnected_()
 void GeappliancesBridge::run_autodiscovery_()
 {
   switch (this->autodiscovery_state_) {
-    case AUTODISCOVERY_WAITING_FOR_MQTT:
-      // Transition triggered by on_mqtt_connected_(); nothing to do here.
-      break;
-
     case AUTODISCOVERY_WAITING_5S:
       // Unsigned subtraction wraps correctly after the ~49-day millis() rollover.
       if (millis() - this->autodiscovery_timer_start_ >= STARTUP_DELAY_MS) {

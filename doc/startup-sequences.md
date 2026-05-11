@@ -8,7 +8,7 @@ The bridge follows a unified startup sequence regardless of configuration. All c
 
 ## Timing Constants
 
-- **STARTUP_DELAY_MS**: 5 seconds - Wait time after MQTT connects before starting autodiscovery
+- **STARTUP_DELAY_MS**: 5 seconds - Wait time after boot before starting autodiscovery
 - **AUTODISCOVERY_BROADCAST_WINDOW_MS**: 5 seconds - Time window to collect responses from broadcast
 - **GEA2_LOOP_DURATION_MS**: 200 milliseconds - Tight loop duration for GEA2 operations
 - **SUBSCRIPTION_TIMEOUT_MS**: 30 seconds - Fallback timeout for AUTO mode
@@ -28,15 +28,12 @@ The bridge follows a unified startup sequence regardless of configuration. All c
 │ • Subscribe to activity events                                      │
 │ • Log device ID (if configured) - will apply after autodiscovery    │
 │ • Set device_id_state = IDLE                                        │
-│ • Set autodiscovery_state = WAITING_FOR_MQTT                        │
+│ • Set autodiscovery_state = WAITING_5S                              │
 └─────────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────────┐
-│ Phase 2: MQTT Connection Wait                                       │
+│ Phase 2: Boot Stabilization Delay                                   │
 │                                                                      │
-│ • loop() polls for MQTT broker connection                           │
-│ • When connected: on_mqtt_connected_() triggered                    │
-│ • Set autodiscovery_state = WAITING_5S                              │
 │ • Start 5-second timer                                              │
 └─────────────────────────────────────────────────────────────────────┘
                               ↓

@@ -129,10 +129,7 @@ loop() begins — Phase 1: run_protocol_stack_() always active
        ▼
 Phase 2: run_autodiscovery_()
        │
-       ├── AUTODISCOVERY_WAITING_FOR_MQTT
-       │          │  (MQTT connects → on_mqtt_connected_())
-       │          ▼
-       │   AUTODISCOVERY_WAITING_5S  ← 5-second stabilization delay
+       ├── AUTODISCOVERY_WAITING_5S  ← 5-second stabilization delay
        │          │  (5 s elapsed)
        │          ▼
        │   GEA3_BROADCAST_PENDING/WAITING (then GEA2 if GEA3 fails)
@@ -179,7 +176,7 @@ Phase 7: check_subscription_activity_()  (AUTO mode watchdog)
 Phase 8: run_ha_discovery_()             (deferred, when generate_device_config: true)
 ```
 
-The 5-second delay (`STARTUP_DELAY_MS = 5000`) allows the appliance buses to fully initialize and the MQTT broker to stabilize before sending any bus traffic.
+The 5-second delay (`STARTUP_DELAY_MS = 5000`) allows the appliance buses to fully initialize before sending any bus traffic.
 
 ---
 
@@ -188,9 +185,6 @@ The 5-second delay (`STARTUP_DELAY_MS = 5000`) allows the appliance buses to ful
 The full state machine is:
 
 ```
-AUTODISCOVERY_WAITING_FOR_MQTT
-        │  (MQTT connect event → on_mqtt_connected_())
-        ▼
 AUTODISCOVERY_WAITING_5S
         │  (5 s elapsed)
         ▼
@@ -418,7 +412,7 @@ esphome_uart_adapter  ◄──────────────────�
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `STARTUP_DELAY_MS` | `5,000 ms` | Delay after MQTT connect before discovery starts |
+| `STARTUP_DELAY_MS` | `5,000 ms` | Delay after boot before discovery starts |
 | `AUTODISCOVERY_BROADCAST_WINDOW_MS` | `5,000 ms` | Duration of each broadcast listen window |
 | `SUBSCRIPTION_TIMEOUT_MS` | `30,000 ms` | Auto-mode: time before falling back to polling |
 | `MAX_READ_RETRIES` | `1,000` | ERD queue-full retries before giving up |
