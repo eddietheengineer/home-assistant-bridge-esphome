@@ -2,7 +2,10 @@
 #include "geappliances_bridge_constants.h"
 #include "esphome/core/log.h"
 #include "esphome_time_source.h"
+
+#ifdef USE_ESP_IDF
 #include "esp_heap_utils.h"
+#endif
 
 namespace esphome {
 namespace geappliances_bridge {
