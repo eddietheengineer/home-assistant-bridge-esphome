@@ -4,6 +4,10 @@
 #include "esphome/core/hal.h"
 #include "esphome_time_source.h"
 
+#ifdef USE_ESP32
+#include "esp_heap_utils.h"
+#endif
+
 namespace esphome {
 namespace geappliances_bridge {
 
@@ -224,27 +228,22 @@ void GeappliancesBridge::loop() {
   if (now - this->last_heap_sensor_update_ >= HEAP_SENSOR_UPDATE_INTERVAL_MS) {
     this->last_heap_sensor_update_ = now;
     
+#ifdef USE_ESP32
     if (this->free_heap_sensor_ != nullptr) {
-      this->free_heap_sensor_->publish_state(static_cast<float>(esphome::getFreeHeap()));
+      this->free_heap_sensor_->publish_state(static_cast<float>(esp_get_free_heap_size()));
     }
     if (this->min_free_heap_sensor_ != nullptr) {
-      // ESPHome doesn't have a direct API for minimum free heap, 
-      // so we'll track it ourselves
-      static uint32_t min_free = UINT32_MAX;
-      uint32_t current_free = esphome::getFreeHeap();
-      if (current_free < min_free) {
-        min_free = current_free;
-      }
-      this->min_free_heap_sensor_->publish_state(static_cast<float>(min_free));
+      this->min_free_heap_sensor_->publish_state(static_cast<float>(esp_get_minimum_free_heap_size()));
     }
     if (this->heap_fragmentation_sensor_ != nullptr) {
-      // ESPHome doesn't expose total heap directly, so we'll skip this for now
-      // or use a simple approximation
-      // For now, just publish free heap as a percentage of a typical ESP32-C6 total (~320KB)
-      uint32_t current_free = esphome::getFreeHeap();
-      float usage_percent = 100.0f - (100.0f * current_free / 327680.0f);  // 320KB typical
+      // Calculate fragmentation as percentage of total internal heap that is used
+      size_t total_heap = esp_get_heap_size(MALLOC_CAP_INTERNAL);
+      size_t free_heap = esp_get_free_heap_size();
+      float usage_percent = (total_heap > 0) ? 
+        (100.0f - (100.0f * free_heap / total_heap)) : 0.0f;
       this->heap_fragmentation_sensor_->publish_state(usage_percent);
     }
+#endif
   }
 }
 
