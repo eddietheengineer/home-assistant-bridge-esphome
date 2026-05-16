@@ -1,6 +1,7 @@
 #pragma once
 
 #include "esphome/core/component.h"
+#include "esphome/components/sensor/sensor.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/mqtt/mqtt_client.h"
 #include <string>
@@ -56,6 +57,9 @@ class GeappliancesBridge : public Component {
   void set_generate_device_config(bool generate_device_config) { this->generate_device_config_ = generate_device_config; }
   void add_custom_erd(uint16_t erd) { this->custom_erds_vec_.push_back(static_cast<tiny_erd_t>(erd)); }
   void set_ha_discovery_base_url(const std::string& url) { this->ha_discovery_base_url_ = url; }
+  void set_free_heap_sensor(sensor::Sensor* s) { this->free_heap_sensor_ = s; }
+  void set_min_free_heap_sensor(sensor::Sensor* s) { this->min_free_heap_sensor_ = s; }
+  void set_heap_fragmentation_sensor(sensor::Sensor* s) { this->heap_fragmentation_sensor_ = s; }
 
  protected:
   void on_mqtt_connected_();
@@ -273,6 +277,13 @@ class GeappliancesBridge : public Component {
     "https://raw.githubusercontent.com/joshualongenecker/"
     "home-assistant-bridge-esphome/main/ha_discovery"
   };
+
+  // Heap monitoring sensors - update every 60 seconds
+  sensor::Sensor* free_heap_sensor_{nullptr};
+  sensor::Sensor* min_free_heap_sensor_{nullptr};
+  sensor::Sensor* heap_fragmentation_sensor_{nullptr};
+  uint32_t last_heap_sensor_update_{0};
+  static constexpr uint32_t HEAP_SENSOR_UPDATE_INTERVAL_MS = 60000;  // 60 seconds
 
   QueueHandle_t ha_discovery_queue_{nullptr};   // carries HaDiscoveryItem* (nullptr = sentinel)
   TaskHandle_t  ha_fetch_task_handle_{nullptr};

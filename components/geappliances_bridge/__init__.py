@@ -2,7 +2,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins
-from esphome.components import esp32, uart, mqtt
+from esphome.components import esp32, uart, mqtt, sensor
 from esphome.const import (
     CONF_ID,
 )
@@ -34,6 +34,11 @@ CONF_APPLIANCE_API_PARSING = "appliance_api_parsing"
 CONF_CUSTOM_ERDS = "custom_erds"
 CONF_GENERATE_DEVICE_CONFIG = "generate_device_config"
 CONF_HA_DISCOVERY_BASE_URL = "ha_discovery_base_url"
+
+# Heap monitoring sensor configuration keys
+CONF_FREE_HEAP_SENSOR = "free_heap_sensor"
+CONF_MIN_FREE_HEAP_SENSOR = "min_free_heap_sensor"
+CONF_HEAP_FRAGMENTATION_SENSOR = "heap_fragmentation_sensor"
 
 # Default base URL for the per-category JSONL files used by runtime HA discovery.
 HA_DISCOVERY_DEFAULT_BASE_URL = (
@@ -287,6 +292,10 @@ CONFIG_SCHEMA = cv.Schema(
         ),
         cv.Optional(CONF_HA_DISCOVERY_BASE_URL,
                     default=HA_DISCOVERY_DEFAULT_BASE_URL): cv.string,
+        # Optional heap monitoring sensors
+        cv.Optional(CONF_FREE_HEAP_SENSOR): cv.use_id(sensor.Sensor),
+        cv.Optional(CONF_MIN_FREE_HEAP_SENSOR): cv.use_id(sensor.Sensor),
+        cv.Optional(CONF_HEAP_FRAGMENTATION_SENSOR): cv.use_id(sensor.Sensor),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
@@ -342,6 +351,19 @@ async def to_code(config):
     # Register any user-configured custom ERDs
     for erd in config[CONF_CUSTOM_ERDS]:
         cg.add(var.add_custom_erd(erd))
+    
+    # Register heap monitoring sensors if configured
+    if CONF_FREE_HEAP_SENSOR in config:
+        sens = await cg.get_variable(config[CONF_FREE_HEAP_SENSOR])
+        cg.add(var.set_free_heap_sensor(sens))
+    
+    if CONF_MIN_FREE_HEAP_SENSOR in config:
+        sens = await cg.get_variable(config[CONF_MIN_FREE_HEAP_SENSOR])
+        cg.add(var.set_min_free_heap_sensor(sens))
+    
+    if CONF_HEAP_FRAGMENTATION_SENSOR in config:
+        sens = await cg.get_variable(config[CONF_HEAP_FRAGMENTATION_SENSOR])
+        cg.add(var.set_heap_fragmentation_sensor(sens))
     
     # Load appliance types from JSON and generate C++ mapping function
     appliance_types = load_appliance_types()
