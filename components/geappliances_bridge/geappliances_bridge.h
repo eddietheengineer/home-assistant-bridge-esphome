@@ -364,11 +364,6 @@ class GeappliancesBridge : public Component {
 
   mqtt_bridge_t mqtt_bridge_;
   mqtt_bridge_polling_t mqtt_bridge_polling_;
-  // Polling bridge used exclusively for custom ERDs when the primary bridge is
-  // in subscribe (or auto-subscribe) mode. Initialized alongside mqtt_bridge_
-  // when custom_erds_vec_ is non-empty and use_polling is false.
-  mqtt_bridge_polling_t custom_erd_bridge_;
-  bool custom_erd_polling_active_{false};
 
   tiny_event_subscription_t erd_client_activity_subscription_;
   tiny_event_subscription_t gea2_activity_subscription_;

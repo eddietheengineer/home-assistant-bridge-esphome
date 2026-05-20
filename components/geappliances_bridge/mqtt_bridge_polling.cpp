@@ -63,15 +63,44 @@ static void reset_lost_appliance_timer(mqtt_bridge_polling_t* self)
     });
 }
 
+// Growth increment for dynamic polling list reallocation.
+// Large enough to amortize allocation cost, small enough to avoid wasting heap.
+static const uint16_t POLLING_LIST_GROWTH_INCREMENT = 32;
+
+// Allocate or grow the polling list to at least the requested capacity.
+// If the list is already large enough, this is a no-op.
+static void ensure_polling_list_capacity(mqtt_bridge_polling_t* self, uint16_t needed)
+{
+  if (needed <= self->polling_list_capacity) {
+    return;
+  }
+  // Grow to the needed size, rounded up to the next growth increment.
+  uint16_t new_capacity = needed + (POLLING_LIST_GROWTH_INCREMENT - 1);
+  // Enforce a hard safety cap to prevent runaway allocations.
+  if (new_capacity > POLLING_LIST_MAX_SIZE) {
+    new_capacity = POLLING_LIST_MAX_SIZE;
+  }
+  tiny_erd_t* new_list = new tiny_erd_t[new_capacity];
+  if (self->erd_polling_list) {
+    // Copy existing entries.
+    for (uint16_t i = 0; i < self->polling_list_count; i++) {
+      new_list[i] = self->erd_polling_list[i];
+    }
+    delete[] self->erd_polling_list;
+  }
+  self->erd_polling_list = new_list;
+  self->polling_list_capacity = new_capacity;
+}
+
 static void add_erd_to_polling_list(mqtt_bridge_polling_t* self, tiny_erd_t erd)
 {
   if (erd_set(self).find(erd) == erd_set(self).end()) {
     mqtt_client_register_erd(self->mqtt_client, erd);
     erd_set(self).insert(erd);
-    if (self->polling_list_count < POLLING_LIST_MAX_SIZE) {
-      self->erd_polling_list[self->polling_list_count] = erd;
-      self->polling_list_count++;
-    }
+    // Ensure there's room in the dynamic array.
+    ensure_polling_list_capacity(self, self->polling_list_count + 1);
+    self->erd_polling_list[self->polling_list_count] = erd;
+    self->polling_list_count++;
   }
 }
 
@@ -494,7 +523,9 @@ static void mqtt_bridge_polling_init_impl(
   self->api_parsed_list_count  = api_parsed_list_count;
   self->custom_erd_list        = nullptr;
   self->custom_erd_list_count  = 0;
+  self->erd_polling_list       = nullptr;
   self->polling_list_count     = 0;
+  self->polling_list_capacity  = 0;
   self->erd_set   = reinterpret_cast<void*>(new set<tiny_erd_t>());
   self->erd_cache = reinterpret_cast<void*>(new map<tiny_erd_t, vector<uint8_t>>());
 
@@ -589,4 +620,10 @@ void mqtt_bridge_polling_destroy(mqtt_bridge_polling_t* self)
   delete reinterpret_cast<map<tiny_erd_t, vector<uint8_t>>*>(self->erd_cache);
   self->erd_set = nullptr;
   self->erd_cache = nullptr;
+
+  // Free the dynamically allocated polling list.
+  delete[] self->erd_polling_list;
+  self->erd_polling_list = nullptr;
+  self->polling_list_count = 0;
+  self->polling_list_capacity = 0;
 }

@@ -81,10 +81,10 @@ void GeappliancesBridge::run_ha_discovery_()
         bool subscription_quiet =
           (millis() - this->ha_discovery_last_activity_ >= HA_DISCOVERY_QUIET_MS);
         if (subscription_quiet) {
-          // Wait for the custom ERD bridge's first poll cycle to complete
+          // Wait for the polling bridge's first poll cycle to complete
           // before generating HA discovery payloads.
           bool custom_erds_ready = this->custom_erds_vec_.empty() ||
-                                   this->custom_erd_bridge_.polling_list_complete;
+                                   this->mqtt_bridge_polling_.polling_list_complete;
           ready = custom_erds_ready;
         }
       }

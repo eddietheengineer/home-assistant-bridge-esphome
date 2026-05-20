@@ -13,8 +13,9 @@
 #include "erd_lists.h"
 
 typedef struct {
-  tiny_erd_t erd_polling_list[POLLING_LIST_MAX_SIZE];
+  tiny_erd_t* erd_polling_list;       // Heap-allocated, dynamically sized
   uint16_t polling_list_count;
+  uint16_t polling_list_capacity;      // Allocated capacity of erd_polling_list
   uint32_t polling_interval_ms;
   tiny_timer_group_t* timer_group;
   i_tiny_gea3_erd_client_t* erd_client;
