@@ -396,8 +396,6 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
         (is_feature_bit_erd(erd) ||
          (is_device_info_erd(erd) && this->device_id_state_ == DEVICE_ID_STATE_COMPLETE));
       if (route_to_feature_bits) {
-        ESP_LOGW(TAG, "Failed to read ERD 0x%04X during feature bit phase (reason: %u), advancing",
-                 erd, args->read_failed.reason);
         this->handle_feature_bit_read_failure_(erd);
       } else {
         ESP_LOGW(TAG, "Failed to read ERD 0x%04X for device ID generation (reason: %u), will retry",
