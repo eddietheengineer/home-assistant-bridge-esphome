@@ -34,11 +34,16 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 SANITIZE_FLAGS := -fsanitize=address -fsanitize=undefined
 
+# CppUTest installation paths (homebrew on macOS)
+CPPUTEST_PREFIX ?= /opt/homebrew
+CPPUTEST_INC := -I$(CPPUTEST_PREFIX)/include
+CPPUTEST_LIB := -L$(CPPUTEST_PREFIX)/lib
+
 CFLAGS += -std=c11 -pedantic
 CPPFLAGS += $(SANITIZE_FLAGS) -fno-omit-frame-pointer
-CPPFLAGS += $(INC_FLAGS) -MMD -MP -g -Wall -Wextra -Wcast-qual -Werror
+CPPFLAGS += $(INC_FLAGS) $(CPPUTEST_INC) -MMD -MP -g -Wall -Wextra -Wcast-qual -Werror
 CXXFLAGS += -std=c++17
-LDFLAGS := $(SANITIZE_FLAGS)
+LDFLAGS := $(SANITIZE_FLAGS) $(CPPUTEST_LIB)
 LDLIBS := -lstdc++ -lCppUTest -lCppUTestExt -lm
 
 BUILD_DEPS += $(MAKEFILE_LIST)
