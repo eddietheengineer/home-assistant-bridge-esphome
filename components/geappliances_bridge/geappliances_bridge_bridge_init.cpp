@@ -186,8 +186,10 @@ void GeappliancesBridge::configure_polling_optional_lists_()
 // ---------------------------------------------------------------------------
 // Start custom ERD polling bridge (deferred: called after subscription settles)
 // ---------------------------------------------------------------------------
-// When in subscription mode with custom ERDs, this replaces the subscription
-// bridge with a single polling bridge that polls only the custom ERDs.
+// When in subscription mode with custom ERDs, this starts a polling bridge
+// that polls only the custom ERDs alongside the subscription bridge.
+// The subscription bridge continues to handle all standard ERDs, while the
+// polling bridge handles custom ERDs that may not be covered by subscription.
 // The polling list is allocated to the exact size needed.
 // ---------------------------------------------------------------------------
 
@@ -196,10 +198,13 @@ void GeappliancesBridge::start_custom_erd_polling_()
   if (this->custom_erds_vec_.empty()) {
     return;
   }
-  // Tear down the subscription bridge - we're switching to polling for custom ERDs.
-  mqtt_bridge_destroy(&this->mqtt_bridge_);
+  // Do NOT destroy the subscription bridge - it continues to handle all
+  // standard ERD publications. The polling bridge runs alongside it, only
+  // polling the custom ERDs that may not be covered by subscription.
+  // Both bridges subscribe to the same ERD client activity event, but they
+  // handle different event types (subscription vs read_completed).
 
-  // Initialize a single polling bridge with the custom ERDs as the api_parsed_list.
+  // Initialize a polling bridge with the custom ERDs as the api_parsed_list.
   // This skips discovery states and goes straight to polling with an exact-size list.
   mqtt_bridge_polling_init_at_address(
     &this->mqtt_bridge_polling_,
@@ -212,7 +217,7 @@ void GeappliancesBridge::start_custom_erd_polling_()
     this->custom_erds_vec_.data(),
     static_cast<uint16_t>(this->custom_erds_vec_.size()));
   this->custom_erd_polling_started_ = true;
-  ESP_LOGI(TAG, "Started custom-only ERD polling (%zu ERD(s)) after subscription settled",
+  ESP_LOGI(TAG, "Started custom ERD polling (%zu ERD(s)) alongside subscription bridge",
            this->custom_erds_vec_.size());
 }
 
