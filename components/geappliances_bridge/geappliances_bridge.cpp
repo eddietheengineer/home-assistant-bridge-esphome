@@ -5,7 +5,8 @@
 #include "esphome_time_source.h"
 
 #ifdef USE_ESP32
-#include "esp_heap_utils.h"
+#include "esp_system.h"
+#include "esp_heap_caps.h"
 #endif
 
 namespace esphome {
@@ -237,8 +238,8 @@ void GeappliancesBridge::loop() {
     }
     if (this->heap_fragmentation_sensor_ != nullptr) {
       // Calculate fragmentation as percentage of total internal heap that is used
-      size_t total_heap = esp_get_heap_size(MALLOC_CAP_INTERNAL);
-      size_t free_heap = esp_get_free_heap_size();
+      size_t total_heap = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+      size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
       float usage_percent = (total_heap > 0) ? 
         (100.0f - (100.0f * free_heap / total_heap)) : 0.0f;
       this->heap_fragmentation_sensor_->publish_state(usage_percent);

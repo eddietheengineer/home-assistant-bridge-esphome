@@ -211,6 +211,7 @@ void GeappliancesBridge::start_custom_erd_polling_()
     this->host_address_,
     this->custom_erds_vec_.data(),
     static_cast<uint16_t>(this->custom_erds_vec_.size()));
+  this->custom_erd_polling_started_ = true;
   ESP_LOGI(TAG, "Started custom-only ERD polling (%zu ERD(s)) after subscription settled",
            this->custom_erds_vec_.size());
 }
@@ -218,7 +219,8 @@ void GeappliancesBridge::start_custom_erd_polling_()
 void GeappliancesBridge::maybe_start_custom_erd_polling_()
 {
   if (this->custom_erds_vec_.empty() ||
-      !this->mqtt_bridge_initialized_) {
+      !this->mqtt_bridge_initialized_ ||
+      this->custom_erd_polling_started_) {
     return;
   }
 

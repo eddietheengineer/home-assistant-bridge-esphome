@@ -177,6 +177,7 @@ class GeappliancesBridge : public Component {
   uint32_t subscription_start_time_{0};
   uint32_t custom_erd_subscription_last_activity_{0};
   std::set<tiny_erd_t> custom_erd_subscription_seen_erds_;
+  bool custom_erd_polling_started_{false};  // Guard to prevent re-initialization
   static constexpr uint32_t SUBSCRIPTION_TIMEOUT_MS = 30000; // 30 seconds
 
   // GEA2 tight-loop duration: covers the full TX→RX cycle at 19200 baud
