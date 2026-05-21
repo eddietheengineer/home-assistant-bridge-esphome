@@ -16,12 +16,19 @@ extern "C" {
 #include "tiny_gea2_erd_client.h"
 #include "tiny_gea2_interface.h"
 #include "tiny_timer.h"
+#include "tiny_hsm.h"
 }
 
 #include "gea2_erd_client_adapter.h"
 
 #include "esphome_uart_adapter.h"
 #include "esphome_mqtt_client_adapter.h"
+#include "heap_monitor.h"
+#include "device_identity_manager.h"
+#include "feature_bit_manager.h"
+#include "autodiscovery_manager.h"
+#include "ha_discovery_manager.h"
+#include "geappliances_bridge_startup_hsm.h"
 
 // Forward declaration of the generated function
 std::string appliance_type_to_string(uint8_t appliance_type);
@@ -38,6 +45,31 @@ enum BridgeMode {
 };
 
 class GeappliancesBridge : public Component {
+  // Allow the startup HSM state functions to access protected members
+  friend GeappliancesBridge* bridge_from_hsm(tiny_hsm_t* hsm);
+  friend tiny_hsm_result_t startup_state_top(
+    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+  friend tiny_hsm_result_t startup_state_protocol_stack(
+    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+  friend tiny_hsm_result_t startup_state_autodiscovery(
+    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+  friend tiny_hsm_result_t startup_state_device_id(
+    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+  friend tiny_hsm_result_t startup_state_mqtt_client_init(
+    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+  friend tiny_hsm_result_t startup_state_feature_bits(
+    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+  friend tiny_hsm_result_t startup_state_bridge_init(
+    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+  friend tiny_hsm_result_t startup_state_subscription_watch(
+    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+  friend tiny_hsm_result_t startup_state_ha_discovery(
+    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+  friend tiny_hsm_result_t startup_state_heap_monitor(
+    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+  friend tiny_hsm_result_t startup_state_running(
+    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+
  public:
   static constexpr unsigned long baud = 230400;
 
@@ -45,6 +77,7 @@ class GeappliancesBridge : public Component {
   void loop() override;
   void dump_config() override;
   float get_setup_priority() const override;
+  bool teardown() override;
 
   void set_gea3_uart(uart::UARTComponent *uart) { this->uart_ = uart; }
   void set_gea2_uart(uart::UARTComponent *uart) { this->gea2_uart_ = uart; }
@@ -69,73 +102,24 @@ class GeappliancesBridge : public Component {
   void initialize_mqtt_bridge_();
   void start_custom_erd_polling_();
   void maybe_start_custom_erd_polling_();
-  void publish_ha_discovery_();
-  void publish_next_ha_discovery_entity_();
   void configure_polling_optional_lists_();
   void check_subscription_activity_();
   // ── Per-phase run_*() methods called from loop() ─────────────────────────
   void run_protocol_stack_();       // Phase 0: drive GEA2/GEA3 hardware
-  void run_autodiscovery_();        // Phase 1: find appliance on bus
-  void run_feature_bit_reading_();  // Phase 2: read appliance API feature bits
-  void run_device_id_generation_(); // Phase 3: assemble device ID from ERDs
-  void run_ha_discovery_();         // Phase 6: publish HA entity configs
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
 
   void start_feature_bit_reading_();
+  // Device ID generation is now handled by DeviceIdentityManager -
+  // the following are retained for backward compatibility during migration
   void start_device_id_generation_();
-  void process_device_id_erd_response_(tiny_erd_t erd, const uint8_t* data, uint8_t size);
-  void handle_device_id_read_failure_(tiny_erd_t erd);
-  void process_feature_bit_erd_response_(tiny_erd_t erd, const uint8_t* data, uint8_t size);
-  void handle_feature_bit_read_failure_(tiny_erd_t erd);
-  void skip_to_next_feature_erd_(tiny_erd_t failed_erd);
-  void parse_and_log_feature_bits_();
+  void sync_feature_bit_legacy_members_();
+  void sync_autodiscovery_legacy_members_();
+  void sync_ha_discovery_legacy_members_();
+  void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   std::string bytes_to_string_(const uint8_t* data, size_t size);
   std::string sanitize_for_mqtt_topic_(const std::string& input);
-  void on_ha_discovery_erd_seen_(tiny_erd_t erd);
+  bool should_route_to_feature_bits_(tiny_erd_t erd);
   bool try_read_erd_with_retry_(tiny_erd_t erd, const char* erd_name);
-
-  enum DeviceIdState {
-    DEVICE_ID_STATE_IDLE,
-    DEVICE_ID_STATE_READING_APPLIANCE_TYPE,
-    DEVICE_ID_STATE_READING_MODEL_NUMBER,
-    DEVICE_ID_STATE_READING_SERIAL_NUMBER,
-    DEVICE_ID_STATE_COMPLETE,
-    DEVICE_ID_STATE_FAILED
-  };
-
-  // States for reading the appliance API feature bit ERDs:
-  //   0x0092 (common), 0x0093-0x0097 (appliance groups 0-4),
-  //   0x0109-0x010D (appliance groups 5-9).
-  // This step runs after autodiscovery and before device ID generation.
-  //
-  // READING_XXXX: loop() needs to queue a read for that ERD.
-  // IN_FLIGHT:    a read has been queued and is waiting for a response; loop()
-  //               skips this state so it does not issue a duplicate request.
-  //               On response (or failure), the handler transitions back to
-  //               the next READING state or to COMPLETE/FAILED.
-  enum FeatureBitState {
-    FEATURE_BIT_STATE_IDLE,          // Not started yet
-    // Re-read device-info ERDs for MQTT publish (values were already parsed
-    // during Phase 2; re-reading avoids storing raw bytes a second time).
-    FEATURE_BIT_STATE_READING_0008,  // Need to queue read for ERD 0x0008 (appliance type)
-    FEATURE_BIT_STATE_READING_0001,  // Need to queue read for ERD 0x0001 (model number)
-    FEATURE_BIT_STATE_READING_0002,  // Need to queue read for ERD 0x0002 (serial number)
-    // Appliance API feature bit ERDs
-    FEATURE_BIT_STATE_READING_0092,  // Need to queue read for ERD 0x0092
-    FEATURE_BIT_STATE_READING_0093,  // Need to queue read for ERD 0x0093
-    FEATURE_BIT_STATE_READING_0094,  // Need to queue read for ERD 0x0094
-    FEATURE_BIT_STATE_READING_0095,  // Need to queue read for ERD 0x0095
-    FEATURE_BIT_STATE_READING_0096,  // Need to queue read for ERD 0x0096
-    FEATURE_BIT_STATE_READING_0097,  // Need to queue read for ERD 0x0097
-    FEATURE_BIT_STATE_READING_0109,  // Need to queue read for ERD 0x0109
-    FEATURE_BIT_STATE_READING_010A,  // Need to queue read for ERD 0x010A
-    FEATURE_BIT_STATE_READING_010B,  // Need to queue read for ERD 0x010B
-    FEATURE_BIT_STATE_READING_010C,  // Need to queue read for ERD 0x010C
-    FEATURE_BIT_STATE_READING_010D,  // Need to queue read for ERD 0x010D
-    FEATURE_BIT_STATE_IN_FLIGHT,     // Read queued, waiting for response
-    FEATURE_BIT_STATE_COMPLETE,
-    FEATURE_BIT_STATE_FAILED
-  };
 
   enum BridgeInitState {
     BRIDGE_INIT_STATE_WAITING_FOR_DEVICE_ID,
@@ -143,14 +127,12 @@ class GeappliancesBridge : public Component {
     BRIDGE_INIT_STATE_COMPLETE
   };
 
-  enum AutodiscoveryState {
-    AUTODISCOVERY_WAITING_5S,                // Waiting 5 seconds after boot
-    AUTODISCOVERY_GEA3_BROADCAST_PENDING,    // About to send GEA3 broadcast
-    AUTODISCOVERY_GEA3_BROADCAST_WAITING,    // Sent GEA3 broadcast, waiting 5s for responses
-    AUTODISCOVERY_GEA2_BROADCAST_PENDING,    // About to send GEA2 broadcast
-    AUTODISCOVERY_GEA2_BROADCAST_WAITING,    // Sent GEA2 broadcast, waiting 5s for responses
-    AUTODISCOVERY_COMPLETE                   // At least one board discovered
-  };
+  // Startup HSM — replaces the manual switch-based phase progression.
+  // The HSM drives the linear startup sequence:
+  //   protocol_stack → autodiscovery → device_id → mqtt_client_init
+  //                 → feature_bits → bridge_init → subscription_watch
+  //                 → ha_discovery → heap_monitor → running
+  tiny_hsm_t startup_hsm_;
 
   uart::UARTComponent *uart_{nullptr};
   uart::UARTComponent *gea2_uart_{nullptr};
@@ -185,6 +167,14 @@ class GeappliancesBridge : public Component {
   static constexpr uint32_t GEA2_LOOP_DURATION_MS = 200;
   bool gea2_protocol_active_{false}; // true once a GEA2 appliance is discovered
 
+  // Device identity manager (extracted from god class)
+  DeviceIdentityManager device_identity_manager_;
+
+  // Feature bit manager (extracted from god class)
+  FeatureBitManager feature_bit_manager_;
+
+  // Legacy members retained for backward compatibility during migration -
+  // these will be removed once all code paths use device_identity_manager_
   DeviceIdState device_id_state_{DEVICE_ID_STATE_IDLE};
   BridgeInitState bridge_init_state_{BRIDGE_INIT_STATE_WAITING_FOR_DEVICE_ID};
 
@@ -217,11 +207,6 @@ class GeappliancesBridge : public Component {
   // Sorted vector of the same set, for passing to the polling bridge as a C array
   std::vector<tiny_erd_t> appliance_api_valid_erds_vec_;
   bool appliance_api_valid_list_ready_{false};
-  // Flag set by the GEA callback (process_feature_bit_erd_response_ / skip_to_next_feature_erd_)
-  // when the last feature-bit ERD has been processed. The actual parsing and transition to
-  // device-ID generation are deferred to loop() so the callback returns quickly and the GEA2
-  // tight-loop continues processing UART bytes without being stalled by parse_and_log_feature_bits_().
-  bool feature_bit_parse_pending_{false};
 
   // HA device discovery publish: deferred until ERD registration has settled.
   // In subscription mode: publish 10 s after the last NEW ERD subscription
@@ -232,45 +217,10 @@ class GeappliancesBridge : public Component {
   bool ha_discovery_pending_{false};
   bool ha_discovery_published_{false};
   bool ha_discovery_publish_in_progress_{false};
-  uint32_t ha_discovery_last_activity_{0};         // millis() of last NEW ERD registered/seen (subscription mode)
-  uint32_t ha_entity_last_publish_ms_{0};          // millis() of last HA entity publish (rate-limiter)
-  const char* last_logged_poll_state_{nullptr};    // tracks current_state_name to detect transitions for debug logging
-  // ERD IDs received via subscription that have been seen at least once.
-  // The quiet window is only reset when a NEW ERD ID arrives; repeated value
-  // updates for already-known ERDs do not extend the wait.
-  std::set<tiny_erd_t> ha_discovery_seen_erds_;
-  // Set of all ERD IDs that the device has registered (populated by the MQTT
-  // adapter's register_erd callback). Used to filter HA discovery entities so
-  // only ERDs actually supported by the connected device are published.
+  uint32_t ha_discovery_last_activity_{0};
+  const char* last_logged_poll_state_{nullptr};
   std::set<tiny_erd_t> ha_registered_erds_;
-  // Immutable snapshot of ha_registered_erds_ taken just before the HA
-  // discovery FreeRTOS task is spawned.  The background task reads ONLY this
-  // copy so it never races with concurrent insert() calls on ha_registered_erds_
-  // from the main loop (e.g. new subscription ERDs arriving during the fetch).
-  std::set<tiny_erd_t> ha_registered_erds_snapshot_;
-  // Set of string-type ERD IDs built from ha_discovery_config.h at bridge init.
-  // Passed to the MQTT adapter so it can publish ASCII text instead of hex.
   std::set<tiny_erd_t> ha_string_erds_set_;
-  static constexpr uint32_t HA_DISCOVERY_QUIET_MS = 10000;  // 10 s quiet period (subscription mode)
-  // Minimum interval between successive HA entity publishes. Publishing one QoS-1
-  // MQTT message per loop() call (which runs ~100s of times/sec) floods the IDF
-  // MQTT event queue and causes "Dropped inbound MQTT events" warnings. 50 ms
-  // gives the stack time to send the packet and process the PUBACK before the next
-  // one arrives while keeping total discovery time reasonable (<100 entities × 50 ms = 5 s).
-  static constexpr uint32_t HA_ENTITY_PUBLISH_INTERVAL_MS = 50;
-
-  // --- Runtime HA-discovery fetch state ------------------------------------
-  // Entity definitions are downloaded at runtime from compact JSONL files
-  // rather than stored in flash.  A FreeRTOS background task performs the
-  // HTTPS fetch; each discovered entity is sent to a queue that the main
-  // loop() drains one publish per iteration (preserving the existing
-  // rate-limiting behaviour).
-
-  // A (topic, payload) pair ready to be published via MQTT.
-  struct HaDiscoveryItem {
-    std::string topic;
-    std::string payload;
-  };
 
   // Base URL for the per-category JSONL files.
   // Can be overridden in YAML via ha_discovery_base_url.
@@ -279,55 +229,33 @@ class GeappliancesBridge : public Component {
     "home-assistant-bridge-esphome/main/ha_discovery"
   };
 
-  // Heap monitoring sensors - update every 60 seconds
+  // Heap monitoring sensors - setter targets; values are passed to HeapMonitor
+  // during setup() so the manager can own them independently.
   sensor::Sensor* free_heap_sensor_{nullptr};
   sensor::Sensor* min_free_heap_sensor_{nullptr};
   sensor::Sensor* heap_fragmentation_sensor_{nullptr};
-  uint32_t last_heap_sensor_update_{0};
-  static constexpr uint32_t HEAP_SENSOR_UPDATE_INTERVAL_MS = 60000;  // 60 seconds
 
-  QueueHandle_t ha_discovery_queue_{nullptr};   // carries HaDiscoveryItem* (nullptr = sentinel)
-  TaskHandle_t  ha_fetch_task_handle_{nullptr};
-  // Heap-allocated stack and TCB for xTaskCreateStatic().  Using static
-  // allocation prevents FreeRTOS from freeing the task's stack inside
-  // prvCheckTasksWaitingTermination() in the idle task — if a stack overflow
-  // corrupted heap metadata, that free would crash the idle task (the exact
-  // crash pattern observed on ESP32-C3/C6).  The main loop frees these
-  // buffers after the task signals completion via the queue sentinel.
-  StackType_t*  ha_fetch_task_stack_{nullptr};
-  StaticTask_t* ha_fetch_task_tcb_{nullptr};
+  // Heap monitoring - delegated to HeapMonitor manager
+  HeapMonitor heap_monitor_;
 
-  static void ha_fetch_task_fn_(void* param);
-  void        fetch_ha_definitions_();
-  bool        fetch_category_(const std::string& url,
-                              const std::string& device_id,
-                              const std::string& device_json);
-  bool        process_jsonl_line_(const char* line,
-                                  const std::string& device_id,
-                                  const std::string& device_json);
+  // Autodiscovery manager (extracted from god class)
+  AutodiscoveryManager autodiscovery_manager_;
 
+  // HA discovery manager (extracted from god class)
+  HaDiscoveryManager ha_discovery_manager_;
 
-  // Autodiscovery state machine
+  // Legacy members retained for backward compatibility during migration -
+  // these will be removed once all code paths use autodiscovery_manager_
   AutodiscoveryState autodiscovery_state_{AUTODISCOVERY_WAITING_5S};
-  uint32_t autodiscovery_timer_start_{0};
-  bool gea3_board_discovered_{false};
-  bool gea2_board_discovered_{false};
-  static constexpr uint32_t STARTUP_DELAY_MS = 5000;               // 5s after boot
-  static constexpr uint32_t AUTODISCOVERY_BROADCAST_WINDOW_MS = 5000;  // 5s window per broadcast
+  uint32_t autodiscovery_retry_count_{0};
 
   tiny_gea3_erd_client_request_id_t pending_request_id_;
   uint8_t appliance_type_{0};
   std::string model_number_;
   std::string serial_number_;
-  uint32_t read_retry_count_{0};
+  uint32_t queue_retry_count_{0};
   static constexpr uint32_t LOG_EVERY_N_RETRIES = 50; // Log retry attempts periodically
-  static constexpr uint32_t MAX_READ_RETRIES = 1000; // Maximum retries before giving up (about 10 seconds at loop rate)
-  // Counts consecutive READ-RESPONSE failures for the current device-ID ERD.
-  // Separate from read_retry_count_ which counts queue failures.  When this
-  // reaches MAX_DEVICE_ID_RESPONSE_RETRIES the ERD is skipped and a fallback
-  // value is used so device ID generation can always complete.
-  uint32_t device_id_response_retries_{0};
-  static constexpr uint32_t MAX_DEVICE_ID_RESPONSE_RETRIES = 3;
+  static constexpr uint32_t MAX_QUEUE_RETRIES = 1000; // Maximum retries before giving up (about 10 seconds at loop rate)
 
   tiny_timer_group_t timer_group_;
 

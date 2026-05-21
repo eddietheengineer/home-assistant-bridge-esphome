@@ -296,11 +296,11 @@ TEST(configuration_based_tests, config_polling_mode_default_interval)
   // Configuration: mode: poll, polling_interval: 10000
   mock().disable();
   configure_polling_mode(default_polling_interval);
+
+  // Bridge should be in identification state after init.
   mock().enable();
-  
-  // In polling mode, the bridge periodically reads ERDs
-  // This validates the infrastructure is set up correctly
-  CHECK_TRUE(true);
+  CHECK(mqtt_bridge_polling.current_state_name != nullptr);
+  CHECK(strcmp(mqtt_bridge_polling.current_state_name, "identify_appliance") == 0);
 }
 
 // ============================================================================
@@ -317,10 +317,11 @@ TEST(configuration_based_tests, config_polling_mode_fast_interval)
   // Configuration: mode: poll, polling_interval: 5000
   mock().disable();
   configure_polling_mode(fast_polling_interval);
+
+  // Bridge should be in identification state after init.
   mock().enable();
-  
-  // Fast polling mode for responsive appliances
-  CHECK_TRUE(true);
+  CHECK(mqtt_bridge_polling.current_state_name != nullptr);
+  CHECK(strcmp(mqtt_bridge_polling.current_state_name, "identify_appliance") == 0);
 }
 
 // ============================================================================
@@ -337,10 +338,11 @@ TEST(configuration_based_tests, config_polling_mode_slow_interval)
   // Configuration: mode: poll, polling_interval: 30000
   mock().disable();
   configure_polling_mode(slow_polling_interval);
+
+  // Bridge should be in identification state after init.
   mock().enable();
-  
-  // Slow polling mode to reduce traffic
-  CHECK_TRUE(true);
+  CHECK(mqtt_bridge_polling.current_state_name != nullptr);
+  CHECK(strcmp(mqtt_bridge_polling.current_state_name, "identify_appliance") == 0);
 }
 
 // ============================================================================
@@ -849,13 +851,14 @@ TEST_GROUP(only_publish_on_change_config)
 
 TEST(only_publish_on_change_config, config_polling_always_publish_is_default)
 {
-  // Without only_publish_on_change, a polling bridge with only_publish_on_change=false
-  // initializes successfully (verifying the default behavior builds and runs)
+  // Without only_publish_on_change, the polling bridge initializes in
+  // identification state (verifying default behavior builds and runs).
   mock().disable();
   configure_always_publish();
   mock().enable();
 
-  CHECK_TRUE(true);
+  CHECK(bridge.current_state_name != nullptr);
+  CHECK(strcmp(bridge.current_state_name, "identify_appliance") == 0);
 }
 
 // ============================================================================
@@ -870,10 +873,12 @@ TEST(only_publish_on_change_config, config_polling_always_publish_is_default)
 
 TEST(only_publish_on_change_config, config_polling_with_only_publish_on_change)
 {
-  // With only_publish_on_change=true, the bridge initializes successfully
+  // With only_publish_on_change=true, the bridge initializes in
+  // identification state (verifying the option builds and runs).
   mock().disable();
   configure_only_publish_on_change();
   mock().enable();
 
-  CHECK_TRUE(true);
+  CHECK(bridge.current_state_name != nullptr);
+  CHECK(strcmp(bridge.current_state_name, "identify_appliance") == 0);
 }

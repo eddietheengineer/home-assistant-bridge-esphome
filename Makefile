@@ -34,8 +34,25 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 SANITIZE_FLAGS := -fsanitize=address -fsanitize=undefined
 
-# CppUTest installation paths (homebrew on macOS)
-CPPUTEST_PREFIX ?= /opt/homebrew
+# CppUTest installation paths — auto-detect common locations
+# Override with: make CPPUTEST_PREFIX=/path/to/cpputest
+#   macOS (Apple Silicon):  /opt/homebrew  (default)
+#   macOS (Intel):          /usr/local
+#   Linux (system pkg):     /usr
+#   Linux (local build):    /path/to/CppUTest
+UNAME_S := $(shell uname -s)
+UNAME_P := $(shell uname -p)
+ifeq ($(UNAME_S),Darwin)
+  # Apple Silicon → homebrew at /opt/homebrew; Intel → /usr/local
+  ifeq ($(UNAME_P),arm)
+    CPPUTEST_PREFIX ?= /opt/homebrew
+  else
+    CPPUTEST_PREFIX ?= /usr/local
+  endif
+else
+  # Linux: default to system-wide install
+  CPPUTEST_PREFIX ?= /usr
+endif
 CPPUTEST_INC := -I$(CPPUTEST_PREFIX)/include
 CPPUTEST_LIB := -L$(CPPUTEST_PREFIX)/lib
 
@@ -94,5 +111,10 @@ $(BUILD_DIR)/%.cpp.o: %.cpp $(BUILD_DEPS)
 clean:
 	@echo Cleaning...
 	@rm -rf $(BUILD_DIR)
+
+.PHONY: pytest
+pytest:
+	@echo Running Python tests...
+	@python3 -m pytest scripts/test_generate_erd_lists.py -v
 
 -include $(DEPS)

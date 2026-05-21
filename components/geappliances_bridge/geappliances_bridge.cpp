@@ -6,7 +6,6 @@
 
 #ifdef USE_ESP32
 #include "esp_system.h"
-#include "esp_heap_caps.h"
 #endif
 
 namespace esphome {
@@ -63,6 +62,24 @@ void GeappliancesBridge::setup() {
 
   // Initialize timer group
   tiny_timer_group_init(&this->timer_group_, esphome_time_source_init());
+
+  // Initialize heap monitoring
+  this->heap_monitor_.init(
+      this->free_heap_sensor_,
+      this->min_free_heap_sensor_,
+      this->heap_fragmentation_sensor_);
+
+  // Initialize autodiscovery manager
+  this->autodiscovery_manager_.init(
+      this->uart_ != nullptr ? &this->erd_client_.interface : nullptr,
+      this->gea2_uart_ != nullptr ? &this->gea2_erd_client_.interface : nullptr,
+      this->gea2_uart_ != nullptr ? &this->gea2_erd_client_adapter_.interface : nullptr,
+      this->uart_ != nullptr,
+      this->gea2_uart_ != nullptr,
+      [this]() {
+        this->sync_autodiscovery_legacy_members_();
+        this->start_device_id_generation_();
+      });
 
   // Initialize GEA3 components if GEA3 UART is configured
   if (this->uart_ != nullptr) {
@@ -156,9 +173,9 @@ void GeappliancesBridge::setup() {
   // device_id_state_ stays IDLE until autodiscovery completes
 
   // Start the boot stabilization delay before autodiscovery traffic.
-  this->autodiscovery_timer_start_ = millis();
+  // (AutodiscoveryManager uses AUTODISCOVERY_STARTUP_DELAY_MS internally)
   ESP_LOGI(TAG, "Waiting %u seconds before starting autodiscovery...",
-           STARTUP_DELAY_MS / 1000);
+           AUTODISCOVERY_STARTUP_DELAY_MS / 1000);
 
   ESP_LOGCONFIG(TAG, "GE Appliances Bridge setup complete");
 }
@@ -170,6 +187,9 @@ void GeappliancesBridge::loop() {
     bool is_connected = mqtt_client->is_connected();
     if (is_connected && !this->mqtt_was_connected_) {
       this->on_mqtt_connected_();
+      // Signal the startup HSM that MQTT is now connected — this may
+      // unblock the feature_bits or bridge_init phases.
+      tiny_hsm_send_signal(&this->startup_hsm_, signal_mqtt_connected, nullptr);
     } else if (!is_connected && this->mqtt_was_connected_) {
       // Notify the adapter that MQTT has disconnected so it resets the
       // connect timestamp and publishes the disconnect event to the bridge
@@ -190,62 +210,31 @@ void GeappliancesBridge::loop() {
     this->mqtt_was_connected_ = is_connected;
   }
 
-  run_protocol_stack_();          // Phase 1: drive GEA2/GEA3 hardware
-  run_autodiscovery_();           // Phase 2: find appliance on bus
-  run_device_id_generation_();    // Phase 3: assemble device ID from ERDs
+  // ── Startup HSM ────────────────────────────────────────────────────────
+  // The bridge progresses through a linear sequence of startup phases via
+  // a tiny_hsm-based state machine.  Each state handles its own entry/exit
+  // logic and waits for signals from managers before transitioning.
+  //
+  // Phase dependency chain:
+  //   PROTOCOL → AUTODISCOVERY → DEVICE_ID → MQTT_CLIENT → FEATURE_BITS
+  //           → BRIDGE_INIT → SUBSCRIPTION_WATCH → HA_DISCOVERY → HEAP
+  //           → RUNNING (steady-state)
+  // ────────────────────────────────────────────────────────────────────────
 
-  // Phase 4: initialize MQTT client adapter as soon as device ID is ready,
-  // so feature bit ERDs can be published over MQTT as they are read.
-  if (this->device_id_state_ == DEVICE_ID_STATE_COMPLETE &&
-      !this->mqtt_client_adapter_initialized_) {
-    this->initialize_mqtt_client_();
+  // Drive the GEA2/GEA3 protocol stack on every loop iteration so that
+  // UART bytes are processed and ERD read responses are delivered to the
+  // active manager (autodiscovery, device ID, feature bits, polling bridge).
+  this->run_protocol_stack_();
+
+  // Initialize the startup HSM on the first loop() call.
+  if (this->startup_hsm_.current == nullptr) {
+    tiny_hsm_init(&this->startup_hsm_, &startup_hsm_configuration,
+                  startup_state_protocol_stack);
   }
 
-  run_feature_bit_reading_();     // Phase 5: read appliance API feature bits
-
-  // Phase 6: initialize bridge once feature bits + MQTT are ready.
-  // Autodiscovery must complete first so active_erd_client_ and host_address_
-  // are set to the correct appliance before polling/subscription begins.
-  if (this->bridge_init_state_ == BRIDGE_INIT_STATE_WAITING_FOR_MQTT &&
-      this->autodiscovery_state_ == AUTODISCOVERY_COMPLETE &&
-      mqtt_client != nullptr && mqtt_client->is_connected()) {
-    ESP_LOGI(TAG, "Device ID ready and MQTT connected, initializing MQTT bridge");
-    this->initialize_mqtt_bridge_();
-    this->bridge_init_state_ = BRIDGE_INIT_STATE_COMPLETE;
-  }
-
-  // Phase 7: AUTO mode subscription watchdog — fall back to polling if
-  // no subscription publications arrive within SUBSCRIPTION_TIMEOUT_MS.
-  if (this->mode_ == BRIDGE_MODE_AUTO && this->subscription_mode_active_) {
-    this->check_subscription_activity_();
-  }
-
-  this->maybe_start_custom_erd_polling_();
-  log_poll_state_transitions_();  // Debug: log polling HSM state changes
-  run_ha_discovery_();            // Phase 8: deferred HA entity publish
-  
-  // Phase 9: Update heap monitoring sensors every 60 seconds
-  uint32_t now = millis();
-  if (now - this->last_heap_sensor_update_ >= HEAP_SENSOR_UPDATE_INTERVAL_MS) {
-    this->last_heap_sensor_update_ = now;
-    
-#ifdef USE_ESP32
-    if (this->free_heap_sensor_ != nullptr) {
-      this->free_heap_sensor_->publish_state(static_cast<float>(esp_get_free_heap_size()));
-    }
-    if (this->min_free_heap_sensor_ != nullptr) {
-      this->min_free_heap_sensor_->publish_state(static_cast<float>(esp_get_minimum_free_heap_size()));
-    }
-    if (this->heap_fragmentation_sensor_ != nullptr) {
-      // Calculate fragmentation as percentage of total internal heap that is used
-      size_t total_heap = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
-      size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-      float usage_percent = (total_heap > 0) ? 
-        (100.0f - (100.0f * free_heap / total_heap)) : 0.0f;
-      this->heap_fragmentation_sensor_->publish_state(usage_percent);
-    }
-#endif
-  }
+  // Send the run_loop signal to the current HSM state — this drives
+  // the ongoing work for whatever phase we're in.
+  tiny_hsm_send_signal(&this->startup_hsm_, signal_run_loop, nullptr);
 }
 
 // ---------------------------------------------------------------------------
@@ -334,78 +323,98 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
   }
 
   // Handle autodiscovery: first responder on GEA3 or GEA2 broadcast
-  bool in_gea3_discovery = (this->autodiscovery_state_ == AUTODISCOVERY_GEA3_BROADCAST_WAITING);
-  bool in_gea2_discovery = (this->autodiscovery_state_ == AUTODISCOVERY_GEA2_BROADCAST_WAITING);
+  bool in_gea3_discovery = (this->autodiscovery_manager_.get_state() == AUTODISCOVERY_GEA3_BROADCAST_WAITING);
+  bool in_gea2_discovery = (this->autodiscovery_manager_.get_state() == AUTODISCOVERY_GEA2_BROADCAST_WAITING);
   if (in_gea3_discovery || in_gea2_discovery) {
-    bool& discovered = in_gea3_discovery ? this->gea3_board_discovered_ : this->gea2_board_discovered_;
     if (args->type == tiny_gea3_erd_client_activity_type_read_completed &&
         args->read_completed.erd == ERD_APPLIANCE_TYPE &&
-        !discovered && args->read_completed.data_size >= 1) {
+        this->autodiscovery_manager_.get_active_erd_client() == nullptr &&
+        args->read_completed.data_size >= 1) {
       uint8_t app_type = reinterpret_cast<const uint8_t*>(args->read_completed.data)[0];
-      if (in_gea3_discovery) {
-        ESP_LOGD(TAG, "GEA3 board discovered: address=0x%02X appliance_type=%u (%s)",
-                 args->address, app_type, appliance_type_to_string(app_type).c_str());
-        this->active_erd_client_ = &this->erd_client_.interface;
-      } else {
-        ESP_LOGD(TAG, "GEA2 board discovered: address=0x%02X appliance_type=%u (%s)",
-                 args->address, app_type, appliance_type_to_string(app_type).c_str());
-        this->active_erd_client_ = &this->gea2_erd_client_adapter_.interface;
-      }
-      discovered = true;
-      this->host_address_ = args->address;
+      ESP_LOGD(TAG, "Board discovered: address=0x%02X appliance_type=%u (%s)",
+               args->address, app_type, appliance_type_to_string(app_type).c_str());
+      this->autodiscovery_manager_.on_broadcast_response(args->address, app_type, in_gea3_discovery);
+      // Sync legacy members immediately for backward compatibility.
+      this->sync_autodiscovery_legacy_members_();
     }
     return;
   }
 
   // Device ID + feature bit reads (after discovery, before bridge init)
   if (!this->mqtt_bridge_initialized_ && args->address == this->host_address_) {
-    // Route responses to the correct handler.  Device-info ERDs (0x0008/0x0001/0x0002)
-    // are read twice: once during device ID generation and again at the start of feature
-    // bit reading for MQTT publish.  Use device_id_state_ to distinguish the two cases.
-    auto is_device_info_erd = [](tiny_erd_t e) {
-      return e == ERD_APPLIANCE_TYPE || e == ERD_MODEL_NUMBER || e == ERD_SERIAL_NUMBER;
-    };
-
     if (args->type == tiny_gea3_erd_client_activity_type_read_completed) {
       tiny_erd_t erd = args->read_completed.erd;
-      bool feature_bit_active = (this->feature_bit_state_ != FEATURE_BIT_STATE_IDLE &&
-                                   this->feature_bit_state_ != FEATURE_BIT_STATE_COMPLETE &&
-                                   this->feature_bit_state_ != FEATURE_BIT_STATE_FAILED);
-      // Route to feature bit handler if: it's a feature bit ERD, OR it's a device-info
-      // ERD being re-read during the feature bit phase (device ID already complete).
-      bool route_to_feature_bits = feature_bit_active &&
-        (is_feature_bit_erd(erd) ||
-         (is_device_info_erd(erd) && this->device_id_state_ == DEVICE_ID_STATE_COMPLETE));
-      if (route_to_feature_bits) {
-        this->process_feature_bit_erd_response_(
-          erd,
-          reinterpret_cast<const uint8_t*>(args->read_completed.data),
-          args->read_completed.data_size);
+      const uint8_t* data = reinterpret_cast<const uint8_t*>(args->read_completed.data);
+      uint8_t size = args->read_completed.data_size;
+      if (this->should_route_to_feature_bits_(erd)) {
+        this->feature_bit_manager_.on_erd_read_completed(erd, data, size);
+        // Sync legacy members for backward compatibility.
+        this->sync_feature_bit_legacy_members_();
+        if (this->feature_bit_manager_.is_complete()) {
+          // Signal the startup HSM that feature bits are ready.
+          tiny_hsm_send_signal(&this->startup_hsm_, signal_feature_bits_complete, nullptr);
+        }
       } else {
-        this->process_device_id_erd_response_(
-          erd,
-          reinterpret_cast<const uint8_t*>(args->read_completed.data),
-          args->read_completed.data_size);
+        this->device_identity_manager_.on_erd_read_completed(erd, data, size);
+        // Sync legacy members for backward compatibility.
+        this->device_id_state_ = this->device_identity_manager_.get_state();
+        if (this->device_identity_manager_.is_complete()) {
+          this->appliance_type_ = this->device_identity_manager_.get_appliance_type();
+          this->model_number_   = this->device_identity_manager_.get_model_number();
+          this->serial_number_  = this->device_identity_manager_.get_serial_number();
+          this->generated_device_id_ = this->device_identity_manager_.get_generated_device_id();
+          this->final_device_id_     = this->device_identity_manager_.get_device_id();
+          // Signal the startup HSM that device ID is ready.
+          tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_complete, nullptr);
+        }
       }
     } else if (args->type == tiny_gea3_erd_client_activity_type_read_failed) {
       tiny_erd_t erd = args->read_failed.erd;
-      bool feature_bit_active = (this->feature_bit_state_ != FEATURE_BIT_STATE_IDLE &&
-                                   this->feature_bit_state_ != FEATURE_BIT_STATE_COMPLETE &&
-                                   this->feature_bit_state_ != FEATURE_BIT_STATE_FAILED);
-      bool route_to_feature_bits = feature_bit_active &&
-        (is_feature_bit_erd(erd) ||
-         (is_device_info_erd(erd) && this->device_id_state_ == DEVICE_ID_STATE_COMPLETE));
-      if (route_to_feature_bits) {
-        this->handle_feature_bit_read_failure_(erd);
+      if (this->should_route_to_feature_bits_(erd)) {
+        this->feature_bit_manager_.on_erd_read_failed(erd);
+        // Sync legacy members for backward compatibility.
+        this->sync_feature_bit_legacy_members_();
+        // If feature bits failed, signal the HSM so it can continue.
+        if (this->feature_bit_manager_.is_failed()) {
+          tiny_hsm_send_signal(&this->startup_hsm_, signal_feature_bits_complete, nullptr);
+        }
       } else {
         ESP_LOGW(TAG, "Failed to read ERD 0x%04X for device ID generation (reason: %u), will retry",
                  erd, args->read_failed.reason);
-        this->handle_device_id_read_failure_(erd);
+        this->device_identity_manager_.on_erd_read_failed(erd);
+        // Sync legacy members for backward compatibility.
+        this->device_id_state_ = this->device_identity_manager_.get_state();
+        if (this->device_identity_manager_.is_complete()) {
+          this->appliance_type_ = this->device_identity_manager_.get_appliance_type();
+          this->model_number_   = this->device_identity_manager_.get_model_number();
+          this->serial_number_  = this->device_identity_manager_.get_serial_number();
+          this->generated_device_id_ = this->device_identity_manager_.get_generated_device_id();
+          this->final_device_id_     = this->device_identity_manager_.get_device_id();
+          // Signal the startup HSM that device ID is ready (even on failure, we have a fallback).
+          tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_complete, nullptr);
+        } else if (this->device_identity_manager_.is_failed()) {
+          this->final_device_id_     = this->device_identity_manager_.get_device_id();
+          this->generated_device_id_ = this->device_identity_manager_.get_generated_device_id();
+          tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_failed, nullptr);
+        }
       }
     }
   }
 }
 
+bool GeappliancesBridge::should_route_to_feature_bits_(tiny_erd_t erd)
+{
+  auto is_device_info_erd = [](tiny_erd_t e) {
+    return e == ERD_APPLIANCE_TYPE || e == ERD_MODEL_NUMBER || e == ERD_SERIAL_NUMBER;
+  };
+
+  bool feature_bit_active = (this->feature_bit_state_ != FEATURE_BIT_STATE_IDLE &&
+                               this->feature_bit_state_ != FEATURE_BIT_STATE_COMPLETE &&
+                               this->feature_bit_state_ != FEATURE_BIT_STATE_FAILED);
+  return feature_bit_active &&
+    (is_feature_bit_erd(erd) ||
+     (is_device_info_erd(erd) && this->device_id_state_ == DEVICE_ID_STATE_COMPLETE));
+}
 
 void GeappliancesBridge::dump_config() {
   ESP_LOGCONFIG(TAG, "GE Appliances Bridge:");
@@ -462,11 +471,56 @@ void GeappliancesBridge::dump_config() {
   if (!this->custom_erds_vec_.empty()) {
     ESP_LOGCONFIG(TAG, "  Custom ERDs: %zu configured", this->custom_erds_vec_.size());
   }
+
+  // Display current startup state for debugging
+  const char* phase_str = "Unknown";
+  if (this->startup_hsm_.current == startup_state_protocol_stack)       phase_str = "Protocol Stack";
+  else if (this->startup_hsm_.current == startup_state_autodiscovery)    phase_str = "Autodiscovery";
+  else if (this->startup_hsm_.current == startup_state_device_id)        phase_str = "Device ID";
+  else if (this->startup_hsm_.current == startup_state_mqtt_client_init) phase_str = "MQTT Client Init";
+  else if (this->startup_hsm_.current == startup_state_feature_bits)     phase_str = "Feature Bits";
+  else if (this->startup_hsm_.current == startup_state_bridge_init)      phase_str = "Bridge Init";
+  else if (this->startup_hsm_.current == startup_state_subscription_watch) phase_str = "Subscription Watch";
+  else if (this->startup_hsm_.current == startup_state_ha_discovery)     phase_str = "HA Discovery";
+  else if (this->startup_hsm_.current == startup_state_heap_monitor)     phase_str = "Heap Monitor";
+  else if (this->startup_hsm_.current == startup_state_running)          phase_str = "Running";
+  ESP_LOGCONFIG(TAG, "  Startup State: %s", phase_str);
 }
 
 float GeappliancesBridge::get_setup_priority() const {
   // Run after UART (priority 600) and MQTT (priority 50)
   return setup_priority::DATA;  // Priority 600
+}
+
+bool GeappliancesBridge::teardown() {
+  // Clean up HA discovery manager first (may have a running FreeRTOS task).
+  this->ha_discovery_manager_.cleanup();
+
+  // Destroy whichever bridge(s) were initialized.
+  if (this->custom_erd_polling_started_) {
+    mqtt_bridge_polling_destroy(&this->mqtt_bridge_polling_);
+  }
+  if (this->mqtt_bridge_initialized_) {
+    bool is_poll_mode = !((this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
+                          (this->mode_ == BRIDGE_MODE_AUTO && this->subscription_mode_active_));
+    if (is_poll_mode) {
+      // Polling bridge may be in mqtt_bridge_polling_ (custom ERDs) or
+      // mqtt_bridge_polling_ (fallback from subscription).
+      if (!this->custom_erd_polling_started_) {
+        mqtt_bridge_polling_destroy(&this->mqtt_bridge_polling_);
+      }
+    } else {
+      mqtt_bridge_destroy(&this->mqtt_bridge_);
+    }
+  }
+
+  // Free heap-allocated members of the MQTT client adapter to prevent
+  // memory leaks (device_id string, pending_updates map, etc.).
+  if (this->mqtt_client_adapter_initialized_) {
+    esphome_mqtt_client_adapter_destroy(&this->mqtt_client_adapter_);
+  }
+  Component::teardown();
+  return true;
 }
 
 }  // namespace geappliances_bridge
