@@ -80,6 +80,10 @@ tiny_hsm_result_t startup_state_heap_monitor(
 tiny_hsm_result_t startup_state_running(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
+/// Set the back-pointer to the bridge instance so the HSM state functions
+/// can access it without using container_of/offsetof on a non-POD class.
+void set_bridge_instance(GeappliancesBridge* bridge);
+
 // HSM configuration (state descriptors + hierarchy)
 extern const tiny_hsm_configuration_t startup_hsm_configuration;
 

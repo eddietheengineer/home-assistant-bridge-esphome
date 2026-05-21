@@ -226,8 +226,16 @@ void GeappliancesBridge::loop() {
   // active manager (autodiscovery, device ID, feature bits, polling bridge).
   this->run_protocol_stack_();
 
+  // Run heap monitoring every loop() regardless of HSM state so the
+  // heap sensors always show data, even if the HSM is stalled waiting
+  // for MQTT to connect.
+  this->heap_monitor_.run();
+
   // Initialize the startup HSM on the first loop() call.
   if (this->startup_hsm_.current == nullptr) {
+    // Set the back-pointer so HSM state functions can access the bridge
+    // without using container_of/offsetof on a non-POD C++ class.
+    set_bridge_instance(this);
     tiny_hsm_init(&this->startup_hsm_, &startup_hsm_configuration,
                   startup_state_protocol_stack);
   }

@@ -18,7 +18,7 @@
 #include "esphome/core/hal.h"
 
 extern "C" {
-#include "tiny_utils.h"
+#include "tiny_utils.h"  // element_count macro
 }
 
 namespace esphome {
@@ -26,14 +26,23 @@ namespace geappliances_bridge {
 
 static const char* const TAG = "geappliances_bridge";
 
-// Helper: get the bridge instance from the HSM pointer.
-// The startup_hsm_t is embedded as a member of GeappliancesBridge.
+// Back-pointer to the bridge instance, set during HSM init.
+// This avoids using container_of (which relies on offsetof) on a
+// non-POD C++ class — offsetof within non-standard-layout types is
+// conditionally-supported and triggers compiler warnings/errors.
+static GeappliancesBridge* g_bridge_instance = nullptr;
+
 GeappliancesBridge* bridge_from_hsm(tiny_hsm_t* hsm)
 {
-  // The startup HSM is the startup_hsm_ member of GeappliancesBridge.
-  // We use container_of to get back to the bridge.
-  return container_of(GeappliancesBridge, startup_hsm_, hsm);
+  (void)hsm;
+  return g_bridge_instance;
 }
+
+void set_bridge_instance(GeappliancesBridge* bridge)
+{
+  g_bridge_instance = bridge;
+}
+
 
 // ============================================================================
 // Top state — handles signals common to all startup phases
@@ -153,6 +162,8 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
             bridge->active_erd_client_,
             bridge->host_address_);
       }
+      // Start the phase timeout timer.
+      bridge->device_id_phase_start_ms_ = millis();
       // If a device_id is pre-configured, the manager is already complete
       // from init().  Sync the final_device_id_ and transition.
       if (bridge->device_identity_manager_.is_complete()) {
@@ -166,6 +177,20 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
       break;
 
     case signal_run_loop:
+      // Check for phase timeout — prevent indefinite stalls.
+      if (millis() - bridge->device_id_phase_start_ms_ >= bridge->DEVICE_ID_PHASE_TIMEOUT_MS) {
+        ESP_LOGW(TAG, "Device ID phase timed out after %u ms, using fallback", 
+                 static_cast<unsigned>(bridge->DEVICE_ID_PHASE_TIMEOUT_MS));
+        bridge->final_device_id_     = bridge->device_identity_manager_.get_device_id();
+        bridge->generated_device_id_ = bridge->device_identity_manager_.get_generated_device_id();
+        if (bridge->final_device_id_.empty()) {
+          bridge->final_device_id_ = "Unknown_Unknown_Unknown";
+          bridge->generated_device_id_ = bridge->final_device_id_;
+        }
+        tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
+        break;
+      }
+
       bridge->device_identity_manager_.run();
 
       if (bridge->device_identity_manager_.is_complete()) {
@@ -254,10 +279,19 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
   switch (signal) {
     case tiny_hsm_signal_entry:
       ESP_LOGI(TAG, "Startup: Feature bits phase");
+      bridge->feature_bits_phase_start_ms_ = millis();
       break;
 
     case signal_run_loop:
       {
+      // Check for phase timeout — prevent indefinite stalls.
+      if (millis() - bridge->feature_bits_phase_start_ms_ >= bridge->FEATURE_BITS_PHASE_TIMEOUT_MS) {
+        ESP_LOGW(TAG, "Feature bits phase timed out after %u ms, continuing without feature filtering",
+                 static_cast<unsigned>(bridge->FEATURE_BITS_PHASE_TIMEOUT_MS));
+        // Mark as complete so we can proceed without feature bit filtering.
+        bridge->sync_feature_bit_legacy_members_();
+      }
+
       bridge->feature_bit_manager_.run();
 
       // Check if we can transition to bridge_init:

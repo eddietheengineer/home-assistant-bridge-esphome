@@ -64,8 +64,25 @@ void HaDiscoveryManager::cleanup()
     // Non-blocking send — if queue is full, the task will get the sentinel
     // after it drains existing items.
     xQueueSend(this->queue_, &sentinel, 0);
+
+    // Wait for the task to actually terminate before freeing its stack/TCB.
+    // Without this, freeing the stack while the task is still executing
+    // causes a use-after-free crash.
+    if (this->task_handle_ != nullptr) {
+      // Poll with a generous timeout (up to 5 s) to wait for the task
+    // to call vTaskDelete().  The task deletes itself after sending the
+    // sentinel to the queue, so we wait until the handle becomes NULL.
+      uint32_t deadline = millis() + 5000;
+      while (this->task_handle_ != nullptr && millis() < deadline) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+      }
+      if (this->task_handle_ != nullptr) {
+        ESP_LOGW(TAG, "HA discovery task did not terminate within 5 s");
+      }
+    }
   }
   // Free heap-allocated stack and TCB (allocated in publish_ha_discovery_).
+  // Safe to free now — the task has terminated (or timed out).
   if (this->task_stack_ != nullptr) {
     free(this->task_stack_);
     this->task_stack_ = nullptr;

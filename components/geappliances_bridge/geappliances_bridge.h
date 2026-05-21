@@ -162,6 +162,13 @@ class GeappliancesBridge : public Component {
   bool custom_erd_polling_started_{false};  // Guard to prevent re-initialization
   static constexpr uint32_t SUBSCRIPTION_TIMEOUT_MS = 30000; // 30 seconds
 
+  // Startup phase timeouts — prevent the startup HSM from stalling
+  // indefinitely in any phase that waits for ERD reads.
+  static constexpr uint32_t DEVICE_ID_PHASE_TIMEOUT_MS = 30000;  // 30 s
+  static constexpr uint32_t FEATURE_BITS_PHASE_TIMEOUT_MS = 60000;  // 60 s
+  uint32_t device_id_phase_start_ms_{0};
+  uint32_t feature_bits_phase_start_ms_{0};
+
   // GEA2 tight-loop duration: covers the full TX→RX cycle at 19200 baud
   // (see doc/geappliances_bridge.md section 13 for detailed explanation)
   static constexpr uint32_t GEA2_LOOP_DURATION_MS = 200;
