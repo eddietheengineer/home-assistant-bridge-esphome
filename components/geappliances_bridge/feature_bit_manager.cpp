@@ -15,7 +15,14 @@
 namespace esphome {
 namespace geappliances_bridge {
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-const-variable"
+#endif
 static const char* const TAG = "feature_bit";
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
                               uint8_t host_address,
@@ -54,7 +61,14 @@ void FeatureBitManager::run()
 
   // Map current READING state to the ERD we need to read next.
   tiny_erd_t  feature_erd  = 0;
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#endif
   const char* feature_name = nullptr;
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
   switch (this->state_) {
     case FEATURE_BIT_STATE_READING_0008: feature_erd = ERD_APPLIANCE_TYPE;        feature_name = "appliance type (0x0008)";              break;
@@ -199,10 +213,17 @@ void FeatureBitManager::parse_and_log_feature_bits_()
   }
 
   // Static tables for appliance ERDs (indexed 0-9).
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
+#endif
   static const char* const erd_names[10] = {
     "0x0093", "0x0094", "0x0095", "0x0096", "0x0097",
     "0x0109", "0x010A", "0x010B", "0x010C", "0x010D"
   };
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
   // Process one appliance ERD per call to avoid blocking loop() for too long.
   while (this->parse_erd_idx_ < 10) {

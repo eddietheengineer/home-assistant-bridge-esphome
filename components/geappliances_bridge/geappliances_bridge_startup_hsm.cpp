@@ -24,7 +24,14 @@ extern "C" {
 namespace esphome {
 namespace geappliances_bridge {
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-const-variable"
+#endif
 static const char* const TAG = "geappliances_bridge";
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 // Back-pointer to the bridge instance, set during HSM init.
 // This avoids using container_of (which relies on offsetof) on a
@@ -78,6 +85,7 @@ tiny_hsm_result_t startup_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, c
 tiny_hsm_result_t startup_state_protocol_stack(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   GeappliancesBridge* bridge = bridge_from_hsm(hsm);
+  (void)bridge;  /* Used only in ESP_LOG calls below. */
   (void)data;
 
   switch (signal) {

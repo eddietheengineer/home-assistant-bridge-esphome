@@ -1,0 +1,66 @@
+# MQTT Bridge Polling
+
+## Purpose
+
+Discovers the connected appliance by reading ERD 0x0008 (appliance type) on the broadcast address, then walks through a chain of per-appliance ERD discovery states before settling into steady-state polling. Publishes ERD values to MQTT and handles write requests.
+
+## Public API
+
+| Function | Description |
+|----------|-------------|
+| `mqtt_bridge_polling_init(self, timer_group, erd_client, mqtt_client, interval_ms, only_publish_on_change)` | Initialize with broadcast discovery |
+| `mqtt_bridge_polling_init_at_address(self, timer_group, erd_client, mqtt_client, interval_ms, only_publish_on_change, known_address, api_list, api_list_count)` | Initialize with a pre-known host address (skips broadcast) |
+| `mqtt_bridge_polling_destroy(self)` | Stop timers, unsubscribe events, free heap state |
+
+## State Machine
+
+```
+poll_state_top (parent — handles write requests and appliance loss globally)
+  ├─ state_identify_appliance
+  │    └─ read ERD 0x0008 from broadcast (or skip if address pre-known)
+  │       → if api_parsed_list set → state_add_appliance_api_feature_erds
+  │       → else → state_add_common_erds
+  │
+  ├─ state_add_common_erds
+  │    └→ state_add_energy_erds
+  │
+  ├─ state_add_energy_erds
+  │    └→ state_add_appliance_api_feature_erds
+  │
+  ├─ state_add_appliance_api_feature_erds
+  │    └→ state_add_appliance_erds (or state_polling if api_parsed_list)
+  │
+  ├─ state_add_appliance_erds
+  │    └→ state_polling
+  │
+  └─ state_polling (steady state)
+       ├─ polling_timer_expired: start new cycle when current cycle is complete
+       ├─ read_completed: publish if changed (or always), queue next read
+       ├─ mqtt_disconnected: continue polling (values are queued)
+       └─ appliance_lost (60 s timeout) → state_identify_appliance
+```
+
+Discovery states use a shared `handle_discovery_list_signals` handler that reads each ERD in the list, adds it to the polling list, publishes the value, and transitions to the next state when done.
+
+## Dependencies
+
+- `i_tiny_gea3_erd_client` — GEA3 ERD client interface
+- `i_mqtt_client` — MQTT client adapter
+- `tiny_hsm` — hierarchical state machine
+- `tiny_timer` — polling, retry, and appliance-lost timers
+- `erd_lists.h` — static ERD lists (common, energy, appliance-type-specific)
+- `mqtt_bridge_common.h` — shared signals, timing constants, and utility templates
+
+## Key Design Decisions
+
+- **Dynamic polling list**: The `erd_polling_list` is heap-allocated and grows in increments of 32 ERDs (up to `POLLING_LIST_MAX_SIZE`). This avoids fixed-size buffer limitations while bounding memory usage.
+- **ERD cache for "publish on change"**: When `only_publish_on_change` is true, a `std::map<tiny_erd_t, vector<uint8_t>>` caches the last published value per ERD. Only changed values are published to MQTT.
+- **No overlapping polling cycles**: A new polling cycle only starts when the current cycle is fully complete (all ERDs read). This prevents the GEA3 ERD client's fixed-size request queue from overflowing, which can corrupt adjacent heap memory.
+- **60-second appliance lost timer**: If no read completes within 60 seconds, the bridge transitions back to `state_identify_appliance` to rediscover the appliance.
+- **MQTT disconnect tolerance**: On MQTT disconnect, the polling bridge continues polling — values are queued in `pending_updates` and flushed when MQTT reconnects. No re-identification is needed.
+- **API-parsed list shortcut**: When `api_parsed_list` is set (from appliance API feature bit parsing), the bridge skips common/energy/appliance discovery states and goes directly to polling with the parsed list.
+- **Custom ERD support**: User-configured custom ERDs are appended to the polling list after discovered or API-parsed ERDs.
+
+## Testing
+
+Covered by unit tests in `test/tests/test_mqtt_bridge_polling.cpp` and integration tests through the full polling bridge flow. Discovery state transitions, ERD caching, and appliance loss recovery are tested with simulated ERD client activity.

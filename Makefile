@@ -24,6 +24,21 @@ SRC_FILES := \
   components/geappliances_bridge/mqtt_bridge.cpp \
   components/geappliances_bridge/mqtt_bridge_polling.cpp \
   components/geappliances_bridge/gea2_erd_client_adapter.cpp \
+  components/geappliances_bridge/heap_monitor.cpp \
+  components/geappliances_bridge/device_identity_manager.cpp \
+  components/geappliances_bridge/feature_bit_manager.cpp \
+  components/geappliances_bridge/autodiscovery_manager.cpp \
+  components/geappliances_bridge/esphome_mqtt_client_adapter.cpp \
+  components/geappliances_bridge/esphome_time_source.cpp \
+  components/geappliances_bridge/esphome_uart_adapter.cpp \
+  components/geappliances_bridge/ha_discovery_manager.cpp \
+  components/geappliances_bridge/geappliances_bridge.cpp \
+  components/geappliances_bridge/geappliances_bridge_bridge_init.cpp \
+  components/geappliances_bridge/geappliances_bridge_device_id.cpp \
+  components/geappliances_bridge/geappliances_bridge_feature_bits.cpp \
+  components/geappliances_bridge/geappliances_bridge_ha_discovery.cpp \
+  components/geappliances_bridge/geappliances_bridge_startup_hsm.cpp \
+  components/geappliances_bridge/geappliances_bridge_autodiscovery.cpp
 
 SRCS := $(SRC_FILES) $(shell find $(SRC_DIRS) -maxdepth 1 -name *.cpp -or -name *.c -or -name *.s)
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
@@ -101,6 +116,13 @@ $(BUILD_DIR)/%.c.o: %.c $(BUILD_DEPS)
 	@echo Compiling $<...
 	@mkdir -p $(dir $@)
 	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+# Compile heap_monitor.cpp with USE_ESP32 so test doubles for esp_heap_caps
+# are used instead of the real ESP-IDF headers.
+$(BUILD_DIR)/components/geappliances_bridge/heap_monitor.cpp.o: components/geappliances_bridge/heap_monitor.cpp $(BUILD_DEPS)
+	@echo Compiling $<...
+	@mkdir -p $(dir $@)
+	@$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DUSE_ESP32 -c $< -o $@
 
 $(BUILD_DIR)/%.cpp.o: %.cpp $(BUILD_DEPS)
 	@echo Compiling $<...

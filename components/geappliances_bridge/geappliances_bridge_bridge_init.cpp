@@ -24,7 +24,14 @@
 namespace esphome {
 namespace geappliances_bridge {
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-const-variable"
+#endif
 static const char* const TAG = "geappliances_bridge";
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 // ---------------------------------------------------------------------------
 // Phase 4: Initialize the MQTT client adapter (called once from loop())
@@ -97,7 +104,14 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
 
   // Select operating mode.
   bool        use_polling = false;
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#endif
   const char* mode_name   = "unknown";
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
   if (this->gea2_protocol_active_) {
     use_polling = true;

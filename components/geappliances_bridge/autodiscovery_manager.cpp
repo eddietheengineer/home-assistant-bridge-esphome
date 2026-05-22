@@ -14,7 +14,14 @@
 namespace esphome {
 namespace geappliances_bridge {
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-const-variable"
+#endif
 static const char* const TAG = "autodiscovery";
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 void AutodiscoveryManager::init(i_tiny_gea3_erd_client_t* gea3_erd_client,
                                  i_tiny_gea2_erd_client_t* gea2_erd_client,
@@ -140,6 +147,7 @@ void AutodiscoveryManager::run()
 void AutodiscoveryManager::on_broadcast_response(uint8_t address, uint8_t appliance_type,
                                                   bool is_gea3)
 {
+  (void)appliance_type;  /* Used only in ESP_LOG calls below. */
   if (this->state_ == AUTODISCOVERY_COMPLETE) return;
 
   bool in_gea3_waiting = (this->state_ == AUTODISCOVERY_GEA3_BROADCAST_WAITING);

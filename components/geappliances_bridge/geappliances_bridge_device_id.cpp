@@ -24,7 +24,14 @@ std::string appliance_type_to_string(uint8_t appliance_type);
 namespace esphome {
 namespace geappliances_bridge {
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-const-variable"
+#endif
 static const char* const TAG = "geappliances_bridge";
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 // ---------------------------------------------------------------------------
 // Startup: begin device ID generation (or skip if already configured)
@@ -49,6 +56,7 @@ void GeappliancesBridge::start_device_id_generation_()
   }
 
   const char* protocol = this->gea2_protocol_active_ ? "GEA2" : "GEA3";
+  (void)protocol;  /* Used only in ESP_LOGI below. */
   ESP_LOGI(TAG, "Starting device ID generation from host address 0x%02X via %s",
            this->host_address_, protocol);
   this->device_id_state_ = DEVICE_ID_STATE_READING_APPLIANCE_TYPE;
@@ -60,6 +68,7 @@ void GeappliancesBridge::start_device_id_generation_()
 
 bool GeappliancesBridge::try_read_erd_with_retry_(tiny_erd_t erd, const char* erd_name)
 {
+  (void)erd_name;  /* Used only in ESP_LOGD below. */
   if (tiny_gea3_erd_client_read(this->active_erd_client_, &this->pending_request_id_,
                                  this->host_address_, erd)) {
     ESP_LOGD(TAG, "Reading %s ERD 0x%04X", erd_name, erd);

@@ -4,6 +4,7 @@
  */
 
 #include "heap_monitor.h"
+#include "esphome/core/hal.h"
 
 #ifdef USE_ESP32
 #include "esp_heap_caps.h"

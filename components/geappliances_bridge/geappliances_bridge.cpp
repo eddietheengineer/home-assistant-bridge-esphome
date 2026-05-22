@@ -11,7 +11,14 @@
 namespace esphome {
 namespace geappliances_bridge {
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-const-variable"
+#endif
 static const char *const TAG = "geappliances_bridge";
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 static const tiny_gea3_erd_client_configuration_t client_configuration = {
   .request_timeout = 250,
@@ -454,7 +461,14 @@ void GeappliancesBridge::dump_config() {
   }
 
   // Display bridge mode
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#endif
   const char* mode_str = "Unknown";
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
   if (this->mode_ == BRIDGE_MODE_POLL) {
     mode_str = "Polling";
   } else if (this->mode_ == BRIDGE_MODE_SUBSCRIBE) {
@@ -481,7 +495,14 @@ void GeappliancesBridge::dump_config() {
   }
 
   // Display current startup state for debugging
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#endif
   const char* phase_str = "Unknown";
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
   if (this->startup_hsm_.current == startup_state_protocol_stack)       phase_str = "Protocol Stack";
   else if (this->startup_hsm_.current == startup_state_autodiscovery)    phase_str = "Autodiscovery";
   else if (this->startup_hsm_.current == startup_state_device_id)        phase_str = "Device ID";

@@ -21,7 +21,14 @@
 namespace esphome {
 namespace geappliances_bridge {
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-const-variable"
+#endif
 static const char* const TAG = "ha_discovery";
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 void HaDiscoveryManager::init(const std::string& base_url,
                               const std::string& device_id,
@@ -205,6 +212,7 @@ void HaDiscoveryManager::publish_ha_discovery_(mqtt::MQTTClientComponent* mqtt_c
 
 void HaDiscoveryManager::publish_next_entity_(mqtt::MQTTClientComponent* mqtt_client)
 {
+  (void)mqtt_client;  /* Used only under USE_ESP_IDF. */
 #ifdef USE_ESP_IDF
   if (!this->queue_) return;
   if (mqtt_client == nullptr || !mqtt_client->is_connected()) return;
