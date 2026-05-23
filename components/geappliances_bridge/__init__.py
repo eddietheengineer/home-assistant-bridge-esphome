@@ -39,9 +39,10 @@ CONF_HA_DISCOVERY_BASE_URL = "ha_discovery_base_url"
 
 
 # Default base URL for the per-category JSONL files used by runtime HA discovery.
+# Uses HEAD to always resolve against the repository's default branch.
 HA_DISCOVERY_DEFAULT_BASE_URL = (
     "https://raw.githubusercontent.com/joshualongenecker/"
-    "home-assistant-bridge-esphome/main/ha_discovery"
+    "home-assistant-bridge-esphome/HEAD/ha_discovery"
 )
 
 # Bridge mode options (polling vs subscriptions)

@@ -224,9 +224,10 @@ class GeappliancesBridge : public Component {
 
   // Base URL for the per-category JSONL files.
   // Can be overridden in YAML via ha_discovery_base_url.
+  // Uses HEAD to always resolve against the repository's default branch.
   std::string ha_discovery_base_url_{
     "https://raw.githubusercontent.com/joshualongenecker/"
-    "home-assistant-bridge-esphome/main/ha_discovery"
+    "home-assistant-bridge-esphome/HEAD/ha_discovery"
   };
 
   // Autodiscovery manager (extracted from god class)
