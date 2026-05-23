@@ -158,7 +158,7 @@ The test suite covers various YAML configuration scenarios:
    - Default polling (10 seconds) for balanced performance
    - Slow polling (30 seconds) for reduced network traffic
 
-3. **Auto Mode** (future implementation)
+3. **Auto Mode** (default)
    ```yaml
    geappliances_bridge:
      gea3_uart_id: gea3_uart
@@ -168,7 +168,7 @@ The test suite covers various YAML configuration scenarios:
      # polling_interval: 10000  # Optional: set polling interval (ms)
      # polling_onlypublish_onchange: false  # Optional: only publish when value changes
    ```
-   - Start with subscription, fallback to polling if no activity
+   - Start with subscription, fallback to polling if no ERD activity within 30 seconds
 
 4. **Custom Device ID**
    ```yaml

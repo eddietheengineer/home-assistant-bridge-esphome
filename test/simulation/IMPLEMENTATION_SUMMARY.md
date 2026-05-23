@@ -54,7 +54,7 @@ Documentation covering:
 
 - Updated `Makefile` to include simulation tests in the build
 - All simulation tests run as part of `make test`
-- Tests compile and run successfully (28 tests passing)
+- Tests compile and run successfully
 
 ### 4. Documentation
 
@@ -115,8 +115,7 @@ mock().expectOneCall("update_erd")
 ## Test Coverage
 
 Current test suite includes:
-- **38 total tests** (17 original + 5 basic + 6 examples + 10 configuration tests)
-- **81 assertions** validating behavior
+- Tests across multiple files covering both subscription and polling modes
 - All tests passing
 - Covers both subscription and polling modes
 - Tests multiple appliance types and configurations

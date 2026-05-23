@@ -62,10 +62,7 @@ startup_state_top (root — handles entry/exit, defers all other signals)
   │
   ├─ startup_state_ha_discovery
   │    ├─ run_loop: run HaDiscoveryManager
-  │    └─ transition to heap_monitor (HA discovery runs in background)
-  │
-  ├─ startup_state_heap_monitor
-  │    └─ transition to running
+  │    └─ transition to running (HA discovery runs in background)
   │
   └─ startup_state_running (steady state)
        └─ run_loop: log poll state transitions, check subscription activity
