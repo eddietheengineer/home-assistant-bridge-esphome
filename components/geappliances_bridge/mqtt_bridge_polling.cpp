@@ -92,6 +92,26 @@ static void ensure_polling_list_capacity(mqtt_bridge_polling_t* self, uint16_t n
   self->polling_list_capacity = new_capacity;
 }
 
+static set<tiny_erd_t>& pending_registration_set(mqtt_bridge_polling_t* self)
+{
+  return *reinterpret_cast<set<tiny_erd_t>*>(self->pending_registration_set);
+}
+
+static void add_erd_to_polling_list_no_register(mqtt_bridge_polling_t* self, tiny_erd_t erd)
+{
+  /* Add to erd_set to prevent add_erd_to_polling_list() from treating this
+   * as a new ERD.  Add to pending_registration_set so signal_read_completed
+   * knows to register on MQTT.  Do NOT register on MQTT yet — that's deferred
+   * until the ERD is first successfully read. */
+  if (erd_set(self).find(erd) == erd_set(self).end()) {
+    erd_set(self).insert(erd);
+    pending_registration_set(self).insert(erd);
+    ensure_polling_list_capacity(self, self->polling_list_count + 1);
+    self->erd_polling_list[self->polling_list_count] = erd;
+    self->polling_list_count++;
+  }
+}
+
 static void add_erd_to_polling_list(mqtt_bridge_polling_t* self, tiny_erd_t erd)
 {
   if (erd_set(self).find(erd) == erd_set(self).end()) {
@@ -222,6 +242,14 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
       // supplies an api_parsed_list (the custom ERDs), so full discovery and
       // feature-bit reads are unnecessary.
       if (self->erd_host_address != tiny_gea_broadcast_address) {
+        // If we already have a polling list (re-entry after appliance lost),
+        // clear everything so ERDs are re-added via _no_register and will
+        // be re-registered on first read.
+        if (self->polling_list_count > 0 && self->api_parsed_list != nullptr) {
+          erd_set(self).clear();
+          pending_registration_set(self).clear();
+          self->polling_list_count = 0;
+        }
         tiny_hsm_state_t next = (self->api_parsed_list != nullptr)
           ? state_polling
           : state_add_common_erds;
@@ -290,6 +318,7 @@ static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     // set's tree nodes to be freed and reallocated on each reconnect, fragmenting
     // the heap over time.
     erd_set(self).clear();
+    pending_registration_set(self).clear();
     self->polling_list_count       = 0;
     self->request_id++;
     bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
@@ -380,19 +409,19 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
   switch (signal) {
     case tiny_hsm_signal_entry:
       erd_cache(self).clear();
-      // When using an API-parsed list, register all ERDs upfront since
-      // the discovery states are skipped.
+      // When using an API-parsed list, add all ERDs to the polling list
+      // without registering them yet — they'll be registered on first
+      // successful read, just like the discovery path.
       if (self->api_parsed_list != nullptr) {
         for (uint16_t i = 0; i < self->api_parsed_list_count; i++) {
-          add_erd_to_polling_list(self, self->api_parsed_list[i]);
+          add_erd_to_polling_list_no_register(self, self->api_parsed_list[i]);
         }
       }
-      // Add user-configured custom ERDs to the polling list. This works for
-      // both discovery mode (custom ERDs appended after discovered ERDs) and
-      // api_parsed_list mode (custom ERDs appended after API-parsed ERDs).
+      // Add user-configured custom ERDs to the polling list without
+      // registering them yet — same reasoning as above.
       if (self->custom_erd_list != nullptr) {
         for (uint16_t i = 0; i < self->custom_erd_list_count; i++) {
-          add_erd_to_polling_list(self, self->custom_erd_list[i]);
+          add_erd_to_polling_list_no_register(self, self->custom_erd_list[i]);
         }
       }
       // Pin erd_index to polling_list_count so that the first
@@ -470,9 +499,15 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       tiny_erd_t      erd       = args->read_completed.erd;
       const uint8_t*  erd_data  = reinterpret_cast<const uint8_t*>(args->read_completed.data);
       uint8_t         data_size = args->read_completed.data_size;
-      // Register any ERD that arrives for the first time. This handles delayed
-      // discovery responses that arrive after the transition to state_polling.
-      add_erd_to_polling_list(self, erd);
+      // If the ERD is in pending_registration_set (added via _no_register in
+      // entry), register it on MQTT now — confirming it's present on the
+      // appliance.  If not in erd_set at all, it's a late discovery response.
+      if (pending_registration_set(self).find(erd) != pending_registration_set(self).end()) {
+        mqtt_client_register_erd(self->mqtt_client, erd);
+        pending_registration_set(self).erase(erd);
+      } else if (erd_set(self).find(erd) == erd_set(self).end()) {
+        add_erd_to_polling_list(self, erd);
+      }
 
       bool should_publish;
       if (self->only_publish_on_change) {
@@ -590,6 +625,7 @@ static void mqtt_bridge_polling_init_impl(
   self->polling_list_capacity  = 0;
   self->erd_set   = reinterpret_cast<void*>(new set<tiny_erd_t>());
   self->erd_cache = reinterpret_cast<void*>(new map<tiny_erd_t, vector<uint8_t>>());
+  self->pending_registration_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
 
   tiny_event_subscription_init(
     &self->erd_client_activity_subscription, self, +[](void* context, const void* _args) {
@@ -680,8 +716,10 @@ void mqtt_bridge_polling_destroy(mqtt_bridge_polling_t* self)
 
   delete reinterpret_cast<set<tiny_erd_t>*>(self->erd_set);
   delete reinterpret_cast<map<tiny_erd_t, vector<uint8_t>>*>(self->erd_cache);
+  delete reinterpret_cast<set<tiny_erd_t>*>(self->pending_registration_set);
   self->erd_set = nullptr;
   self->erd_cache = nullptr;
+  self->pending_registration_set = nullptr;
 
   // Free the dynamically allocated polling list.
   delete[] self->erd_polling_list;

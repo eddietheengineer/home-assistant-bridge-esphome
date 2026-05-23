@@ -30,6 +30,10 @@ typedef struct {
   tiny_hsm_state_t next_discovery_state;
   void* erd_set;
   void* erd_cache;
+  // Set of ERDs that have been added to the polling list but not yet
+  // registered on MQTT (added via add_erd_to_polling_list_no_register).
+  // On first successful read, these are registered and removed from this set.
+  void* pending_registration_set;
   tiny_gea3_erd_client_request_id_t request_id;
   uint8_t erd_host_address;
   uint8_t appliance_type;
