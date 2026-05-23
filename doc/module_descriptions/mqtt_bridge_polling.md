@@ -20,6 +20,8 @@ poll_state_top (parent — handles write requests and appliance loss globally)
   │    └─ read ERD 0x0008 from broadcast (or skip if address pre-known)
   │       → if api_parsed_list set → state_add_appliance_api_feature_erds
   │       → else → state_add_common_erds
+  │       (on re-entry with known address + api_parsed_list: clear erd_set,
+  │        pending_registration_set, and polling list before transitioning)
   │
   ├─ state_add_common_erds
   │    └→ state_add_energy_erds
@@ -38,7 +40,9 @@ poll_state_top (parent — handles write requests and appliance loss globally)
        │   completed (success or failure) AND the timer has expired;
        │   on the first cycle (erd_index == polling_list_count), the
        │   timer kicks off the first read from ERD[0]
-       ├─ read_completed: publish if changed (or always), then read next ERD
+       ├─ read_completed: register on MQTT if deferred (first read for
+       │   api_parsed_list or custom_erd_list ERDs), then publish if changed
+       │   (or always), then read next ERD
        ├─ read_failed: count as completed, then read next ERD
        ├─ timer_expired (retry): re-arm (ERD client handles retries internally)
        ├─ mqtt_disconnected: continue polling (values are queued)
@@ -79,6 +83,8 @@ Discovery states use a shared `handle_discovery_list_signals` handler that reads
 - **MQTT disconnect tolerance**: On MQTT disconnect, the polling bridge continues polling — values are queued in `pending_updates` and flushed when MQTT reconnects. No re-identification is needed.
 - **API-parsed list shortcut**: When `api_parsed_list` is set (from appliance API feature bit parsing), the bridge skips common/energy/appliance discovery states and goes directly to polling with the parsed list.
 - **Custom ERD support**: User-configured custom ERDs are appended to the polling list after discovered or API-parsed ERDs.
+- **Deferred ERD registration**: ERDs added via `api_parsed_list` or `custom_erd_list` are placed in the polling list *without* being registered on MQTT initially.  Registration is deferred until the first successful read — confirming the ERD is actually present on the appliance.  ERDs are tracked in a `pending_registration_set` and removed from it once registered.  This avoids registering ERDs that may not exist on the specific appliance variant.
+- **Re-entry after appliance lost**: When the bridge re-enters `state_polling` after the appliance-lost timer fires (e.g., with `init_at_address`), the `erd_set`, `pending_registration_set`, and polling list are cleared in `state_identify_appliance` before transitioning back to `state_polling`, so all ERDs are re-added via the deferred path and re-registered on first read.
 
 ## Testing
 
