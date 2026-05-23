@@ -2,14 +2,14 @@
 
 ## Purpose
 
-The main ESPHome component class that orchestrates the entire GE Appliances bridge. It manages UART interfaces for GEA2/GEA3 protocols, drives the startup state machine, handles MQTT connection lifecycle, and coordinates all sub-managers (autodiscovery, device identity, feature bits, HA discovery, heap monitoring).
+The main ESPHome component class that orchestrates the entire GE Appliances bridge. It manages UART interfaces for GEA2/GEA3 protocols, drives the startup state machine, handles MQTT connection lifecycle, and coordinates all sub-managers (autodiscovery, device identity, feature bits, HA discovery).
 
 ## Public API
 
 | Method | Description |
 |--------|-------------|
 | `setup()` | Initialize timer group, UART adapters, ERD clients, GEA interfaces, managers |
-| `loop()` | Drive protocol stack, heap monitor, and startup HSM |
+| `loop()` | Drive protocol stack and startup HSM |
 | `dump_config()` | Log current configuration and state |
 | `get_setup_priority()` | Returns `setup_priority::DATA` (600) — after UART, before MQTT |
 | `teardown()` | Clean up HA discovery, bridges, and MQTT adapter |
@@ -28,9 +28,6 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `set_generate_device_config(bool)` | Enable device config generation |
 | `add_custom_erd(erd)` | Add a custom ERD to poll |
 | `set_ha_discovery_base_url(url)` | Override the HA discovery JSONL base URL |
-| `set_free_heap_sensor(sensor)` | Set free heap sensor |
-| `set_min_free_heap_sensor(sensor)` | Set minimum free heap sensor |
-| `set_heap_fragmentation_sensor(sensor)` | Set heap fragmentation sensor |
 
 ## Protected Methods
 
@@ -52,7 +49,7 @@ The bridge progresses through a linear sequence of phases via the `startup_hsm_`
 ```
 protocol_stack → autodiscovery → device_id → mqtt_client_init
              → feature_bits → bridge_init → subscription_watch
-             → ha_discovery → heap_monitor → running
+             → ha_discovery → running
 ```
 
 ## Dependencies
@@ -60,10 +57,9 @@ protocol_stack → autodiscovery → device_id → mqtt_client_init
 - ESPHome `Component` base class
 - ESPHome `uart::UARTComponent` — UART interfaces
 - ESPHome `mqtt::MQTTClientComponent` — MQTT client
-- ESPHome `sensor::Sensor` — heap monitoring sensors
 - `tiny_gea3_interface`, `tiny_gea3_erd_client` — GEA3 protocol stack
 - `tiny_gea2_interface`, `tiny_gea2_erd_client` — GEA2 protocol stack
-- All sub-managers: `AutodiscoveryManager`, `DeviceIdentityManager`, `FeatureBitManager`, `HaDiscoveryManager`, `HeapMonitor`
+- All sub-managers: `AutodiscoveryManager`, `DeviceIdentityManager`, `FeatureBitManager`, `HaDiscoveryManager`
 - Adapters: `esphome_uart_adapter`, `esphome_mqtt_client_adapter`, `gea2_erd_client_adapter`
 - Bridges: `mqtt_bridge`, `mqtt_bridge_polling`
 - `tiny_hsm`, `tiny_timer` — state machine and timer infrastructure

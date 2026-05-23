@@ -1,7 +1,6 @@
 #pragma once
 
 #include "esphome/core/component.h"
-#include "esphome/components/sensor/sensor.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/mqtt/mqtt_client.h"
 #include <string>
@@ -23,7 +22,6 @@ extern "C" {
 
 #include "esphome_uart_adapter.h"
 #include "esphome_mqtt_client_adapter.h"
-#include "heap_monitor.h"
 #include "device_identity_manager.h"
 #include "feature_bit_manager.h"
 #include "autodiscovery_manager.h"
@@ -65,8 +63,6 @@ class GeappliancesBridge : public Component {
     tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
   friend tiny_hsm_result_t startup_state_ha_discovery(
     tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_heap_monitor(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
   friend tiny_hsm_result_t startup_state_running(
     tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
@@ -90,9 +86,6 @@ class GeappliancesBridge : public Component {
   void set_generate_device_config(bool generate_device_config) { this->generate_device_config_ = generate_device_config; }
   void add_custom_erd(uint16_t erd) { this->custom_erds_vec_.push_back(static_cast<tiny_erd_t>(erd)); }
   void set_ha_discovery_base_url(const std::string& url) { this->ha_discovery_base_url_ = url; }
-  void set_free_heap_sensor(sensor::Sensor* s) { this->free_heap_sensor_ = s; }
-  void set_min_free_heap_sensor(sensor::Sensor* s) { this->min_free_heap_sensor_ = s; }
-  void set_heap_fragmentation_sensor(sensor::Sensor* s) { this->heap_fragmentation_sensor_ = s; }
 
  protected:
   void on_mqtt_connected_();
@@ -131,7 +124,7 @@ class GeappliancesBridge : public Component {
   // The HSM drives the linear startup sequence:
   //   protocol_stack → autodiscovery → device_id → mqtt_client_init
   //                 → feature_bits → bridge_init → subscription_watch
-  //                 → ha_discovery → heap_monitor → running
+  //                 → ha_discovery → running
   tiny_hsm_t startup_hsm_;
 
   uart::UARTComponent *uart_{nullptr};
@@ -235,15 +228,6 @@ class GeappliancesBridge : public Component {
     "https://raw.githubusercontent.com/joshualongenecker/"
     "home-assistant-bridge-esphome/main/ha_discovery"
   };
-
-  // Heap monitoring sensors - setter targets; values are passed to HeapMonitor
-  // during setup() so the manager can own them independently.
-  sensor::Sensor* free_heap_sensor_{nullptr};
-  sensor::Sensor* min_free_heap_sensor_{nullptr};
-  sensor::Sensor* heap_fragmentation_sensor_{nullptr};
-
-  // Heap monitoring - delegated to HeapMonitor manager
-  HeapMonitor heap_monitor_;
 
   // Autodiscovery manager (extracted from god class)
   AutodiscoveryManager autodiscovery_manager_;

@@ -24,7 +24,6 @@ SRC_FILES := \
   components/geappliances_bridge/mqtt_bridge.cpp \
   components/geappliances_bridge/mqtt_bridge_polling.cpp \
   components/geappliances_bridge/gea2_erd_client_adapter.cpp \
-  components/geappliances_bridge/heap_monitor.cpp \
   components/geappliances_bridge/device_identity_manager.cpp \
   components/geappliances_bridge/feature_bit_manager.cpp \
   components/geappliances_bridge/autodiscovery_manager.cpp \
@@ -116,13 +115,6 @@ $(BUILD_DIR)/%.c.o: %.c $(BUILD_DEPS)
 	@echo Compiling $<...
 	@mkdir -p $(dir $@)
 	@$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
-
-# Compile heap_monitor.cpp with USE_ESP32 so test doubles for esp_heap_caps
-# are used instead of the real ESP-IDF headers.
-$(BUILD_DIR)/components/geappliances_bridge/heap_monitor.cpp.o: components/geappliances_bridge/heap_monitor.cpp $(BUILD_DEPS)
-	@echo Compiling $<...
-	@mkdir -p $(dir $@)
-	@$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DUSE_ESP32 -c $< -o $@
 
 $(BUILD_DIR)/%.cpp.o: %.cpp $(BUILD_DEPS)
 	@echo Compiling $<...

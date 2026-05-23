@@ -70,12 +70,6 @@ void GeappliancesBridge::setup() {
   // Initialize timer group
   tiny_timer_group_init(&this->timer_group_, esphome_time_source_init());
 
-  // Initialize heap monitoring
-  this->heap_monitor_.init(
-      this->free_heap_sensor_,
-      this->min_free_heap_sensor_,
-      this->heap_fragmentation_sensor_);
-
   // Initialize autodiscovery manager
   this->autodiscovery_manager_.init(
       this->uart_ != nullptr ? &this->erd_client_.interface : nullptr,
@@ -232,11 +226,6 @@ void GeappliancesBridge::loop() {
   // UART bytes are processed and ERD read responses are delivered to the
   // active manager (autodiscovery, device ID, feature bits, polling bridge).
   this->run_protocol_stack_();
-
-  // Run heap monitoring every loop() regardless of HSM state so the
-  // heap sensors always show data, even if the HSM is stalled waiting
-  // for MQTT to connect.
-  this->heap_monitor_.run();
 
   // Initialize the startup HSM on the first loop() call.
   if (this->startup_hsm_.current == nullptr) {
@@ -521,7 +510,6 @@ void GeappliancesBridge::dump_config() {
   else if (this->startup_hsm_.current == startup_state_bridge_init)      phase_str = "Bridge Init";
   else if (this->startup_hsm_.current == startup_state_subscription_watch) phase_str = "Subscription Watch";
   else if (this->startup_hsm_.current == startup_state_ha_discovery)     phase_str = "HA Discovery";
-  else if (this->startup_hsm_.current == startup_state_heap_monitor)     phase_str = "Heap Monitor";
   else if (this->startup_hsm_.current == startup_state_running)          phase_str = "Running";
   ESP_LOGCONFIG(TAG, "  Startup State: %s", phase_str);
 }

@@ -470,37 +470,8 @@ tiny_hsm_result_t startup_state_ha_discovery(tiny_hsm_t* hsm, tiny_hsm_signal_t 
           bridge->subscription_activity_detected_,
           mqtt::global_mqtt_client);
 
-      // Transition to heap_monitor — HA discovery runs in the background
+      // Transition to running — HA discovery runs in the background
       // and doesn't block startup.
-      tiny_hsm_transition(hsm, startup_state_heap_monitor);
-      break;
-
-    case tiny_hsm_signal_exit:
-      break;
-
-    default:
-      return tiny_hsm_result_signal_deferred;
-  }
-
-  return tiny_hsm_result_signal_consumed;
-}
-
-// ============================================================================
-// Phase 9: Heap Monitor — update heap metrics
-//
-// Runs the HeapMonitor each loop iteration.  Transitions to running
-// (steady state) on first entry.
-// ============================================================================
-
-tiny_hsm_result_t startup_state_heap_monitor(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
-{
-  GeappliancesBridge* bridge = bridge_from_hsm(hsm);
-  (void)data;
-
-  switch (signal) {
-    case tiny_hsm_signal_entry:
-      bridge->heap_monitor_.run();
-      ESP_LOGI(TAG, "Startup complete — entering steady state");
       tiny_hsm_transition(hsm, startup_state_running);
       break;
 
@@ -515,7 +486,7 @@ tiny_hsm_result_t startup_state_heap_monitor(tiny_hsm_t* hsm, tiny_hsm_signal_t 
 }
 
 // ============================================================================
-// Phase 10: Running — steady-state operation
+// Phase 9: Running — steady-state operation
 //
 // All recurring tasks run every loop() iteration.  This is the terminal
 // state of the startup sequence.
@@ -550,8 +521,6 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
           bridge->mqtt_bridge_polling_.polling_list_complete,
           bridge->subscription_activity_detected_,
           mqtt::global_mqtt_client);
-
-      bridge->heap_monitor_.run();
       break;
 
     case tiny_hsm_signal_exit:
@@ -578,7 +547,6 @@ static const tiny_hsm_state_descriptor_t startup_hsm_state_descriptors[] = {
   { .state = startup_state_bridge_init,      .parent = startup_state_top },
   { .state = startup_state_subscription_watch, .parent = startup_state_top },
   { .state = startup_state_ha_discovery,     .parent = startup_state_top },
-  { .state = startup_state_heap_monitor,     .parent = startup_state_top },
   { .state = startup_state_running,          .parent = startup_state_top },
 };
 

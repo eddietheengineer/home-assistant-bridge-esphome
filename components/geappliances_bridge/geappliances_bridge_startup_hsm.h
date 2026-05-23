@@ -7,7 +7,7 @@
  *
  *   protocol_stack → autodiscovery → device_id → mqtt_client_init
  *                 → feature_bits → bridge_init → subscription_watch
- *                 → ha_discovery → heap_monitor → running
+ *                 → ha_discovery → running
  *
  * Each state handles its own entry/exit logic and waits for signals
  * from the managers (autodiscovery, device identity, feature bits,
@@ -72,9 +72,6 @@ tiny_hsm_result_t startup_state_subscription_watch(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
 tiny_hsm_result_t startup_state_ha_discovery(
-  tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-
-tiny_hsm_result_t startup_state_heap_monitor(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
 tiny_hsm_result_t startup_state_running(
