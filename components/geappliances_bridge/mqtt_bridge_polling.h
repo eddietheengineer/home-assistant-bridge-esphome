@@ -36,6 +36,11 @@ typedef struct {
   const tiny_erd_t* appliance_erd_list;
   uint16_t appliance_erd_list_count;
   uint16_t erd_index;
+  // Number of ERDs in the current polling cycle that have completed (success
+  // or failure).  Used together with erd_index to determine when a full cycle
+  // has finished — the cycle only restarts when cycle_completed_count equals
+  // polling_list_count AND the polling timer has expired.
+  uint16_t cycle_completed_count;
   bool only_publish_on_change;
   // Set to true once the HSM transitions into state_polling (all ERD
   // discovery phases have completed). Reset to false on appliance loss/

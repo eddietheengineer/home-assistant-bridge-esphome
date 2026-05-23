@@ -406,6 +406,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       // polling_list_count ensures signal_polling_timer_expired always resets to 0
       // and starts from ERD[0] on the very first polling pass.
       self->erd_index = self->polling_list_count;
+      self->cycle_completed_count = 0;
       arm_polling_timer(self, self->polling_interval_ms);
       self->polling_list_complete = true;
       self->current_state_name    = "polling";
@@ -416,7 +417,8 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       break;
 
     case signal_polling_timer_expired:
-      // Only start a new cycle when the current one is fully complete.
+      // Only restart a new cycle when ALL ERDs in the current cycle have
+      // completed (success or failure) AND the polling timer has expired.
       //
       // Previously a polling_retries counter force-reset the cycle after
       // (max_polling_retries + 1) × polling_interval_ms, starting a new
@@ -432,9 +434,16 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       // stops responding, no read_completed ever fires, the 100 ms retry timer
       // never re-arms, and after 60 s the HSM transitions back to
       // state_identify_appliance to rediscover the appliance.
-      if (self->erd_index >= self->polling_list_count) {
+      //
+      // Do NOT send a new read here — only reset the index if the current
+      // cycle is fully complete (all ERDs have either read successfully or
+      // failed).  Forward progress is driven entirely by
+      // signal_read_completed → send_next_poll_read_request().  This ensures
+      // only one read is ever in-flight at a time, preventing queue pressure
+      // from building up in the shared ERD client queue.
+      if (self->cycle_completed_count >= self->polling_list_count) {
         self->erd_index = 0;
-        send_next_poll_read_request(self);
+        self->cycle_completed_count = 0;
       }
       // Always re-arm the polling timer so the next cycle boundary is tracked
       // even when the current cycle is still in progress.
@@ -473,9 +482,20 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       if (should_publish) {
         mqtt_client_update_erd(self->mqtt_client, erd, erd_data, data_size);
       }
+      self->cycle_completed_count++;
       send_next_poll_read_request(self);
       break;
     }
+
+    case signal_read_failed:
+      // A read failed (all retries exhausted).  Count it as completed so the
+      // cycle can advance — the polling timer will restart the cycle from
+      // index 0 once all ERDs have either succeeded or failed.
+      disarm_timer(self);
+      reset_lost_appliance_timer(self);
+      self->cycle_completed_count++;
+      send_next_poll_read_request(self);
+      break;
 
     case signal_mqtt_disconnected:
       // MQTT broker lost connection; the appliance is still on the GEA bus
