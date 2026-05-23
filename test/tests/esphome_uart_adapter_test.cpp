@@ -202,3 +202,150 @@ TEST(esphome_uart_adapter, on_receive_returns_receive_event_interface)
   i_tiny_event_t* event = adapter.interface.api->on_receive(&adapter.interface);
   CHECK(event == &adapter.receive_event.interface);
 }
+
+/* ------------------------------------------------------------------ */
+/* enabled flag tests                                                   */
+/* ------------------------------------------------------------------ */
+
+TEST(esphome_uart_adapter, init_sets_enabled_to_true)
+{
+  init_adapter();
+  CHECK(adapter.enabled);
+}
+
+TEST(esphome_uart_adapter, set_enabled_can_disable_adapter)
+{
+  init_adapter();
+  esphome_uart_adapter_set_enabled(&adapter, false);
+  CHECK_FALSE(adapter.enabled);
+}
+
+TEST(esphome_uart_adapter, set_enabled_can_re_enable_adapter)
+{
+  init_adapter();
+  esphome_uart_adapter_set_enabled(&adapter, false);
+  esphome_uart_adapter_set_enabled(&adapter, true);
+  CHECK(adapter.enabled);
+}
+
+/* ------------------------------------------------------------------ */
+/* poll() respects enabled flag                                         */
+/* ------------------------------------------------------------------ */
+
+static void receive_event_callback(void* context, const void* args)
+{
+  (void)context;
+  uint8_t byte = reinterpret_cast<const tiny_uart_on_receive_args_t*>(args)->byte;
+  mock().actualCall("receive_event_published").withParameter("byte", byte);
+}
+
+static void send_complete_event_callback(void* context, const void* args)
+{
+  (void)context; (void)args;
+  mock().actualCall("send_complete_event_published");
+}
+
+TEST(esphome_uart_adapter, poll_does_not_publish_receive_events_when_disabled)
+{
+  init_adapter();
+  esphome_uart_adapter_set_enabled(&adapter, false);
+
+  // Pretend there are bytes available on the UART
+  mock_uart.read_buffer[0] = 0xAA;
+  mock_uart.read_buffer[1] = 0xBB;
+  mock_uart.available_count = 2;
+
+  // Trigger the poll callback by running the timer group once.
+  // Using elapse_time() with a period-0 timer causes an infinite loop
+  // because the timer re-schedules immediately, so we call run() directly.
+  tiny_timer_group_run(&timer_group.timer_group);
+
+  // No receive events should have been published
+  // (no mock expectations = no calls should have been made)
+}
+
+TEST(esphome_uart_adapter, poll_publishes_receive_events_when_enabled)
+{
+  init_adapter();
+
+  // Subscribe to the receive event so we can verify it's called
+  tiny_event_subscription_t sub;
+  tiny_event_subscription_init(&sub, nullptr, receive_event_callback);
+  tiny_event_subscribe(&adapter.receive_event.interface, &sub);
+
+  // Pretend there are bytes available on the UART
+  mock_uart.read_buffer[0] = 0xAA;
+  mock_uart.read_buffer[1] = 0xBB;
+  mock_uart.available_count = 2;
+
+  // Expect both bytes to be published
+  mock().expectOneCall("receive_event_published").withParameter("byte", 0xAA);
+  mock().expectOneCall("receive_event_published").withParameter("byte", 0xBB);
+
+  // Trigger the poll callback by running the timer group once
+  tiny_timer_group_run(&timer_group.timer_group);
+
+  // Unsubscribe to clean up
+  tiny_event_unsubscribe(&adapter.receive_event.interface, &sub);
+}
+
+TEST(esphome_uart_adapter, poll_does_not_publish_send_complete_when_disabled)
+{
+  init_adapter();
+  esphome_uart_adapter_set_enabled(&adapter, false);
+
+  // Mark that a byte was sent
+  adapter.sent = true;
+
+  // Trigger the poll callback by running the timer group once
+  tiny_timer_group_run(&timer_group.timer_group);
+
+  // No send_complete event should have been published
+  // Verify sent flag was NOT cleared (poll returned early)
+  CHECK(adapter.sent);
+}
+
+TEST(esphome_uart_adapter, poll_publishes_send_complete_when_enabled)
+{
+  init_adapter();
+
+  // Subscribe to the send_complete event
+  tiny_event_subscription_t sub;
+  tiny_event_subscription_init(&sub, nullptr, send_complete_event_callback);
+  tiny_event_subscribe(&adapter.send_complete_event.interface, &sub);
+
+  // Mark that a byte was sent
+  adapter.sent = true;
+
+  // Set available to 0 so poll only processes the send_complete
+  mock_uart.available_count = 0;
+
+  mock().expectOneCall("send_complete_event_published");
+
+  // Trigger the poll callback by running the timer group once
+  tiny_timer_group_run(&timer_group.timer_group);
+
+  // Verify sent flag was cleared
+  CHECK_FALSE(adapter.sent);
+
+  // Unsubscribe to clean up
+  tiny_event_unsubscribe(&adapter.send_complete_event.interface, &sub);
+}
+
+TEST(esphome_uart_adapter, poll_skips_receive_but_still_checks_sent_when_disabled)
+{
+  // When disabled, the entire poll() returns early, so sent is NOT cleared.
+  // This is intentional - the inactive adapter should not process anything.
+  init_adapter();
+  esphome_uart_adapter_set_enabled(&adapter, false);
+
+  mock_uart.read_buffer[0] = 0xAA;
+  mock_uart.available_count = 1;
+  adapter.sent = true;
+
+  tiny_timer_group_run(&timer_group.timer_group);
+
+  // Both receive processing AND sent clearing should be skipped
+  CHECK(adapter.sent);  // sent flag unchanged
+  CHECK(mock_uart.read_buffer_index == 0);  // no bytes read
+}

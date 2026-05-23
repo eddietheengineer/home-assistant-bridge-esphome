@@ -266,6 +266,16 @@ void GeappliancesBridge::run_protocol_stack_()
     this->autodiscovery_state_ == AUTODISCOVERY_GEA2_BROADCAST_PENDING ||
     this->autodiscovery_state_ == AUTODISCOVERY_GEA2_BROADCAST_WAITING);
 
+  // When both UARTs are configured, only enable the adapter for the active
+  // protocol.  Both adapters register poll timers in the shared timer_group_,
+  // so tiny_timer_group_run() fires both poll callbacks on every call.  By
+  // disabling the inactive adapter, its poll() returns early without reading
+  // bytes or publishing events to an interface that isn't being driven.
+  if (this->gea2_uart_ != nullptr && this->uart_ != nullptr) {
+    esphome_uart_adapter_set_enabled(&this->uart_adapter_, !need_gea2_loop);
+    esphome_uart_adapter_set_enabled(&this->gea2_uart_adapter_, need_gea2_loop);
+  }
+
   if (need_gea2_loop) {
     uint32_t loop_start_ms = millis();
     // Initialize s_gea2_last_ms on first entry so we don't replay accumulated
