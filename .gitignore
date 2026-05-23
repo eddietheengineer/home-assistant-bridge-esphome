@@ -14,6 +14,7 @@ build/
 logs/
 my_configs/
 tmp/
+packages/
 
 # IDE
 .vscode/
