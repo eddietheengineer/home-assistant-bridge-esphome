@@ -111,8 +111,16 @@ static bool send_next_read_request(mqtt_bridge_polling_t* self)
   bool more_erds_to_try = (self->erd_index < self->appliance_erd_list_count);
   if (more_erds_to_try) {
     self->request_id++;
-    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    arm_timer(self, retry_delay);
+    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    /* If the ERD client queue is full (e.g., because a subscription bridge
+     * is sharing the same client and flooding it with acknowledgments),
+     * don't arm the retry timer — that would compound the queue pressure
+     * and risk ring-buffer overflow corrupting adjacent heap metadata.
+     * The retry timer will be armed by the next signal_read_completed or
+     * signal_timer_expired that arrives once the queue drains. */
+    if (queued) {
+      arm_timer(self, retry_delay);
+    }
   }
   return more_erds_to_try;
 }
@@ -121,9 +129,14 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
 {
   if (self->erd_index < self->polling_list_count) {
     self->request_id++;
-    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->erd_polling_list[self->erd_index]);
+    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->erd_polling_list[self->erd_index]);
     self->erd_index++;
-    arm_timer(self, retry_delay);
+    /* Same guard as send_next_read_request: if the queue is full, don't
+     * arm the retry timer.  The polling timer (signal_polling_timer_expired)
+     * will retry the remaining ERDs on the next cycle boundary. */
+    if (queued) {
+      arm_timer(self, retry_delay);
+    }
   }
 }
 
@@ -217,10 +230,13 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
       }
       __attribute__((fallthrough));
 
-    case signal_timer_expired:
-      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, 0x0008);
-      arm_timer(self, retry_delay);
-      break;
+    case signal_timer_expired: {
+      self->request_id++;
+      bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, 0x0008);
+      if (queued) {
+        arm_timer(self, retry_delay);
+      }
+    } break;
 
     case signal_read_completed:
       // Ignore reads for ERDs other than the appliance type ERD (0x0008); they
@@ -275,8 +291,11 @@ static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     // the heap over time.
     erd_set(self).clear();
     self->polling_list_count       = 0;
-    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    arm_timer(self, retry_delay);
+    self->request_id++;
+    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    if (queued) {
+      arm_timer(self, retry_delay);
+    }
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -293,8 +312,11 @@ static tiny_hsm_result_t state_add_energy_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     self->appliance_erd_list       = energyErds;
     self->appliance_erd_list_count = energyErdCount;
     self->erd_index                = 0;
-    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    arm_timer(self, retry_delay);
+    self->request_id++;
+    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    if (queued) {
+      arm_timer(self, retry_delay);
+    }
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -315,8 +337,11 @@ static tiny_hsm_result_t state_add_appliance_api_feature_erds(tiny_hsm_t* hsm, t
     self->appliance_erd_list       = applianceApiFeatureErds;
     self->appliance_erd_list_count = applianceApiFeatureErdCount;
     self->erd_index                = 0;
-    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    arm_timer(self, retry_delay);
+    self->request_id++;
+    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    if (queued) {
+      arm_timer(self, retry_delay);
+    }
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -336,8 +361,11 @@ static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_sign
     self->appliance_erd_list       = applianceTypeToErdGroupTranslation[self->appliance_type].erdList;
     self->appliance_erd_list_count = applianceTypeToErdGroupTranslation[self->appliance_type].erdCount;
     self->erd_index                = 0;
-    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    arm_timer(self, retry_delay);
+    self->request_id++;
+    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    if (queued) {
+      arm_timer(self, retry_delay);
+    }
     return tiny_hsm_result_signal_consumed;
   }
 

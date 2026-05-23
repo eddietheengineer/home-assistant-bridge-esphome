@@ -259,7 +259,14 @@ class GeappliancesBridge : public Component {
   uint8_t send_queue_buffer_[1000];
 
   tiny_gea3_erd_client_t erd_client_;
-  uint8_t client_queue_buffer_[1024];
+  /* GEA3 client queue buffer — sized to hold enough read requests for the
+   * custom-ERD polling bridge (up to ~31 reads × 6 bytes each ≈ 188 bytes)
+   * plus in-flight subscription acknowledgments and write requests.
+   * Increased from 1024 to 2048 to prevent ring-buffer overflow when the
+   * polling bridge and subscription bridge share the same ERD client;
+   * overflow corrupts adjacent heap metadata causing
+   * prvCheckTasksWaitingTermination crashes (see mqtt_bridge_polling.cpp). */
+  uint8_t client_queue_buffer_[2048];
 
   // GEA2 components (only used when gea2_uart_ is set)
   esphome_uart_adapter_t gea2_uart_adapter_;

@@ -6,6 +6,7 @@
 
 #ifdef USE_ESP32
 #include "esp_system.h"
+#include "esp_task_wdt.h"
 #endif
 
 namespace esphome {
@@ -226,6 +227,11 @@ void GeappliancesBridge::loop() {
   // UART bytes are processed and ERD read responses are delivered to the
   // active manager (autodiscovery, device ID, feature bits, polling bridge).
   this->run_protocol_stack_();
+#ifdef USE_ESP32
+  // Feed the task watchdog after the protocol stack — the GEA2 tight loop
+  // can run for 200 ms wall-clock time, exceeding the default TWDT timeout.
+  esp_task_wdt_reset();
+#endif
 
   // Initialize the startup HSM on the first loop() call.
   if (this->startup_hsm_.current == nullptr) {
@@ -239,6 +245,12 @@ void GeappliancesBridge::loop() {
   // Send the run_loop signal to the current HSM state — this drives
   // the ongoing work for whatever phase we're in.
   tiny_hsm_send_signal(&this->startup_hsm_, signal_run_loop, nullptr);
+#ifdef USE_ESP32
+  // Feed the task watchdog after the HSM run_loop signal — in steady-state
+  // this drains pending MQTT updates (each acquiring the IDF MQTT mutex)
+  // and can block for hundreds of milliseconds.
+  esp_task_wdt_reset();
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -273,6 +285,12 @@ void GeappliancesBridge::run_protocol_stack_()
       s_gea2_last_ms = loop_start_ms;
     }
     while (millis() - loop_start_ms < GEA2_LOOP_DURATION_MS) {
+#ifdef USE_ESP32
+      // Feed the task watchdog inside the tight loop — 200 ms exceeds the
+      // default TWDT timeout (usually 3-10 s depending on config, but
+      // ESPHome's component watchdog is 30 ms).
+      esp_task_wdt_reset();
+#endif
       // Fire the GEA2 msec interrupt once per real millisecond. Doing this
       // here (not via a timer_group_ periodic timer) ensures the 1 ms
       // interrupt only fires inside the GEA2 tight loop and never starves
