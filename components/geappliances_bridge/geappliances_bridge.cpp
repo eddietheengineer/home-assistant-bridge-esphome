@@ -283,12 +283,30 @@ void GeappliancesBridge::run_protocol_stack_()
         tiny_event_publish(&this->gea2_msec_interrupt_, nullptr);
         s_gea2_last_ms++;
       }
+      // tiny_timer_group_run() services at most a single timer per call.
+      // With two period-0 UART poll timers in the shared group, calling it
+      // once would only fire one of them, effectively halving the polling
+      // rate of the active UART and causing missed bytes / ERD read failures.
+      // Drain both timers (the inactive one returns early from poll()).
       tiny_timer_group_run(&this->timer_group_);
+      if (this->uart_ != nullptr) {
+        tiny_timer_group_run(&this->timer_group_);
+      }
       tiny_gea2_interface_run(&this->gea2_interface_);
     }
   } else {
     // Standard single-pass for GEA3 (or while awaiting autodiscovery).
     tiny_timer_group_run(&this->timer_group_);
+    // When both UARTs are configured, the inactive adapter's period-0 poll
+    // timer also fires from the shared timer group.  Drain it so it doesn't
+    // steal the next call's slot from the GEA3 adapter's poll timer.
+    // tiny_timer_group_run() services exactly one timer per call; with two
+    // period-0 timers, calling it once leaves the other timer still pending,
+    // which means on the next loop() iteration the GEA2 (inactive) timer
+    // fires instead of the GEA3 one — effectively halving the GEA3 poll rate.
+    if (this->gea2_uart_ != nullptr) {
+      tiny_timer_group_run(&this->timer_group_);
+    }
     if (this->uart_ != nullptr) {
       tiny_gea3_interface_run(&this->gea3_interface_);
     }
