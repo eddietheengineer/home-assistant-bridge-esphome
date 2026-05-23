@@ -395,9 +395,9 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
           add_erd_to_polling_list(self, self->custom_erd_list[i]);
         }
       }
-      // Pin erd_index to polling_list_count so that the fallthrough into
-      // signal_timer_expired (below) is a no-op and the first actual read
-      // happens on the first signal_polling_timer_expired.
+      // Pin erd_index to polling_list_count so that the first
+      // signal_polling_timer_expired detects this as the "first cycle" and
+      // resets to 0, starting the first read from ERD[0].
       //
       // This also corrects the "first N ERDs skipped" bug from the full-discovery
       // path: previous HSM states (state_add_*) leave erd_index pointing at the
@@ -410,13 +410,18 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       arm_polling_timer(self, self->polling_interval_ms);
       self->polling_list_complete = true;
       self->current_state_name    = "polling";
-      __attribute__((fallthrough));
-
-    case signal_timer_expired:
-      send_next_poll_read_request(self);
       break;
 
-    case signal_polling_timer_expired:
+    case signal_timer_expired:
+      // Retry timer fired — a read is still in-flight after retry_delay.
+      // Do NOT resend; the ERD client handles retries internally (10 × 250ms).
+      // The retry timer is armed in send_next_poll_read_request() as a safety
+      // net and is disarmed in signal_read_completed / signal_read_failed.
+      // If we reach here, the read is still pending — just re-arm the timer.
+      arm_timer(self, retry_delay);
+      break;
+
+    case signal_polling_timer_expired: {
       // Only restart a new cycle when ALL ERDs in the current cycle have
       // completed (success or failure) AND the polling timer has expired.
       //
@@ -441,14 +446,23 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       // signal_read_completed → send_next_poll_read_request().  This ensures
       // only one read is ever in-flight at a time, preventing queue pressure
       // from building up in the shared ERD client queue.
-      if (self->cycle_completed_count >= self->polling_list_count) {
+      //
+      // On the very first entry into state_polling, erd_index is pinned to
+      // polling_list_count.  The first signal_polling_timer_expired is what
+      // kicks off the first cycle — detect this by checking erd_index ==
+      // polling_list_count (no reads have ever been sent in this cycle).
+      bool first_cycle = (self->erd_index == self->polling_list_count);
+      bool all_completed = (self->cycle_completed_count >= self->polling_list_count);
+      if (first_cycle || all_completed) {
         self->erd_index = 0;
         self->cycle_completed_count = 0;
+        send_next_poll_read_request(self);
       }
       // Always re-arm the polling timer so the next cycle boundary is tracked
       // even when the current cycle is still in progress.
       arm_polling_timer(self, self->polling_interval_ms);
       break;
+    }
 
     case signal_read_completed: {
       disarm_timer(self);

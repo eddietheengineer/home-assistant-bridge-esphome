@@ -34,8 +34,13 @@ poll_state_top (parent — handles write requests and appliance loss globally)
   │    └→ state_polling
   │
   └─ state_polling (steady state)
-       ├─ polling_timer_expired: start new cycle when current cycle is complete
-       ├─ read_completed: publish if changed (or always), queue next read
+       ├─ polling_timer_expired: restart cycle only when all ERDs have
+       │   completed (success or failure) AND the timer has expired;
+       │   on the first cycle (erd_index == polling_list_count), the
+       │   timer kicks off the first read from ERD[0]
+       ├─ read_completed: publish if changed (or always), then read next ERD
+       ├─ read_failed: count as completed, then read next ERD
+       ├─ timer_expired (retry): re-arm (ERD client handles retries internally)
        ├─ mqtt_disconnected: continue polling (values are queued)
        └─ appliance_lost (60 s timeout) → state_identify_appliance
 ```
@@ -55,7 +60,21 @@ Discovery states use a shared `handle_discovery_list_signals` handler that reads
 
 - **Dynamic polling list**: The `erd_polling_list` is heap-allocated and grows in increments of 32 ERDs (up to `POLLING_LIST_MAX_SIZE`). This avoids fixed-size buffer limitations while bounding memory usage.
 - **ERD cache for "publish on change"**: When `only_publish_on_change` is true, a `std::map<tiny_erd_t, vector<uint8_t>>` caches the last published value per ERD. Only changed values are published to MQTT.
-- **No overlapping polling cycles**: A new polling cycle only starts when the current cycle is fully complete (all ERDs read). This prevents the GEA3 ERD client's fixed-size request queue from overflowing, which can corrupt adjacent heap memory.
+- **Sequential polling — one read at a time**: Each ERD read is sent only after
+  the previous one has completed (success or failure).  Forward progress is
+  driven by `signal_read_completed` and `signal_read_failed`, each calling
+  `send_next_poll_read_request()` for the next ERD.  The retry timer
+  (`signal_timer_expired`) re-arms without resending — the ERD client handles
+  retries internally (10 × 250ms).
+- **Cycle restarts only when complete AND timer expired**: A new polling cycle
+  (resetting `erd_index` to 0) starts only when **all** ERDs in the current
+  cycle have either read successfully or failed **and** the polling timer
+  (default 10 s) has expired.  This prevents overlapping cycles from building
+  up pressure in the shared GEA3 ERD client queue.
+- **No overlapping polling cycles**: Because only one read is ever in-flight
+  and cycles don't restart until complete, the GEA3 ERD client's fixed-size
+  request queue cannot overflow — preventing heap corruption that previously
+  manifested as FreeRTOS `prvCheckTasksWaitingTermination` crashes.
 - **60-second appliance lost timer**: If no read completes within 60 seconds, the bridge transitions back to `state_identify_appliance` to rediscover the appliance.
 - **MQTT disconnect tolerance**: On MQTT disconnect, the polling bridge continues polling — values are queued in `pending_updates` and flushed when MQTT reconnects. No re-identification is needed.
 - **API-parsed list shortcut**: When `api_parsed_list` is set (from appliance API feature bit parsing), the bridge skips common/energy/appliance discovery states and goes directly to polling with the parsed list.

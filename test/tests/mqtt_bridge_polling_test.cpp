@@ -785,3 +785,248 @@ TEST(mqtt_bridge_polling_custom_erds, should_resume_polling_at_known_address_aft
   should_update_erd(custom_erd_2, uint8_t(0xDD));
   when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xDD));
 }
+
+// ============================================================================
+// Tests for sequential polling — one read at a time, cycle restarts only
+// when all ERDs have completed AND the polling timer has expired
+// ============================================================================
+
+TEST_GROUP(mqtt_bridge_polling_sequential)
+{
+  enum {
+    retry_delay = 100,
+    polling_interval = 1000,
+    erd_a = 0x1001,
+    erd_b = 0x1002,
+    erd_c = 0x1003
+  };
+
+  mqtt_bridge_polling_t self;
+
+  tiny_timer_group_double_t timer_group;
+  tiny_gea3_erd_client_double_t erd_client;
+  mqtt_client_double_t mqtt_client;
+
+  const tiny_erd_t api_list[3] = {erd_a, erd_b, erd_c};
+
+  void setup()
+  {
+    mock().strictOrder();
+    tiny_timer_group_double_init(&timer_group);
+    tiny_gea3_erd_client_double_init(&erd_client);
+    mqtt_client_double_init(&mqtt_client);
+  }
+
+  void teardown()
+  {
+    mock().disable();
+    mqtt_bridge_polling_destroy(&self);
+    mock().enable();
+  }
+
+  void when_the_bridge_is_initialized()
+  {
+    mqtt_bridge_polling_init(
+      &self,
+      &timer_group.timer_group,
+      &erd_client.interface,
+      &mqtt_client.interface,
+      polling_interval,
+      false);
+    self.api_parsed_list = api_list;
+    self.api_parsed_list_count = 3;
+  }
+
+  void after(tiny_timer_ticks_t ticks)
+  {
+    tiny_timer_group_double_elapse_time(&timer_group, ticks);
+  }
+
+  void trigger_read_completed(uint8_t address, tiny_erd_t erd, const void* data, uint8_t data_size)
+  {
+    tiny_gea3_erd_client_on_activity_args_t args;
+    args.type = tiny_gea3_erd_client_activity_type_read_completed;
+    args.address = address;
+    args.read_completed.erd = erd;
+    args.read_completed.data = data;
+    args.read_completed.data_size = data_size;
+    tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
+  }
+
+  void trigger_read_failed(tiny_erd_t erd)
+  {
+    tiny_gea3_erd_client_on_activity_args_t args;
+    args.type = tiny_gea3_erd_client_activity_type_read_failed;
+    args.address = 0xC0;
+    args.read_failed.request_id = 0;
+    args.read_failed.erd = erd;
+    args.read_failed.reason = tiny_gea3_erd_client_read_failure_reason_retries_exhausted;
+    tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
+  }
+
+  void should_request_read(uint8_t address, tiny_erd_t erd)
+  {
+    mock()
+      .expectOneCall("read")
+      .onObject(&erd_client)
+      .withParameter("address", address)
+      .withParameter("erd", erd)
+      .ignoreOtherParameters()
+      .andReturnValue(true);
+  }
+
+  void should_register_erd(tiny_erd_t erd)
+  {
+    mock()
+      .expectOneCall("register_erd")
+      .onObject(&mqtt_client)
+      .withParameter("erd", erd);
+  }
+
+  template <typename T>
+  void should_update_erd(tiny_erd_t erd, T value)
+  {
+    static T _value;
+    _value = value;
+    mock()
+      .expectOneCall("update_erd")
+      .onObject(&mqtt_client)
+      .withParameter("erd", erd)
+      .withMemoryBufferParameter("value", reinterpret_cast<const uint8_t*>(&_value), sizeof(_value));
+  }
+
+  template <typename T>
+  void when_a_poll_read_completes(uint8_t address, tiny_erd_t erd, T value)
+  {
+    static T _value;
+    _value = value;
+    trigger_read_completed(address, erd, &_value, sizeof(_value));
+  }
+};
+
+// The polling timer should NOT restart a new cycle while ERDs are still
+// in-flight mid-cycle.  Only the first cycle (erd_index == polling_list_count)
+// or a fully completed cycle should trigger a restart.
+TEST(mqtt_bridge_polling_sequential, should_not_restart_cycle_mid_cycle_when_timer_fires)
+{
+  // Init + skip feature ERD discovery
+  should_request_read(0xFF, 0x0008);
+  when_the_bridge_is_initialized();
+
+  mock().disable();
+  uint8_t appliance_type = 0x03;
+  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
+  after(retry_delay * applianceApiFeatureErdCount);
+  mock().enable();
+
+  // First polling timer fires (first cycle): starts reading erd_a
+  should_request_read(0xC0, erd_a);
+  after(polling_interval);
+
+  // erd_a completes, reads erd_b
+  should_update_erd(erd_a, uint8_t(0x01));
+  should_request_read(0xC0, erd_b);
+  when_a_poll_read_completes(0xC0, erd_a, uint8_t(0x01));
+
+  // Polling timer fires again while erd_b is in-flight — should NOT restart
+  // the cycle because not all ERDs have completed.  No new read should be sent.
+  after(polling_interval);
+
+  // erd_b completes, reads erd_c
+  should_update_erd(erd_b, uint8_t(0x02));
+  should_request_read(0xC0, erd_c);
+  when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x02));
+
+  // erd_c completes, cycle is now fully done
+  should_update_erd(erd_c, uint8_t(0x03));
+  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x03));
+
+  // Next polling timer fires: all ERDs completed, so restart from erd_a
+  should_request_read(0xC0, erd_a);
+  after(polling_interval);
+}
+
+// When a read fails (all retries exhausted), the cycle should advance to the
+// next ERD — a failed read counts as "completed" for cycle-tracking purposes.
+TEST(mqtt_bridge_polling_sequential, should_advance_cycle_on_read_failed)
+{
+  // Init + skip feature ERD discovery
+  should_request_read(0xFF, 0x0008);
+  when_the_bridge_is_initialized();
+
+  mock().disable();
+  uint8_t appliance_type = 0x03;
+  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
+  after(retry_delay * applianceApiFeatureErdCount);
+  mock().enable();
+
+  // First polling timer fires: starts reading erd_a
+  should_request_read(0xC0, erd_a);
+  after(polling_interval);
+
+  // erd_a fails — should advance to erd_b
+  should_request_read(0xC0, erd_b);
+  trigger_read_failed(erd_a);
+
+  // erd_b completes, reads erd_c
+  should_update_erd(erd_b, uint8_t(0x02));
+  should_request_read(0xC0, erd_c);
+  when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x02));
+
+  // erd_c completes, cycle is now fully done (1 failed + 2 succeeded = 3 total)
+  should_update_erd(erd_c, uint8_t(0x03));
+  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x03));
+
+  // Next polling timer fires: all ERDs completed (success or failure), restart
+  should_request_read(0xC0, erd_a);
+  after(polling_interval);
+}
+
+// Verify that reads are strictly sequential — each read is sent only after
+// the previous one has completed (success or failure), never in parallel.
+TEST(mqtt_bridge_polling_sequential, should_read_erds_sequentially_one_at_a_time)
+{
+  // Init + skip feature ERD discovery
+  should_request_read(0xFF, 0x0008);
+  when_the_bridge_is_initialized();
+
+  mock().disable();
+  uint8_t appliance_type = 0x03;
+  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
+  after(retry_delay * applianceApiFeatureErdCount);
+  mock().enable();
+
+  // First polling timer fires: erd_a
+  should_request_read(0xC0, erd_a);
+  after(polling_interval);
+
+  // erd_a completes → erd_b
+  should_update_erd(erd_a, uint8_t(0x01));
+  should_request_read(0xC0, erd_b);
+  when_a_poll_read_completes(0xC0, erd_a, uint8_t(0x01));
+
+  // erd_b completes → erd_c
+  should_update_erd(erd_b, uint8_t(0x02));
+  should_request_read(0xC0, erd_c);
+  when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x02));
+
+  // erd_c completes → no more ERDs in cycle
+  should_update_erd(erd_c, uint8_t(0x03));
+  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x03));
+
+  // Polling timer fires: restart from erd_a
+  should_request_read(0xC0, erd_a);
+  after(polling_interval);
+
+  // Second cycle: erd_a → erd_b → erd_c
+  should_update_erd(erd_a, uint8_t(0x04));
+  should_request_read(0xC0, erd_b);
+  when_a_poll_read_completes(0xC0, erd_a, uint8_t(0x04));
+
+  should_update_erd(erd_b, uint8_t(0x05));
+  should_request_read(0xC0, erd_c);
+  when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x05));
+
+  should_update_erd(erd_c, uint8_t(0x06));
+  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x06));
+}

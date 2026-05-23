@@ -165,6 +165,9 @@ TEST(esphome_mqtt_client_adapter, update_erd_publishes_hex_when_connected)
   uint8_t data[] = {0x01, 0x02, 0xAB};
   adapter.interface.api->update_erd(&adapter.interface, 0x0092, data, 3);
 
+  // update_erd always queues; notify_connected drains the queue and publishes
+  esphome_mqtt_client_adapter_notify_connected(&adapter);
+
   CHECK_EQUAL(1u, mock_client.published_topics.size());
   CHECK(mock_client.published_topics.back() == "geappliances/test_device/erd/0x0092/value");
   CHECK(mock_client.published_payloads.back() == "0102ab");
@@ -180,6 +183,9 @@ TEST(esphome_mqtt_client_adapter, update_erd_publishes_string_when_in_filter)
 
   uint8_t data[] = "Hello";
   adapter.interface.api->update_erd(&adapter.interface, 0x0001, data, 5);
+
+  // update_erd always queues; notify_connected drains the queue and publishes
+  esphome_mqtt_client_adapter_notify_connected(&adapter);
 
   CHECK_EQUAL(1u, mock_client.published_topics.size());
   CHECK(mock_client.published_topics.back() == "geappliances/test_device/erd/0x0001/value");
