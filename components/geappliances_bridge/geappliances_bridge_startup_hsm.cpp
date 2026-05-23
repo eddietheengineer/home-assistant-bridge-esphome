@@ -109,7 +109,9 @@ tiny_hsm_result_t startup_state_protocol_stack(tiny_hsm_t* hsm, tiny_hsm_signal_
 // Phase 2: Autodiscovery — find appliance on bus
 //
 // Runs the AutodiscoveryManager each loop iteration.  Transitions to
-// device_id when autodiscovery completes (success or failure).
+// device_id only when autodiscovery successfully discovers a board.
+// If no board responds, the manager keeps retrying indefinitely — this
+// state will not transition until a valid board address is found.
 // ============================================================================
 
 tiny_hsm_result_t startup_state_autodiscovery(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
@@ -125,8 +127,9 @@ tiny_hsm_result_t startup_state_autodiscovery(tiny_hsm_t* hsm, tiny_hsm_signal_t
     case signal_run_loop:
       bridge->autodiscovery_manager_.run();
 
-      // Check if autodiscovery is complete (success or failure).
-      if (bridge->autodiscovery_manager_.is_complete() || bridge->autodiscovery_manager_.is_failed()) {
+      // Only transition when autodiscovery successfully discovers a board.
+      // If no board responds, the manager keeps retrying indefinitely.
+      if (bridge->autodiscovery_manager_.is_complete()) {
         ESP_LOGI(TAG, "Autodiscovery complete (host=0x%02X, protocol=%s)",
                  bridge->autodiscovery_manager_.get_host_address(),
                  bridge->autodiscovery_manager_.is_gea2_protocol() ? "GEA2" : "GEA3");
@@ -135,8 +138,11 @@ tiny_hsm_result_t startup_state_autodiscovery(tiny_hsm_t* hsm, tiny_hsm_signal_t
       break;
 
     case signal_autodiscovery_complete:
-      // External signal from autodiscovery callback — transition immediately.
-      tiny_hsm_transition(hsm, startup_state_device_id);
+      // External signal from autodiscovery callback — transition only if
+      // a board was actually discovered (not on failure/no-response).
+      if (bridge->autodiscovery_manager_.is_complete()) {
+        tiny_hsm_transition(hsm, startup_state_device_id);
+      }
       break;
 
     case tiny_hsm_signal_exit:

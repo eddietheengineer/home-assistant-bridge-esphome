@@ -132,7 +132,42 @@ TEST(autodiscovery_manager, init_is_not_complete)
 {
   init_both_uart();
   CHECK_FALSE(manager.is_complete());
+  CHECK_FALSE(manager.is_failed());  // is_failed() always returns false — retries indefinitely
+}
+
+TEST(autodiscovery_manager, is_failed_always_returns_false)
+{
+  init_both_uart();
   CHECK_FALSE(manager.is_failed());
+
+  /* Even after many timeouts with no response, is_failed() stays false */
+  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
+  manager.run();  /* → GEA3_BROADCAST_PENDING */
+  expect_gea3_broadcast_read();
+  uint32_t gea3_time = AUTODISCOVERY_STARTUP_DELAY_MS + 100;
+  esphome_hal_double_set_millis(gea3_time);
+  manager.run();  /* → GEA3_BROADCAST_WAITING */
+
+  /* Timeout with no response → retry GEA2 */
+  esphome_hal_double_set_millis(gea3_time + AUTODISCOVERY_BROADCAST_WINDOW_MS);
+  manager.run();  /* → GEA2_BROADCAST_PENDING */
+  expect_gea2_broadcast_read();
+  uint32_t gea2_time = gea3_time + AUTODISCOVERY_BROADCAST_WINDOW_MS + 100;
+  esphome_hal_double_set_millis(gea2_time);
+  manager.run();  /* → GEA2_BROADCAST_WAITING */
+
+  /* Timeout again with no response → retry GEA3 */
+  esphome_hal_double_set_millis(gea2_time + AUTODISCOVERY_BROADCAST_WINDOW_MS);
+  manager.run();  /* → GEA3_BROADCAST_PENDING */
+  expect_gea3_broadcast_read();
+  uint32_t gea3_time2 = gea2_time + AUTODISCOVERY_BROADCAST_WINDOW_MS + 100;
+  esphome_hal_double_set_millis(gea3_time2);
+  manager.run();  /* → GEA3_BROADCAST_WAITING */
+
+  CHECK_FALSE(manager.is_failed());
+  CHECK_FALSE(manager.is_complete());
+  /* Should still be in a retrying state, not COMPLETE */
+  CHECK(manager.get_state() != AUTODISCOVERY_COMPLETE);
 }
 
 /* ------------------------------------------------------------------ */

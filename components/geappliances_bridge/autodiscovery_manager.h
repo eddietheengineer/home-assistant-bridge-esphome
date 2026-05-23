@@ -3,9 +3,12 @@
  * @brief AutodiscoveryManager – appliance autodiscovery state machine.
  *
  * Extracted from GeappliancesBridge as part of the god class refactoring.
- * Encapsulates the GEA3→GEA2 broadcast discovery logic with max-retry
- * backoff.  On completion the manager reports the discovered host address,
- * active ERD client, and protocol type back to the bridge via getters.
+ * Encapsulates the GEA3→GEA2 broadcast discovery logic with infinite retry.
+ * The manager never gives up — if no board responds, it keeps retrying
+ * indefinitely, alternating between GEA3 and GEA2 (if both UARTs are
+ * configured).  On completion the manager reports the discovered host
+ * address, active ERD client, and protocol type back to the bridge via
+ * getters.
  */
 
 #pragma once
@@ -23,7 +26,6 @@ namespace geappliances_bridge {
 
 static constexpr uint32_t AUTODISCOVERY_STARTUP_DELAY_MS      = 5000;
 static constexpr uint32_t AUTODISCOVERY_BROADCAST_WINDOW_MS   = 5000;
-static constexpr uint32_t AUTODISCOVERY_MAX_RETRIES           = 3;
 
 enum AutodiscoveryState {
   AUTODISCOVERY_WAITING_5S,
@@ -48,7 +50,7 @@ class AutodiscoveryManager {
   void on_broadcast_response(uint8_t address, uint8_t appliance_type, bool is_gea3);
 
   bool is_complete() const { return state_ == AUTODISCOVERY_COMPLETE; }
-  bool is_failed()   const { return state_ == AUTODISCOVERY_COMPLETE && this->host_address_ == 0; }
+  bool is_failed()   const { return false; }  // Never fails — retries indefinitely
 
   uint8_t  get_host_address()       const { return host_address_; }
   i_tiny_gea3_erd_client_t* get_active_erd_client() const { return active_erd_client_; }

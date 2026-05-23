@@ -80,18 +80,13 @@ void AutodiscoveryManager::run()
           if (this->on_complete_cb_) this->on_complete_cb_();
         } else {
           this->retry_count_++;
-          if (this->retry_count_ > AUTODISCOVERY_MAX_RETRIES) {
-            ESP_LOGE(TAG, "Autodiscovery failed after %u retries - no appliance found on bus",
+          if (this->has_gea2_uart_) {
+            ESP_LOGW(TAG, "No GEA3 boards found, trying GEA2... (attempt %u)",
                      this->retry_count_);
-            this->state_ = AUTODISCOVERY_COMPLETE;
-            if (this->on_complete_cb_) this->on_complete_cb_();
-          } else if (this->has_gea2_uart_) {
-            ESP_LOGW(TAG, "No GEA3 boards found, trying GEA2... (retry %u/%u)",
-                     this->retry_count_, AUTODISCOVERY_MAX_RETRIES);
             this->state_ = AUTODISCOVERY_GEA2_BROADCAST_PENDING;
           } else {
-            ESP_LOGW(TAG, "No GEA3 boards found, retrying GEA3... (retry %u/%u)",
-                     this->retry_count_, AUTODISCOVERY_MAX_RETRIES);
+            ESP_LOGW(TAG, "No GEA3 boards found, retrying GEA3... (attempt %u)",
+                     this->retry_count_);
             this->state_ = AUTODISCOVERY_GEA3_BROADCAST_PENDING;
           }
         }
@@ -121,18 +116,13 @@ void AutodiscoveryManager::run()
           if (this->on_complete_cb_) this->on_complete_cb_();
         } else {
           this->retry_count_++;
-          if (this->retry_count_ > AUTODISCOVERY_MAX_RETRIES) {
-            ESP_LOGE(TAG, "Autodiscovery failed after %u retries - no appliance found on bus",
+          if (this->has_gea3_uart_) {
+            ESP_LOGW(TAG, "No GEA2 boards found, retrying GEA3... (attempt %u)",
                      this->retry_count_);
-            this->state_ = AUTODISCOVERY_COMPLETE;
-            if (this->on_complete_cb_) this->on_complete_cb_();
-          } else if (this->has_gea3_uart_) {
-            ESP_LOGW(TAG, "No GEA2 boards found, retrying GEA3... (retry %u/%u)",
-                     this->retry_count_, AUTODISCOVERY_MAX_RETRIES);
             this->state_ = AUTODISCOVERY_GEA3_BROADCAST_PENDING;
           } else {
-            ESP_LOGW(TAG, "No GEA2 boards found, retrying GEA2... (retry %u/%u)",
-                     this->retry_count_, AUTODISCOVERY_MAX_RETRIES);
+            ESP_LOGW(TAG, "No GEA2 boards found, retrying GEA2... (attempt %u)",
+                     this->retry_count_);
             this->state_ = AUTODISCOVERY_GEA2_BROADCAST_PENDING;
           }
         }
