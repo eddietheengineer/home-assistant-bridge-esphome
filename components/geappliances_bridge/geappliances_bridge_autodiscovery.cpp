@@ -56,12 +56,5 @@ void GeappliancesBridge::on_mqtt_connected_()
 
 }
 
-void GeappliancesBridge::notify_mqtt_disconnected_()
-{
-  if (this->mqtt_bridge_initialized_) {
-    esphome_mqtt_client_adapter_notify_disconnected(&this->mqtt_client_adapter_);
-  }
-}
-
 }  // namespace geappliances_bridge
 }  // namespace esphome

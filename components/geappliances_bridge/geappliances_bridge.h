@@ -98,7 +98,6 @@ class GeappliancesBridge : public Component {
 
  protected:
   void on_mqtt_connected_();
-  void notify_mqtt_disconnected_();
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();
   void notify_device_id_sensors_();
