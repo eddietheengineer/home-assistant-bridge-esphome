@@ -40,9 +40,11 @@ void GeappliancesBridge::start_feature_bit_reading_()
     return;
   }
   ESP_LOGI(TAG, "Reading device info ERDs for MQTT publish, then appliance API feature bits...");
-  this->feature_bit_manager_.init(this->active_erd_client_, this->host_address_,
-                                   &this->mqtt_client_adapter_.interface,
-                                   this->mqtt_client_adapter_initialized_);
+  this->feature_bit_manager_.init(
+      this->autodiscovery_manager_.get_active_erd_client(),
+      this->autodiscovery_manager_.get_host_address(),
+      &this->mqtt_client_adapter_.interface,
+      this->mqtt_client_adapter_initialized_);
 }
 
 // ---------------------------------------------------------------------------

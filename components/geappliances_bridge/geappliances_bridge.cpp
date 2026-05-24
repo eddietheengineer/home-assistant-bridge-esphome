@@ -379,7 +379,7 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
   // Subscription publications: track AUTO mode activity and reset the HA
   // discovery quiet window for both AUTO and SUBSCRIBE modes.
   if (this->mqtt_bridge_initialized_ &&
-      args->address == this->host_address_ &&
+      args->address == this->autodiscovery_manager_.get_host_address() &&
       args->type == tiny_gea3_erd_client_activity_type_subscription_publication_received) {
     if (this->mode_ == BRIDGE_MODE_AUTO && this->subscription_mode_active_ &&
         !this->subscription_activity_detected_) {
@@ -411,7 +411,7 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
   }
 
   // Device ID + feature bit reads (after discovery, before bridge init)
-  if (!this->mqtt_bridge_initialized_ && args->address == this->host_address_) {
+  if (!this->mqtt_bridge_initialized_ && args->address == this->autodiscovery_manager_.get_host_address()) {
     if (args->type == tiny_gea3_erd_client_activity_type_read_completed) {
       tiny_erd_t erd = args->read_completed.erd;
       const uint8_t* data = reinterpret_cast<const uint8_t*>(args->read_completed.data);
@@ -520,7 +520,7 @@ void GeappliancesBridge::dump_config() {
     ESP_LOGCONFIG(TAG, "  Device ID Generation: FAILED (see logs for details)");
   }
   ESP_LOGCONFIG(TAG, "  Client Address: 0x%02X", this->client_address_);
-  ESP_LOGCONFIG(TAG, "  Host Address: 0x%02X", this->host_address_);
+  ESP_LOGCONFIG(TAG, "  Host Address: 0x%02X", this->autodiscovery_manager_.get_host_address());
   if (this->uart_ != nullptr) {
     ESP_LOGCONFIG(TAG, "  GEA3 UART: configured (baud %lu)", baud);
   }

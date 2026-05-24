@@ -173,8 +173,8 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
       if (!bridge->device_identity_manager_.is_complete() && !bridge->device_identity_manager_.is_failed()) {
         bridge->device_identity_manager_.init(
             bridge->configured_device_id_,
-            bridge->active_erd_client_,
-            bridge->host_address_);
+            bridge->autodiscovery_manager_.get_active_erd_client(),
+            bridge->autodiscovery_manager_.get_host_address());
       }
       // Start the phase timeout timer.
       bridge->device_id_phase_start_ms_ = millis();

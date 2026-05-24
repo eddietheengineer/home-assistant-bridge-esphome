@@ -144,7 +144,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     mqtt_bridge_polling_init(
       &this->mqtt_bridge_polling_,
       &this->timer_group_,
-      this->active_erd_client_,
+      this->autodiscovery_manager_.get_active_erd_client(),
       &this->mqtt_client_adapter_.interface,
       this->polling_interval_ms_,
       this->polling_only_publish_on_change_);
@@ -154,9 +154,9 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     mqtt_bridge_init(
       &this->mqtt_bridge_,
       &this->timer_group_,
-      this->active_erd_client_,
+      this->autodiscovery_manager_.get_active_erd_client(),
       &this->mqtt_client_adapter_.interface,
-      this->host_address_);
+      this->autodiscovery_manager_.get_host_address());
     this->subscription_bridge_initialized_ = true;
 
     if (!this->custom_erds_vec_.empty()) {
@@ -241,11 +241,11 @@ void GeappliancesBridge::start_custom_erd_polling_()
   mqtt_bridge_polling_init_at_address(
     &this->mqtt_bridge_polling_,
     &this->timer_group_,
-    this->active_erd_client_,
+    this->autodiscovery_manager_.get_active_erd_client(),
     &this->mqtt_client_adapter_.interface,
     this->polling_interval_ms_,
     this->polling_only_publish_on_change_,
-    this->host_address_,
+    this->autodiscovery_manager_.get_host_address(),
     this->custom_erds_vec_.data(),
     static_cast<uint16_t>(this->custom_erds_vec_.size()));
   this->custom_erd_polling_started_ = true;
@@ -314,7 +314,7 @@ void GeappliancesBridge::check_subscription_activity_()
   mqtt_bridge_polling_init(
     &this->mqtt_bridge_polling_,
     &this->timer_group_,
-    this->active_erd_client_,
+    this->autodiscovery_manager_.get_active_erd_client(),
     &this->mqtt_client_adapter_.interface,
     this->polling_interval_ms_,
     this->polling_only_publish_on_change_);
