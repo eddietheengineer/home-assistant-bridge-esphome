@@ -67,6 +67,11 @@ class FeatureBitManager {
   bool is_failed() const;
   bool is_parse_pending() const;
 
+  // Mark the manager as complete (with whatever data has been collected so far).
+  // Used when the phase times out — the bridge should continue startup rather
+  // than hang indefinitely waiting for ERD reads that will never arrive.
+  void mark_timed_out();
+
   const std::set<tiny_erd_t>& get_valid_erds() const;
   const std::vector<tiny_erd_t>& get_valid_erds_vec() const;
   bool is_valid_list_ready() const;

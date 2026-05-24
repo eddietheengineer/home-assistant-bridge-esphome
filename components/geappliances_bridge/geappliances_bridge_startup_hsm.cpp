@@ -181,12 +181,7 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
       // If a device_id is pre-configured, the manager is already complete
       // from init().  Sync the final_device_id_ and transition.
       if (bridge->device_identity_manager_.is_complete()) {
-        bridge->final_device_id_ = bridge->device_identity_manager_.get_device_id();
-        bridge->appliance_type_  = bridge->device_identity_manager_.get_appliance_type();
-        bridge->model_number_    = bridge->device_identity_manager_.get_model_number();
-        bridge->serial_number_   = bridge->device_identity_manager_.get_serial_number();
-        bridge->generated_device_id_ = bridge->device_identity_manager_.get_generated_device_id();
-        bridge->notify_device_id_sensors_();
+        bridge->finalize_device_id_(true);
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       }
       break;
@@ -196,13 +191,7 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
       if (millis() - bridge->device_id_phase_start_ms_ >= bridge->DEVICE_ID_PHASE_TIMEOUT_MS) {
         ESP_LOGW(TAG, "Device ID phase timed out after %u ms, using fallback",
                  static_cast<unsigned>(bridge->DEVICE_ID_PHASE_TIMEOUT_MS));
-        bridge->final_device_id_     = bridge->device_identity_manager_.get_device_id();
-        bridge->generated_device_id_ = bridge->device_identity_manager_.get_generated_device_id();
-        if (bridge->final_device_id_.empty()) {
-          bridge->final_device_id_ = "Unknown_Unknown_Unknown";
-          bridge->generated_device_id_ = bridge->final_device_id_;
-        }
-        bridge->notify_device_id_sensors_();
+        bridge->finalize_device_id_(false);
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
         break;
       }
@@ -210,34 +199,23 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
       bridge->device_identity_manager_.run();
 
       if (bridge->device_identity_manager_.is_complete()) {
-        bridge->appliance_type_  = bridge->device_identity_manager_.get_appliance_type();
-        bridge->model_number_    = bridge->device_identity_manager_.get_model_number();
-        bridge->serial_number_   = bridge->device_identity_manager_.get_serial_number();
-        bridge->generated_device_id_ = bridge->device_identity_manager_.get_generated_device_id();
-        bridge->final_device_id_     = bridge->device_identity_manager_.get_device_id();
-        bridge->notify_device_id_sensors_();
+        bridge->finalize_device_id_(true);
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       } else if (bridge->device_identity_manager_.is_failed()) {
         // Even on failure, we have a fallback device ID — continue startup.
-        bridge->final_device_id_     = bridge->device_identity_manager_.get_device_id();
-        bridge->generated_device_id_ = bridge->device_identity_manager_.get_generated_device_id();
         ESP_LOGW(TAG, "Device ID generation failed, using fallback");
-        bridge->notify_device_id_sensors_();
+        bridge->finalize_device_id_(false);
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       }
       break;
 
     case signal_device_id_complete:
-      bridge->final_device_id_     = bridge->device_identity_manager_.get_device_id();
-      bridge->generated_device_id_ = bridge->device_identity_manager_.get_generated_device_id();
-      bridge->notify_device_id_sensors_();
+      bridge->finalize_device_id_(true);
       tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       break;
 
     case signal_device_id_failed:
-      bridge->final_device_id_     = bridge->device_identity_manager_.get_device_id();
-      bridge->generated_device_id_ = bridge->device_identity_manager_.get_generated_device_id();
-      bridge->notify_device_id_sensors_();
+      bridge->finalize_device_id_(false);
       tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       break;
 
@@ -308,7 +286,11 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
       if (millis() - bridge->feature_bits_phase_start_ms_ >= bridge->FEATURE_BITS_PHASE_TIMEOUT_MS) {
         ESP_LOGW(TAG, "Feature bits phase timed out after %u ms, continuing without feature filtering",
                  static_cast<unsigned>(bridge->FEATURE_BITS_PHASE_TIMEOUT_MS));
-        // Mark as complete so we can proceed without feature bit filtering.
+        // Mark the manager as complete so is_complete() returns true and
+        // we can transition to bridge_init.  Without this the HSM would
+        // be stuck here forever (the old code only called sync_legacy
+        // but never set the manager's state to COMPLETE).
+        bridge->feature_bit_manager_.mark_timed_out();
         bridge->sync_feature_bit_legacy_members_();
       }
 

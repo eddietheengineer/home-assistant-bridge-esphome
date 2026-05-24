@@ -335,6 +335,18 @@ bool FeatureBitManager::is_parse_pending() const
   return this->parse_pending_;
 }
 
+void FeatureBitManager::mark_timed_out()
+{
+  // Force the manager into a complete state so the startup HSM can
+  // transition to bridge_init.  Whatever ERD data has been collected
+  // so far is kept; the valid ERD list may be partial or empty,
+  // which is fine — the bridge continues without feature filtering.
+  this->state_ = FEATURE_BIT_STATE_COMPLETE;
+  this->parse_pending_ = true;
+  // Immediately drain any pending parsing so is_complete() returns true.
+  this->parse_and_log_feature_bits_();
+}
+
 const std::set<tiny_erd_t>& FeatureBitManager::get_valid_erds() const
 {
   return this->valid_erds_;

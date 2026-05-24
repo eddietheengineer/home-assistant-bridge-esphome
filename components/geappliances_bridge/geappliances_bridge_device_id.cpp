@@ -63,65 +63,26 @@ void GeappliancesBridge::start_device_id_generation_()
 }
 
 // ---------------------------------------------------------------------------
-// ERD queue helper
+// Finalize device ID: sync fields from manager, apply fallback, notify sensors
 // ---------------------------------------------------------------------------
 
-bool GeappliancesBridge::try_read_erd_with_retry_(tiny_erd_t erd, const char* erd_name)
+void GeappliancesBridge::finalize_device_id_(bool sync_all)
 {
-  (void)erd_name;  /* Used only in ESP_LOGD below. */
-  if (tiny_gea3_erd_client_read(this->active_erd_client_, &this->pending_request_id_,
-                                 this->host_address_, erd)) {
-    ESP_LOGD(TAG, "Reading %s ERD 0x%04X", erd_name, erd);
-    this->device_id_state_  = DEVICE_ID_STATE_IDLE;  // wait for response
-    this->queue_retry_count_ = 0;
-    return true;
+  this->final_device_id_     = this->device_identity_manager_.get_device_id();
+  this->generated_device_id_ = this->device_identity_manager_.get_generated_device_id();
+
+  if (sync_all) {
+    this->appliance_type_ = this->device_identity_manager_.get_appliance_type();
+    this->model_number_   = this->device_identity_manager_.get_model_number();
+    this->serial_number_  = this->device_identity_manager_.get_serial_number();
   }
 
-  this->queue_retry_count_++;
-  if (this->queue_retry_count_ >= MAX_QUEUE_RETRIES) {
-    ESP_LOGE(TAG, "Failed to read %s after %u retries, giving up", erd_name, MAX_QUEUE_RETRIES);
-    this->device_id_state_ = DEVICE_ID_STATE_FAILED;
-    return false;
+  if (this->final_device_id_.empty()) {
+    this->final_device_id_     = "Unknown_Unknown_Unknown";
+    this->generated_device_id_ = this->final_device_id_;
   }
-  if (this->queue_retry_count_ % LOG_EVERY_N_RETRIES == 0) {
-    ESP_LOGW(TAG, "Failed to queue %s read, retrying... (attempt %u)",
-             erd_name, this->queue_retry_count_);
-  }
-  return false;
-}
 
-// ---------------------------------------------------------------------------
-// String utilities
-// ---------------------------------------------------------------------------
-
-std::string GeappliancesBridge::bytes_to_string_(const uint8_t* data, size_t size)
-{
-  if (data == nullptr || size == 0) {
-    return "";
-  }
-  std::string result;
-  result.reserve(size);
-  for (size_t i = 0; i < size; i++) {
-    if (data[i] == 0x00) break;  // stop at null terminator
-    result += static_cast<char>(data[i]);
-  }
-  return result;
-}
-
-std::string GeappliancesBridge::sanitize_for_mqtt_topic_(const std::string& input)
-{
-  std::string result;
-  result.reserve(input.length());
-  for (char c : input) {
-    unsigned char uc = static_cast<unsigned char>(c);
-    if (c == '+' || c == '#' || c == '\0' || c == ' ' || c == '/' || c == '$' ||
-        uc < 0x20 || uc > 0x7E) {
-      result += '_';
-    } else {
-      result += c;
-    }
-  }
-  return result;
+  this->notify_device_id_sensors_();
 }
 
 }  // namespace geappliances_bridge

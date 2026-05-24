@@ -284,7 +284,19 @@ void GeappliancesBridge::run_protocol_stack_()
     if (s_gea2_last_ms == 0) {
       s_gea2_last_ms = loop_start_ms;
     }
+    // Hard safety cap: never run longer than 2x the nominal duration.
+    // If the loop exceeds this, break to avoid starving the ESPHome
+    // framework watchdog (which fires at 30 ms intervals).
+    static constexpr uint32_t GEA2_LOOP_HARD_CAP_MS = GEA2_LOOP_DURATION_MS * 2;
     while (millis() - loop_start_ms < GEA2_LOOP_DURATION_MS) {
+      // Safety break: if we've exceeded the hard cap, exit immediately.
+      // This can happen if millis() jumps (e.g., after deep sleep wake)
+      // or if the interface_run call stalls unexpectedly.
+      if (millis() - loop_start_ms >= GEA2_LOOP_HARD_CAP_MS) {
+        ESP_LOGW(TAG, "GEA2 tight loop exceeded hard cap (%u ms), breaking",
+                 static_cast<unsigned>(GEA2_LOOP_HARD_CAP_MS));
+        break;
+      }
 #ifdef USE_ESP32
       // Feed the task watchdog inside the tight loop — 200 ms exceeds the
       // default TWDT timeout (usually 3-10 s depending on config, but
@@ -296,10 +308,18 @@ void GeappliancesBridge::run_protocol_stack_()
       // interrupt only fires inside the GEA2 tight loop and never starves
       // the GEA3/polling-bridge timers in the shared timer_group_.
       uint32_t now_ms = millis();
-      while (s_gea2_last_ms < now_ms) {
+      // Safety cap on the inner msec-catchup loop: if millis() jumped
+      // (e.g., deep sleep wake), don't fire thousands of backlogged
+      // msec interrupts in one loop iteration.  Cap at 1000 interrupts
+      // per loop entry — enough to cover a ~1 s gap without starving
+      // the ESPHome watchdog.
+      static constexpr uint32_t MSEC_CATCHUP_CAP = 1000;
+      uint32_t catchup_count = 0;
+      while (s_gea2_last_ms < now_ms && catchup_count < MSEC_CATCHUP_CAP) {
         s_gea2_tick_count++;
         tiny_event_publish(&this->gea2_msec_interrupt_, nullptr);
         s_gea2_last_ms++;
+        catchup_count++;
       }
       // tiny_timer_group_run() services at most a single timer per call.
       // With two period-0 UART poll timers in the shared group, calling it
@@ -603,22 +623,14 @@ bool GeappliancesBridge::teardown() {
   // Clean up HA discovery manager first (may have a running FreeRTOS task).
   this->ha_discovery_manager_.cleanup();
 
-  // Destroy whichever bridge(s) were initialized.
-  if (this->custom_erd_polling_started_) {
-    mqtt_bridge_polling_destroy(&this->mqtt_bridge_polling_);
+  // Destroy whichever bridge(s) were actually initialized.
+  // Using explicit ownership flags makes this unambiguous and prevents
+  // double-free or missed cleanup.
+  if (this->subscription_bridge_initialized_) {
+    mqtt_bridge_destroy(&this->mqtt_bridge_);
   }
-  if (this->mqtt_bridge_initialized_) {
-    bool is_poll_mode = !((this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-                          (this->mode_ == BRIDGE_MODE_AUTO && this->subscription_mode_active_));
-    if (is_poll_mode) {
-      // Polling bridge may be in mqtt_bridge_polling_ (custom ERDs) or
-      // mqtt_bridge_polling_ (fallback from subscription).
-      if (!this->custom_erd_polling_started_) {
-        mqtt_bridge_polling_destroy(&this->mqtt_bridge_polling_);
-      }
-    } else {
-      mqtt_bridge_destroy(&this->mqtt_bridge_);
-    }
+  if (this->polling_bridge_initialized_) {
+    mqtt_bridge_polling_destroy(&this->mqtt_bridge_polling_);
   }
 
   // Free heap-allocated members of the MQTT client adapter to prevent

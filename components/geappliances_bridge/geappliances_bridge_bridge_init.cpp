@@ -146,6 +146,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       &this->mqtt_client_adapter_.interface,
       this->polling_interval_ms_,
       this->polling_only_publish_on_change_);
+    this->polling_bridge_initialized_ = true;
     this->configure_polling_optional_lists_();
   } else {
     mqtt_bridge_init(
@@ -154,6 +155,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       this->active_erd_client_,
       &this->mqtt_client_adapter_.interface,
       this->host_address_);
+    this->subscription_bridge_initialized_ = true;
 
     if (!this->custom_erds_vec_.empty()) {
       this->custom_erd_subscription_seen_erds_.clear();
@@ -247,6 +249,7 @@ void GeappliancesBridge::start_custom_erd_polling_()
     this->custom_erds_vec_.data(),
     static_cast<uint16_t>(this->custom_erds_vec_.size()));
   this->custom_erd_polling_started_ = true;
+  this->polling_bridge_initialized_ = true;
 }
 
 void GeappliancesBridge::maybe_start_custom_erd_polling_()
@@ -297,12 +300,14 @@ void GeappliancesBridge::check_subscription_activity_()
 
   // Tear down the subscription bridge.
   mqtt_bridge_destroy(&this->mqtt_bridge_);
+  this->subscription_bridge_initialized_ = false;
 
   // Destroy any existing polling bridge (e.g., from custom ERD polling)
   // before re-initializing to avoid leaking heap allocations.
   if (this->custom_erd_polling_started_) {
     mqtt_bridge_polling_destroy(&this->mqtt_bridge_polling_);
     this->custom_erd_polling_started_ = false;
+    this->polling_bridge_initialized_ = false;
   }
 
   // Stand up the polling bridge.
@@ -313,6 +318,7 @@ void GeappliancesBridge::check_subscription_activity_()
     &this->mqtt_client_adapter_.interface,
     this->polling_interval_ms_,
     this->polling_only_publish_on_change_);
+  this->polling_bridge_initialized_ = true;
   this->configure_polling_optional_lists_();
   this->subscription_mode_active_ = false;
 

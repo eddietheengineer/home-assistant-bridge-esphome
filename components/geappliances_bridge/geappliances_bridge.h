@@ -102,6 +102,10 @@ class GeappliancesBridge : public Component {
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();
   void notify_device_id_sensors_();
+  // Sync device identity fields from the manager and notify sensors.
+  // Handles fallback when the device ID is empty (e.g., after timeout).
+  // Set sync_all=true to also copy appliance_type_, model_number_, serial_number_.
+  void finalize_device_id_(bool sync_all = true);
   void initialize_mqtt_bridge_();
   void start_custom_erd_polling_();
   void maybe_start_custom_erd_polling_();
@@ -119,10 +123,7 @@ class GeappliancesBridge : public Component {
   void sync_autodiscovery_legacy_members_();
   void sync_ha_discovery_legacy_members_();
   void on_ha_discovery_erd_seen_(tiny_erd_t erd);
-  std::string bytes_to_string_(const uint8_t* data, size_t size);
-  std::string sanitize_for_mqtt_topic_(const std::string& input);
   bool should_route_to_feature_bits_(tiny_erd_t erd);
-  bool try_read_erd_with_retry_(tiny_erd_t erd, const char* erd_name);
 
   enum BridgeInitState {
     BRIDGE_INIT_STATE_WAITING_FOR_DEVICE_ID,
@@ -255,9 +256,6 @@ class GeappliancesBridge : public Component {
   uint8_t appliance_type_{0};
   std::string model_number_;
   std::string serial_number_;
-  uint32_t queue_retry_count_{0};
-  static constexpr uint32_t LOG_EVERY_N_RETRIES = 50; // Log retry attempts periodically
-  static constexpr uint32_t MAX_QUEUE_RETRIES = 1000; // Maximum retries before giving up (about 10 seconds at loop rate)
 
   tiny_timer_group_t timer_group_;
 
@@ -298,10 +296,17 @@ class GeappliancesBridge : public Component {
   // Adapter that wraps the GEA2 ERD client as a GEA3 ERD client interface
   gea2_erd_client_adapter_t gea2_erd_client_adapter_;
 
-  i_tiny_gea3_erd_client_t* active_erd_client_{nullptr}; // set during initialize_mqtt_bridge_()
+  i_tiny_gea3_erd_client_t* active_erd_client_{nullptr}; // set during sync_autodiscovery_legacy_members_()
 
   mqtt_bridge_t mqtt_bridge_;
   mqtt_bridge_polling_t mqtt_bridge_polling_;
+
+  // Track which bridge(s) were actually initialized so teardown is unambiguous.
+  // A subscription bridge (mqtt_bridge_) is created when use_polling is false.
+  // A polling bridge (mqtt_bridge_polling_) is created when use_polling is true,
+  // or when custom ERD polling is started alongside a subscription bridge.
+  bool subscription_bridge_initialized_{false};
+  bool polling_bridge_initialized_{false};
 
   tiny_event_subscription_t erd_client_activity_subscription_;
   tiny_event_subscription_t gea2_activity_subscription_;

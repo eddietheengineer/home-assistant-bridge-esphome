@@ -79,8 +79,10 @@ void HaDiscoveryManager::cleanup()
       // Poll with a generous timeout (up to 5 s) to wait for the task
     // to call vTaskDelete().  The task deletes itself after sending the
     // sentinel to the queue, so we wait until the handle becomes NULL.
-      uint32_t deadline = millis() + 5000;
-      while (this->task_handle_ != nullptr && millis() < deadline) {
+      // Use subtraction to avoid millis() overflow (deadline = start + 5000
+      // wraps incorrectly when millis() is near UINT32_MAX).
+      uint32_t start = millis();
+      while (this->task_handle_ != nullptr && millis() - start < 5000) {
         vTaskDelay(pdMS_TO_TICKS(10));
       }
       if (this->task_handle_ != nullptr) {
