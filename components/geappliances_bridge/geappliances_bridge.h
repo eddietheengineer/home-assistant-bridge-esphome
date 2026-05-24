@@ -102,8 +102,6 @@ class GeappliancesBridge : public Component {
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();
   void notify_device_id_sensors_();
-  // Sync device identity fields from the manager and notify sensors.
-  void finalize_device_id_();
   void initialize_mqtt_bridge_();
   void start_custom_erd_polling_();
   void maybe_start_custom_erd_polling_();

@@ -33,14 +33,5 @@ static const char* const TAG = "geappliances_bridge";
 #pragma clang diagnostic pop
 #endif
 
-// ---------------------------------------------------------------------------
-// Finalize device ID: sync fields from manager, apply fallback, notify sensors
-// ---------------------------------------------------------------------------
-
-void GeappliancesBridge::finalize_device_id_()
-{
-  this->notify_device_id_sensors_();
-}
-
 }  // namespace geappliances_bridge
 }  // namespace esphome

@@ -425,7 +425,7 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
       } else {
         this->device_identity_manager_.on_erd_read_completed(erd, data, size);
         if (this->device_identity_manager_.is_complete()) {
-          this->finalize_device_id_();
+          this->notify_device_id_sensors_();
           // Signal the startup HSM that device ID is ready.
           tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_complete, nullptr);
         }
@@ -443,11 +443,11 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
                  erd, args->read_failed.reason);
         this->device_identity_manager_.on_erd_read_failed(erd);
         if (this->device_identity_manager_.is_complete()) {
-          this->finalize_device_id_();
+          this->notify_device_id_sensors_();
           // Signal the startup HSM that device ID is ready (even on failure, we have a fallback).
           tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_complete, nullptr);
         } else if (this->device_identity_manager_.is_failed()) {
-          this->finalize_device_id_();
+          this->notify_device_id_sensors_();
           tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_failed, nullptr);
         }
       }
