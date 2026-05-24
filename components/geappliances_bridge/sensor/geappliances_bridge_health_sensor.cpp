@@ -1,5 +1,5 @@
-#include "sensor/geappliances_bridge_health_sensor.h"
-#include "geappliances_bridge.h"
+#include "geappliances_bridge_health_sensor.h"
+#include "../geappliances_bridge.h"
 #include "esphome/core/log.h"
 
 namespace esphome {

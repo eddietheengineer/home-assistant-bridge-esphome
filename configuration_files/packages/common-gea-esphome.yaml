@@ -1,0 +1,87 @@
+# External component configuration
+external_components:
+  - source:
+      type: local
+      path: ../components  # Path relative to this YAML file
+    components: [ geappliances_bridge ]
+
+# external_components:
+#   - source: github://eddietheengineer/home-assistant-bridge-esphome@urlreference
+#     components: [ geappliances_bridge ]
+#     refresh: 1min
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  output_power: 13dB
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+# Enable logging
+logger:
+  baud_rate: 0
+
+# Allow OTA updates
+ota:
+  - platform: esphome
+
+debug:
+  update_interval: 1min
+
+sensor:
+  - platform: uptime
+    type: seconds
+    name: Uptime Sensor
+
+  - platform: debug
+    free:
+      name: "Heap Free"
+    block:
+      name: "Heap Max Block"
+    min_free:
+      name: "Heap Min Free"
+    fragmentation:
+      name: "Heap Fragmentation"
+    loop_time:
+      name: "Loop Time"
+    cpu_frequency:
+      name: "CPU Frequency"
+
+  # Bridge health monitoring sensors (60s interval)
+  - platform: geappliances_bridge
+    sensor_type: pending_mqtt_updates
+    name: "Pending MQTT Updates"
+    icon: "mdi:database"
+
+  - platform: geappliances_bridge
+    sensor_type: polling_cycle_time_ms
+    name: "Polling Cycle Time"
+    unit_of_measurement: ms
+    icon: "mdi:timer"
+
+  - platform: geappliances_bridge
+    sensor_type: polling_cycle_count
+    name: "Polling Cycle Count"
+    icon: "mdi:counter"
+
+text_sensor:
+  - platform: debug
+    device:
+      name: "Device Info"
+    reset_reason:
+      name: "Reset Reason"
+  - platform: geappliances_bridge
+    name: "Appliance Device ID"
+
+# MQTT configuration for Home Assistant
+mqtt:
+  broker: !secret mqtt_broker  # Your MQTT broker IP
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  port: 1883
+  discovery: true
+  discovery_prefix: homeassistant
+  clean_session: true
+

@@ -18,7 +18,11 @@ SENSOR_TYPE_PENDING_UPDATES = "pending_mqtt_updates"
 SENSOR_TYPE_POLLING_CYCLE_TIME_MS = "polling_cycle_time_ms"
 SENSOR_TYPE_POLLING_CYCLE_COUNT = "polling_cycle_count"
 
-SENSOR_TYPES = [SENSOR_TYPE_PENDING_UPDATES, SENSOR_TYPE_POLLING_CYCLE_TIME_MS, SENSOR_TYPE_POLLING_CYCLE_COUNT]
+SENSOR_TYPES = {
+  SENSOR_TYPE_PENDING_UPDATES: 0,
+  SENSOR_TYPE_POLLING_CYCLE_TIME_MS: 1,
+  SENSOR_TYPE_POLLING_CYCLE_COUNT: 2,
+}
 
 CONFIG_SCHEMA = (
     sensor.sensor_schema(
@@ -41,4 +45,8 @@ async def to_code(config):
 
     parent = await cg.get_variable(config[CONF_BRIDGE_ID])
     cg.add(var.set_parent(parent))
-    cg.add(var.set_sensor_type(config[CONF_SENSOR_TYPE]))
+    # Map the integer sensor_type value to the C++ enum
+    sensor_type_value = config[CONF_SENSOR_TYPE]
+    cg.add(var.set_sensor_type(
+        geappliances_bridge_ns.BridgeHealthSensorType(sensor_type_value)
+    ))
