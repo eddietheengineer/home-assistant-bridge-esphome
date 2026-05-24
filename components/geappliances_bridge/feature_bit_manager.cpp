@@ -291,20 +291,18 @@ void FeatureBitManager::parse_and_log_feature_bits_()
   // All appliance ERDs parsed — finalize.
   if (this->parse_erd_idx_ >= 10) {
     // Add mandatory ERDs (always published regardless of feature bits).
-    this->valid_erds_.insert(ERD_MODEL_NUMBER);
-    this->valid_erds_.insert(ERD_SERIAL_NUMBER);
-    this->valid_erds_.insert(ERD_APPLIANCE_TYPE);
-    this->valid_erds_.insert(ERD_COMMON_FEATURE_API);
-    this->valid_erds_.insert(ERD_APPLIANCE_FEATURE_API_0);
-    this->valid_erds_.insert(ERD_APPLIANCE_FEATURE_API_1);
-    this->valid_erds_.insert(ERD_APPLIANCE_FEATURE_API_2);
-    this->valid_erds_.insert(ERD_APPLIANCE_FEATURE_API_3);
-    this->valid_erds_.insert(ERD_APPLIANCE_FEATURE_API_4);
-    this->valid_erds_.insert(ERD_APPLIANCE_FEATURE_API_5);
-    this->valid_erds_.insert(ERD_APPLIANCE_FEATURE_API_6);
-    this->valid_erds_.insert(ERD_APPLIANCE_FEATURE_API_7);
-    this->valid_erds_.insert(ERD_APPLIANCE_FEATURE_API_8);
-    this->valid_erds_.insert(ERD_APPLIANCE_FEATURE_API_9);
+    static const tiny_erd_t mandatory_erds[] = {
+      ERD_MODEL_NUMBER, ERD_SERIAL_NUMBER, ERD_APPLIANCE_TYPE,
+      ERD_COMMON_FEATURE_API, ERD_APPLIANCE_FEATURE_API_0,
+      ERD_APPLIANCE_FEATURE_API_1, ERD_APPLIANCE_FEATURE_API_2,
+      ERD_APPLIANCE_FEATURE_API_3, ERD_APPLIANCE_FEATURE_API_4,
+      ERD_APPLIANCE_FEATURE_API_5, ERD_APPLIANCE_FEATURE_API_6,
+      ERD_APPLIANCE_FEATURE_API_7, ERD_APPLIANCE_FEATURE_API_8,
+      ERD_APPLIANCE_FEATURE_API_9
+    };
+    for (auto erd : mandatory_erds) {
+      this->valid_erds_.insert(erd);
+    }
 
     this->valid_erds_vec_.assign(this->valid_erds_.begin(), this->valid_erds_.end());
     this->valid_list_ready_ = true;

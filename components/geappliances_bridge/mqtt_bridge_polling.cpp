@@ -18,12 +18,15 @@
 
 #include "mqtt_bridge_common.h"
 #include "erd_lists.h"
+#include "esphome/core/log.h"
 #include <cstring>
 #include <map>
 #include <set>
 #include <vector>
 
 using namespace std;
+
+static const char* const TAG __attribute__((unused)) = "mqtt_bridge_polling";
 
 // ============================================================================
 // Polling bridge — forward declarations
@@ -499,6 +502,10 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       tiny_erd_t      erd       = args->read_completed.erd;
       const uint8_t*  erd_data  = reinterpret_cast<const uint8_t*>(args->read_completed.data);
       uint8_t         data_size = args->read_completed.data_size;
+
+      ESP_LOGD(TAG, "Polling ERD 0x%04X read completed (data_size=%u)",
+               erd, data_size);
+
       // If the ERD is in pending_registration_set (added via _no_register in
       // entry), register it on MQTT now — confirming it's present on the
       // appliance.  If not in erd_set at all, it's a late discovery response.
