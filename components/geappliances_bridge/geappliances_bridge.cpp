@@ -466,6 +466,37 @@ bool GeappliancesBridge::should_route_to_feature_bits_(tiny_erd_t erd)
      (is_device_info_erd(erd) && this->device_id_state_ == DEVICE_ID_STATE_COMPLETE));
 }
 
+// ---------------------------------------------------------------------------
+// Notify all registered device ID sensors with the auto-generated device ID
+// ---------------------------------------------------------------------------
+
+void GeappliancesBridge::notify_device_id_sensors_()
+{
+  std::string device_id = this->device_identity_manager_.get_generated_device_id();
+  if (device_id.empty()) {
+    device_id = this->generated_device_id_;
+  }
+
+  for (auto *sensor : this->device_id_sensors_) {
+    if (sensor != nullptr) {
+      sensor->publish_state(device_id);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public getter for the auto-generated device ID
+// ---------------------------------------------------------------------------
+
+const std::string& GeappliancesBridge::get_generated_device_id() const
+{
+  const std::string& id = this->device_identity_manager_.get_generated_device_id();
+  if (!id.empty()) {
+    return id;
+  }
+  return this->generated_device_id_;
+}
+
 void GeappliancesBridge::dump_config() {
   ESP_LOGCONFIG(TAG, "GE Appliances Bridge:");
   if (!this->configured_device_id_.empty()) {
@@ -527,6 +558,9 @@ void GeappliancesBridge::dump_config() {
   }
   if (!this->custom_erds_vec_.empty()) {
     ESP_LOGCONFIG(TAG, "  Custom ERDs: %zu configured", this->custom_erds_vec_.size());
+  }
+  if (!this->device_id_sensors_.empty()) {
+    ESP_LOGCONFIG(TAG, "  Device ID Sensors: %zu registered", this->device_id_sensors_.size());
   }
 
   // Display current startup state for debugging

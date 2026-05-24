@@ -186,6 +186,7 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
         bridge->model_number_    = bridge->device_identity_manager_.get_model_number();
         bridge->serial_number_   = bridge->device_identity_manager_.get_serial_number();
         bridge->generated_device_id_ = bridge->device_identity_manager_.get_generated_device_id();
+        bridge->notify_device_id_sensors_();
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       }
       break;
@@ -193,7 +194,7 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
     case signal_run_loop:
       // Check for phase timeout — prevent indefinite stalls.
       if (millis() - bridge->device_id_phase_start_ms_ >= bridge->DEVICE_ID_PHASE_TIMEOUT_MS) {
-        ESP_LOGW(TAG, "Device ID phase timed out after %u ms, using fallback", 
+        ESP_LOGW(TAG, "Device ID phase timed out after %u ms, using fallback",
                  static_cast<unsigned>(bridge->DEVICE_ID_PHASE_TIMEOUT_MS));
         bridge->final_device_id_     = bridge->device_identity_manager_.get_device_id();
         bridge->generated_device_id_ = bridge->device_identity_manager_.get_generated_device_id();
@@ -201,6 +202,7 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
           bridge->final_device_id_ = "Unknown_Unknown_Unknown";
           bridge->generated_device_id_ = bridge->final_device_id_;
         }
+        bridge->notify_device_id_sensors_();
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
         break;
       }
@@ -213,12 +215,14 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
         bridge->serial_number_   = bridge->device_identity_manager_.get_serial_number();
         bridge->generated_device_id_ = bridge->device_identity_manager_.get_generated_device_id();
         bridge->final_device_id_     = bridge->device_identity_manager_.get_device_id();
+        bridge->notify_device_id_sensors_();
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       } else if (bridge->device_identity_manager_.is_failed()) {
         // Even on failure, we have a fallback device ID — continue startup.
         bridge->final_device_id_     = bridge->device_identity_manager_.get_device_id();
         bridge->generated_device_id_ = bridge->device_identity_manager_.get_generated_device_id();
         ESP_LOGW(TAG, "Device ID generation failed, using fallback");
+        bridge->notify_device_id_sensors_();
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       }
       break;
@@ -226,12 +230,14 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
     case signal_device_id_complete:
       bridge->final_device_id_     = bridge->device_identity_manager_.get_device_id();
       bridge->generated_device_id_ = bridge->device_identity_manager_.get_generated_device_id();
+      bridge->notify_device_id_sensors_();
       tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       break;
 
     case signal_device_id_failed:
       bridge->final_device_id_     = bridge->device_identity_manager_.get_device_id();
       bridge->generated_device_id_ = bridge->device_identity_manager_.get_generated_device_id();
+      bridge->notify_device_id_sensors_();
       tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       break;
 
