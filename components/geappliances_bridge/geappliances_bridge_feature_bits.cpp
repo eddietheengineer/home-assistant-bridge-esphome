@@ -49,11 +49,5 @@ void GeappliancesBridge::start_feature_bit_reading_()
 // Sync legacy members from FeatureBitManager (called after routing callbacks)
 // ---------------------------------------------------------------------------
 
-void GeappliancesBridge::sync_feature_bit_legacy_members_()
-{
-  // No-op: the bridge now accesses FeatureBitManager directly.
-  // Kept as a hook for any future sync needs.
-}
-
 }  // namespace geappliances_bridge
 }  // namespace esphome

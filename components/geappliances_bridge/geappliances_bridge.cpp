@@ -418,8 +418,6 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
       uint8_t size = args->read_completed.data_size;
       if (this->should_route_to_feature_bits_(erd)) {
         this->feature_bit_manager_.on_erd_read_completed(erd, data, size);
-        // Sync legacy members for backward compatibility.
-        this->sync_feature_bit_legacy_members_();
         if (this->feature_bit_manager_.is_complete()) {
           // Signal the startup HSM that feature bits are ready.
           tiny_hsm_send_signal(&this->startup_hsm_, signal_feature_bits_complete, nullptr);
@@ -427,7 +425,7 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
       } else {
         this->device_identity_manager_.on_erd_read_completed(erd, data, size);
         if (this->device_identity_manager_.is_complete()) {
-          this->finalize_device_id_(true);
+          this->finalize_device_id_();
           // Signal the startup HSM that device ID is ready.
           tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_complete, nullptr);
         }
@@ -436,8 +434,6 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
       tiny_erd_t erd = args->read_failed.erd;
       if (this->should_route_to_feature_bits_(erd)) {
         this->feature_bit_manager_.on_erd_read_failed(erd);
-        // Sync legacy members for backward compatibility.
-        this->sync_feature_bit_legacy_members_();
         // If feature bits failed, signal the HSM so it can continue.
         if (this->feature_bit_manager_.is_failed()) {
           tiny_hsm_send_signal(&this->startup_hsm_, signal_feature_bits_complete, nullptr);
@@ -447,11 +443,11 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
                  erd, args->read_failed.reason);
         this->device_identity_manager_.on_erd_read_failed(erd);
         if (this->device_identity_manager_.is_complete()) {
-          this->finalize_device_id_(true);
+          this->finalize_device_id_();
           // Signal the startup HSM that device ID is ready (even on failure, we have a fallback).
           tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_complete, nullptr);
         } else if (this->device_identity_manager_.is_failed()) {
-          this->finalize_device_id_(false);
+          this->finalize_device_id_();
           tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_failed, nullptr);
         }
       }

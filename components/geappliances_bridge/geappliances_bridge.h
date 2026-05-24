@@ -103,9 +103,7 @@ class GeappliancesBridge : public Component {
   void initialize_mqtt_client_();
   void notify_device_id_sensors_();
   // Sync device identity fields from the manager and notify sensors.
-  // Handles fallback when the device ID is empty (e.g., after timeout).
-  // Set sync_all=true to also copy appliance_type_, model_number_, serial_number_.
-  void finalize_device_id_(bool sync_all = true);
+  void finalize_device_id_();
   void initialize_mqtt_bridge_();
   void start_custom_erd_polling_();
   void maybe_start_custom_erd_polling_();
@@ -119,7 +117,6 @@ class GeappliancesBridge : public Component {
   // Device ID generation is now handled by DeviceIdentityManager -
   // the following are retained for backward compatibility during migration
   void start_device_id_generation_();
-  void sync_feature_bit_legacy_members_();
   void sync_autodiscovery_legacy_members_();
   void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   bool should_route_to_feature_bits_(tiny_erd_t erd);

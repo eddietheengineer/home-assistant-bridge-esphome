@@ -49,7 +49,7 @@ void GeappliancesBridge::start_device_id_generation_()
   // immediately (see DeviceIdentityManager::init with non-empty configured_id).
   // Sync legacy members for backward compatibility with dump_config() etc.
   if (this->device_identity_manager_.is_complete()) {
-    this->finalize_device_id_(true);
+    this->finalize_device_id_();
     this->start_feature_bit_reading_();
     return;
   }
@@ -64,9 +64,8 @@ void GeappliancesBridge::start_device_id_generation_()
 // Finalize device ID: sync fields from manager, apply fallback, notify sensors
 // ---------------------------------------------------------------------------
 
-void GeappliancesBridge::finalize_device_id_(bool sync_all)
+void GeappliancesBridge::finalize_device_id_()
 {
-  (void)sync_all;  // No longer needed — callers read directly from the manager.
   this->notify_device_id_sensors_();
 }
 
