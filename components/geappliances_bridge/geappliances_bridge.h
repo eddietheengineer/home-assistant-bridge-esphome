@@ -125,12 +125,6 @@ class GeappliancesBridge : public Component {
   void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 
-  enum BridgeInitState {
-    BRIDGE_INIT_STATE_WAITING_FOR_DEVICE_ID,
-    BRIDGE_INIT_STATE_WAITING_FOR_MQTT,
-    BRIDGE_INIT_STATE_COMPLETE
-  };
-
   // Startup HSM — replaces the manual switch-based phase progression.
   // The HSM drives the linear startup sequence:
   //   protocol_stack → autodiscovery → device_id → mqtt_client_init
@@ -187,32 +181,9 @@ class GeappliancesBridge : public Component {
   // Legacy members retained for backward compatibility during migration -
   // these will be removed once all code paths use device_identity_manager_
   DeviceIdState device_id_state_{DEVICE_ID_STATE_IDLE};
-  BridgeInitState bridge_init_state_{BRIDGE_INIT_STATE_WAITING_FOR_DEVICE_ID};
 
   // Feature bit reading state machine (runs after autodiscovery, before device ID gen)
   FeatureBitState feature_bit_state_{FEATURE_BIT_STATE_IDLE};
-  uint8_t feature_bit_erd_0092_[8]{};  // raw bytes from ERD 0x0092 (common features)
-  uint8_t feature_bit_erd_0093_[8]{};  // raw bytes from ERD 0x0093 (appliance APIs, group 0)
-  uint8_t feature_bit_erd_0094_[8]{};  // raw bytes from ERD 0x0094 (appliance APIs, group 1)
-  uint8_t feature_bit_erd_0095_[8]{};  // raw bytes from ERD 0x0095 (appliance APIs, group 2)
-  uint8_t feature_bit_erd_0096_[8]{};  // raw bytes from ERD 0x0096 (appliance APIs, group 3)
-  uint8_t feature_bit_erd_0097_[8]{};  // raw bytes from ERD 0x0097 (appliance APIs, group 4)
-  uint8_t feature_bit_erd_0109_[8]{};  // raw bytes from ERD 0x0109 (appliance APIs, group 5)
-  uint8_t feature_bit_erd_010A_[8]{};  // raw bytes from ERD 0x010A (appliance APIs, group 6)
-  uint8_t feature_bit_erd_010B_[8]{};  // raw bytes from ERD 0x010B (appliance APIs, group 7)
-  uint8_t feature_bit_erd_010C_[8]{};  // raw bytes from ERD 0x010C (appliance APIs, group 8)
-  uint8_t feature_bit_erd_010D_[8]{};  // raw bytes from ERD 0x010D (appliance APIs, group 9)
-  uint8_t feature_bit_erd_0092_size_{0};
-  uint8_t feature_bit_erd_0093_size_{0};
-  uint8_t feature_bit_erd_0094_size_{0};
-  uint8_t feature_bit_erd_0095_size_{0};
-  uint8_t feature_bit_erd_0096_size_{0};
-  uint8_t feature_bit_erd_0097_size_{0};
-  uint8_t feature_bit_erd_0109_size_{0};
-  uint8_t feature_bit_erd_010A_size_{0};
-  uint8_t feature_bit_erd_010B_size_{0};
-  uint8_t feature_bit_erd_010C_size_{0};
-  uint8_t feature_bit_erd_010D_size_{0};
   // Set of valid ERDs built from parsed feature bits; used when appliance_api_parsing_ is true
   std::set<tiny_erd_t> appliance_api_valid_erds_;
   // Sorted vector of the same set, for passing to the polling bridge as a C array
@@ -250,9 +221,6 @@ class GeappliancesBridge : public Component {
   // Legacy members retained for backward compatibility during migration -
   // these will be removed once all code paths use autodiscovery_manager_
   AutodiscoveryState autodiscovery_state_{AUTODISCOVERY_WAITING_5S};
-  uint32_t autodiscovery_retry_count_{0};
-
-  tiny_gea3_erd_client_request_id_t pending_request_id_;
   uint8_t appliance_type_{0};
   std::string model_number_;
   std::string serial_number_;

@@ -69,11 +69,10 @@ void GeappliancesBridge::notify_mqtt_disconnected_()
 
 void GeappliancesBridge::sync_autodiscovery_legacy_members_()
 {
-  this->autodiscovery_state_       = this->autodiscovery_manager_.get_state();
-  this->autodiscovery_retry_count_ = this->autodiscovery_manager_.get_retry_count();
-  this->host_address_              = this->autodiscovery_manager_.get_host_address();
-  this->active_erd_client_        = this->autodiscovery_manager_.get_active_erd_client();
-  this->gea2_protocol_active_     = this->autodiscovery_manager_.is_gea2_protocol();
+  this->autodiscovery_state_ = this->autodiscovery_manager_.get_state();
+  this->host_address_        = this->autodiscovery_manager_.get_host_address();
+  this->active_erd_client_   = this->autodiscovery_manager_.get_active_erd_client();
+  this->gea2_protocol_active_ = this->autodiscovery_manager_.is_gea2_protocol();
 }
 
 }  // namespace geappliances_bridge

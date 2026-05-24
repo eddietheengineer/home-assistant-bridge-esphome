@@ -429,11 +429,7 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
         // Sync legacy members for backward compatibility.
         this->device_id_state_ = this->device_identity_manager_.get_state();
         if (this->device_identity_manager_.is_complete()) {
-          this->appliance_type_ = this->device_identity_manager_.get_appliance_type();
-          this->model_number_   = this->device_identity_manager_.get_model_number();
-          this->serial_number_  = this->device_identity_manager_.get_serial_number();
-          this->generated_device_id_ = this->device_identity_manager_.get_generated_device_id();
-          this->final_device_id_     = this->device_identity_manager_.get_device_id();
+          this->finalize_device_id_(true);
           // Signal the startup HSM that device ID is ready.
           tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_complete, nullptr);
         }
@@ -455,16 +451,11 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
         // Sync legacy members for backward compatibility.
         this->device_id_state_ = this->device_identity_manager_.get_state();
         if (this->device_identity_manager_.is_complete()) {
-          this->appliance_type_ = this->device_identity_manager_.get_appliance_type();
-          this->model_number_   = this->device_identity_manager_.get_model_number();
-          this->serial_number_  = this->device_identity_manager_.get_serial_number();
-          this->generated_device_id_ = this->device_identity_manager_.get_generated_device_id();
-          this->final_device_id_     = this->device_identity_manager_.get_device_id();
+          this->finalize_device_id_(true);
           // Signal the startup HSM that device ID is ready (even on failure, we have a fallback).
           tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_complete, nullptr);
         } else if (this->device_identity_manager_.is_failed()) {
-          this->final_device_id_     = this->device_identity_manager_.get_device_id();
-          this->generated_device_id_ = this->device_identity_manager_.get_generated_device_id();
+          this->finalize_device_id_(false);
           tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_failed, nullptr);
         }
       }
