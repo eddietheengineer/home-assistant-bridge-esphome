@@ -265,7 +265,7 @@ void GeappliancesBridge::run_protocol_stack_()
   // wall-clock busy loop so the full TX→RX cycle at 19200 baud completes
   // within a single loop() call.  See doc/geappliances_bridge.md §13.
   bool need_gea2_loop = this->gea2_uart_ != nullptr && (
-    this->gea2_protocol_active_ ||
+    this->autodiscovery_manager_.is_gea2_protocol() ||
     this->autodiscovery_manager_.get_state() == AUTODISCOVERY_GEA2_BROADCAST_PENDING ||
     this->autodiscovery_manager_.get_state() == AUTODISCOVERY_GEA2_BROADCAST_WAITING);
 
@@ -528,7 +528,7 @@ void GeappliancesBridge::dump_config() {
     ESP_LOGCONFIG(TAG, "  GEA2 UART: configured (baud %u)", 19200u);
   }
   if (this->autodiscovery_manager_.is_complete()) {
-    ESP_LOGCONFIG(TAG, "  Active Protocol: %s", this->gea2_protocol_active_ ? "GEA2" : "GEA3");
+    ESP_LOGCONFIG(TAG, "  Active Protocol: %s", this->autodiscovery_manager_.is_gea2_protocol() ? "GEA2" : "GEA3");
   }
 
   // Display bridge mode

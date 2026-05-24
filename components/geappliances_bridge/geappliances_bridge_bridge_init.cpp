@@ -120,7 +120,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
 #pragma GCC diagnostic pop
 #endif
 
-  if (this->gea2_protocol_active_) {
+  if (this->autodiscovery_manager_.is_gea2_protocol()) {
     use_polling = true;
     mode_name   = "polling (GEA2 - subscriptions not supported)";
   } else if (this->mode_ == BRIDGE_MODE_POLL) {
