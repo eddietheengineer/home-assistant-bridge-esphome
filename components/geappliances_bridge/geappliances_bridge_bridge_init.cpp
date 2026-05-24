@@ -96,12 +96,12 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
 
   // Apply the valid-ERD filter when appliance API parsing is enabled and
   // produced results. An empty set would silently suppress all publishes.
-  if (this->appliance_api_parsing_ && this->appliance_api_valid_list_ready_ &&
-      !this->appliance_api_valid_erds_.empty()) {
+  if (this->appliance_api_parsing_ && this->appliance_api_valid_list_ready_ &&\
+      !this->feature_bit_manager_.get_valid_erds().empty()) {
     esphome_mqtt_client_adapter_set_valid_erds_filter(
-      &this->mqtt_client_adapter_, &this->appliance_api_valid_erds_);
+      &this->mqtt_client_adapter_, &this->feature_bit_manager_.get_valid_erds());
     ESP_LOGI(TAG, "Appliance API parsing enabled: publishing filtered to %zu valid ERDs",
-             this->appliance_api_valid_erds_.size());
+             this->feature_bit_manager_.get_valid_erds().size());
   }
 
   // Select operating mode.
@@ -180,8 +180,6 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
         this->ha_registered_erds_,
         true);
     this->ha_discovery_manager_.set_registered_erds(this->ha_registered_erds_);
-    this->ha_discovery_pending_       = true;
-    this->ha_discovery_last_activity_ = millis();
     ESP_LOGI(TAG, "HA discovery deferred: will publish after ERD discovery completes "
                   "(polling mode) or %u s quiet window (subscription mode)",
              HA_DISCOVERY_QUIET_MS / 1000);
@@ -197,11 +195,11 @@ void GeappliancesBridge::configure_polling_optional_lists_()
   // Set the API-parsed list before any events fire. state_identify_appliance
   // only checks api_parsed_list in signal_read_completed, so setting it here
   // (synchronously, before any events) is safe.
-  if (this->appliance_api_parsing_ && this->appliance_api_valid_list_ready_ &&
-      !this->appliance_api_valid_erds_vec_.empty()) {
-    this->mqtt_bridge_polling_.api_parsed_list       = this->appliance_api_valid_erds_vec_.data();
+  if (this->appliance_api_parsing_ && this->appliance_api_valid_list_ready_ &&\
+      !this->feature_bit_manager_.get_valid_erds_vec().empty()) {
+    this->mqtt_bridge_polling_.api_parsed_list       = this->feature_bit_manager_.get_valid_erds_vec().data();
     this->mqtt_bridge_polling_.api_parsed_list_count =
-      static_cast<uint16_t>(this->appliance_api_valid_erds_vec_.size());
+      static_cast<uint16_t>(this->feature_bit_manager_.get_valid_erds_vec().size());
     ESP_LOGI(TAG, "Polling with API-parsed list of %u ERDs (discovery skipped)",
              this->mqtt_bridge_polling_.api_parsed_list_count);
   }
@@ -327,10 +325,11 @@ void GeappliancesBridge::check_subscription_activity_()
   // Signal the startup HSM that subscription fallback has occurred.
   tiny_hsm_send_signal(&this->startup_hsm_, signal_subscription_fallback, nullptr);
 
-  // In polling mode, HA discovery is gated on polling_list_complete; no timer
-  // reset is needed here beyond the conservative safety-net update below.
-  if (this->ha_discovery_pending_ && !this->ha_discovery_published_) {
-    this->ha_discovery_last_activity_ = millis();
+  // In polling mode, HA discovery is gated on polling_list_complete; the
+  // manager handles its own timing internally.
+  if (this->ha_discovery_manager_.is_ready_to_start()) {
+    // Manager is in WAITING_FOR_READY — the polling_list_complete flag
+    // passed to run() will unblock it.
   }
 
   ESP_LOGI(TAG, "Successfully switched to polling mode");

@@ -121,7 +121,6 @@ class GeappliancesBridge : public Component {
   void start_device_id_generation_();
   void sync_feature_bit_legacy_members_();
   void sync_autodiscovery_legacy_members_();
-  void sync_ha_discovery_legacy_members_();
   void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 
@@ -177,24 +176,16 @@ class GeappliancesBridge : public Component {
   FeatureBitManager feature_bit_manager_;
 
   // Feature bit reading state machine (runs after autodiscovery, before device ID gen)
-  // Set of valid ERDs built from parsed feature bits; used when appliance_api_parsing_ is true
-  std::set<tiny_erd_t> appliance_api_valid_erds_;
-  // Sorted vector of the same set, for passing to the polling bridge as a C array
-  std::vector<tiny_erd_t> appliance_api_valid_erds_vec_;
-  bool appliance_api_valid_list_ready_{false};
+  // The FeatureBitManager owns the valid ERD list; use its getters directly.
+  bool appliance_api_valid_list_ready_{false};  // cached from FeatureBitManager once ready
 
-  // HA device discovery publish: deferred until ERD registration has settled.
-  // In subscription mode: publish 10 s after the last NEW ERD subscription
-  //   publication is received (or 30 s from bridge init as a safety cap).
-  // In polling mode: publish 10 s after the last ERD is registered by the
-  //   polling bridge (tracked by comparing ha_registered_erds_.size() each
-  //   loop iteration — the same 30 s cap applies).
-  bool ha_discovery_pending_{false};
-  bool ha_discovery_published_{false};
-  bool ha_discovery_publish_in_progress_{false};
-  uint32_t ha_discovery_last_activity_{0};
+  // HA device discovery state is managed by HaDiscoveryManager; the bridge
+  // delegates to it rather than maintaining redundant copies.
   const char* last_logged_poll_state_{nullptr};
+  // Shared set of ERDs the device has registered — used by both the MQTT
+  // adapter (for tracking) and the HA discovery manager (for filtering).
   std::set<tiny_erd_t> ha_registered_erds_;
+  // String-type ERD set for the MQTT adapter (built from ha_string_erd_ids).
   std::set<tiny_erd_t> ha_string_erds_set_;
 
   // Base URL for the per-category JSONL files.

@@ -51,10 +51,9 @@ void GeappliancesBridge::start_feature_bit_reading_()
 
 void GeappliancesBridge::sync_feature_bit_legacy_members_()
 {
-  // If parsing completed, sync the valid ERD lists (only once, on transition).
+  // Cache the valid-list-ready flag. The actual ERD data is accessed directly
+  // from the FeatureBitManager via get_valid_erds() / get_valid_erds_vec().
   if (this->feature_bit_manager_.is_valid_list_ready() && !this->appliance_api_valid_list_ready_) {
-    this->appliance_api_valid_erds_ = this->feature_bit_manager_.get_valid_erds();
-    this->appliance_api_valid_erds_vec_ = this->feature_bit_manager_.get_valid_erds_vec();
     this->appliance_api_valid_list_ready_ = true;
   }
 }

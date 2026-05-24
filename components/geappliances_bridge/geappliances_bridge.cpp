@@ -568,7 +568,7 @@ void GeappliancesBridge::dump_config() {
   }
   ESP_LOGCONFIG(TAG, "  Appliance API Parsing: %s", this->appliance_api_parsing_ ? "enabled" : "disabled");
   if (this->appliance_api_valid_list_ready_) {
-    ESP_LOGCONFIG(TAG, "  Appliance API Valid ERDs: %zu", this->appliance_api_valid_erds_.size());
+    ESP_LOGCONFIG(TAG, "  Appliance API Valid ERDs: %zu", this->feature_bit_manager_.get_valid_erds().size());
   }
   if (!this->custom_erds_vec_.empty()) {
     ESP_LOGCONFIG(TAG, "  Custom ERDs: %zu configured", this->custom_erds_vec_.size());
