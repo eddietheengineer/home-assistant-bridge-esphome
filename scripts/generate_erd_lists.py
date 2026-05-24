@@ -322,7 +322,7 @@ def generate_appliance_api_feature_lists_header(appliance_api_data: Dict) -> str
                 lines.append(f"  0x{erd_id:04x},")
             lines.append("};")
         else:
-            lines.append(f"static const tiny_erd_t* {array_name} = nullptr;")
+            lines.append(f"static const tiny_erd_t* {array_name} __attribute__((unused)) = nullptr;")
         lines.append("")
 
     # Generate master common feature descriptor array
@@ -412,7 +412,7 @@ def generate_appliance_api_feature_lists_header(appliance_api_data: Dict) -> str
                         lines.append(f"  0x{erd_id:04x},")
                     lines.append("};")
                 else:
-                    lines.append(f"static const tiny_erd_t* {array_name} = nullptr;")
+                    lines.append(f"static const tiny_erd_t* {array_name} __attribute__((unused)) = nullptr;")
                 lines.append("")
 
     # Generate master descriptor array: one row per feature per version.

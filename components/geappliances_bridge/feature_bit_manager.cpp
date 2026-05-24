@@ -64,10 +64,15 @@ void FeatureBitManager::run()
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #endif
   const char* feature_name = nullptr;
 #ifdef __clang__
 #pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
 #endif
 
   switch (this->state_) {
@@ -216,6 +221,9 @@ void FeatureBitManager::parse_and_log_feature_bits_()
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable"
 #endif
   static const char* const erd_names[10] = {
     "0x0093", "0x0094", "0x0095", "0x0096", "0x0097",
@@ -223,6 +231,8 @@ void FeatureBitManager::parse_and_log_feature_bits_()
   };
 #ifdef __clang__
 #pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
 #endif
 
   // Process one appliance ERD per call to avoid blocking loop() for too long.

@@ -4,6 +4,7 @@
  */
 
 #include <string>
+#include <cstdint>
 
 std::string appliance_type_to_string(uint8_t appliance_type)
 {

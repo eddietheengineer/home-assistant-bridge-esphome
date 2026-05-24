@@ -189,9 +189,9 @@ static const tiny_erd_t appliance_api_water_heater_v1_mixing_valve_erds[] = {
   0x4105,
 };
 
-static const tiny_erd_t* appliance_api_water_heater_v1_tall_tank_erds = nullptr;
+static const tiny_erd_t* appliance_api_water_heater_v1_tall_tank_erds __attribute__((unused)) = nullptr;
 
-static const tiny_erd_t* appliance_api_water_heater_v1_wifi_erds = nullptr;
+static const tiny_erd_t* appliance_api_water_heater_v1_wifi_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_water_heater_v1_heat_pump_erds[] = {
   0x4061,
@@ -200,13 +200,13 @@ static const tiny_erd_t appliance_api_water_heater_v1_heat_pump_erds[] = {
   0x4064,
 };
 
-static const tiny_erd_t* appliance_api_water_heater_v1_concurrent_loads_erds = nullptr;
+static const tiny_erd_t* appliance_api_water_heater_v1_concurrent_loads_erds __attribute__((unused)) = nullptr;
 
-static const tiny_erd_t* appliance_api_water_heater_v1_variable_speed_fan_erds = nullptr;
+static const tiny_erd_t* appliance_api_water_heater_v1_variable_speed_fan_erds __attribute__((unused)) = nullptr;
 
-static const tiny_erd_t* appliance_api_water_heater_v1_variable_speed_compressor_erds = nullptr;
+static const tiny_erd_t* appliance_api_water_heater_v1_variable_speed_compressor_erds __attribute__((unused)) = nullptr;
 
-static const tiny_erd_t* appliance_api_water_heater_v1_120v_operation_erds = nullptr;
+static const tiny_erd_t* appliance_api_water_heater_v1_120v_operation_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_water_heater_v1_estimation_erds[] = {
   0x40cb,
@@ -219,9 +219,9 @@ static const tiny_erd_t appliance_api_water_heater_v1_cost_of_power_erds[] = {
   0x4125,
 };
 
-static const tiny_erd_t* appliance_api_water_heater_v1_gas_erds = nullptr;
+static const tiny_erd_t* appliance_api_water_heater_v1_gas_erds __attribute__((unused)) = nullptr;
 
-static const tiny_erd_t* appliance_api_water_heater_v1_blower_erds = nullptr;
+static const tiny_erd_t* appliance_api_water_heater_v1_blower_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_water_heater_v1_dad_mode_erds[] = {
   0x411d,
@@ -241,7 +241,7 @@ static const tiny_erd_t appliance_api_water_heater_v1_water_heater_active_erds[]
   0x4226,
 };
 
-static const tiny_erd_t* appliance_api_water_heater_v1_canadian_model_erds = nullptr;
+static const tiny_erd_t* appliance_api_water_heater_v1_canadian_model_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_water_heater_v1_anode_percentage_remaining_erds[] = {
   0x40c2,
@@ -721,7 +721,7 @@ static const tiny_erd_t appliance_api_clothes_washer_v1_time_saver_erds[] = {
   0x2055,
 };
 
-static const tiny_erd_t* appliance_api_clothes_washer_v1_deprecated_m00000800_erds = nullptr;
+static const tiny_erd_t* appliance_api_clothes_washer_v1_deprecated_m00000800_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_clothes_washer_v1_prewash_erds[] = {
   0x205a,
@@ -2186,9 +2186,9 @@ static const tiny_erd_t appliance_api_cooking_v2_remote_bluetooth_device_managem
   0x6204,
 };
 
-static const tiny_erd_t* appliance_api_cooking_v2_stui_presence_erds = nullptr;
+static const tiny_erd_t* appliance_api_cooking_v2_stui_presence_erds __attribute__((unused)) = nullptr;
 
-static const tiny_erd_t* appliance_api_cooking_v2_sentry_erds = nullptr;
+static const tiny_erd_t* appliance_api_cooking_v2_sentry_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_cooking_v2_estimated_remaining_cook_minutes_erds[] = {
   0x5790,
@@ -2264,11 +2264,11 @@ static const tiny_erd_t appliance_api_cooking_v2_flex_cook_timer_erds[] = {
   0x521e,
 };
 
-static const tiny_erd_t* appliance_api_cooking_v2_microphone_supported_erds = nullptr;
+static const tiny_erd_t* appliance_api_cooking_v2_microphone_supported_erds __attribute__((unused)) = nullptr;
 
-static const tiny_erd_t* appliance_api_cooking_v2_enhanced_speaker_supported_erds = nullptr;
+static const tiny_erd_t* appliance_api_cooking_v2_enhanced_speaker_supported_erds __attribute__((unused)) = nullptr;
 
-static const tiny_erd_t* appliance_api_cooking_v3_ui_misconfiguration_detection_erds = nullptr;
+static const tiny_erd_t* appliance_api_cooking_v3_ui_misconfiguration_detection_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_cooking_v3_enhanced_sabbath_manual_mode_erds[] = {
   0x502e,
@@ -2450,7 +2450,7 @@ static const tiny_erd_t appliance_api_split_ac_v1_multimode_conflict_reporting_e
   0x7859,
 };
 
-static const tiny_erd_t* appliance_api_home_water_softener_v1_foundation_erds = nullptr;
+static const tiny_erd_t* appliance_api_home_water_softener_v1_foundation_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_home_water_softener_v1_water_valve_erds[] = {
   0x1167,
@@ -2494,7 +2494,7 @@ static const tiny_erd_t appliance_api_home_water_softener_v1_water_softener_aler
   0x8007,
 };
 
-static const tiny_erd_t* appliance_api_home_water_filter_v1_foundation_erds = nullptr;
+static const tiny_erd_t* appliance_api_home_water_filter_v1_foundation_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_home_water_filter_v1_water_valve_erds[] = {
   0x115e,
@@ -4179,11 +4179,11 @@ static const tiny_erd_t appliance_api_stand_mixer_v2_foundation_erds[] = {
   0x9317,
 };
 
-static const tiny_erd_t* appliance_api_stand_mixer_v2_precision_speed_erds = nullptr;
+static const tiny_erd_t* appliance_api_stand_mixer_v2_precision_speed_erds __attribute__((unused)) = nullptr;
 
-static const tiny_erd_t* appliance_api_stand_mixer_v2_active_stir_erds = nullptr;
+static const tiny_erd_t* appliance_api_stand_mixer_v2_active_stir_erds __attribute__((unused)) = nullptr;
 
-static const tiny_erd_t* appliance_api_stand_mixer_v2_auto_sense_additional_parameters_erds = nullptr;
+static const tiny_erd_t* appliance_api_stand_mixer_v2_auto_sense_additional_parameters_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_smoker_v1_foundation_erds[] = {
   0x9400,
@@ -4342,7 +4342,7 @@ static const tiny_erd_t appliance_api_smoker_v1_preheat_progress_erds[] = {
   0x9439,
 };
 
-static const tiny_erd_t* appliance_api_air_handler_vrf_v1_foundation_erds = nullptr;
+static const tiny_erd_t* appliance_api_air_handler_vrf_v1_foundation_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_fabric_care_cabinet_or_closet_v1_foundation_erds[] = {
   0x2000,

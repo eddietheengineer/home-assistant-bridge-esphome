@@ -530,10 +530,15 @@ void GeappliancesBridge::dump_config() {
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #endif
   const char* mode_str = "Unknown";
 #ifdef __clang__
 #pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
 #endif
   if (this->mode_ == BRIDGE_MODE_POLL) {
     mode_str = "Polling";
@@ -567,10 +572,15 @@ void GeappliancesBridge::dump_config() {
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #endif
   const char* phase_str = "Unknown";
 #ifdef __clang__
 #pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
 #endif
   if (this->startup_hsm_.current == startup_state_protocol_stack)       phase_str = "Protocol Stack";
   else if (this->startup_hsm_.current == startup_state_autodiscovery)    phase_str = "Autodiscovery";

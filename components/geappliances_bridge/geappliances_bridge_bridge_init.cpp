@@ -107,10 +107,15 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #endif
   const char* mode_name   = "unknown";
 #ifdef __clang__
 #pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
 #endif
 
   if (this->gea2_protocol_active_) {
