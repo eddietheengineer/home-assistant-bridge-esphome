@@ -178,12 +178,7 @@ class GeappliancesBridge : public Component {
   // Feature bit manager (extracted from god class)
   FeatureBitManager feature_bit_manager_;
 
-  // Legacy members retained for backward compatibility during migration -
-  // these will be removed once all code paths use device_identity_manager_
-  DeviceIdState device_id_state_{DEVICE_ID_STATE_IDLE};
-
   // Feature bit reading state machine (runs after autodiscovery, before device ID gen)
-  FeatureBitState feature_bit_state_{FEATURE_BIT_STATE_IDLE};
   // Set of valid ERDs built from parsed feature bits; used when appliance_api_parsing_ is true
   std::set<tiny_erd_t> appliance_api_valid_erds_;
   // Sorted vector of the same set, for passing to the polling bridge as a C array
@@ -218,9 +213,6 @@ class GeappliancesBridge : public Component {
   // HA discovery manager (extracted from god class)
   HaDiscoveryManager ha_discovery_manager_;
 
-  // Legacy members retained for backward compatibility during migration -
-  // these will be removed once all code paths use autodiscovery_manager_
-  AutodiscoveryState autodiscovery_state_{AUTODISCOVERY_WAITING_5S};
   uint8_t appliance_type_{0};
   std::string model_number_;
   std::string serial_number_;

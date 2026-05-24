@@ -34,14 +34,15 @@ static const char* const TAG = "geappliances_bridge";
 
 void GeappliancesBridge::start_feature_bit_reading_()
 {
-  if (this->feature_bit_state_ != FEATURE_BIT_STATE_IDLE) {
+  // Guard: don't re-initialize if already running or done.
+  if (this->feature_bit_manager_.is_complete() || this->feature_bit_manager_.is_failed() ||
+      this->feature_bit_manager_.is_parse_pending()) {
     return;
   }
   ESP_LOGI(TAG, "Reading device info ERDs for MQTT publish, then appliance API feature bits...");
   this->feature_bit_manager_.init(this->active_erd_client_, this->host_address_,
                                    &this->mqtt_client_adapter_.interface,
                                    this->mqtt_client_adapter_initialized_);
-  this->feature_bit_state_ = FEATURE_BIT_STATE_READING_0008;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,9 +51,6 @@ void GeappliancesBridge::start_feature_bit_reading_()
 
 void GeappliancesBridge::sync_feature_bit_legacy_members_()
 {
-  // Sync state from manager.
-  this->feature_bit_state_ = this->feature_bit_manager_.get_state();
-
   // If parsing completed, sync the valid ERD lists (only once, on transition).
   if (this->feature_bit_manager_.is_valid_list_ready() && !this->appliance_api_valid_list_ready_) {
     this->appliance_api_valid_erds_ = this->feature_bit_manager_.get_valid_erds();

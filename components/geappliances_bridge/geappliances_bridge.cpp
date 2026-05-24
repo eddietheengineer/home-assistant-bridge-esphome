@@ -264,8 +264,8 @@ void GeappliancesBridge::run_protocol_stack_()
   // within a single loop() call.  See doc/geappliances_bridge.md §13.
   bool need_gea2_loop = this->gea2_uart_ != nullptr && (
     this->gea2_protocol_active_ ||
-    this->autodiscovery_state_ == AUTODISCOVERY_GEA2_BROADCAST_PENDING ||
-    this->autodiscovery_state_ == AUTODISCOVERY_GEA2_BROADCAST_WAITING);
+    this->autodiscovery_manager_.get_state() == AUTODISCOVERY_GEA2_BROADCAST_PENDING ||
+    this->autodiscovery_manager_.get_state() == AUTODISCOVERY_GEA2_BROADCAST_WAITING);
 
   // When both UARTs are configured, only enable the adapter for the active
   // protocol.  Both adapters register poll timers in the shared timer_group_,
@@ -426,8 +426,6 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
         }
       } else {
         this->device_identity_manager_.on_erd_read_completed(erd, data, size);
-        // Sync legacy members for backward compatibility.
-        this->device_id_state_ = this->device_identity_manager_.get_state();
         if (this->device_identity_manager_.is_complete()) {
           this->finalize_device_id_(true);
           // Signal the startup HSM that device ID is ready.
@@ -448,8 +446,6 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
         ESP_LOGW(TAG, "Failed to read ERD 0x%04X for device ID generation (reason: %u), will retry",
                  erd, args->read_failed.reason);
         this->device_identity_manager_.on_erd_read_failed(erd);
-        // Sync legacy members for backward compatibility.
-        this->device_id_state_ = this->device_identity_manager_.get_state();
         if (this->device_identity_manager_.is_complete()) {
           this->finalize_device_id_(true);
           // Signal the startup HSM that device ID is ready (even on failure, we have a fallback).
@@ -469,12 +465,14 @@ bool GeappliancesBridge::should_route_to_feature_bits_(tiny_erd_t erd)
     return e == ERD_APPLIANCE_TYPE || e == ERD_MODEL_NUMBER || e == ERD_SERIAL_NUMBER;
   };
 
-  bool feature_bit_active = (this->feature_bit_state_ != FEATURE_BIT_STATE_IDLE &&
-                               this->feature_bit_state_ != FEATURE_BIT_STATE_COMPLETE &&
-                               this->feature_bit_state_ != FEATURE_BIT_STATE_FAILED);
+  // Feature bits are "active" if the manager has been initialized but not
+  // yet completed or failed (i.e., still in the middle of reading ERDs).
+  bool feature_bit_active = !this->feature_bit_manager_.is_complete() &&
+                            !this->feature_bit_manager_.is_failed() &&
+                            !this->feature_bit_manager_.is_parse_pending();
   return feature_bit_active &&
     (is_feature_bit_erd(erd) ||
-     (is_device_info_erd(erd) && this->device_id_state_ == DEVICE_ID_STATE_COMPLETE));
+     (is_device_info_erd(erd) && this->device_identity_manager_.is_complete()));
 }
 
 // ---------------------------------------------------------------------------
@@ -522,7 +520,7 @@ void GeappliancesBridge::dump_config() {
     ESP_LOGCONFIG(TAG, "    Model Number: %s", this->model_number_.c_str());
     ESP_LOGCONFIG(TAG, "    Serial Number: %s", this->serial_number_.c_str());
   }
-  if (this->device_id_state_ == DEVICE_ID_STATE_FAILED) {
+  if (this->device_identity_manager_.is_failed()) {
     ESP_LOGCONFIG(TAG, "  Device ID Generation: FAILED (see logs for details)");
   }
   ESP_LOGCONFIG(TAG, "  Client Address: 0x%02X", this->client_address_);
@@ -533,7 +531,7 @@ void GeappliancesBridge::dump_config() {
   if (this->gea2_uart_ != nullptr) {
     ESP_LOGCONFIG(TAG, "  GEA2 UART: configured (baud %u)", 19200u);
   }
-  if (this->autodiscovery_state_ == AUTODISCOVERY_COMPLETE) {
+  if (this->autodiscovery_manager_.is_complete()) {
     ESP_LOGCONFIG(TAG, "  Active Protocol: %s", this->gea2_protocol_active_ ? "GEA2" : "GEA3");
   }
 

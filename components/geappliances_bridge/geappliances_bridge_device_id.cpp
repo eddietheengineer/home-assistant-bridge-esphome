@@ -49,8 +49,7 @@ void GeappliancesBridge::start_device_id_generation_()
   // immediately (see DeviceIdentityManager::init with non-empty configured_id).
   // Sync legacy members for backward compatibility with dump_config() etc.
   if (this->device_identity_manager_.is_complete()) {
-    this->device_id_state_ = this->device_identity_manager_.get_state();
-    this->final_device_id_ = this->device_identity_manager_.get_device_id();
+    this->finalize_device_id_(true);
     this->start_feature_bit_reading_();
     return;
   }
@@ -59,7 +58,6 @@ void GeappliancesBridge::start_device_id_generation_()
   (void)protocol;  /* Used only in ESP_LOGI below. */
   ESP_LOGI(TAG, "Starting device ID generation from host address 0x%02X via %s",
            this->host_address_, protocol);
-  this->device_id_state_ = DEVICE_ID_STATE_READING_APPLIANCE_TYPE;
 }
 
 // ---------------------------------------------------------------------------
