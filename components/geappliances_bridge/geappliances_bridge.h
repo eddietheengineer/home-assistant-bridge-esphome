@@ -128,7 +128,6 @@ class GeappliancesBridge : public Component {
   uart::UARTComponent *gea2_uart_{nullptr};
   std::string configured_device_id_;
   uint8_t client_address_{0xE4};
-  uint8_t host_address_{0xC0};       // Host address for ERD reads (0xC0 fallback; updated during autodiscovery)
   bool mqtt_was_connected_{false};
   bool mqtt_client_adapter_initialized_{false};
   bool mqtt_bridge_initialized_{false};
