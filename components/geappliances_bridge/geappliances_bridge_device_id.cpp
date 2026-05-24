@@ -34,33 +34,6 @@ static const char* const TAG = "geappliances_bridge";
 #endif
 
 // ---------------------------------------------------------------------------
-// Startup: begin device ID generation (or skip if already configured)
-// ---------------------------------------------------------------------------
-
-void GeappliancesBridge::start_device_id_generation_()
-{
-  // Initialize the DeviceIdentityManager with current context
-  this->device_identity_manager_.init(
-      this->configured_device_id_,
-      this->active_erd_client_,
-      this->host_address_);
-
-  // If a device_id is pre-configured, the manager marks itself complete
-  // immediately (see DeviceIdentityManager::init with non-empty configured_id).
-  // Sync legacy members for backward compatibility with dump_config() etc.
-  if (this->device_identity_manager_.is_complete()) {
-    this->finalize_device_id_();
-    this->start_feature_bit_reading_();
-    return;
-  }
-
-  const char* protocol = this->gea2_protocol_active_ ? "GEA2" : "GEA3";
-  (void)protocol;  /* Used only in ESP_LOGI below. */
-  ESP_LOGI(TAG, "Starting device ID generation from host address 0x%02X via %s",
-           this->host_address_, protocol);
-}
-
-// ---------------------------------------------------------------------------
 // Finalize device ID: sync fields from manager, apply fallback, notify sensors
 // ---------------------------------------------------------------------------
 

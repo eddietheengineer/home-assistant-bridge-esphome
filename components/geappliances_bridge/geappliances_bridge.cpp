@@ -80,7 +80,9 @@ void GeappliancesBridge::setup() {
       this->gea2_uart_ != nullptr,
       [this]() {
         this->sync_autodiscovery_legacy_members_();
-        this->start_device_id_generation_();
+        // Signal the HSM to transition to the device_id phase.
+        // The HSM handles DeviceIdentityManager::init() directly.
+        tiny_hsm_send_signal(&this->startup_hsm_, signal_autodiscovery_complete, nullptr);
       });
 
   // Initialize GEA3 components if GEA3 UART is configured
