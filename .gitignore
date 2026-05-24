@@ -13,6 +13,7 @@ gea-esphome-zonelinec6.yaml
 build/
 logs/
 my_configs/
+configuration_files/
 tmp/
 packages/
 
