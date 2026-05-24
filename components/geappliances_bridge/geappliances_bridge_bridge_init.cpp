@@ -327,13 +327,6 @@ void GeappliancesBridge::check_subscription_activity_()
   // Signal the startup HSM that subscription fallback has occurred.
   tiny_hsm_send_signal(&this->startup_hsm_, signal_subscription_fallback, nullptr);
 
-  // In polling mode, HA discovery is gated on polling_list_complete; the
-  // manager handles its own timing internally.
-  if (this->ha_discovery_manager_.is_ready_to_start()) {
-    // Manager is in WAITING_FOR_READY — the polling_list_complete flag
-    // passed to run() will unblock it.
-  }
-
   ESP_LOGI(TAG, "Successfully switched to polling mode");
 }
 
