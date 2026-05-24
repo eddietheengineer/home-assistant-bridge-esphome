@@ -176,8 +176,7 @@ class GeappliancesBridge : public Component {
   FeatureBitManager feature_bit_manager_;
 
   // Feature bit reading state machine (runs after autodiscovery, before device ID gen)
-  // The FeatureBitManager owns the valid ERD list; use its getters directly.
-  bool appliance_api_valid_list_ready_{false};  // cached from FeatureBitManager once ready
+  // The FeatureBitManager owns the valid ERD list and ready flag; use its getters directly.
 
   // HA device discovery state is managed by HaDiscoveryManager; the bridge
   // delegates to it rather than maintaining redundant copies.
