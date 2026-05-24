@@ -287,9 +287,7 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
         ESP_LOGW(TAG, "Feature bits phase timed out after %u ms, continuing without feature filtering",
                  static_cast<unsigned>(bridge->FEATURE_BITS_PHASE_TIMEOUT_MS));
         // Mark the manager as complete so is_complete() returns true and
-        // we can transition to bridge_init.  Without this the HSM would
-        // be stuck here forever (the old code only called sync_legacy
-        // but never set the manager's state to COMPLETE).
+        // we can transition to bridge_init.
         bridge->feature_bit_manager_.mark_timed_out();
       }
 

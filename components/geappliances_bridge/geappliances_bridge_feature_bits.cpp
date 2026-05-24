@@ -47,9 +47,5 @@ void GeappliancesBridge::start_feature_bit_reading_()
       this->mqtt_client_adapter_initialized_);
 }
 
-// ---------------------------------------------------------------------------
-// Sync legacy members from FeatureBitManager (called after routing callbacks)
-// ---------------------------------------------------------------------------
-
 }  // namespace geappliances_bridge
 }  // namespace esphome
