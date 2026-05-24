@@ -19,6 +19,7 @@
 #include "mqtt_bridge_common.h"
 #include "erd_lists.h"
 #include "esphome/core/log.h"
+#include "esphome/core/application.h"
 #include <cstring>
 #include <map>
 #include <set>
@@ -489,6 +490,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       if (first_cycle || all_completed) {
         self->erd_index = 0;
         self->cycle_completed_count = 0;
+        self->cycle_start_ms = esphome::millis();
         send_next_poll_read_request(self);
       } else if (self->erd_index < self->polling_list_count) {
         // Mid-cycle: retry the current ERD in case the previous read attempt
@@ -547,6 +549,10 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         mqtt_client_update_erd(self->mqtt_client, erd, erd_data, data_size);
       }
       self->cycle_completed_count++;
+      if (self->cycle_completed_count >= self->polling_list_count) {
+        self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
+        self->cycle_count++;
+      }
       send_next_poll_read_request(self);
       break;
     }
@@ -558,6 +564,10 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       disarm_timer(self);
       reset_lost_appliance_timer(self);
       self->cycle_completed_count++;
+      if (self->cycle_completed_count >= self->polling_list_count) {
+        self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
+        self->cycle_count++;
+      }
       send_next_poll_read_request(self);
       break;
 

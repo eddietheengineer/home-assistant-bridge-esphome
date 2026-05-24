@@ -491,6 +491,27 @@ const std::string& GeappliancesBridge::get_generated_device_id() const
   return this->device_identity_manager_.get_device_id();
 }
 
+// ---------------------------------------------------------------------------
+// Health metrics getters
+// ---------------------------------------------------------------------------
+
+size_t GeappliancesBridge::get_pending_mqtt_updates() const
+{
+  return esphome_mqtt_client_adapter_get_pending_update_count(&this->mqtt_client_adapter_);
+}
+
+uint32_t GeappliancesBridge::get_polling_cycle_time_ms() const
+{
+  if (!this->polling_bridge_initialized_) return 0;
+  return this->mqtt_bridge_polling_.last_cycle_time_ms;
+}
+
+uint32_t GeappliancesBridge::get_polling_cycle_count() const
+{
+  if (!this->polling_bridge_initialized_) return 0;
+  return this->mqtt_bridge_polling_.cycle_count;
+}
+
 void GeappliancesBridge::dump_config() {
   ESP_LOGCONFIG(TAG, "GE Appliances Bridge:");
   if (!this->configured_device_id_.empty()) {

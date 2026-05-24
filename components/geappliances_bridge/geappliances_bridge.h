@@ -96,6 +96,11 @@ class GeappliancesBridge : public Component {
   // Public getter for the auto-generated device ID (used by the text sensor platform)
   const std::string& get_generated_device_id() const;
 
+  // Health metrics getters (used by the number sensor platform)
+  size_t get_pending_mqtt_updates() const;
+  uint32_t get_polling_cycle_time_ms() const;
+  uint32_t get_polling_cycle_count() const;
+
  protected:
   void on_mqtt_connected_();
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);

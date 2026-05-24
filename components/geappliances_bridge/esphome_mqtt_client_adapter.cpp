@@ -338,3 +338,12 @@ extern "C" void esphome_mqtt_client_adapter_destroy(
     self->pending_updates = nullptr;
   }
 }
+
+extern "C" size_t esphome_mqtt_client_adapter_get_pending_update_count(
+  const esphome_mqtt_client_adapter_t* self)
+{
+  if (self->pending_updates == nullptr) {
+    return 0;
+  }
+  return self->pending_updates->size();
+}

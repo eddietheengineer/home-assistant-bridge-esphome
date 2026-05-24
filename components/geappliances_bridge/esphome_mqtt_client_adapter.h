@@ -73,6 +73,9 @@ void esphome_mqtt_client_adapter_notify_connected(
 void esphome_mqtt_client_adapter_destroy(
   esphome_mqtt_client_adapter_t* self);
 
+size_t esphome_mqtt_client_adapter_get_pending_update_count(
+  const esphome_mqtt_client_adapter_t* self);
+
 #ifdef __cplusplus
 }
 #endif

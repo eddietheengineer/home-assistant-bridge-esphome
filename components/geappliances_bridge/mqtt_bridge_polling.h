@@ -69,6 +69,13 @@ typedef struct {
   // "no pre-known address — use broadcast discovery" (the default from
   // mqtt_bridge_polling_init()).
   uint8_t known_host_address;
+  // Health metrics: updated by the polling bridge as cycles complete.
+  // cycle_start_ms: millis() when the current cycle's first read was sent.
+  // last_cycle_time_ms: duration of the last completed cycle (ms).
+  // cycle_count: total completed cycles since init.
+  uint32_t cycle_start_ms;
+  uint32_t last_cycle_time_ms;
+  uint32_t cycle_count;
 } mqtt_bridge_polling_t;
 
 /*!
