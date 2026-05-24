@@ -48,7 +48,7 @@ void GeappliancesBridge::initialize_mqtt_client_()
 
   // For manual device_id configs where autodiscovery is skipped, set the
   // active ERD client now so the startup HSM's feature_bits phase can queue reads.
-  if (this->active_erd_client_ == nullptr) {
+  if (this->autodiscovery_manager_.get_active_erd_client() == nullptr) {
     if (this->uart_ != nullptr) {
       this->active_erd_client_ = &this->erd_client_.interface;
     } else {

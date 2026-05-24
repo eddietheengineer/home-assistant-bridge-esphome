@@ -79,7 +79,6 @@ void GeappliancesBridge::setup() {
       this->uart_ != nullptr,
       this->gea2_uart_ != nullptr,
       [this]() {
-        this->sync_autodiscovery_legacy_members_();
         // Signal the HSM to transition to the device_id phase.
         // The HSM handles DeviceIdentityManager::init() directly.
         tiny_hsm_send_signal(&this->startup_hsm_, signal_autodiscovery_complete, nullptr);
