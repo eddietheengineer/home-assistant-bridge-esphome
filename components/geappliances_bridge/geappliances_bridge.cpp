@@ -12,14 +12,7 @@
 namespace esphome {
 namespace geappliances_bridge {
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-const-variable"
-#endif
-static const char *const TAG = "geappliances_bridge";
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
+static const char* const TAG __attribute__((unused)) = "geappliances_bridge";
 
 static const tiny_gea3_erd_client_configuration_t client_configuration = {
   .request_timeout = 250,

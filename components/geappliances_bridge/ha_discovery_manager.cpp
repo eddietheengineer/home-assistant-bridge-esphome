@@ -21,14 +21,7 @@
 namespace esphome {
 namespace geappliances_bridge {
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-const-variable"
-#endif
-static const char* const TAG = "ha_discovery";
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
+static const char* const TAG __attribute__((unused)) = "ha_discovery";
 
 void HaDiscoveryManager::init(const std::string& base_url,
                               const std::string& device_id,

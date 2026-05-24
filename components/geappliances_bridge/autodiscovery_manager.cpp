@@ -14,14 +14,7 @@
 namespace esphome {
 namespace geappliances_bridge {
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-const-variable"
-#endif
-static const char* const TAG = "autodiscovery";
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
+static const char* const TAG __attribute__((unused)) = "autodiscovery";
 
 void AutodiscoveryManager::init(i_tiny_gea3_erd_client_t* gea3_erd_client,
                                  i_tiny_gea2_erd_client_t* gea2_erd_client,

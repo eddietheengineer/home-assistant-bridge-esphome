@@ -18,14 +18,7 @@ std::string appliance_type_to_string(uint8_t appliance_type);
 namespace esphome {
 namespace geappliances_bridge {
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-const-variable"
-#endif
-static const char* const TAG = "device_identity";
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
+static const char* const TAG __attribute__((unused)) = "device_identity";
 
 void DeviceIdentityManager::init(const std::string& configured_id,
                                   i_tiny_gea3_erd_client_t* erd_client,

@@ -13,14 +13,7 @@ extern "C" {
 #include <cctype>
 #include <map>
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-const-variable"
-#endif
-static const char *const TAG = "geappliances_bridge.mqtt";
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
+static const char *const TAG __attribute__((unused)) = "geappliances_bridge.mqtt";
 
 // Maximum number of distinct ERDs that can be pending (safety bound — in
 // practice bounded by the number of ERDs the appliance registers, typically <100).

@@ -13,14 +13,7 @@
 namespace esphome {
 namespace geappliances_bridge {
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-const-variable"
-#endif
-static const char* const TAG = "geappliances_bridge";
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
+static const char* const TAG __attribute__((unused)) = "geappliances_bridge";
 
 // ---------------------------------------------------------------------------
 // on_ha_discovery_erd_seen_() — called when a new ERD is seen via subscription
