@@ -481,9 +481,9 @@ bool GeappliancesBridge::should_route_to_feature_bits_(tiny_erd_t erd)
 
 void GeappliancesBridge::notify_device_id_sensors_()
 {
-  std::string device_id = this->device_identity_manager_.get_generated_device_id();
+  std::string device_id = this->device_identity_manager_.get_device_id();
   if (device_id.empty()) {
-    device_id = this->generated_device_id_;
+    device_id = "Unknown_Unknown_Unknown";
   }
 
   for (auto *sensor : this->device_id_sensors_) {
@@ -499,11 +499,7 @@ void GeappliancesBridge::notify_device_id_sensors_()
 
 const std::string& GeappliancesBridge::get_generated_device_id() const
 {
-  const std::string& id = this->device_identity_manager_.get_generated_device_id();
-  if (!id.empty()) {
-    return id;
-  }
-  return this->generated_device_id_;
+  return this->device_identity_manager_.get_device_id();
 }
 
 void GeappliancesBridge::dump_config() {
@@ -511,14 +507,18 @@ void GeappliancesBridge::dump_config() {
   if (!this->configured_device_id_.empty()) {
     ESP_LOGCONFIG(TAG, "  Configured Device ID: %s", this->configured_device_id_.c_str());
   }
-  if (!this->final_device_id_.empty()) {
-    ESP_LOGCONFIG(TAG, "  Device ID: %s", this->final_device_id_.c_str());
-  }
-  if (!this->generated_device_id_.empty()) {
-    ESP_LOGCONFIG(TAG, "  Generated Device ID: %s", this->generated_device_id_.c_str());
-    ESP_LOGCONFIG(TAG, "    Appliance Type: %u", this->appliance_type_);
-    ESP_LOGCONFIG(TAG, "    Model Number: %s", this->model_number_.c_str());
-    ESP_LOGCONFIG(TAG, "    Serial Number: %s", this->serial_number_.c_str());
+  {
+    const std::string& device_id = this->device_identity_manager_.get_device_id();
+    if (!device_id.empty()) {
+      ESP_LOGCONFIG(TAG, "  Device ID: %s", device_id.c_str());
+    }
+    const std::string& generated_id = this->device_identity_manager_.get_generated_device_id();
+    if (!generated_id.empty()) {
+      ESP_LOGCONFIG(TAG, "  Generated Device ID: %s", generated_id.c_str());
+      ESP_LOGCONFIG(TAG, "    Appliance Type: %u", this->device_identity_manager_.get_appliance_type());
+      ESP_LOGCONFIG(TAG, "    Model Number: %s", this->device_identity_manager_.get_model_number().c_str());
+      ESP_LOGCONFIG(TAG, "    Serial Number: %s", this->device_identity_manager_.get_serial_number().c_str());
+    }
   }
   if (this->device_identity_manager_.is_failed()) {
     ESP_LOGCONFIG(TAG, "  Device ID Generation: FAILED (see logs for details)");

@@ -135,8 +135,6 @@ class GeappliancesBridge : public Component {
   uart::UARTComponent *uart_{nullptr};
   uart::UARTComponent *gea2_uart_{nullptr};
   std::string configured_device_id_;
-  std::string generated_device_id_;
-  std::string final_device_id_;
   uint8_t client_address_{0xE4};
   uint8_t host_address_{0xC0};       // Host address for ERD reads (0xC0 fallback; updated during autodiscovery)
   bool mqtt_was_connected_{false};
@@ -212,10 +210,6 @@ class GeappliancesBridge : public Component {
 
   // HA discovery manager (extracted from god class)
   HaDiscoveryManager ha_discovery_manager_;
-
-  uint8_t appliance_type_{0};
-  std::string model_number_;
-  std::string serial_number_;
 
   tiny_timer_group_t timer_group_;
 

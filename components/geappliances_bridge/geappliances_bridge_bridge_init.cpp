@@ -43,7 +43,8 @@ void GeappliancesBridge::initialize_mqtt_client_()
     return;
   }
 
-  ESP_LOGI(TAG, "Initializing MQTT client adapter with device ID: %s", this->final_device_id_.c_str());
+  ESP_LOGI(TAG, "Initializing MQTT client adapter with device ID: %s",
+           this->device_identity_manager_.get_device_id().c_str());
 
   // For manual device_id configs where autodiscovery is skipped, set the
   // active ERD client now so the startup HSM's feature_bits phase can queue reads.
@@ -57,7 +58,8 @@ void GeappliancesBridge::initialize_mqtt_client_()
   }
 
   // Bind the adapter to the device ID.
-  esphome_mqtt_client_adapter_init(&this->mqtt_client_adapter_, this->final_device_id_.c_str());
+  esphome_mqtt_client_adapter_init(&this->mqtt_client_adapter_,
+                                   this->device_identity_manager_.get_device_id().c_str());
 
   // Wire up registered-ERD tracking so every ERD the device registers is
   // captured for use when filtering HA discovery to supported entities.
@@ -172,9 +174,9 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
   if (this->generate_device_config_) {
     this->ha_discovery_manager_.init(
         this->ha_discovery_base_url_,
-        this->final_device_id_,
-        this->model_number_,
-        this->serial_number_,
+        this->device_identity_manager_.get_device_id(),
+        this->device_identity_manager_.get_model_number(),
+        this->device_identity_manager_.get_serial_number(),
         this->ha_registered_erds_,
         true);
     this->ha_discovery_manager_.set_registered_erds(this->ha_registered_erds_);

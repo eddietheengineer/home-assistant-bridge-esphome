@@ -66,20 +66,7 @@ void GeappliancesBridge::start_device_id_generation_()
 
 void GeappliancesBridge::finalize_device_id_(bool sync_all)
 {
-  this->final_device_id_     = this->device_identity_manager_.get_device_id();
-  this->generated_device_id_ = this->device_identity_manager_.get_generated_device_id();
-
-  if (sync_all) {
-    this->appliance_type_ = this->device_identity_manager_.get_appliance_type();
-    this->model_number_   = this->device_identity_manager_.get_model_number();
-    this->serial_number_  = this->device_identity_manager_.get_serial_number();
-  }
-
-  if (this->final_device_id_.empty()) {
-    this->final_device_id_     = "Unknown_Unknown_Unknown";
-    this->generated_device_id_ = this->final_device_id_;
-  }
-
+  (void)sync_all;  // No longer needed — callers read directly from the manager.
   this->notify_device_id_sensors_();
 }
 
