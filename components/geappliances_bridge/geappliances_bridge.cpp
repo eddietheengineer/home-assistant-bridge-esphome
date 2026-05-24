@@ -265,6 +265,7 @@ void GeappliancesBridge::run_protocol_stack_()
   // within a single loop() call.  See doc/geappliances_bridge.md §13.
   bool need_gea2_loop = this->gea2_uart_ != nullptr && (
     this->autodiscovery_manager_.is_gea2_protocol() ||
+    this->gea2_protocol_active_ ||
     this->autodiscovery_manager_.get_state() == AUTODISCOVERY_GEA2_BROADCAST_PENDING ||
     this->autodiscovery_manager_.get_state() == AUTODISCOVERY_GEA2_BROADCAST_WAITING);
 
