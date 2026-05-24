@@ -159,7 +159,7 @@ class GeappliancesBridge : public Component {
   // GEA2 tight-loop duration: covers the full TX→RX cycle at 19200 baud
   // (see doc/geappliances_bridge.md section 13 for detailed explanation)
   static constexpr uint32_t GEA2_LOOP_DURATION_MS = 200;
-  bool gea2_protocol_active_{false}; // true once a GEA2 appliance is discovered
+  bool gea2_protocol_active_{false}; // fallback for manual device_id when autodiscovery is skipped
 
   // Device identity manager (extracted from god class)
   DeviceIdentityManager device_identity_manager_;
@@ -232,7 +232,7 @@ class GeappliancesBridge : public Component {
   // Adapter that wraps the GEA2 ERD client as a GEA3 ERD client interface
   gea2_erd_client_adapter_t gea2_erd_client_adapter_;
 
-  i_tiny_gea3_erd_client_t* active_erd_client_{nullptr}; // set during sync_autodiscovery_legacy_members_()
+  i_tiny_gea3_erd_client_t* active_erd_client_{nullptr}; // fallback for manual device_id when autodiscovery is skipped
 
   mqtt_bridge_t mqtt_bridge_;
   mqtt_bridge_polling_t mqtt_bridge_polling_;
