@@ -944,8 +944,16 @@ TEST(mqtt_bridge_polling_sequential, should_not_restart_cycle_mid_cycle_when_tim
   should_request_read(0xC0, erd_b);
   when_a_poll_read_completes(0xC0, erd_a, uint8_t(0x01));
 
-  // Polling timer fires again while erd_b is in-flight — should NOT restart
-  // the cycle because not all ERDs have completed.  No new read should be sent.
+  // Polling timer fires again while erd_c is in-flight — should NOT restart
+  // the cycle because not all ERDs have completed.  The bridge retries the
+  // current read (idempotent: queue rejects the duplicate, erd_index stays put).
+  mock()
+    .expectOneCall("read")
+    .onObject(&erd_client)
+    .withParameter("address", 0xC0)
+    .withParameter("erd", erd_c)
+    .ignoreOtherParameters()
+    .andReturnValue(false);  // Queue rejects duplicate of in-flight read
   after(polling_interval);
 
   // erd_b completes, registers, reads erd_c

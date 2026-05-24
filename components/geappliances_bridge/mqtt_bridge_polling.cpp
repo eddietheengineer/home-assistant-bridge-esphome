@@ -153,11 +153,12 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
   if (self->erd_index < self->polling_list_count) {
     self->request_id++;
     bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->erd_polling_list[self->erd_index]);
-    self->erd_index++;
-    /* Same guard as send_next_read_request: if the queue is full, don't
-     * arm the retry timer.  The polling timer (signal_polling_timer_expired)
-     * will retry the remaining ERDs on the next cycle boundary. */
+    /* If the queue is full, do NOT advance erd_index — the retry timer or
+     * polling timer will re-send this same ERD.  Advancing on a failed queue
+     * silently skips ERDs, causing incomplete polling cycles when the shared
+     * ERD client is under pressure (e.g., subscription bridge flooding). */
     if (queued) {
+      self->erd_index++;
       arm_timer(self, retry_delay);
     }
   }
@@ -488,6 +489,13 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       if (first_cycle || all_completed) {
         self->erd_index = 0;
         self->cycle_completed_count = 0;
+        send_next_poll_read_request(self);
+      } else if (self->erd_index < self->polling_list_count) {
+        // Mid-cycle: retry the current ERD in case the previous read attempt
+        // failed to queue (queue full due to shared ERD client pressure from
+        // a subscription bridge). send_next_poll_read_request is idempotent:
+        // if the read is already in-flight, the queue rejects the duplicate
+        // and erd_index stays put; if the queue drained, the read is queued.
         send_next_poll_read_request(self);
       }
       // Always re-arm the polling timer so the next cycle boundary is tracked
