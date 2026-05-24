@@ -406,8 +406,6 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
       ESP_LOGD(TAG, "Board discovered: address=0x%02X appliance_type=%u (%s)",
                args->address, app_type, appliance_type_to_string(app_type).c_str());
       this->autodiscovery_manager_.on_broadcast_response(args->address, app_type, in_gea3_discovery);
-      // Sync legacy members immediately for backward compatibility.
-      this->sync_autodiscovery_legacy_members_();
     }
     return;
   }
