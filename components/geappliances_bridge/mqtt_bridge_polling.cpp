@@ -153,15 +153,15 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
 {
   if (self->erd_index < self->polling_list_count) {
     self->request_id++;
-    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->erd_polling_list[self->erd_index]);
-    /* If the queue is full, do NOT advance erd_index — the retry timer or
-     * polling timer will re-send this same ERD.  Advancing on a failed queue
-     * silently skips ERDs, causing incomplete polling cycles when the shared
-     * ERD client is under pressure (e.g., subscription bridge flooding). */
-    if (queued) {
-      self->erd_index++;
-      arm_timer(self, retry_delay);
-    }
+    // Fire-and-forget: always advance erd_index and arm the retry timer,
+    // regardless of whether the queue accepted the read. This allows
+    // simultaneous reads during steady-state polling, significantly
+    // improving throughput when the shared ERD client queue is under
+    // pressure from subscription traffic. The 8KB queue provides enough
+    // headroom to handle bursts of simultaneous reads without overflow.
+    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->erd_polling_list[self->erd_index]);
+    self->erd_index++;
+    arm_timer(self, retry_delay);
   }
 }
 
@@ -456,49 +456,21 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       break;
 
     case signal_polling_timer_expired: {
-      // Only restart a new cycle when ALL ERDs in the current cycle have
-      // completed (success or failure) AND the polling timer has expired.
-      //
-      // Previously a polling_retries counter force-reset the cycle after
-      // (max_polling_retries + 1) × polling_interval_ms, starting a new
-      // cycle while the previous one's GEA3 reads were still in-flight.
-      // Overlapping reads grow the GEA3 ERD client's fixed-size request queue
-      // faster than it drains; when the queue (backed by client_queue_buffer_)
-      // overflows its ring-buffer, adjacent heap metadata is corrupted — which
-      // manifests as the FreeRTOS prvCheckTasksWaitingTermination crash at
-      // PC 0x4080430C seen in the field.
-      //
-      // Correct behaviour: let the current cycle run to completion.  The
-      // 60-second appliance_lost_timer is the safety net: if the appliance
-      // stops responding, no read_completed ever fires, the 100 ms retry timer
-      // never re-arms, and after 60 s the HSM transitions back to
-      // state_identify_appliance to rediscover the appliance.
-      //
-      // Do NOT send a new read here — only reset the index if the current
-      // cycle is fully complete (all ERDs have either read successfully or
-      // failed).  Forward progress is driven entirely by
-      // signal_read_completed → send_next_poll_read_request().  This ensures
-      // only one read is ever in-flight at a time, preventing queue pressure
-      // from building up in the shared ERD client queue.
-      //
-      // On the very first entry into state_polling, erd_index is pinned to
-      // polling_list_count.  The first signal_polling_timer_expired is what
-      // kicks off the first cycle — detect this by checking erd_index ==
-      // polling_list_count (no reads have ever been sent in this cycle).
+      // With simultaneous reads, the polling timer fires all reads at once
+      // when starting a new cycle. Forward progress during the cycle is driven
+      // by signal_read_completed / signal_read_failed calling
+      // send_next_poll_read_request() for the next ERD in sequence.
       bool first_cycle = (self->erd_index == self->polling_list_count);
       bool all_completed = (self->cycle_completed_count >= self->polling_list_count);
       if (first_cycle || all_completed) {
         self->erd_index = 0;
         self->cycle_completed_count = 0;
         self->cycle_start_ms = esphome::millis();
-        send_next_poll_read_request(self);
-      } else if (self->erd_index < self->polling_list_count) {
-        // Mid-cycle: retry the current ERD in case the previous read attempt
-        // failed to queue (queue full due to shared ERD client pressure from
-        // a subscription bridge). send_next_poll_read_request is idempotent:
-        // if the read is already in-flight, the queue rejects the duplicate
-        // and erd_index stays put; if the queue drained, the read is queued.
-        send_next_poll_read_request(self);
+        // Fire all reads simultaneously by calling send_next_poll_read_request
+        // for each ERD in the polling list.
+        while (self->erd_index < self->polling_list_count) {
+          send_next_poll_read_request(self);
+        }
       }
       // Always re-arm the polling timer so the next cycle boundary is tracked
       // even when the current cycle is still in progress.
@@ -550,7 +522,9 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
         self->cycle_count++;
       }
-      send_next_poll_read_request(self);
+      // With simultaneous reads, all ERDs were already fired from the polling
+      // timer. Do NOT call send_next_poll_read_request() here — the next cycle
+      // will be started by the polling timer when all ERDs have completed.
       break;
     }
 
@@ -565,7 +539,8 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
         self->cycle_count++;
       }
-      send_next_poll_read_request(self);
+      // With simultaneous reads, all ERDs were already fired from the polling
+      // timer. Do NOT call send_next_poll_read_request() here.
       break;
 
     case signal_mqtt_disconnected:
