@@ -513,9 +513,6 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       const uint8_t*  erd_data  = reinterpret_cast<const uint8_t*>(args->read_completed.data);
       uint8_t         data_size = args->read_completed.data_size;
 
-      ESP_LOGD(TAG, "Polling ERD 0x%04X read completed (data_size=%u)",
-               erd, data_size);
-
       // If the ERD is in pending_registration_set (added via _no_register in
       // entry), register it on MQTT now — confirming it's present on the
       // appliance.  If not in erd_set at all, it's a late discovery response.

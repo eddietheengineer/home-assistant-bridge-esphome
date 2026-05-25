@@ -34,9 +34,6 @@ static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
       auto erd = args->subscription_publication_received.erd;
 
-      ESP_LOGD(TAG, "Subscription ERD 0x%04X received (data_size=%u)",
-               erd, args->subscription_publication_received.data_size);
-
       if(erd_set(self).find(erd) == erd_set(self).end()) {
         mqtt_client_register_erd(self->mqtt_client, erd);
         erd_set(self).insert(erd);
