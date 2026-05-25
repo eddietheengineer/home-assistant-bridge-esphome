@@ -213,7 +213,7 @@ class GeappliancesBridge : public Component {
    * polling bridge and subscription bridge share the same ERD client;
    * overflow corrupts adjacent heap metadata causing
    * prvCheckTasksWaitingTermination crashes (see mqtt_bridge_polling.cpp). */
-  uint8_t client_queue_buffer_[32768];
+  uint8_t client_queue_buffer_[8192];
 
   // GEA2 components (only used when gea2_uart_ is set)
   esphome_uart_adapter_t gea2_uart_adapter_;
