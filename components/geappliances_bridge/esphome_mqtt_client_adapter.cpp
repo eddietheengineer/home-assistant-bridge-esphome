@@ -13,7 +13,7 @@ extern "C" {
 #include <cctype>
 #include <map>
 
-static const char *const TAG = "geappliances_bridge.mqtt";
+static const char *const TAG __attribute__((unused)) = "geappliances_bridge.mqtt";
 
 // Maximum number of distinct ERDs that can be pending (safety bound — in
 // practice bounded by the number of ERDs the appliance registers, typically <100).
@@ -104,24 +104,21 @@ static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value
     }
   }
   
-  // Publish to MQTT or queue if not connected
-  auto mqtt_client = esphome::mqtt::global_mqtt_client;
-  if (mqtt_client != nullptr && mqtt_client->is_connected()) {
-    mqtt_client->publish(topic, payload, 0, true);  // QoS 0, retain
+  // Always queue the update in the pending map rather than publishing
+  // directly.  The map key is the ERD so a repeated update overwrites the
+  // previous pending value — only the most recent value is ever published.
+  //
+  // This keeps the main loop non-blocking even when the IDF MQTT outbox is
+  // full (e.g., slow network or busy broker).  The notify_connected() drain
+  // (called every loop() iteration while MQTT is connected) publishes up to
+  // MAX_FLUSH_PER_CALL per call, spreading the burst across multiple loop
+  // iterations without stalling the loop.
+  if (self->pending_updates != nullptr && self->pending_updates->size() < MAX_PENDING_UPDATES) {
+    (*self->pending_updates)[erd] = {topic, payload};
+  } else if (self->pending_updates == nullptr) {
+    ESP_LOGW(TAG, "Pending updates queue not initialized, dropping ERD update for 0x%04X", erd);
   } else {
-    // Queue the update for later when MQTT connects. The map key is the ERD so
-    // a repeated update overwrites the previous pending value instead of
-    // appending — this prevents the queue from filling with stale duplicates
-    // across multiple polling cycles while MQTT is down.
-    if (self->pending_updates != nullptr && self->pending_updates->size() < MAX_PENDING_UPDATES) {
-      (*self->pending_updates)[erd] = {topic, payload};
-      ESP_LOGD(TAG, "MQTT not connected, queued ERD update for 0x%04X (queue size: %zu)",
-               erd, self->pending_updates->size());
-    } else if (self->pending_updates == nullptr) {
-      ESP_LOGW(TAG, "Pending updates queue not initialized, dropping ERD update for 0x%04X", erd);
-    } else {
-      ESP_LOGW(TAG, "Pending update queue full, dropping ERD update for 0x%04X", erd);
-    }
+    ESP_LOGW(TAG, "Pending update queue full, dropping ERD update for 0x%04X", erd);
   }
 }
 
@@ -325,7 +322,7 @@ extern "C" void esphome_mqtt_client_adapter_notify_connected(
     flushed++;
   }
   if (flushed > 0 && self->pending_updates->empty()) {
-    ESP_LOGI(TAG, "Flushed all pending ERD updates");
+    ESP_LOGV(TAG, "Flushed all pending ERD updates");
   }
 }
 
@@ -340,4 +337,13 @@ extern "C" void esphome_mqtt_client_adapter_destroy(
     delete self->pending_updates;
     self->pending_updates = nullptr;
   }
+}
+
+extern "C" size_t esphome_mqtt_client_adapter_get_pending_update_count(
+  const esphome_mqtt_client_adapter_t* self)
+{
+  if (self->pending_updates == nullptr) {
+    return 0;
+  }
+  return self->pending_updates->size();
 }

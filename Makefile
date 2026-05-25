@@ -24,6 +24,19 @@ SRC_FILES := \
   components/geappliances_bridge/mqtt_bridge.cpp \
   components/geappliances_bridge/mqtt_bridge_polling.cpp \
   components/geappliances_bridge/gea2_erd_client_adapter.cpp \
+  components/geappliances_bridge/device_identity_manager.cpp \
+  components/geappliances_bridge/feature_bit_manager.cpp \
+  components/geappliances_bridge/autodiscovery_manager.cpp \
+  components/geappliances_bridge/esphome_mqtt_client_adapter.cpp \
+  components/geappliances_bridge/esphome_time_source.cpp \
+  components/geappliances_bridge/esphome_uart_adapter.cpp \
+  components/geappliances_bridge/ha_discovery_manager.cpp \
+  components/geappliances_bridge/geappliances_bridge.cpp \
+  components/geappliances_bridge/geappliances_bridge_bridge_init.cpp \
+  components/geappliances_bridge/geappliances_bridge_feature_bits.cpp \
+  components/geappliances_bridge/geappliances_bridge_ha_discovery.cpp \
+  components/geappliances_bridge/geappliances_bridge_startup_hsm.cpp \
+  components/geappliances_bridge/geappliances_bridge_autodiscovery.cpp
 
 SRCS := $(SRC_FILES) $(shell find $(SRC_DIRS) -maxdepth 1 -name *.cpp -or -name *.c -or -name *.s)
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
@@ -34,11 +47,33 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 SANITIZE_FLAGS := -fsanitize=address -fsanitize=undefined
 
+# CppUTest installation paths — auto-detect common locations
+# Override with: make CPPUTEST_PREFIX=/path/to/cpputest
+#   macOS (Apple Silicon):  /opt/homebrew  (default)
+#   macOS (Intel):          /usr/local
+#   Linux (system pkg):     /usr
+#   Linux (local build):    /path/to/CppUTest
+UNAME_S := $(shell uname -s)
+UNAME_P := $(shell uname -p)
+ifeq ($(UNAME_S),Darwin)
+  # Apple Silicon → homebrew at /opt/homebrew; Intel → /usr/local
+  ifeq ($(UNAME_P),arm)
+    CPPUTEST_PREFIX ?= /opt/homebrew
+  else
+    CPPUTEST_PREFIX ?= /usr/local
+  endif
+else
+  # Linux: default to system-wide install
+  CPPUTEST_PREFIX ?= /usr
+endif
+CPPUTEST_INC := -I$(CPPUTEST_PREFIX)/include
+CPPUTEST_LIB := -L$(CPPUTEST_PREFIX)/lib
+
 CFLAGS += -std=c11 -pedantic
 CPPFLAGS += $(SANITIZE_FLAGS) -fno-omit-frame-pointer
-CPPFLAGS += $(INC_FLAGS) -MMD -MP -g -Wall -Wextra -Wcast-qual -Werror
+CPPFLAGS += $(INC_FLAGS) $(CPPUTEST_INC) -MMD -MP -g -Wall -Wextra -Wcast-qual -Werror
 CXXFLAGS += -std=c++17
-LDFLAGS := $(SANITIZE_FLAGS)
+LDFLAGS := $(SANITIZE_FLAGS) $(CPPUTEST_LIB)
 LDLIBS := -lstdc++ -lCppUTest -lCppUTestExt -lm
 
 BUILD_DEPS += $(MAKEFILE_LIST)
@@ -89,5 +124,10 @@ $(BUILD_DIR)/%.cpp.o: %.cpp $(BUILD_DEPS)
 clean:
 	@echo Cleaning...
 	@rm -rf $(BUILD_DIR)
+
+.PHONY: pytest
+pytest:
+	@echo Running Python tests...
+	@python3 -m pytest scripts/test_generate_erd_lists.py -v
 
 -include $(DEPS)

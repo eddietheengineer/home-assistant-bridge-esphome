@@ -5,13 +5,22 @@ doc/secrets.yaml
 doc/.esphome/
 __pycache__/
 *.pyc
+secrets.yaml
+gea-esphome-zonelinec6.yaml
+.esphome
 
 # Test build artifacts
 build/
+logs/
+my_configs/
+configuration_files/
+tmp/
+packages/
 
 # IDE
 .vscode/
 .DS_Store
+.venv
 
 # CodeQL
 _codeql_detected_source_root

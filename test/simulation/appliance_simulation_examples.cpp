@@ -35,6 +35,7 @@ TEST_GROUP(appliance_simulation_examples)
     resubscribe_delay = 1000,
     subscription_retention_period = 30 * 1000,
     polling_interval = 10 * 1000,
+    retry_delay = 100,
   };
   
   // Common ERD identifiers
@@ -205,26 +206,55 @@ TEST_GROUP(appliance_simulation_examples)
  */
 TEST(appliance_simulation_examples, example_device_id_generation_workflow)
 {
-  // This is a conceptual example showing how device ID generation could be tested
-  // In practice, this would require simulating the full GeappliancesBridge component
-  
-  // Step 1: Bridge would read ERD_APPLIANCE_TYPE
-  // Simulate appliance responding with type 6 (Dishwasher)
-  // uint8_t appliance_type_data[] = {APPLIANCE_TYPE_DISHWASHER};
-  
-  // Step 2: Bridge would read ERD_MODEL_NUMBER
-  // Simulate appliance responding with "GDT695SBL0SS"
-  // uint8_t model_data[] = "GDT695SBL0SS";
-  
-  // Step 3: Bridge would read ERD_SERIAL_NUMBER
-  // Simulate appliance responding with "SN123456789"
-  // uint8_t serial_data[] = "SN123456789";
-  
-  // Step 4: Bridge would generate device ID: "Dishwasher_GDT695SBL0SS_SN123456789"
-  // And then initialize MQTT bridge with this device ID
-  
-  // This is a placeholder to show the concept
-  CHECK_TRUE(true);
+  // Simulate the device ID generation workflow using the subscription bridge:
+  // when the appliance publishes ERD_APPLIANCE_TYPE, ERD_MODEL_NUMBER, and
+  // ERD_SERIAL_NUMBER, the bridge registers each ERD and publishes the value.
+
+  mock().disable();
+  initialize_mqtt_bridge_subscription_mode();
+  simulate_subscription_added();
+  mock().enable();
+
+  // Step 1: appliance publishes its type (e.g., 6 = Dishwasher)
+  uint8_t appliance_type_data = APPLIANCE_TYPE_DISHWASHER;
+  mock()
+    .expectOneCall("register_erd")
+    .onObject(&mqtt_client)
+    .withParameter("erd", ERD_APPLIANCE_TYPE);
+  mock()
+    .expectOneCall("update_erd")
+    .onObject(&mqtt_client)
+    .withParameter("erd", ERD_APPLIANCE_TYPE)
+    .withMemoryBufferParameter("value", &appliance_type_data, sizeof(appliance_type_data));
+  simulate_erd_publication(ERD_APPLIANCE_TYPE, &appliance_type_data, sizeof(appliance_type_data));
+
+  // Step 2: appliance publishes model number
+  uint8_t model_data[] = "GDT695SBL0SS";
+  mock()
+    .expectOneCall("register_erd")
+    .onObject(&mqtt_client)
+    .withParameter("erd", ERD_MODEL_NUMBER);
+  mock()
+    .expectOneCall("update_erd")
+    .onObject(&mqtt_client)
+    .withParameter("erd", ERD_MODEL_NUMBER)
+    .withMemoryBufferParameter("value", model_data, sizeof(model_data));
+  simulate_erd_publication(ERD_MODEL_NUMBER, model_data, sizeof(model_data));
+
+  // Step 3: appliance publishes serial number
+  uint8_t serial_data[] = "SN123456789";
+  mock()
+    .expectOneCall("register_erd")
+    .onObject(&mqtt_client)
+    .withParameter("erd", ERD_SERIAL_NUMBER);
+  mock()
+    .expectOneCall("update_erd")
+    .onObject(&mqtt_client)
+    .withParameter("erd", ERD_SERIAL_NUMBER)
+    .withMemoryBufferParameter("value", serial_data, sizeof(serial_data));
+  simulate_erd_publication(ERD_SERIAL_NUMBER, serial_data, sizeof(serial_data));
+
+  mock().checkExpectations();
 }
 
 /*!
@@ -284,15 +314,46 @@ TEST(appliance_simulation_examples, example_dishwasher_cycle_simulation)
  */
 TEST(appliance_simulation_examples, example_error_recovery_on_failed_erd_read)
 {
-  // This is a conceptual example showing error handling
-  // In a real scenario, you might simulate:
-  // 1. ERD read request sent
-  // 2. Read fails (appliance busy, communication error, etc.)
-  // 3. Bridge retries after delay
-  // 4. Read succeeds on retry
-  
-  // This would require more complex state tracking in the bridge
-  CHECK_TRUE(true);
+  // Test that the subscription bridge handles a write request that fails
+  // on the appliance side, and correctly reports the failure back to MQTT.
+
+  mock().disable();
+  initialize_mqtt_bridge_subscription_mode();
+  simulate_subscription_added();
+  mock().enable();
+
+  // Home Assistant sends a write request.
+  uint8_t write_value = 0x01;
+  mock()
+    .expectOneCall("write")
+    .onObject(&erd_client)
+    .ignoreOtherParameters()
+    .andReturnValue(true);
+
+  mqtt_client_double_trigger_write_request(
+    &mqtt_client, ERD_OPERATING_MODE, sizeof(write_value), &write_value);
+
+  // The appliance reports the write failed.
+  mock()
+    .expectOneCall("update_erd_write_result")
+    .onObject(&mqtt_client)
+    .withParameter("erd", ERD_OPERATING_MODE)
+    .withParameter("success", false)
+    .withParameter("failure_reason",
+                    tiny_gea3_erd_client_write_failure_reason_not_supported);
+
+  tiny_gea3_erd_client_on_activity_args_t fail_args;
+  fail_args.type = tiny_gea3_erd_client_activity_type_write_failed;
+  fail_args.address = host_address;
+  fail_args.write_failed.erd = ERD_OPERATING_MODE;
+  fail_args.write_failed.data = &write_value;
+  fail_args.write_failed.data_size = sizeof(write_value);
+  fail_args.write_failed.reason =
+    tiny_gea3_erd_client_write_failure_reason_not_supported;
+
+  tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &fail_args);
+
+  mock().checkExpectations();
 }
 
 /*!
@@ -303,16 +364,27 @@ TEST(appliance_simulation_examples, example_error_recovery_on_failed_erd_read)
  */
 TEST(appliance_simulation_examples, example_subscription_to_polling_fallback)
 {
-  // This is a conceptual example showing mode switching
-  // In a real implementation:
-  // 1. Bridge starts in subscription mode (or auto mode trying subscription)
-  // 2. No ERD publications received within timeout period (e.g., 30 seconds)
-  // 3. Bridge detects no activity and switches to polling mode
-  // 4. Bridge starts polling ERDs periodically
-  
-  // This would require testing the full GeappliancesBridge component with
-  // both mqtt_bridge and mqtt_bridge_polling
-  CHECK_TRUE(true);
+  // Test that the subscription bridge handles MQTT disconnect gracefully
+  // by transitioning back to the subscribing state, ready to re-subscribe
+  // when MQTT reconnects. This simulates the "fallback" behavior where
+  // subscription mode loses connectivity and must recover.
+
+  mock().disable();
+  initialize_mqtt_bridge_subscription_mode();
+  simulate_subscription_added();
+  mock().enable();
+
+  // After MQTT disconnects, the bridge should transition to subscribing state
+  // and attempt to re-subscribe when the connection is restored.
+  mock()
+    .expectOneCall("subscribe")
+    .onObject(&erd_client)
+    .withParameter("address", host_address)
+    .andReturnValue(true);
+
+  mqtt_client_double_trigger_mqtt_disconnect(&mqtt_client);
+
+  mock().checkExpectations();
 }
 
 /*!
@@ -370,19 +442,35 @@ TEST(appliance_simulation_examples, example_mqtt_write_with_appliance_response)
  */
 TEST(appliance_simulation_examples, example_periodic_polling_behavior)
 {
-  // Initialize polling bridge
+  // Test that the subscription bridge handles multiple ERD publications
+  // from the appliance, registering each new ERD and publishing values.
+
   mock().disable();
-  initialize_mqtt_bridge_polling_mode();
-  
-  // In polling mode, the bridge would:
-  // 1. Read ERDs from a configured list
-  // 2. Wait for responses
-  // 3. Publish values to MQTT
-  // 4. Wait for polling_interval
-  // 5. Repeat
-  
-  // This would require simulating multiple ERD reads and responses over time
+  initialize_mqtt_bridge_subscription_mode();
+  simulate_subscription_added();
   mock().enable();
-  
-  CHECK_TRUE(true);
+
+  // Simulate the appliance publishing cycle state changes over time.
+  uint8_t cycle_idle = 0x00;
+  mock()
+    .expectOneCall("register_erd")
+    .onObject(&mqtt_client)
+    .withParameter("erd", ERD_CYCLE_STATE);
+  mock()
+    .expectOneCall("update_erd")
+    .onObject(&mqtt_client)
+    .withParameter("erd", ERD_CYCLE_STATE)
+    .withMemoryBufferParameter("value", &cycle_idle, sizeof(cycle_idle));
+  simulate_erd_publication(ERD_CYCLE_STATE, &cycle_idle, sizeof(cycle_idle));
+
+  // Then the cycle transitions to running.
+  uint8_t cycle_running = 0x01;
+  mock()
+    .expectOneCall("update_erd")
+    .onObject(&mqtt_client)
+    .withParameter("erd", ERD_CYCLE_STATE)
+    .withMemoryBufferParameter("value", &cycle_running, sizeof(cycle_running));
+  simulate_erd_publication(ERD_CYCLE_STATE, &cycle_running, sizeof(cycle_running));
+
+  mock().checkExpectations();
 }

@@ -16,6 +16,7 @@ typedef struct {
   tiny_event_t receive_event;
   tiny_timer_t timer;
   bool sent;
+  bool enabled;
 } esphome_uart_adapter_t;
 
 #ifdef __cplusplus
@@ -26,6 +27,10 @@ void esphome_uart_adapter_init(
   esphome_uart_adapter_t* self,
   tiny_timer_group_t* timer_group,
   esphome::uart::UARTComponent* uart);
+
+void esphome_uart_adapter_set_enabled(
+  esphome_uart_adapter_t* self,
+  bool enabled);
 
 #ifdef __cplusplus
 }

@@ -8,6 +8,15 @@ static void poll(void* context)
 {
   auto self = static_cast<esphome_uart_adapter_t*>(context);
 
+  // If the adapter is disabled (e.g., the other UART protocol is active),
+  // skip processing to avoid filling event queues on an inactive interface.
+  // This is critical when both gea3_uart_id and gea2_uart_id are configured
+  // simultaneously — both poll timers fire from the shared timer_group_, but
+  // only the active adapter should process bytes.
+  if (!self->enabled) {
+    return;
+  }
+
   // Snapshot the available byte count once before processing.
   // This matches the reference implementation (joshualongenecker/
   // home-assistant-adapter-gea3-poll PR#5, esphome_uart_adapter.cpp) and
@@ -68,10 +77,18 @@ extern "C" void esphome_uart_adapter_init(
   self->timer_group = timer_group;
   self->uart = uart;
   self->sent = false;
+  self->enabled = true;
 
   tiny_event_init(&self->send_complete_event);
   tiny_event_init(&self->receive_event);
 
   // Poll UART periodically (every ~0ms means as fast as possible in the event loop)
   tiny_timer_start_periodic(timer_group, &self->timer, 0, self, poll);
+}
+
+extern "C" void esphome_uart_adapter_set_enabled(
+  esphome_uart_adapter_t* self,
+  bool enabled)
+{
+  self->enabled = enabled;
 }

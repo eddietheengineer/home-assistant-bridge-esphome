@@ -1,18 +1,19 @@
 """ESPHome component for GE Appliances Bridge."""
-import esphome.codegen as cg
-import esphome.config_validation as cv
-from esphome import pins
-from esphome.components import esp32, uart, mqtt
-from esphome.const import (
-    CONF_ID,
-)
-from esphome.core import CORE
+from __future__ import annotations
+
 import json
+import logging
 import os
 import re
-import logging
-import urllib.request
 import urllib.error
+import urllib.request
+from typing import Any
+
+import esphome.codegen as cg
+import esphome.config_validation as cv
+from esphome.components import esp32, mqtt, uart
+from esphome.const import CONF_ID
+from esphome.core import CORE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,10 +36,13 @@ CONF_CUSTOM_ERDS = "custom_erds"
 CONF_GENERATE_DEVICE_CONFIG = "generate_device_config"
 CONF_HA_DISCOVERY_BASE_URL = "ha_discovery_base_url"
 
+
+
 # Default base URL for the per-category JSONL files used by runtime HA discovery.
+# Uses HEAD to always resolve against the repository's default branch.
 HA_DISCOVERY_DEFAULT_BASE_URL = (
     "https://raw.githubusercontent.com/joshualongenecker/"
-    "home-assistant-bridge-esphome/copilot/implement-goal-2-autodiscovery/ha_discovery"
+    "home-assistant-bridge-esphome/HEAD/ha_discovery"
 )
 
 # Bridge mode options (polling vs subscriptions)
@@ -57,15 +61,15 @@ GeappliancesBridge = geappliances_bridge_ns.class_(
 )
 
 
-def sanitize_appliance_name(name):
+def sanitize_appliance_name(name: str) -> str:
     """Sanitize appliance type name for use in C++ identifiers.
-    
+
     Replaces special characters with readable equivalents and removes
     any non-alphanumeric characters to create valid C++ identifiers.
-    
+
     Args:
         name: The appliance type name to sanitize
-        
+
     Returns:
         A sanitized string suitable for use as a C++ identifier
     """
@@ -88,9 +92,9 @@ def sanitize_appliance_name(name):
     return result
 
 
-def load_appliance_types():
+def load_appliance_types() -> dict[int, str]:
     """Load appliance type mappings from the API documentation library.
-    
+
     Tries multiple locations to find the appliance type definitions JSON:
     1. Local submodule directory (for development with checked out repo)
     2. ESPHome library cache in user's home directory (~/.esphome/external_files/libraries/)
@@ -98,7 +102,7 @@ def load_appliance_types():
     4. ESPHome library cache relative to component (build directory)
     5. Parent directories (alternative library location)
     6. GitHub as fallback (when no local copy is available)
-    
+
     Returns:
         Dictionary mapping appliance type IDs (int) to names (str)
     """
@@ -235,7 +239,7 @@ def load_appliance_types():
     }
 
 
-def generate_appliance_type_function(appliance_types):
+def generate_appliance_type_function(appliance_types: dict[int, str]) -> str:
     """Generate C++ code for the appliance type to string function."""
     # Generate switch cases with consistent indentation
     cases = []
@@ -257,7 +261,18 @@ std::string appliance_type_to_string(uint8_t appliance_type) {{
 '''
     return function_code
 
-def validate_at_least_one_uart(config):
+def validate_at_least_one_uart(config: dict[str, Any]) -> dict[str, Any]:
+    """Validate that at least one UART ID is specified.
+
+    Args:
+        config: Configuration dictionary
+
+    Returns:
+        The validated configuration
+
+    Raises:
+        cv.Invalid: If neither gea3_uart_id nor gea2_uart_id is specified
+    """
     if CONF_GEA3_UART_ID not in config and CONF_GEA2_UART_ID not in config:
         raise cv.Invalid("At least one of gea3_uart_id or gea2_uart_id must be specified")
     return config
@@ -292,8 +307,12 @@ CONFIG_SCHEMA = cv.Schema(
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
 
 
-async def to_code(config):
-    """Generate C++ code for the component."""
+async def to_code(config: dict[str, Any]) -> None:
+    """Generate C++ code for the component.
+
+    Args:
+        config: Configuration dictionary
+    """
     # Add library dependencies
     cg.add_library("https://github.com/ryanplusplus/tiny", None)
     cg.add_library("https://github.com/geappliances/tiny-gea-api#develop", None)

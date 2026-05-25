@@ -13,8 +13,9 @@
 #include "erd_lists.h"
 
 typedef struct {
-  tiny_erd_t erd_polling_list[POLLING_LIST_MAX_SIZE];
+  tiny_erd_t* erd_polling_list;       // Heap-allocated, dynamically sized
   uint16_t polling_list_count;
+  uint16_t polling_list_capacity;      // Allocated capacity of erd_polling_list
   uint32_t polling_interval_ms;
   tiny_timer_group_t* timer_group;
   i_tiny_gea3_erd_client_t* erd_client;
@@ -29,12 +30,21 @@ typedef struct {
   tiny_hsm_state_t next_discovery_state;
   void* erd_set;
   void* erd_cache;
+  // Set of ERDs that have been added to the polling list but not yet
+  // registered on MQTT (added via add_erd_to_polling_list_no_register).
+  // On first successful read, these are registered and removed from this set.
+  void* pending_registration_set;
   tiny_gea3_erd_client_request_id_t request_id;
   uint8_t erd_host_address;
   uint8_t appliance_type;
   const tiny_erd_t* appliance_erd_list;
   uint16_t appliance_erd_list_count;
   uint16_t erd_index;
+  // Number of ERDs in the current polling cycle that have completed (success
+  // or failure).  Used together with erd_index to determine when a full cycle
+  // has finished — the cycle only restarts when cycle_completed_count equals
+  // polling_list_count AND the polling timer has expired.
+  uint16_t cycle_completed_count;
   bool only_publish_on_change;
   // Set to true once the HSM transitions into state_polling (all ERD
   // discovery phases have completed). Reset to false on appliance loss/
@@ -59,6 +69,13 @@ typedef struct {
   // "no pre-known address — use broadcast discovery" (the default from
   // mqtt_bridge_polling_init()).
   uint8_t known_host_address;
+  // Health metrics: updated by the polling bridge as cycles complete.
+  // cycle_start_ms: millis() when the current cycle's first read was sent.
+  // last_cycle_time_ms: duration of the last completed cycle (ms).
+  // cycle_count: total completed cycles since init.
+  uint32_t cycle_start_ms;
+  uint32_t last_cycle_time_ms;
+  uint32_t cycle_count;
 } mqtt_bridge_polling_t;
 
 /*!

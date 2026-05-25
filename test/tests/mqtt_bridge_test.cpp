@@ -378,7 +378,8 @@ TEST(mqtt_bridge, should_register_and_update_newly_discovered_erds_when_publishe
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
   given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
   given_that_mqtt_has_disconnected();
-  should_register_erd(0xABCD);
+  // ERD was already registered during given_that_an_erd_publication_has_been_received,
+  // so only update_erd is expected (register_erd is skipped for already-known ERDs).
   should_update_erd(0xABCD, uint32_t(0x12345678));
   when_an_erd_publication_is_received(0xC0, 0xABCD, uint32_t(0x12345678));
 }
