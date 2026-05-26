@@ -32,7 +32,6 @@ namespace esphome {
 namespace mqtt {
 class MQTTClientComponent;
 }
-
 namespace geappliances_bridge {
 
 static constexpr uint32_t HA_DISCOVERY_QUIET_MS = 10000;
@@ -74,6 +73,9 @@ class HaDiscoveryManager {
            bool subscription_activity_detected,
            mqtt::MQTTClientComponent* mqtt_client);
 
+  /// Set the MQTT adapter for async publishing (optional, nullptr = sync fallback)
+  void set_mqtt_adapter(void* mqtt_adapter);
+
   bool is_complete() const { return state_ == HA_DISCOVERY_COMPLETE; }
   bool is_failed()   const { return state_ == HA_DISCOVERY_FAILED; }
   bool is_publishing() const { return state_ == HA_DISCOVERY_PUBLISHING; }
@@ -114,6 +116,9 @@ class HaDiscoveryManager {
   uint32_t last_activity_{0};
   uint32_t last_publish_ms_{0};
   uint32_t start_time_{0};  // millis() when WAITING_FOR_READY state entered
+
+  // Pointer to the MQTT adapter for async publishing (opaque, set via set_mqtt_adapter)
+  void* mqtt_adapter_{nullptr};
 
 #ifdef USE_ESP_IDF
   QueueHandle_t queue_{nullptr};

@@ -8,6 +8,10 @@
 #include "esphome/components/mqtt/mqtt_client.h"
 #include <cstring>
 
+// Forward declaration of the async MQTT publish function from the adapter
+extern "C" void esphome_mqtt_client_adapter_publish(
+  void* self, const std::string& topic, const std::string& payload, bool retain);
+
 #ifdef USE_ESP_IDF
 #  include "esp_http_client.h"
 #  include "esp_crt_bundle.h"
@@ -53,6 +57,11 @@ void HaDiscoveryManager::on_erd_seen(tiny_erd_t erd)
     this->seen_erds_.insert(erd);
     this->last_activity_ = millis();
   }
+}
+
+void HaDiscoveryManager::set_mqtt_adapter(void* mqtt_adapter)
+{
+  this->mqtt_adapter_ = mqtt_adapter;
 }
 
 void HaDiscoveryManager::cleanup()
@@ -222,7 +231,12 @@ void HaDiscoveryManager::publish_next_entity_(mqtt::MQTTClientComponent* mqtt_cl
       if (this->task_stack_) { heap_caps_free(this->task_stack_); this->task_stack_ = nullptr; }
       if (this->task_tcb_)   { heap_caps_free(this->task_tcb_);   this->task_tcb_   = nullptr; }
     } else {
-      mqtt_client->publish(item->topic, item->payload, 0, true);
+      // Use async publish via the adapter if available, otherwise sync fallback
+      if (this->mqtt_adapter_ != nullptr) {
+        esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, item->topic, item->payload, true);
+      } else {
+        mqtt_client->publish(item->topic, item->payload, 0, true);
+      }
       delete item;
     }
   }

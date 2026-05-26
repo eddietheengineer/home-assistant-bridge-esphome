@@ -175,6 +175,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
         this->ha_registered_erds_,
         true);
     this->ha_discovery_manager_.set_registered_erds(this->ha_registered_erds_);
+    this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
     ESP_LOGI(TAG, "HA discovery deferred: will publish after ERD discovery completes "
                   "(polling mode) or %u s quiet window (subscription mode)",
              HA_DISCOVERY_QUIET_MS / 1000);

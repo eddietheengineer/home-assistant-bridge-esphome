@@ -26,6 +26,63 @@ static constexpr size_t MAX_PENDING_UPDATES = 200;
 // a typical loop rate of ~200 Hz, 200 pending updates drain in ≤200 ms.
 static constexpr size_t MAX_FLUSH_PER_CALL = 5;
 
+// Async MQTT publish task: queue size and stack
+static constexpr size_t MQTT_PUBLISH_QUEUE_SIZE = 200;
+static constexpr uint32_t MQTT_PUBLISH_STACK_SIZE = 4096;
+
+// ---------------------------------------------------------------------------
+// Async MQTT publish background task
+// ---------------------------------------------------------------------------
+
+#ifdef USE_ESP_IDF
+
+static void mqtt_publish_task_(void* param)
+{
+  auto self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(param);
+  while (true) {
+    MqttPublishRequest* req = nullptr;
+    // Block until item available or sentinel (nullptr = shutdown)
+    xQueueReceive(self->publish_queue_, &req, portMAX_DELAY);
+    if (req == nullptr) break;  // Sentinel — exit task
+
+    auto mqtt_client = esphome::mqtt::global_mqtt_client;
+    if (mqtt_client != nullptr && mqtt_client->is_connected()) {
+      mqtt_client->publish(req->topic, req->payload, 0, req->retain);
+    }
+    delete req;
+  }
+}
+
+#endif
+
+// ---------------------------------------------------------------------------
+// enqueue_publish: non-blocking enqueue to async task, or sync fallback
+// ---------------------------------------------------------------------------
+
+static void enqueue_publish(esphome_mqtt_client_adapter_t* self,
+                            const std::string& topic,
+                            const std::string& payload,
+                            bool retain)
+{
+#ifdef USE_ESP_IDF
+  if (self->publish_task_ != nullptr) {
+    MqttPublishRequest* req = new MqttPublishRequest{topic, payload, retain};
+    if (xQueueSend(self->publish_queue_, &req, 0) != pdTRUE) {
+      ESP_LOGW(TAG, "MQTT publish queue full, dropping");
+      delete req;
+    }
+    return;
+  }
+#else
+  (void)self;  // unused in non-ESP-IDF fallback
+#endif
+  // Fallback: synchronous publish (ESP-ARDUINO or task not ready)
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client != nullptr && mqtt_client->is_connected()) {
+    mqtt_client->publish(topic, payload, 0, retain);
+  }
+}
+
 static std::string build_topic(esphome_mqtt_client_adapter_t* self, const char* suffix)
 {
   return std::string("geappliances/") + *self->device_id + suffix;
@@ -143,7 +200,7 @@ static void update_erd_write_result(
   
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client != nullptr && mqtt_client->is_connected()) {
-    mqtt_client->publish(topic, payload, 0, false);  // QoS 0, no retain
+    enqueue_publish(self, topic, payload, false);  // QoS 0, no retain
   } else {
     ESP_LOGD(TAG, "MQTT not connected, skipping write result for 0x%04X", erd);
   }
@@ -186,6 +243,39 @@ extern "C" void esphome_mqtt_client_adapter_init(
 
   tiny_event_init(&self->on_write_request_event);
   tiny_event_init(&self->on_mqtt_disconnect_event);
+
+#ifdef USE_ESP_IDF
+  self->publish_queue_    = nullptr;
+  self->publish_task_     = nullptr;
+  self->publish_task_stack_ = nullptr;
+  self->publish_task_tcb_  = nullptr;
+
+  self->publish_queue_ = xQueueCreate(MQTT_PUBLISH_QUEUE_SIZE, sizeof(MqttPublishRequest*));
+  if (self->publish_queue_ != nullptr) {
+    self->publish_task_stack_ = static_cast<StackType_t*>(
+      heap_caps_malloc(MQTT_PUBLISH_STACK_SIZE * sizeof(StackType_t), MALLOC_CAP_INTERNAL));
+    self->publish_task_tcb_ = static_cast<StaticTask_t*>(
+      heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL));
+    if (self->publish_task_stack_ != nullptr && self->publish_task_tcb_ != nullptr) {
+      self->publish_task_ = xTaskCreateStatic(
+        mqtt_publish_task_, "mqtt_pub", MQTT_PUBLISH_STACK_SIZE, self, 1,
+        self->publish_task_stack_, self->publish_task_tcb_);
+      if (self->publish_task_ == nullptr) {
+        ESP_LOGE(TAG, "Failed to create MQTT publish task");
+        heap_caps_free(self->publish_task_stack_); self->publish_task_stack_ = nullptr;
+        heap_caps_free(self->publish_task_tcb_);   self->publish_task_tcb_   = nullptr;
+        vQueueDelete(self->publish_queue_);        self->publish_queue_      = nullptr;
+      }
+    } else {
+      ESP_LOGE(TAG, "Failed to allocate MQTT publish task stack/TCB");
+      if (self->publish_task_stack_) { heap_caps_free(self->publish_task_stack_); self->publish_task_stack_ = nullptr; }
+      if (self->publish_task_tcb_)   { heap_caps_free(self->publish_task_tcb_);   self->publish_task_tcb_   = nullptr; }
+      vQueueDelete(self->publish_queue_); self->publish_queue_ = nullptr;
+    }
+  } else {
+    ESP_LOGE(TAG, "Failed to create MQTT publish queue");
+  }
+#endif
 }
 
 extern "C" void esphome_mqtt_client_adapter_set_valid_erds_filter(
@@ -317,7 +407,7 @@ extern "C" void esphome_mqtt_client_adapter_notify_connected(
   size_t flushed = 0;
   while (!self->pending_updates->empty() && flushed < MAX_FLUSH_PER_CALL) {
     auto it = self->pending_updates->begin();
-    mqtt_client->publish(it->second.topic, it->second.payload, 0, true);  // QoS 0, retain
+    enqueue_publish(self, it->second.topic, it->second.payload, true);  // retain
     self->pending_updates->erase(it);
     flushed++;
   }
@@ -329,6 +419,31 @@ extern "C" void esphome_mqtt_client_adapter_notify_connected(
 extern "C" void esphome_mqtt_client_adapter_destroy(
   esphome_mqtt_client_adapter_t* self)
 {
+#ifdef USE_ESP_IDF
+  // Shut down the async publish task
+  if (self->publish_task_ != nullptr) {
+    // Send sentinel to unblock the task
+    MqttPublishRequest* sentinel = nullptr;
+    xQueueSend(self->publish_queue_, &sentinel, portMAX_DELAY);
+    // Wait a bit for the task to exit, then delete it
+    vTaskDelay(pdMS_TO_TICKS(100));
+    vTaskDelete(self->publish_task_);
+    self->publish_task_ = nullptr;
+  }
+  if (self->publish_queue_ != nullptr) {
+    vQueueDelete(self->publish_queue_);
+    self->publish_queue_ = nullptr;
+  }
+  if (self->publish_task_stack_ != nullptr) {
+    heap_caps_free(self->publish_task_stack_);
+    self->publish_task_stack_ = nullptr;
+  }
+  if (self->publish_task_tcb_ != nullptr) {
+    heap_caps_free(self->publish_task_tcb_);
+    self->publish_task_tcb_ = nullptr;
+  }
+#endif
+
   if (self->device_id != nullptr) {
     delete self->device_id;
     self->device_id = nullptr;
@@ -346,4 +461,13 @@ extern "C" size_t esphome_mqtt_client_adapter_get_pending_update_count(
     return 0;
   }
   return self->pending_updates->size();
+}
+
+extern "C" void esphome_mqtt_client_adapter_publish(
+  esphome_mqtt_client_adapter_t* self,
+  const std::string& topic,
+  const std::string& payload,
+  bool retain)
+{
+  enqueue_publish(self, topic, payload, retain);
 }
