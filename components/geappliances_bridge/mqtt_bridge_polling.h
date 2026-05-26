@@ -81,11 +81,6 @@ typedef struct {
   // polling immediately when a cycle finishes: if the timer is armed, wait for
   // it to fire; if not, start the next cycle right away.
   bool polling_timer_armed;
-  // Offset into the polling list for the next cycle. Rotated each cycle so
-  // every ERD gets a turn at the "front" of the list. This prevents later ERDs
-  // from consistently being dropped due to queue pressure, which would cause
-  // them to be polled fewer times over many cycles.
-  uint16_t polling_list_offset;
 } mqtt_bridge_polling_t;
 
 /*!
