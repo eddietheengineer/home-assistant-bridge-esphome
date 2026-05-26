@@ -238,7 +238,12 @@ void GeappliancesBridge::loop() {
 
   // Send the run_loop signal to the current HSM state — this drives
   // the ongoing work for whatever phase we're in.
+  uint32_t hsm_start = esphome::millis();
   tiny_hsm_send_signal(&this->startup_hsm_, signal_run_loop, nullptr);
+  uint32_t hsm_elapsed = esphome::millis() - hsm_start;
+  if (hsm_elapsed >= 1000) {
+    ESP_LOGW(TAG, "Long HSM run_loop: %ums", hsm_elapsed);
+  }
 #ifdef USE_ESP32
   // Feed the task watchdog after the HSM run_loop signal — in steady-state
   // this drains pending MQTT updates (each acquiring the IDF MQTT mutex)
@@ -267,6 +272,7 @@ void GeappliancesBridge::run_protocol_stack_()
   // so tiny_timer_group_run() fires both poll callbacks on every call.  By
   // disabling the inactive adapter, its poll() returns early without reading
   // bytes or publishing events to an interface that isn't being driven.
+  uint32_t loop_start = esphome::millis();
   if (this->gea2_uart_ != nullptr && this->uart_ != nullptr) {
     esphome_uart_adapter_set_enabled(&this->uart_adapter_, !need_gea2_loop);
     esphome_uart_adapter_set_enabled(&this->gea2_uart_adapter_, need_gea2_loop);
@@ -343,6 +349,12 @@ void GeappliancesBridge::run_protocol_stack_()
     if (this->uart_ != nullptr) {
       tiny_gea3_interface_run(&this->gea3_interface_);
     }
+  }
+  uint32_t loop_elapsed = esphome::millis() - loop_start;
+  if (loop_elapsed >= 1000) {
+    ESP_LOGW(TAG, "Long run_protocol_stack: %ums (mode=%s, polling=%s)",
+             loop_elapsed, this->mode_ == BRIDGE_MODE_SUBSCRIBE ? "sub" : (this->mode_ == BRIDGE_MODE_AUTO ? "auto" : "poll"),
+             this->mqtt_bridge_initialized_ ? "yes" : "no");
   }
 }
 

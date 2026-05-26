@@ -154,7 +154,9 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
 {
   if (self->erd_index < self->polling_list_count) {
     self->request_id++;
+    uint32_t t0 = esphome::millis();
     bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->erd_polling_list[self->erd_index]);
+    uint32_t elapsed = esphome::millis() - t0;
     self->erd_index++;
     if (queued) {
       arm_timer(self, retry_delay);
@@ -177,6 +179,10 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
           }
         }
       }
+    }
+    if (elapsed >= 500) {
+      ESP_LOGW(TAG, "Slow read request: %ums for ERD 0x%04x (queued=%s)",
+               elapsed, self->erd_polling_list[self->erd_index - 1], queued ? "yes" : "no");
     }
   }
 }
@@ -471,8 +477,13 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         self->erd_index = 0;
         self->cycle_completed_count = 0;
         self->cycle_start_ms = esphome::millis();
+        uint32_t cycle_start = esphome::millis();
         while (self->erd_index < self->polling_list_count) {
           send_next_poll_read_request(self);
+        }
+        uint32_t elapsed = esphome::millis() - cycle_start;
+        if (elapsed >= 1000) {
+          ESP_LOGW(TAG, "Long cycle start: %ums for %u ERDs", elapsed, self->polling_list_count);
         }
       }
       arm_polling_timer(self, self->polling_interval_ms);
