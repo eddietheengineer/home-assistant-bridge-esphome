@@ -52,6 +52,7 @@ static map<tiny_erd_t, vector<uint8_t>>& erd_cache(mqtt_bridge_polling_t* self)
 
 static void arm_polling_timer(mqtt_bridge_polling_t* self, tiny_timer_ticks_t ticks)
 {
+  self->polling_timer_armed = true;
   tiny_timer_start(
     self->timer_group, &self->polling_timer, ticks, self, +[](void* context) {
       tiny_hsm_send_signal(&reinterpret_cast<mqtt_bridge_polling_t*>(context)->hsm, signal_polling_timer_expired, nullptr);
@@ -153,15 +154,30 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
 {
   if (self->erd_index < self->polling_list_count) {
     self->request_id++;
-    // Fire-and-forget: always advance erd_index and arm the retry timer,
-    // regardless of whether the queue accepted the read. This allows
-    // simultaneous reads during steady-state polling, significantly
-    // improving throughput when the shared ERD client queue is under
-    // pressure from subscription traffic. The 8KB queue provides enough
-    // headroom to handle bursts of simultaneous reads without overflow.
-    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->erd_polling_list[self->erd_index]);
+    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->erd_polling_list[self->erd_index]);
     self->erd_index++;
-    arm_timer(self, retry_delay);
+    if (queued) {
+      arm_timer(self, retry_delay);
+    } else {
+      /* Queue full — the read was silently dropped. Count it as completed
+       * (failed) so the cycle can advance. The ERD will be retried on the
+       * next cycle. */
+      self->cycle_completed_count++;
+      if (self->cycle_completed_count >= self->polling_list_count) {
+        self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
+        self->cycle_count++;
+        /* Cycle finished.  If the polling timer is NOT armed, start the next
+         * cycle immediately.  If it IS armed, wait for it to fire. */
+        if (!self->polling_timer_armed) {
+          self->erd_index = 0;
+          self->cycle_completed_count = 0;
+          self->cycle_start_ms = esphome::millis();
+          while (self->erd_index < self->polling_list_count) {
+            send_next_poll_read_request(self);
+          }
+        }
+      }
+    }
   }
 }
 
@@ -429,17 +445,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
           add_erd_to_polling_list_no_register(self, self->custom_erd_list[i]);
         }
       }
-      // Pin erd_index to polling_list_count so that the first
-      // signal_polling_timer_expired detects this as the "first cycle" and
-      // resets to 0, starting the first read from ERD[0].
-      //
-      // This also corrects the "first N ERDs skipped" bug from the full-discovery
-      // path: previous HSM states (state_add_*) leave erd_index pointing at the
-      // end of the *last* discovery list, which can be less than polling_list_count
-      // (the sum of all discovered ERDs across all states).  Forcing erd_index to
-      // polling_list_count ensures signal_polling_timer_expired always resets to 0
-      // and starts from ERD[0] on the very first polling pass.
-      self->erd_index = self->polling_list_count;
+      self->erd_index = 0;
       self->cycle_completed_count = 0;
       arm_polling_timer(self, self->polling_interval_ms);
       self->polling_list_complete = true;
@@ -456,24 +462,19 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       break;
 
     case signal_polling_timer_expired: {
-      // With simultaneous reads, the polling timer fires all reads at once
-      // when starting a new cycle. Forward progress during the cycle is driven
-      // by signal_read_completed / signal_read_failed calling
-      // send_next_poll_read_request() for the next ERD in sequence.
-      bool first_cycle = (self->erd_index == self->polling_list_count);
+      // Timer fired: mark as no longer armed.
+      self->polling_timer_armed = false;
       bool all_completed = (self->cycle_completed_count >= self->polling_list_count);
-      if (first_cycle || all_completed) {
+      bool no_cycle_in_progress = (self->cycle_completed_count == 0) &&
+                                  (self->erd_index == 0);
+      if (all_completed || no_cycle_in_progress) {
         self->erd_index = 0;
         self->cycle_completed_count = 0;
         self->cycle_start_ms = esphome::millis();
-        // Fire all reads simultaneously by calling send_next_poll_read_request
-        // for each ERD in the polling list.
         while (self->erd_index < self->polling_list_count) {
           send_next_poll_read_request(self);
         }
       }
-      // Always re-arm the polling timer so the next cycle boundary is tracked
-      // even when the current cycle is still in progress.
       arm_polling_timer(self, self->polling_interval_ms);
       break;
     }
@@ -485,9 +486,6 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       const uint8_t*  erd_data  = reinterpret_cast<const uint8_t*>(args->read_completed.data);
       uint8_t         data_size = args->read_completed.data_size;
 
-      // If the ERD is in pending_registration_set (added via _no_register in
-      // entry), register it on MQTT now — confirming it's present on the
-      // appliance.  If not in erd_set at all, it's a late discovery response.
       if (pending_registration_set(self).find(erd) != pending_registration_set(self).end()) {
         mqtt_client_register_erd(self->mqtt_client, erd);
         pending_registration_set(self).erase(erd);
@@ -521,26 +519,37 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       if (self->cycle_completed_count >= self->polling_list_count) {
         self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
         self->cycle_count++;
+        /* Cycle finished.  If the polling timer is NOT armed, start the next
+         * cycle immediately.  If it IS armed, do nothing — it will fire and
+         * restart polling. */
+        if (!self->polling_timer_armed) {
+          self->erd_index = 0;
+          self->cycle_completed_count = 0;
+          self->cycle_start_ms = esphome::millis();
+          while (self->erd_index < self->polling_list_count) {
+            send_next_poll_read_request(self);
+          }
+        }
       }
-      // With simultaneous reads, all ERDs were already fired from the polling
-      // timer. Do NOT call send_next_poll_read_request() here — the next cycle
-      // will be started by the polling timer when all ERDs have completed.
       break;
     }
 
     case signal_read_failed:
-      // A read failed (all retries exhausted).  Count it as completed so the
-      // cycle can advance — the polling timer will restart the cycle from
-      // index 0 once all ERDs have either succeeded or failed.
       disarm_timer(self);
       reset_lost_appliance_timer(self);
       self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
         self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
         self->cycle_count++;
+        if (!self->polling_timer_armed) {
+          self->erd_index = 0;
+          self->cycle_completed_count = 0;
+          self->cycle_start_ms = esphome::millis();
+          while (self->erd_index < self->polling_list_count) {
+            send_next_poll_read_request(self);
+          }
+        }
       }
-      // With simultaneous reads, all ERDs were already fired from the polling
-      // timer. Do NOT call send_next_poll_read_request() here.
       break;
 
     case signal_mqtt_disconnected:

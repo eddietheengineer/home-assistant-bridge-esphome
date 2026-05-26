@@ -76,6 +76,11 @@ typedef struct {
   uint32_t cycle_start_ms;
   uint32_t last_cycle_time_ms;
   uint32_t cycle_count;
+  // True while the polling timer is armed (between arm_polling_timer and the
+  // next signal_polling_timer_expired).  Used to decide whether to restart
+  // polling immediately when a cycle finishes: if the timer is armed, wait for
+  // it to fire; if not, start the next cycle right away.
+  bool polling_timer_armed;
 } mqtt_bridge_polling_t;
 
 /*!
