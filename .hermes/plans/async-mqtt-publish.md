@@ -57,7 +57,7 @@ Add to `esphome_mqtt_client_adapter_t` struct (under `#ifdef USE_ESP_IDF`):
 
 ```c
 static constexpr size_t MQTT_PUBLISH_QUEUE_SIZE = 200;  // Max pending publishes
-static constexpr uint32_t MQTT_PUBLISH_STACK_SIZE = 4096;
+static constexpr uint32_t MQTT_PUBLISH_STACK_SIZE = 1024;  // words (~4 KB)
 
 struct MqttPublishRequest {
   std::string topic;
@@ -66,23 +66,30 @@ struct MqttPublishRequest {
 };
 ```
 
-**Task function** (static, C-compatible):
+**Task function** (static, C-compatible) — holds requests when disconnected, self-deletes on shutdown:
 
 ```c
 static void mqtt_publish_task_(void* param) {
   auto self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(param);
   while (true) {
     MqttPublishRequest* req = nullptr;
-    // Block until item available or sentinel (nullptr = shutdown)
     xQueueReceive(self->publish_queue_, &req, portMAX_DELAY);
     if (req == nullptr) break;  // Sentinel — exit task
-    
+
     auto mqtt_client = esphome::mqtt::global_mqtt_client;
     if (mqtt_client != nullptr && mqtt_client->is_connected()) {
       mqtt_client->publish(req->topic, req->payload, 0, req->retain);
+      delete req;
+    } else {
+      // Hold and retry after delay — prevents losing retained messages during flaps
+      vTaskDelay(pdMS_TO_TICKS(500));
+      if (xQueueSend(self->publish_queue_, &req, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "MQTT publish retry queue full, dropping");
+        delete req;
+      }
     }
-    delete req;
   }
+  vTaskDelete(nullptr);  // Static task must self-delete
 }
 ```
 
@@ -101,18 +108,25 @@ static void mqtt_publish_task_(void* param) {
 #endif
 ```
 
-**Destroy** — send sentinel and clean up in `esphome_mqtt_client_adapter_destroy()`:
+**Destroy** — drain remaining requests, send sentinel, task self-deletes in `esphome_mqtt_client_adapter_destroy()`:
 
 ```c
 #ifdef USE_ESP_IDF
-  if (self->publish_queue_) {
+  if (self->publish_task_ != nullptr) {
+    // Drain remaining queued requests (delete heap memory)
+    MqttPublishRequest* req = nullptr;
+    while (xQueueReceive(self->publish_queue_, &req, 0) == pdTRUE) {
+      delete req;
+    }
+    // Send sentinel so the task exits and self-deletes
     MqttPublishRequest* sentinel = nullptr;
     xQueueSend(self->publish_queue_, &sentinel, portMAX_DELAY);
-    vTaskDelete(self->publish_task_);
-    vQueueDelete(self->publish_queue_);
-    heap_caps_free(self->publish_task_stack_);
-    heap_caps_free(self->publish_task_tcb_);
+    vTaskDelay(pdMS_TO_TICKS(200));  // Wait for task to self-delete
+    self->publish_task_ = nullptr;
   }
+  if (self->publish_queue_) vQueueDelete(self->publish_queue_);
+  if (self->publish_task_stack_) heap_caps_free(self->publish_task_stack_);
+  if (self->publish_task_tcb_)   heap_caps_free(self->publish_task_tcb_);
 #endif
 ```
 
@@ -190,8 +204,8 @@ This requires the discovery manager to have access to the adapter. Currently it 
 
 #### 4. Notify connected/disconnected lifecycle
 
-- On `notify_disconnected()`: The background task will find `mqtt_client->is_connected()` returns false and skip publishes. Pending items stay in the queue.
-- On `notify_connected()`: The background task resumes publishing. The `MAX_FLUSH_PER_CALL` drain in `notify_connected()` still controls the rate at which pending ERD updates enter the publish queue.
+- On `notify_disconnected()`: The background task finds `mqtt_client->is_connected()` returns false, holds the request, and retries after 500ms. This prevents silently losing retained HA discovery messages or write-result publishes during connectivity flaps.
+- On `notify_connected()`: The background task resumes publishing normally. The `MAX_FLUSH_PER_CALL` drain in `notify_connected()` still controls the rate at which pending ERD updates enter the publish queue.
 
 ### Files Modified
 
@@ -223,18 +237,20 @@ This requires the discovery manager to have access to the adapter. Currently it 
 
 | Risk | Mitigation |
 |------|-----------|
-| Publish queue fills up (200 items) | Drop oldest (log warning). ERD updates are idempotent — next poll cycle will re-send. |
-| New heap allocations (`new MqttPublishRequest`) | Each request is small (two strings). Queue is bounded at 200. Consider fixed-size pool if heap is tight. |
-| Task stack overflow (4KB) | 4KB is generous for a task that only does `xQueueReceive` + `publish` + `delete`. Monitor with `uxTaskGetStackHighWaterMark`. |
+| Publish queue fills up (200 items) | Drop with warning. ERD updates are idempotent — next poll cycle will re-send. |
+| New heap allocations (`new MqttPublishRequest`) | Each request is small (two strings). Queue is bounded at 200. |
+| Task stack overflow (~4 KB) | 1024 words (~4 KB) is sufficient for a task that only does `xQueueReceive` + `publish` + `delete`. Monitor with `uxTaskGetStackHighWaterMark`. |
 | Non-ESP-IDF builds (ESP-ARDUINO) | `enqueue_publish()` falls back to synchronous `publish()`. No regression. |
-| MQTT disconnect while queue has items | Task checks `is_connected()` and skips. Items remain in queue for next reconnect. |
+| MQTT disconnect while queue has items | Task holds and retries after 500ms delay. Prevents losing retained messages during connectivity flaps. |
+| Shutdown: queued items leaked | Destroy drains the queue (deletes all remaining `MqttPublishRequest*`) before sending the sentinel. |
+| Shutdown: `vTaskDelete` double-delete | Task calls `vTaskDelete(nullptr)` to self-delete on exit. Destroy path does NOT call `vTaskDelete`. |
 | Ordering: HA discovery items mixed with ERD updates | Not a concern — they go to different MQTT topics. HA discovery is one-time at boot. |
 
 ### Expected Results
 
 - **Main loop time**: Should drop from 700-1400ms spikes to <50ms consistently (the enqueue is a non-blocking `xQueueSend` with 0 timeout)
 - **MQTT publish throughput**: Unchanged — the background task publishes at the same rate, just not on the main loop
-- **Heap usage**: ~4KB stack + queue overhead (~1KB) = ~5KB additional. Acceptable on ESP32-C6 (which has 320KB+ PSRAM)
+- **Heap usage**: ~4KB stack (1024 words × 4 bytes) + queue overhead (~1 KB) = ~5 KB additional. Acceptable on ESP32-C6 (which has 320KB+ PSRAM)
 - **ESP32-C3 devices**: Also have sufficient RAM (320KB internal + optional PSRAM)
 
 ### Verification

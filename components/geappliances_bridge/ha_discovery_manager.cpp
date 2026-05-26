@@ -4,13 +4,10 @@
  */
 
 #include "ha_discovery_manager.h"
+#include "esphome_mqtt_client_adapter.h"
 #include "esphome/core/log.h"
 #include "esphome/components/mqtt/mqtt_client.h"
 #include <cstring>
-
-// Forward declaration of the async MQTT publish function from the adapter
-extern "C" void esphome_mqtt_client_adapter_publish(
-  void* self, const std::string& topic, const std::string& payload, bool retain);
 
 #ifdef USE_ESP_IDF
 #  include "esp_http_client.h"
@@ -59,7 +56,7 @@ void HaDiscoveryManager::on_erd_seen(tiny_erd_t erd)
   }
 }
 
-void HaDiscoveryManager::set_mqtt_adapter(void* mqtt_adapter)
+void HaDiscoveryManager::set_mqtt_adapter(esphome_mqtt_client_adapter_t* mqtt_adapter)
 {
   this->mqtt_adapter_ = mqtt_adapter;
 }

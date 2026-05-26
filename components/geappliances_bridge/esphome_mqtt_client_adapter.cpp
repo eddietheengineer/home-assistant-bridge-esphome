@@ -13,6 +13,10 @@ extern "C" {
 #include <cctype>
 #include <map>
 
+#ifdef USE_ESP_IDF
+#include "esp_heap_caps.h"
+#endif
+
 static const char *const TAG __attribute__((unused)) = "geappliances_bridge.mqtt";
 
 // Maximum number of distinct ERDs that can be pending (safety bound — in
@@ -27,8 +31,9 @@ static constexpr size_t MAX_PENDING_UPDATES = 200;
 static constexpr size_t MAX_FLUSH_PER_CALL = 5;
 
 // Async MQTT publish task: queue size and stack
+// Stack depth in StackType_t words (4 bytes each on ESP32), so 1024 words = ~4 KB.
 static constexpr size_t MQTT_PUBLISH_QUEUE_SIZE = 200;
-static constexpr uint32_t MQTT_PUBLISH_STACK_SIZE = 4096;
+static constexpr uint32_t MQTT_PUBLISH_STACK_SIZE = 1024;
 
 // ---------------------------------------------------------------------------
 // Async MQTT publish background task
@@ -48,9 +53,25 @@ static void mqtt_publish_task_(void* param)
     auto mqtt_client = esphome::mqtt::global_mqtt_client;
     if (mqtt_client != nullptr && mqtt_client->is_connected()) {
       mqtt_client->publish(req->topic, req->payload, 0, req->retain);
+      delete req;
     }
-    delete req;
+    // If disconnected, hold the request — re-enqueue after a delay so the
+    // task will retry.  This prevents silently losing retained HA discovery
+    // messages or write-result publishes during connectivity flaps.
+    else {
+      vTaskDelay(pdMS_TO_TICKS(500));
+      if (xQueueSend(self->publish_queue_, &req, 0) != pdTRUE) {
+        // Queue full — drop with warning to prevent memory exhaustion
+        ESP_LOGW(TAG, "MQTT publish retry queue full, dropping request for %.*s",
+                 40, req->topic.c_str());
+        delete req;
+      }
+    }
   }
+  // With xTaskCreateStatic the task must explicitly delete itself, otherwise
+  // the TCB/stack remain allocated.  The destroy path waits for this to
+  // complete before freeing the stack/TCB memory.
+  vTaskDelete(nullptr);
 }
 
 #endif
@@ -420,14 +441,18 @@ extern "C" void esphome_mqtt_client_adapter_destroy(
   esphome_mqtt_client_adapter_t* self)
 {
 #ifdef USE_ESP_IDF
-  // Shut down the async publish task
+  // Shut down the async publish task safely
   if (self->publish_task_ != nullptr) {
-    // Send sentinel to unblock the task
+    // Drain any remaining queued requests first (delete their heap memory)
+    MqttPublishRequest* req = nullptr;
+    while (xQueueReceive(self->publish_queue_, &req, 0) == pdTRUE) {
+      delete req;
+    }
+    // Send sentinel to unblock the task so it exits cleanly via return
     MqttPublishRequest* sentinel = nullptr;
     xQueueSend(self->publish_queue_, &sentinel, portMAX_DELAY);
-    // Wait a bit for the task to exit, then delete it
-    vTaskDelay(pdMS_TO_TICKS(100));
-    vTaskDelete(self->publish_task_);
+    // Wait for the task to delete itself (it calls vTaskDelete(nullptr) on exit)
+    vTaskDelay(pdMS_TO_TICKS(200));
     self->publish_task_ = nullptr;
   }
   if (self->publish_queue_ != nullptr) {

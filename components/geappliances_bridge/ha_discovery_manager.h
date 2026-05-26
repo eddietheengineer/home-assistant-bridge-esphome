@@ -18,6 +18,9 @@
 #include <set>
 #include <string>
 
+// Include the adapter header for the typed pointer (lightweight — no heavy deps)
+#include "esphome_mqtt_client_adapter.h"
+
 extern "C" {
 #include "tiny_gea3_erd_client.h"
 }
@@ -73,8 +76,8 @@ class HaDiscoveryManager {
            bool subscription_activity_detected,
            mqtt::MQTTClientComponent* mqtt_client);
 
-  /// Set the MQTT adapter for async publishing (optional, nullptr = sync fallback)
-  void set_mqtt_adapter(void* mqtt_adapter);
+  /// Set the MQTT adapter for async publishing (typed pointer, nullptr = sync fallback)
+  void set_mqtt_adapter(esphome_mqtt_client_adapter_t* mqtt_adapter);
 
   bool is_complete() const { return state_ == HA_DISCOVERY_COMPLETE; }
   bool is_failed()   const { return state_ == HA_DISCOVERY_FAILED; }
@@ -117,8 +120,8 @@ class HaDiscoveryManager {
   uint32_t last_publish_ms_{0};
   uint32_t start_time_{0};  // millis() when WAITING_FOR_READY state entered
 
-  // Pointer to the MQTT adapter for async publishing (opaque, set via set_mqtt_adapter)
-  void* mqtt_adapter_{nullptr};
+  // Pointer to the MQTT adapter for async publishing (typed, set via set_mqtt_adapter)
+  esphome_mqtt_client_adapter_t* mqtt_adapter_{nullptr};
 
 #ifdef USE_ESP_IDF
   QueueHandle_t queue_{nullptr};
