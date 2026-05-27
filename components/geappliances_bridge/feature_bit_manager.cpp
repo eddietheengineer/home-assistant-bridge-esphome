@@ -145,11 +145,15 @@ void FeatureBitManager::on_erd_read_completed(tiny_erd_t erd, const uint8_t* dat
     this->parse_pending_ = true;
   }
 
-  // Publish the raw ERD value over MQTT if the adapter is initialized.
-  if (this->mqtt_initialized_ && this->mqtt_client_ != nullptr &&
-      this->mqtt_client_->api != nullptr && copy_size > 0) {
-    this->mqtt_client_->api->update_erd(this->mqtt_client_, erd, data, copy_size);
-  }
+  // NOTE: We do NOT call update_erd() here for feature bit ERDs.
+  // These are metadata ERDs (0x0092-0x0097, 0x0109-0x010D) used only for
+  // determining which sensor ERDs the appliance supports. Publishing them
+  // to MQTT during the feature bits phase adds significant heap pressure
+  // (std::string allocations + std::map insertions) on the constrained
+  // ESP32-C3, which can trigger the Task Watchdog Timer (TWDT) and cause
+  // a crash. The feature bit ERD values are not useful to Home Assistant
+  // consumers anyway — they will be read again during normal polling if
+  // needed.
 }
 
 void FeatureBitManager::on_erd_read_failed(tiny_erd_t erd)

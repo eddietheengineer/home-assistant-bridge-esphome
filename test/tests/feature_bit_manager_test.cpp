@@ -698,35 +698,15 @@ TEST(feature_bit_manager, run_gives_up_after_max_queue_retries_for_each_erd)
 /* MQTT integration                                                     */
 /* ------------------------------------------------------------------ */
 
-TEST(feature_bit_manager, on_erd_read_completed_publishes_to_mqtt_when_initialized)
+TEST(feature_bit_manager, on_erd_read_completed_does_not_publish_to_mqtt)
 {
   init_manager_with_mqtt();
 
   uint8_t data[1] = {0x06};
-  // When MQTT is initialized, on_erd_read_completed calls mqtt_client->api->update_erd.
-  mock()
-    .expectOneCall("update_erd")
-    .onObject(&mqtt_client.interface)
-    .withParameter("erd", ERD_APPLIANCE_TYPE)
-    .ignoreOtherParameters();
-  mock()
-    .expectOneCall("read")
-    .onObject(&erd_client.interface)
-    .withParameter("address", 0xC0)
-    .withParameter("erd", ERD_MODEL_NUMBER)
-    .ignoreOtherParameters()
-    .andReturnValue(true);
-  manager.on_erd_read_completed(ERD_APPLIANCE_TYPE, data, 1);
-
-  CHECK_EQUAL(FEATURE_BIT_STATE_IN_FLIGHT, manager.get_state());
-}
-
-TEST(feature_bit_manager, on_erd_read_completed_does_not_publish_to_mqtt_when_not_initialized)
-{
-  init_manager();  // mqtt_initialized = false
-
-  uint8_t data[1] = {0x06};
-  // No update_erd call expected when mqtt_initialized is false.
+  // Feature bit ERDs are NOT published to MQTT during the reading phase.
+  // This avoids heap pressure (std::string + std::map allocations) that
+  // can trigger the Task Watchdog Timer on ESP32-C3.
+  // No update_erd call expected - only the queue_next read.
   mock()
     .expectOneCall("read")
     .onObject(&erd_client.interface)
