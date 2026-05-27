@@ -30,6 +30,7 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
   this->queue_retry_count_ = 0;
   this->parse_pending_    = false;
   this->parse_erd_idx_    = 0;
+  this->common_parse_idx_ = 0;
   this->parse_common_done_ = false;
 }
 
@@ -188,18 +189,34 @@ void FeatureBitManager::skip_to_next_feature_erd_(tiny_erd_t failed_erd)
 
 void FeatureBitManager::parse_and_log_feature_bits_()
 {
-  // First call: initialize (clear state, parse common features from ERD 0x0092).
-  if (this->parse_erd_idx_ == 0 && !this->parse_common_done_) {
+  // Incremental parsing: process common features first (a few descriptors per
+  // call to avoid triggering the TWDT), then appliance ERDs one at a time.
+  // This keeps each loop() iteration short on the constrained ESP32-C3.
+
+  // First call: initialize (clear state).
+  if (this->parse_erd_idx_ == 0 && !this->parse_common_done_ && this->common_parse_idx_ == 0) {
     this->valid_erds_.clear();
     this->valid_erds_vec_.clear();
     this->valid_list_ready_ = false;
 
-    // Parse common features from ERD 0x0092.
     if (this->erd_data_.erd_0092_size > 0) {
       uint32_t common_bits = static_cast<uint32_t>(
         read_be64(this->erd_data_.erd_0092, this->erd_data_.erd_0092_size) & 0xFFFFFFFFu);
       ESP_LOGI(TAG, "Common feature API (0x0092) value: 0x%08X", common_bits);
-      for (uint16_t i = 0; i < common_feature_descriptor_count; i++) {
+      (void)common_bits; /* Used in ESP_LOGI that may be compiled out. */
+    }
+  }
+
+  // Parse common features incrementally (up to COMMON_PARSE_PER_CALL descriptors per call).
+  if (!this->parse_common_done_) {
+    uint16_t start = this->common_parse_idx_;
+    uint16_t end = (start + COMMON_PARSE_PER_CALL > common_feature_descriptor_count)
+                   ? common_feature_descriptor_count : start + COMMON_PARSE_PER_CALL;
+
+    if (this->erd_data_.erd_0092_size > 0) {
+      uint32_t common_bits = static_cast<uint32_t>(
+        read_be64(this->erd_data_.erd_0092, this->erd_data_.erd_0092_size) & 0xFFFFFFFFu);
+      for (uint16_t i = start; i < end; i++) {
         const auto& desc = common_feature_descriptors[i];
         if (common_bits & desc.bit_mask) {
           ESP_LOGI(TAG, "  [SET] Common feature: %s (mask 0x%08X, %u ERDs)",
@@ -210,8 +227,15 @@ void FeatureBitManager::parse_and_log_feature_bits_()
         }
       }
     }
-    this->parse_common_done_ = true;
-    // Fall through to parse the first appliance ERD.
+
+    this->common_parse_idx_ = end;
+    if (this->common_parse_idx_ >= common_feature_descriptor_count) {
+      this->parse_common_done_ = true;
+      // Fall through to parse the first appliance ERD on the next call.
+      return;
+    }
+    // Not done with common features yet — return to keep loop() short.
+    return;
   }
 
   // Static tables for appliance ERDs (indexed 0-9).
@@ -339,7 +363,10 @@ void FeatureBitManager::mark_timed_out()
   this->state_ = FEATURE_BIT_STATE_COMPLETE;
   this->parse_pending_ = true;
   // Immediately drain any pending parsing so is_complete() returns true.
-  this->parse_and_log_feature_bits_();
+  // Loop until parsing is fully complete (incremental parsing needs multiple calls).
+  while (this->parse_pending_) {
+    this->parse_and_log_feature_bits_();
+  }
 }
 
 const std::set<tiny_erd_t>& FeatureBitManager::get_valid_erds() const
