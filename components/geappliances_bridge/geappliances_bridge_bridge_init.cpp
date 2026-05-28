@@ -1,6 +1,13 @@
 /*!
  * @file
- * @brief MQTT client adapter initialization and bridge mode management.
+ * @brief Bridge startup initializers and ongoing bridge lifecycle management.
+ *
+ * MODULE GOAL: Own every one-time initialization step for the MQTT client
+ * adapter and the bridge HSMs, plus feature-bit reading startup and the
+ * AUTO-mode subscription-activity watchdog.
+ *
+ * start_feature_bit_reading_() is called by the startup HSM to kick off
+ * the feature-bit ERD reads once the MQTT client adapter is ready.
  *
  * initialize_mqtt_client_() runs once as soon as the device ID is ready
  * (Phase 4), before feature bit reading.  It binds the MQTT client adapter
@@ -20,12 +27,33 @@
 
 #include "geappliances_bridge.h"
 #include "ha_discovery_config.h"
+#include "appliance_api_feature_lists.h"
+#include "geappliances_bridge_constants.h"
 #include "esphome/core/log.h"
 
 namespace esphome {
 namespace geappliances_bridge {
 
 static const char* const TAG __attribute__((unused)) = "geappliances_bridge";
+
+// ---------------------------------------------------------------------------
+// Startup: kick off feature-bit reading sequence
+// ---------------------------------------------------------------------------
+
+void GeappliancesBridge::start_feature_bit_reading_()
+{
+  // Guard: don't re-initialize if already running or done.
+  if (this->feature_bit_manager_.is_complete() || this->feature_bit_manager_.is_failed() ||
+      this->feature_bit_manager_.is_parse_pending()) {
+    return;
+  }
+  ESP_LOGI(TAG, "Reading device info ERDs for MQTT publish, then appliance API feature bits...");
+  this->feature_bit_manager_.init(
+      this->autodiscovery_manager_.get_active_erd_client(),
+      this->autodiscovery_manager_.get_host_address(),
+      &this->mqtt_client_adapter_.interface,
+      this->mqtt_client_adapter_initialized_);
+}
 
 // ---------------------------------------------------------------------------
 // Phase 4: Initialize the MQTT client adapter (called once from loop())
