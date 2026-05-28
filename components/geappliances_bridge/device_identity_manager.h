@@ -6,6 +6,28 @@
  * then assembles a unique MQTT-topic-safe device identifier string.
  */
 
+// =============================================================================
+// MODULE GOAL
+// =============================================================================
+// Goal: Read appliance identity ERDs and assemble a stable, MQTT-topic-safe
+//       unique device identifier string.
+//
+// Responsibilities:
+//   - Read ERDs 0x0008 (appliance type), 0x0001 (model number),
+//     0x0002 (serial number) in sequence
+//   - Sanitize raw values into MQTT-safe strings
+//   - Concatenate into a final device ID
+//   - Short-circuit if a device ID is already configured in YAML
+//
+// NOT responsible for:
+//   - Configuring the MQTT adapter with the resulting ID (caller's job)
+//   - Managing bridge lifecycle
+//   - Any ERDs beyond the three identity ERDs
+//
+// Dependencies:
+//   - i_tiny_gea3_erd_client
+// =============================================================================
+
 #ifndef DEVICE_IDENTITY_MANAGER_H
 #define DEVICE_IDENTITY_MANAGER_H
 

@@ -1,3 +1,22 @@
+// =============================================================================
+// MODULE GOAL
+// =============================================================================
+// Goal: Provide shared timing constants, HSM signal identifiers, and utility
+//       templates used by both mqtt_bridge.cpp and mqtt_bridge_polling.cpp.
+//
+// Responsibilities:
+//   - Declare signal enum values shared by both bridge implementations
+//   - Define timing constants (retry_delay, resubscribe_delay, etc.)
+//   - Provide arm_timer / disarm_timer / erd_set / handle_write_result helpers
+//
+// NOT responsible for:
+//   - Any bridge state or lifecycle logic
+//   - Anything not shared between both bridge implementations
+//
+// Dependencies:
+//   - mqtt_bridge.h, mqtt_bridge_polling.h, tiny_utils.h, tiny_gea_constants.h
+// =============================================================================
+
 #pragma once
 
 /*!

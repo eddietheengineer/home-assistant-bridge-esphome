@@ -14,6 +14,25 @@
  * support subscriptions; callers must use polling mode only.
  */
 
+// =============================================================================
+// MODULE GOAL
+// =============================================================================
+// Goal: Present a GEA2 ERD client as a GEA3-compatible i_tiny_gea3_erd_client_t
+//       so the polling bridge can operate over GEA2 without modification.
+//
+// Responsibilities:
+//   - Forward read() and write() to the underlying GEA2 client
+//   - Return false for subscribe() and retain_subscription() (GEA2 has none)
+//   - Re-publish GEA2 activity events through the GEA3-typed on_activity event
+//
+// NOT responsible for:
+//   - Any GEA2 protocol framing or timing
+//   - Subscription support (structurally impossible over GEA2)
+//
+// Dependencies:
+//   - i_tiny_gea2_erd_client.h, i_tiny_gea3_erd_client.h
+// =============================================================================
+
 #pragma once
 
 extern "C" {

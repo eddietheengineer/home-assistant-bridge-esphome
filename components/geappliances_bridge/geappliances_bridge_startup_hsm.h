@@ -17,6 +17,28 @@
  * run every loop() iteration.
  */
 
+// =============================================================================
+// MODULE GOAL
+// =============================================================================
+// Goal: Drive the ordered startup phase sequence from protocol initialization
+//       through HA discovery to steady-state running.
+//
+// Responsibilities:
+//   - Own the tiny_hsm state machine for all startup phases
+//   - Transition between phases when each manager signals completion
+//   - Enforce per-phase timeout guards
+//   - Call IBridgeServices to trigger bridge actions at phase boundaries
+//
+// NOT responsible for:
+//   - Implementing any phase's work (delegates to managers via IBridgeServices)
+//   - Owning component instances or configuration state
+//   - Any steady-state work beyond the "running" phase entry
+//
+// Dependencies:
+//   - tiny_hsm
+//   - IBridgeServices (once introduced; currently GeappliancesBridge directly)
+// =============================================================================
+
 #ifndef startup_hsm_h
 #define startup_hsm_h
 

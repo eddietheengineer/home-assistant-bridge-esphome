@@ -7,6 +7,28 @@
  * for polling mode and gating HA discovery.
  */
 
+// =============================================================================
+// MODULE GOAL
+// =============================================================================
+// Goal: Read appliance API feature bit ERDs and produce the set of ERDs that
+//       are available on this appliance.
+//
+// Responsibilities:
+//   - Read the 11 feature bit ERDs (0x0092-0x0097, 0x0109-0x010D) in sequence
+//   - Incrementally parse bitmasks into ERD sets across multiple loop() calls
+//     to avoid triggering the ESP32 Task Watchdog Timer
+//   - Expose the resulting valid ERD set and string ERD set via getters
+//
+// NOT responsible for:
+//   - Using the ERD set (callers decide how to apply it)
+//   - Managing polling or subscription bridges
+//   - Filtering ERDs during MQTT publishing (ErdRegistry / MqttClientAdapter)
+//
+// Dependencies:
+//   - i_tiny_gea3_erd_client
+//   - appliance_api_feature_lists.h (compile-time bitmask descriptors)
+// =============================================================================
+
 #ifndef FEATURE_BIT_MANAGER_H
 #define FEATURE_BIT_MANAGER_H
 
