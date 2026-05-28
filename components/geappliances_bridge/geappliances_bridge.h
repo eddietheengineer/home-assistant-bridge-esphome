@@ -129,8 +129,8 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void run_all_managers() override;
 
   // ── Internal bridge methods (event callbacks and per-phase helpers) ─────────
-  void on_mqtt_connected_();
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
+  bool flush_pending_chunk_(uint8_t chunk_size);
   void initialize_mqtt_client_();
   void initialize_mqtt_bridge_();
   void start_custom_erd_polling_();
@@ -154,7 +154,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   uart::UARTComponent *gea2_uart_{nullptr};
   std::string configured_device_id_;
   uint8_t client_address_{0xE4};
-  bool mqtt_was_connected_{false};
   bool mqtt_client_adapter_initialized_{false};
   bool mqtt_bridge_initialized_{false};
   BridgeMode mode_{BRIDGE_MODE_AUTO};
@@ -265,6 +264,17 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // or when custom ERD polling is started alongside a subscription bridge.
   bool subscription_bridge_initialized_{false};
   bool polling_bridge_initialized_{false};
+
+  // MQTT state machine: manages the connection lifecycle independently of the
+  // startup HSM.  Breaks the heavy (re)connection block into distinct phases
+  // so each loop() tick does a tiny slice of work and yields immediately.
+  enum class MqttBridgeState {
+    DISCONNECTED,      // MQTT not connected (or adapter not initialized)
+    SUBSCRIBING,       // Just connected -- subscribe wildcard write topic
+    FLUSHING_BACKLOG,  // Flush pending ERD updates in chunks
+    READY              // Normal steady-state operation
+  };
+  MqttBridgeState mqtt_state_{MqttBridgeState::DISCONNECTED};
 
   tiny_event_subscription_t erd_client_activity_subscription_;
   tiny_event_subscription_t gea2_activity_subscription_;
