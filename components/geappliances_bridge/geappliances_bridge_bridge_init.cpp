@@ -68,15 +68,11 @@ void GeappliancesBridge::initialize_mqtt_client_()
   ESP_LOGI(TAG, "Initializing MQTT client adapter with device ID: %s",
            this->device_identity_manager_.get_device_id().c_str());
 
-  // For manual device_id configs where autodiscovery is skipped, set the
-  // active ERD client now so the startup HSM's feature_bits phase can queue reads.
-  // After this, the effective active client is whichever is non-null:
-  // manager value (normal path) or bridge fallback (manual device_id).
+  // For manual device_id configs where autodiscovery is skipped (gea2_uart only,
+  // no GEA3 uart), mark the protocol as GEA2 so run_protocol_stack_() enables
+  // the GEA2 tight loop even before autodiscovery runs.
   if (this->autodiscovery_manager_.get_active_erd_client() == nullptr) {
-    if (this->uart_ != nullptr) {
-      this->active_erd_client_ = &this->erd_client_.interface;
-    } else {
-      this->active_erd_client_  = &this->gea2_erd_client_adapter_.interface;
+    if (this->uart_ == nullptr) {
       this->gea2_protocol_active_ = true;
     }
   }

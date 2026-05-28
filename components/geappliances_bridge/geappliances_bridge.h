@@ -128,7 +128,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void run_ha_discovery() override;
   void run_all_managers() override;
 
-  // ── Internal bridge methods ────────────────────────────────────────────────
+  // ── Internal bridge methods (event callbacks and per-phase helpers) ─────────
   void on_mqtt_connected_();
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();
@@ -137,10 +137,8 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void maybe_start_custom_erd_polling_();
   void configure_polling_optional_lists_();
   void check_subscription_activity_();
-  // ── Per-phase run_*() methods called from loop() ─────────────────────────
-  void run_protocol_stack_();       // Phase 0: drive GEA2/GEA3 hardware
+  void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
-
   void start_feature_bit_reading_();
   void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   bool should_route_to_feature_bits_(tiny_erd_t erd);
@@ -257,8 +255,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   // Adapter that wraps the GEA2 ERD client as a GEA3 ERD client interface
   gea2_erd_client_adapter_t gea2_erd_client_adapter_;
-
-  i_tiny_gea3_erd_client_t* active_erd_client_{nullptr}; // fallback for manual device_id when autodiscovery is skipped
 
   mqtt_bridge_t mqtt_bridge_;
   mqtt_bridge_polling_t mqtt_bridge_polling_;
