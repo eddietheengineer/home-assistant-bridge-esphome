@@ -375,7 +375,7 @@ void GeappliancesBridge::log_poll_state_transitions_()
   const char* new_state = this->mqtt_bridge_polling_.current_state_name;
   if (new_state != nullptr && new_state != this->last_logged_poll_state_) {
     ESP_LOGD(TAG, "Polling bridge state: %s (ERDs registered: %zu)",
-             new_state, this->ha_registered_erds_.size());
+             new_state, this->erd_registry_.registered_erds().size());
     this->last_logged_poll_state_ = new_state;
   }
 }

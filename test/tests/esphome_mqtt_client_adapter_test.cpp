@@ -81,9 +81,7 @@ TEST_GROUP(esphome_mqtt_client_adapter)
   esphome_mqtt_client_adapter_t adapter;
   MockMqttClient mock_client;
   std::string device_id_str;
-  std::set<tiny_erd_t> valid_erds;
-  std::set<tiny_erd_t> string_erds;
-  std::set<tiny_erd_t> registered_erds_out;
+  esphome::geappliances_bridge::ErdRegistry erd_registry;
 
   void setup()
   {
@@ -91,9 +89,7 @@ TEST_GROUP(esphome_mqtt_client_adapter)
     device_id_str = "test_device";
     esphome::mqtt::global_mqtt_client = &mock_client;
     mock_client.clear();
-    valid_erds.clear();
-    string_erds.clear();
-    registered_erds_out.clear();
+    erd_registry = esphome::geappliances_bridge::ErdRegistry();
     esphome_hal_double_set_millis(0);
   }
 
@@ -109,12 +105,10 @@ TEST_GROUP(esphome_mqtt_client_adapter)
     esphome_mqtt_client_adapter_init(&adapter, device_id_str.c_str());
   }
 
-  void init_adapter_with_filters()
+  void init_adapter_with_registry()
   {
     init_adapter();
-    esphome_mqtt_client_adapter_set_valid_erds_filter(&adapter, &valid_erds);
-    esphome_mqtt_client_adapter_set_string_erds_filter(&adapter, &string_erds);
-    esphome_mqtt_client_adapter_set_registered_erds_out(&adapter, &registered_erds_out);
+    esphome_mqtt_client_adapter_set_erd_registry(&adapter, &erd_registry);
   }
 };
 
@@ -140,11 +134,12 @@ TEST(esphome_mqtt_client_adapter, init_creates_device_id)
 
 TEST(esphome_mqtt_client_adapter, register_erd_tracks_in_output_set)
 {
-  valid_erds.insert(0x0008);
-  init_adapter_with_filters();
+  std::set<tiny_erd_t> valid{0x0008};
+  erd_registry.set_valid_erds(valid);
+  init_adapter_with_registry();
   adapter.interface.api->register_erd(&adapter.interface, 0x0008);
-  CHECK_EQUAL(1u, registered_erds_out.size());
-  CHECK(registered_erds_out.count(0x0008) == 1);
+  CHECK_EQUAL(1u, erd_registry.registered_erds().size());
+  CHECK(erd_registry.registered_erds().count(0x0008) == 1);
 }
 
 TEST(esphome_mqtt_client_adapter, register_erd_without_output_set)
@@ -176,9 +171,9 @@ TEST(esphome_mqtt_client_adapter, update_erd_publishes_hex_when_connected)
 
 TEST(esphome_mqtt_client_adapter, update_erd_publishes_string_when_in_filter)
 {
-  string_erds.insert(0x0001);
-  init_adapter();
-  esphome_mqtt_client_adapter_set_string_erds_filter(&adapter, &string_erds);
+  std::set<tiny_erd_t> strings{0x0001};
+  erd_registry.set_string_erds(strings);
+  init_adapter_with_registry();
   mock_client.connected = true;
 
   uint8_t data[] = "Hello";
@@ -198,8 +193,9 @@ TEST(esphome_mqtt_client_adapter, update_erd_publishes_string_when_in_filter)
 
 TEST(esphome_mqtt_client_adapter, update_erd_skips_erd_not_in_valid_filter)
 {
-  valid_erds.insert(0x0092);
-  init_adapter_with_filters();
+  std::set<tiny_erd_t> valid{0x0092};
+  erd_registry.set_valid_erds(valid);
+  init_adapter_with_registry();
   mock_client.connected = true;
 
   uint8_t data[] = {0x01};

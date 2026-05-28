@@ -1,3 +1,30 @@
+// =============================================================================
+// MODULE GOAL
+// =============================================================================
+// Goal: Coordinate the lifecycle of all bridge components and serve as the
+//       ESPHome component entry point (setup / loop / dump_config).
+//
+// Responsibilities:
+//   - Own and construct all component instances (adapters, managers, bridges)
+//   - Wire components together during setup()
+//   - Drive the GEA2 tight-loop and delegate ongoing work in loop()
+//   - Expose configuration setters called by the ESPHome code generator
+//   - Implement IBridgeServices so the startup HSM can request bridge actions
+//     without depending on this concrete class
+//
+// NOT responsible for:
+//   - Assembling the device ID (DeviceIdentityManager)
+//   - Determining which ERDs are valid (FeatureBitManager / ErdRegistry)
+//   - Publishing HA discovery payloads (HaDiscoveryManager)
+//   - MQTT connection lifecycle (EsphomeMqttClientAdapter)
+//   - Startup phase sequencing (StartupHsm)
+//
+// Dependencies:
+//   - ESPHome UART, MQTT, and Component APIs
+//   - tiny_gea3_interface, tiny_gea2_interface, tiny_gea3_erd_client
+//   - All manager and adapter classes in this component
+// =============================================================================
+
 #pragma once
 
 #include "esphome/core/component.h"
@@ -21,6 +48,7 @@ extern "C" {
 #include "gea2_erd_client_adapter.h"
 
 #include "esphome_uart_adapter.h"
+#include "erd_registry.h"
 #include "esphome_mqtt_client_adapter.h"
 #include "device_identity_manager.h"
 #include "feature_bit_manager.h"
@@ -163,11 +191,9 @@ class GeappliancesBridge : public Component {
   // HA device discovery state is managed by HaDiscoveryManager; the bridge
   // delegates to it rather than maintaining redundant copies.
   const char* last_logged_poll_state_{nullptr};
-  // Shared set of ERDs the device has registered — used by both the MQTT
-  // adapter (for tracking) and the HA discovery manager (for filtering).
-  std::set<tiny_erd_t> ha_registered_erds_;
-  // String-type ERD set for the MQTT adapter (built from ha_string_erd_ids).
-  std::set<tiny_erd_t> ha_string_erds_set_;
+  // ERD registry: single owner of valid-ERD filter, string-type set,
+  // and runtime registered-ERD tracking.
+  ErdRegistry erd_registry_;
 
   // Base URL for the per-category JSONL files.
   // Can be overridden in YAML via ha_discovery_base_url.

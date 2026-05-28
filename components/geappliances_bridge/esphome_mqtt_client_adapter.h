@@ -1,8 +1,34 @@
+// =============================================================================
+// MODULE GOAL
+// =============================================================================
+// Goal: Deliver ERD value updates to the MQTT broker reliably and
+//       asynchronously, with deduplication and reconnect-safe queuing.
+//
+// Responsibilities:
+//   - Implement i_mqtt_client_t for the bridge and polling bridge
+//   - Publish ERD updates asynchronously via a FreeRTOS task queue
+//   - Deduplicate pending updates per ERD to bound memory use
+//   - Re-flush pending updates on MQTT reconnect
+//   - Route wildcard write-command subscriptions back to the ERD client
+//
+// NOT responsible for:
+//   - Deciding which ERDs to publish (filtering is applied via ErdRegistry)
+//   - Managing bridge lifecycle or startup phases
+//   - HA discovery publishing (HaDiscoveryManager)
+//
+// Dependencies:
+//   - esphome::mqtt::MQTTClientComponent
+//   - i_mqtt_client.h (interface implemented here)
+//   - FreeRTOS task + queue on ESP-IDF builds
+// =============================================================================
+
 #pragma once
 
 #include <string>
 #include <map>
 #include <set>
+
+#include "erd_registry.h"
 
 extern "C" {
 #include "i_mqtt_client.h"
@@ -40,15 +66,10 @@ typedef struct {
   // value per ERD. This prevents the queue from filling with duplicates during
   // a polling reconnect cycle and bounds its size to the number of distinct ERDs.
   std::map<tiny_erd_t, PendingErdUpdate>* pending_updates;
-  // Optional filter: when non-null, update_erd only publishes ERDs that are
-  // present in this set. Used when appliance_api_parsing is enabled.
-  const std::set<tiny_erd_t>* valid_erds_filter;
-  // Optional set of string-type ERDs: when an ERD is in this set, update_erd
-  // publishes the raw bytes as a null-terminated ASCII string instead of hex.
-  const std::set<tiny_erd_t>* string_erds_filter;
-  // Optional output set: when non-null, every ERD passed to register_erd() is
-  // added here so the bridge can track which ERDs the device has registered.
-  std::set<tiny_erd_t>* registered_erds_out;
+  // Optional ERD registry: when non-null, provides valid-ERD filtering,
+  // string-ERD type detection, and registered-ERD tracking in one place.
+  // Set via esphome_mqtt_client_adapter_set_erd_registry().
+  esphome::geappliances_bridge::ErdRegistry* erd_registry;
   // True once the single wildcard MQTT subscription for write commands has been
   // established.  Set on the first MQTT connect after adapter init; never
   // cleared, because ESPHome's MQTT client automatically re-subscribes all
@@ -77,17 +98,9 @@ void esphome_mqtt_client_adapter_init(
   esphome_mqtt_client_adapter_t* self,
   const char* device_id);
 
-void esphome_mqtt_client_adapter_set_valid_erds_filter(
+void esphome_mqtt_client_adapter_set_erd_registry(
   esphome_mqtt_client_adapter_t* self,
-  const std::set<tiny_erd_t>* valid_erds_filter);
-
-void esphome_mqtt_client_adapter_set_string_erds_filter(
-  esphome_mqtt_client_adapter_t* self,
-  const std::set<tiny_erd_t>* string_erds_filter);
-
-void esphome_mqtt_client_adapter_set_registered_erds_out(
-  esphome_mqtt_client_adapter_t* self,
-  std::set<tiny_erd_t>* registered_erds_out);
+  esphome::geappliances_bridge::ErdRegistry* erd_registry);
 
 void esphome_mqtt_client_adapter_notify_disconnected(
   esphome_mqtt_client_adapter_t* self);

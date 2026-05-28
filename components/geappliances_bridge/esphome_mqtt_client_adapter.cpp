@@ -30,16 +30,16 @@ static constexpr size_t MAX_PENDING_UPDATES = 200;
 // a typical loop rate of ~200 Hz, 200 pending updates drain in ≤200 ms.
 static constexpr size_t MAX_FLUSH_PER_CALL = 5;
 
-// Async MQTT publish task: queue size and stack
-// Stack depth in StackType_t words (4 bytes each on ESP32), so 1024 words = ~4 KB.
-static constexpr size_t MQTT_PUBLISH_QUEUE_SIZE = 200;
-static constexpr uint32_t MQTT_PUBLISH_STACK_SIZE = 1024;
-
 // ---------------------------------------------------------------------------
 // Async MQTT publish background task
 // ---------------------------------------------------------------------------
 
 #ifdef USE_ESP_IDF
+
+// Async MQTT publish task: queue size and stack
+// Stack depth in StackType_t words (4 bytes each on ESP32), so 1024 words = ~4 KB.
+static constexpr size_t MQTT_PUBLISH_QUEUE_SIZE = 200;
+static constexpr uint32_t MQTT_PUBLISH_STACK_SIZE = 1024;
 
 static void mqtt_publish_task_(void* param)
 {
@@ -115,8 +115,8 @@ static void register_erd(i_mqtt_client_t* _self, tiny_erd_t erd)
 
   // Track which ERDs the device registers so the bridge can filter
   // HA discovery entities to only those actually supported by the device.
-  if (self->registered_erds_out != nullptr) {
-    self->registered_erds_out->insert(erd);
+  if (self->erd_registry != nullptr) {
+    self->erd_registry->register_erd(erd);
   }
 
   ESP_LOGD(TAG, "Registered ERD 0x%04X", erd);
@@ -136,8 +136,7 @@ static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value
 
   // If a valid ERD filter is set (appliance_api_parsing mode), skip ERDs not
   // in the validated list. This applies to both subscription and polling modes.
-  if(self->valid_erds_filter != nullptr &&
-     self->valid_erds_filter->find(erd) == self->valid_erds_filter->end()) {
+  if (self->erd_registry != nullptr && !self->erd_registry->is_valid(erd)) {
     return;
   }
 
@@ -155,8 +154,7 @@ static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value
 
   // String-type ERDs: publish the raw bytes as a null-terminated ASCII string
   // instead of a hex string so Home Assistant displays human-readable text.
-  bool is_string = (self->string_erds_filter != nullptr &&
-                    self->string_erds_filter->find(erd) != self->string_erds_filter->end());
+  bool is_string = (self->erd_registry != nullptr && self->erd_registry->is_string_type(erd));
 
   std::string payload;
   if (is_string) {
@@ -256,9 +254,7 @@ extern "C" void esphome_mqtt_client_adapter_init(
   self->interface.api = &api;
   self->device_id = new std::string(device_id);
   self->pending_updates = new std::map<tiny_erd_t, PendingErdUpdate>();
-  self->valid_erds_filter = nullptr;
-  self->string_erds_filter = nullptr;
-  self->registered_erds_out = nullptr;
+  self->erd_registry = nullptr;
   self->wildcard_subscribed   = false;
   self->mqtt_connected_at_ms  = 0;
 
@@ -299,25 +295,11 @@ extern "C" void esphome_mqtt_client_adapter_init(
 #endif
 }
 
-extern "C" void esphome_mqtt_client_adapter_set_valid_erds_filter(
+extern "C" void esphome_mqtt_client_adapter_set_erd_registry(
   esphome_mqtt_client_adapter_t* self,
-  const std::set<tiny_erd_t>* valid_erds_filter)
+  esphome::geappliances_bridge::ErdRegistry* erd_registry)
 {
-  self->valid_erds_filter = valid_erds_filter;
-}
-
-extern "C" void esphome_mqtt_client_adapter_set_string_erds_filter(
-  esphome_mqtt_client_adapter_t* self,
-  const std::set<tiny_erd_t>* string_erds_filter)
-{
-  self->string_erds_filter = string_erds_filter;
-}
-
-extern "C" void esphome_mqtt_client_adapter_set_registered_erds_out(
-  esphome_mqtt_client_adapter_t* self,
-  std::set<tiny_erd_t>* registered_erds_out)
-{
-  self->registered_erds_out = registered_erds_out;
+  self->erd_registry = erd_registry;
 }
 
 extern "C" void esphome_mqtt_client_adapter_notify_disconnected(
