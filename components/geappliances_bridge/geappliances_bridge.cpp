@@ -581,7 +581,7 @@ void GeappliancesBridge::dump_config() {
 }
 
 float GeappliancesBridge::get_setup_priority() const {
-  // Run after UART (priority 600) and MQTT (priority 50)
+  // Run after MQTT (priority 50), same priority as UART (priority 600)
   return setup_priority::DATA;  // Priority 600
 }
 
