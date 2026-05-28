@@ -1,9 +1,10 @@
-/*!
+/*
  * @file
  * @brief DeviceIdentityManager implementation.
  *
  * Adapted from geappliances_bridge_device_id.cpp as part of the god class
- * refactoring. Logic is identical - only the class context changes.
+ * refactoring. Each identity ERD is retried indefinitely on failure --
+ * the manager never moves on until it has successfully read all three.
  */
 
 #include "device_identity_manager.h"
@@ -28,7 +29,6 @@ void DeviceIdentityManager::init(const std::string& configured_id,
   this->erd_client_ = erd_client;
   this->host_address_ = host_address;
   this->queue_retry_count_ = 0;
-  this->response_retries_ = 0;
 
   if (!this->configured_device_id_.empty()) {
     ESP_LOGI(TAG, "Using configured device_id: %s", this->configured_device_id_.c_str());
@@ -61,8 +61,6 @@ void DeviceIdentityManager::run()
 
 void DeviceIdentityManager::on_erd_read_completed(tiny_erd_t erd, const uint8_t* data, uint8_t size)
 {
-  this->response_retries_ = 0;
-
   if (erd == ERD_APPLIANCE_TYPE) {
     if (size < 1) return;
     this->appliance_type_ = data[0];
@@ -98,50 +96,16 @@ void DeviceIdentityManager::on_erd_read_completed(tiny_erd_t erd, const uint8_t*
 
 void DeviceIdentityManager::on_erd_read_failed(tiny_erd_t erd)
 {
-  this->response_retries_++;
-  ESP_LOGW(TAG, "Failed to read ERD 0x%04X for device ID generation (reason: %u), retry %u",
-           erd, this->response_retries_);
+  // Log the failure and stay in the current reading state so run() will retry.
+  // We never give up -- retries are indefinite.
+  ESP_LOGW(TAG, "Failed to read ERD 0x%04X for device ID generation, will retry", erd);
 
-  if (this->response_retries_ >= MAX_DEVICE_ID_RESPONSE_RETRIES) {
-    ESP_LOGW(TAG, "Max retries reached for ERD 0x%04X, using fallback value", erd);
-    this->response_retries_ = 0;
-
-    if (erd == ERD_APPLIANCE_TYPE) {
-      this->appliance_type_ = 0xFF;  // Unknown
-      if (this->erd_client_ != nullptr &&
-          tiny_gea3_erd_client_read(this->erd_client_, &this->pending_request_id_,
-                                     this->host_address_, ERD_MODEL_NUMBER)) {
-        this->state_ = DEVICE_ID_STATE_IDLE;
-      } else {
-        this->state_ = DEVICE_ID_STATE_READING_MODEL_NUMBER;
-      }
-    } else if (erd == ERD_MODEL_NUMBER) {
-      this->model_number_ = "Unknown";
-      if (this->erd_client_ != nullptr &&
-          tiny_gea3_erd_client_read(this->erd_client_, &this->pending_request_id_,
-                                     this->host_address_, ERD_SERIAL_NUMBER)) {
-        this->state_ = DEVICE_ID_STATE_IDLE;
-      } else {
-        this->state_ = DEVICE_ID_STATE_READING_SERIAL_NUMBER;
-      }
-    } else if (erd == ERD_SERIAL_NUMBER) {
-      this->serial_number_ = "Unknown";
-      this->generated_device_id_ = appliance_type_to_string(this->appliance_type_) + "_" +
-                                    this->sanitize_for_mqtt_topic_(this->model_number_) + "_" +
-                                    this->sanitize_for_mqtt_topic_(this->serial_number_);
-      this->final_device_id_ = this->generated_device_id_;
-      ESP_LOGW(TAG, "Generated device ID with fallback: %s", this->final_device_id_.c_str());
-      this->state_ = DEVICE_ID_STATE_COMPLETE;
-    }
-  } else {
-    // Reset to the reading state so run() will retry
-    if (erd == ERD_APPLIANCE_TYPE) {
-      this->state_ = DEVICE_ID_STATE_READING_APPLIANCE_TYPE;
-    } else if (erd == ERD_MODEL_NUMBER) {
-      this->state_ = DEVICE_ID_STATE_READING_MODEL_NUMBER;
-    } else if (erd == ERD_SERIAL_NUMBER) {
-      this->state_ = DEVICE_ID_STATE_READING_SERIAL_NUMBER;
-    }
+  if (erd == ERD_APPLIANCE_TYPE) {
+    this->state_ = DEVICE_ID_STATE_READING_APPLIANCE_TYPE;
+  } else if (erd == ERD_MODEL_NUMBER) {
+    this->state_ = DEVICE_ID_STATE_READING_MODEL_NUMBER;
+  } else if (erd == ERD_SERIAL_NUMBER) {
+    this->state_ = DEVICE_ID_STATE_READING_SERIAL_NUMBER;
   }
 }
 
@@ -197,15 +161,11 @@ bool DeviceIdentityManager::try_read_erd_with_retry_(tiny_erd_t erd, const char*
   }
 
   this->queue_retry_count_++;
-  if (this->queue_retry_count_ % LOG_EVERY_N_RETRIES == 0) {
+  if (this->queue_retry_count_ % LOG_EVERY_N_QUEUE_RETRIES == 0) {
     ESP_LOGW(TAG, "Queue full, unable to send %s read (retry %u)",
              erd_name, this->queue_retry_count_);
   }
-  if (this->queue_retry_count_ >= MAX_QUEUE_RETRIES) {
-    ESP_LOGE(TAG, "Max queue retries reached for %s, giving up", erd_name);
-    this->state_ = DEVICE_ID_STATE_FAILED;
-    return false;
-  }
+  // Never give up -- stay in the current reading state and keep retrying.
   return false;
 }
 
