@@ -430,7 +430,6 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
       } else {
         this->device_identity_manager_.on_erd_read_completed(erd, data, size);
         if (this->device_identity_manager_.is_complete()) {
-          this->notify_device_id_sensors_();
           // Signal the startup HSM that device ID is ready.
           tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_complete, nullptr);
         }
@@ -448,11 +447,9 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
                  erd, args->read_failed.reason);
         this->device_identity_manager_.on_erd_read_failed(erd);
         if (this->device_identity_manager_.is_complete()) {
-          this->notify_device_id_sensors_();
           // Signal the startup HSM that device ID is ready (even on failure, we have a fallback).
           tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_complete, nullptr);
         } else if (this->device_identity_manager_.is_failed()) {
-          this->notify_device_id_sensors_();
           tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_failed, nullptr);
         }
       }
@@ -477,51 +474,12 @@ bool GeappliancesBridge::should_route_to_feature_bits_(tiny_erd_t erd)
 }
 
 // ---------------------------------------------------------------------------
-// Notify all registered device ID sensors with the auto-generated device ID
-// ---------------------------------------------------------------------------
-
-void GeappliancesBridge::notify_device_id_sensors_()
-{
-  std::string device_id = this->device_identity_manager_.get_device_id();
-  if (device_id.empty()) {
-    device_id = "Unknown_Unknown_Unknown";
-  }
-
-  for (auto *sensor : this->device_id_sensors_) {
-    if (sensor != nullptr) {
-      sensor->publish_state(device_id);
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Public getter for the auto-generated device ID
 // ---------------------------------------------------------------------------
 
 const std::string& GeappliancesBridge::get_generated_device_id() const
 {
   return this->device_identity_manager_.get_device_id();
-}
-
-// ---------------------------------------------------------------------------
-// Health metrics getters
-// ---------------------------------------------------------------------------
-
-size_t GeappliancesBridge::get_pending_mqtt_updates() const
-{
-  return esphome_mqtt_client_adapter_get_pending_update_count(&this->mqtt_client_adapter_);
-}
-
-uint32_t GeappliancesBridge::get_polling_cycle_time_ms() const
-{
-  if (!this->polling_bridge_initialized_) return 0;
-  return this->mqtt_bridge_polling_.last_cycle_time_ms;
-}
-
-uint32_t GeappliancesBridge::get_polling_cycle_count() const
-{
-  if (!this->polling_bridge_initialized_) return 0;
-  return this->mqtt_bridge_polling_.cycle_count;
 }
 
 void GeappliancesBridge::dump_config() {
@@ -594,9 +552,6 @@ void GeappliancesBridge::dump_config() {
   }
   if (!this->custom_erds_vec_.empty()) {
     ESP_LOGCONFIG(TAG, "  Custom ERDs: %zu configured", this->custom_erds_vec_.size());
-  }
-  if (!this->device_id_sensors_.empty()) {
-    ESP_LOGCONFIG(TAG, "  Device ID Sensors: %zu registered", this->device_id_sensors_.size());
   }
 
   // Display current startup state for debugging

@@ -174,7 +174,6 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
       // If a device_id is pre-configured, the manager is already complete
       // from init().  Sync the final_device_id_ and transition.
       if (bridge->device_identity_manager_.is_complete()) {
-        bridge->notify_device_id_sensors_();
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       }
       break;
@@ -184,7 +183,6 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
       if (millis() - bridge->device_id_phase_start_ms_ >= bridge->DEVICE_ID_PHASE_TIMEOUT_MS) {
         ESP_LOGW(TAG, "Device ID phase timed out after %u ms, using fallback",
                  static_cast<unsigned>(bridge->DEVICE_ID_PHASE_TIMEOUT_MS));
-        bridge->notify_device_id_sensors_();
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
         break;
       }
@@ -192,23 +190,19 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
       bridge->device_identity_manager_.run();
 
       if (bridge->device_identity_manager_.is_complete()) {
-        bridge->notify_device_id_sensors_();
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       } else if (bridge->device_identity_manager_.is_failed()) {
         // Even on failure, we have a fallback device ID — continue startup.
         ESP_LOGW(TAG, "Device ID generation failed, using fallback");
-        bridge->notify_device_id_sensors_();
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       }
       break;
 
     case signal_device_id_complete:
-      bridge->notify_device_id_sensors_();
       tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       break;
 
     case signal_device_id_failed:
-      bridge->notify_device_id_sensors_();
       tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       break;
 

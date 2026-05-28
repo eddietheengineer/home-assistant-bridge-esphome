@@ -3,7 +3,6 @@
 #include "esphome/core/component.h"
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/mqtt/mqtt_client.h"
-#include "esphome/components/text_sensor/text_sensor.h"
 #include <string>
 #include <set>
 #include <vector>
@@ -88,24 +87,13 @@ class GeappliancesBridge : public Component {
   void add_custom_erd(uint16_t erd) { this->custom_erds_vec_.push_back(static_cast<tiny_erd_t>(erd)); }
   void set_ha_discovery_base_url(const std::string& url) { this->ha_discovery_base_url_ = url; }
 
-  // Register a text sensor that will be updated with the auto-generated device ID
-  void register_device_id_sensor(text_sensor::TextSensor *s) {
-    this->device_id_sensors_.push_back(s);
-  }
-
-  // Public getter for the auto-generated device ID (used by the text sensor platform)
+  // Public getter for the auto-generated device ID (used by external consumers)
   const std::string& get_generated_device_id() const;
-
-  // Health metrics getters (used by the number sensor platform)
-  size_t get_pending_mqtt_updates() const;
-  uint32_t get_polling_cycle_time_ms() const;
-  uint32_t get_polling_cycle_count() const;
 
  protected:
   void on_mqtt_connected_();
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();
-  void notify_device_id_sensors_();
   void initialize_mqtt_bridge_();
   void start_custom_erd_polling_();
   void maybe_start_custom_erd_polling_();
@@ -248,9 +236,6 @@ class GeappliancesBridge : public Component {
 
   tiny_event_subscription_t erd_client_activity_subscription_;
   tiny_event_subscription_t gea2_activity_subscription_;
-
-  // Text sensors that will be updated with the auto-generated device ID
-  std::vector<text_sensor::TextSensor *> device_id_sensors_;
 };
 
 }  // namespace geappliances_bridge
