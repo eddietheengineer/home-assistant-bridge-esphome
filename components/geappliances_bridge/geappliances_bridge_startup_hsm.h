@@ -36,13 +36,17 @@
 //
 // Dependencies:
 //   - tiny_hsm
-//   - IBridgeServices (once introduced; currently GeappliancesBridge directly)
+//   - IBridgeServices
 // =============================================================================
 
 #ifndef startup_hsm_h
 #define startup_hsm_h
 
+#include "i_bridge_services.h"
+
+extern "C" {
 #include "tiny_hsm.h"
+}
 
 // ============================================================================
 // Startup HSM signal identifiers
@@ -66,8 +70,7 @@ enum {
 namespace esphome {
 namespace geappliances_bridge {
 
-// Forward declaration of the bridge class
-class GeappliancesBridge;
+// Forward declaration no longer needed — IBridgeServices is included above.
 
 tiny_hsm_result_t startup_state_top(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
@@ -99,9 +102,10 @@ tiny_hsm_result_t startup_state_ha_discovery(
 tiny_hsm_result_t startup_state_running(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
-/// Set the back-pointer to the bridge instance so the HSM state functions
-/// can access it without using container_of/offsetof on a non-POD class.
-void set_bridge_instance(GeappliancesBridge* bridge);
+/// Set the back-pointer to the bridge services so the HSM state functions
+/// can invoke bridge operations without a compile-time dependency on
+/// GeappliancesBridge's internals.
+void set_bridge_services(IBridgeServices* services);
 
 // HSM configuration (state descriptors + hierarchy)
 extern const tiny_hsm_configuration_t startup_hsm_configuration;

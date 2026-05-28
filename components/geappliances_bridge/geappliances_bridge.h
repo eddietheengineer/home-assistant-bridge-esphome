@@ -48,6 +48,8 @@ extern "C" {
 #include "gea2_erd_client_adapter.h"
 
 #include "esphome_uart_adapter.h"
+#include "bridge_mode.h"
+#include "i_bridge_services.h"
 #include "erd_registry.h"
 #include "esphome_mqtt_client_adapter.h"
 #include "device_identity_manager.h"
@@ -62,37 +64,9 @@ std::string appliance_type_to_string(uint8_t appliance_type);
 namespace esphome {
 namespace geappliances_bridge {
 
-// Operation mode for the bridge
-// Note: These enum values must match MODE_*_VALUE constants in __init__.py
-enum BridgeMode {
-  BRIDGE_MODE_POLL = 0,       // Always use polling mode
-  BRIDGE_MODE_SUBSCRIBE = 1,  // Always use subscription mode
-  BRIDGE_MODE_AUTO = 2        // Auto: try subscription, fallback to polling
-};
+// BridgeMode is now defined in bridge_mode.h (included via i_bridge_services.h).
 
-class GeappliancesBridge : public Component {
-  // Allow the startup HSM state functions to access protected members
-  friend GeappliancesBridge* bridge_from_hsm(tiny_hsm_t* hsm);
-  friend tiny_hsm_result_t startup_state_top(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_protocol_stack(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_autodiscovery(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_device_id(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_mqtt_client_init(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_feature_bits(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_bridge_init(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_subscription_watch(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_ha_discovery(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_running(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+class GeappliancesBridge : public Component, public IBridgeServices {
 
  public:
   static constexpr unsigned long baud = 230400;
@@ -119,6 +93,42 @@ class GeappliancesBridge : public Component {
   const std::string& get_generated_device_id() const;
 
  protected:
+  // ── IBridgeServices implementation (called exclusively by the startup HSM) ──
+  void run_autodiscovery() override;
+  bool is_autodiscovery_complete() const override;
+  uint8_t get_discovered_host_address() const override;
+  bool is_discovered_gea2_protocol() const override;
+
+  void init_device_id_reading() override;
+  void run_device_id() override;
+  bool is_device_id_complete() const override;
+  bool is_device_id_failed() const override;
+  void record_device_id_phase_start() override;
+  bool is_device_id_phase_timed_out() const override;
+
+  bool is_mqtt_client_initialized() const override;
+  void initialize_mqtt_client() override;
+
+  void start_feature_bit_reading() override;
+  void run_feature_bits() override;
+  bool is_feature_bits_complete() const override;
+  void mark_feature_bits_timed_out() override;
+  void record_feature_bits_phase_start() override;
+  bool is_feature_bits_phase_timed_out() const override;
+
+  bool is_bridge_initialized() const override;
+  void initialize_mqtt_bridge() override;
+
+  BridgeMode get_mode() const override;
+  bool is_subscription_mode_active() const override;
+
+  void check_subscription_activity() override;
+  void maybe_start_custom_erd_polling() override;
+  void log_poll_state_transitions() override;
+  void run_ha_discovery() override;
+  void run_all_managers() override;
+
+  // ── Internal bridge methods ────────────────────────────────────────────────
   void on_mqtt_connected_();
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();

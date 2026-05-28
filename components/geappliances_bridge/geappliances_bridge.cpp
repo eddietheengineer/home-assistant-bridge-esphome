@@ -229,9 +229,9 @@ void GeappliancesBridge::loop() {
 
   // Initialize the startup HSM on the first loop() call.
   if (this->startup_hsm_.current == nullptr) {
-    // Set the back-pointer so HSM state functions can access the bridge
-    // without using container_of/offsetof on a non-POD C++ class.
-    set_bridge_instance(this);
+    // Set the back-pointer so HSM state functions can invoke bridge
+    // operations through IBridgeServices without a dependency on internals.
+    set_bridge_services(this);
     tiny_hsm_init(&this->startup_hsm_, &startup_hsm_configuration,
                   startup_state_protocol_stack);
   }
@@ -606,6 +606,175 @@ bool GeappliancesBridge::teardown() {
   }
   Component::teardown();
   return true;
+}
+
+// =============================================================================
+// IBridgeServices implementation
+//
+// These thin wrappers are the only entry points the startup HSM is allowed to
+// use when interacting with the bridge. Each delegates to an existing internal
+// method or member, keeping the HSM decoupled from GeappliancesBridge internals.
+// =============================================================================
+
+// -- Autodiscovery ------------------------------------------------------------
+
+void GeappliancesBridge::run_autodiscovery()
+{
+  autodiscovery_manager_.run();
+}
+
+bool GeappliancesBridge::is_autodiscovery_complete() const
+{
+  return autodiscovery_manager_.is_complete();
+}
+
+uint8_t GeappliancesBridge::get_discovered_host_address() const
+{
+  return autodiscovery_manager_.get_host_address();
+}
+
+bool GeappliancesBridge::is_discovered_gea2_protocol() const
+{
+  return autodiscovery_manager_.is_gea2_protocol();
+}
+
+// -- Device ID ----------------------------------------------------------------
+
+void GeappliancesBridge::init_device_id_reading()
+{
+  if (!device_identity_manager_.is_complete() && !device_identity_manager_.is_failed()) {
+    device_identity_manager_.init(
+        configured_device_id_,
+        autodiscovery_manager_.get_active_erd_client(),
+        autodiscovery_manager_.get_host_address());
+  }
+}
+
+void GeappliancesBridge::run_device_id()
+{
+  device_identity_manager_.run();
+}
+
+bool GeappliancesBridge::is_device_id_complete() const
+{
+  return device_identity_manager_.is_complete();
+}
+
+bool GeappliancesBridge::is_device_id_failed() const
+{
+  return device_identity_manager_.is_failed();
+}
+
+void GeappliancesBridge::record_device_id_phase_start()
+{
+  device_id_phase_start_ms_ = millis();
+}
+
+bool GeappliancesBridge::is_device_id_phase_timed_out() const
+{
+  return millis() - device_id_phase_start_ms_ >= DEVICE_ID_PHASE_TIMEOUT_MS;
+}
+
+// -- MQTT client adapter ------------------------------------------------------
+
+bool GeappliancesBridge::is_mqtt_client_initialized() const
+{
+  return mqtt_client_adapter_initialized_;
+}
+
+void GeappliancesBridge::initialize_mqtt_client()
+{
+  initialize_mqtt_client_();
+}
+
+// -- Feature bits -------------------------------------------------------------
+
+void GeappliancesBridge::start_feature_bit_reading()
+{
+  start_feature_bit_reading_();
+}
+
+void GeappliancesBridge::run_feature_bits()
+{
+  feature_bit_manager_.run();
+}
+
+bool GeappliancesBridge::is_feature_bits_complete() const
+{
+  return feature_bit_manager_.is_complete();
+}
+
+void GeappliancesBridge::mark_feature_bits_timed_out()
+{
+  feature_bit_manager_.mark_timed_out();
+}
+
+void GeappliancesBridge::record_feature_bits_phase_start()
+{
+  feature_bits_phase_start_ms_ = millis();
+}
+
+bool GeappliancesBridge::is_feature_bits_phase_timed_out() const
+{
+  return millis() - feature_bits_phase_start_ms_ >= FEATURE_BITS_PHASE_TIMEOUT_MS;
+}
+
+// -- Bridge initialization ----------------------------------------------------
+
+bool GeappliancesBridge::is_bridge_initialized() const
+{
+  return mqtt_bridge_initialized_;
+}
+
+void GeappliancesBridge::initialize_mqtt_bridge()
+{
+  initialize_mqtt_bridge_();
+}
+
+// -- Operating mode -----------------------------------------------------------
+
+BridgeMode GeappliancesBridge::get_mode() const
+{
+  return mode_;
+}
+
+bool GeappliancesBridge::is_subscription_mode_active() const
+{
+  return subscription_mode_active_;
+}
+
+// -- Recurring tasks ----------------------------------------------------------
+
+void GeappliancesBridge::check_subscription_activity()
+{
+  check_subscription_activity_();
+}
+
+void GeappliancesBridge::maybe_start_custom_erd_polling()
+{
+  maybe_start_custom_erd_polling_();
+}
+
+void GeappliancesBridge::log_poll_state_transitions()
+{
+  log_poll_state_transitions_();
+}
+
+void GeappliancesBridge::run_ha_discovery()
+{
+  ha_discovery_manager_.run(
+      !((mode_ == BRIDGE_MODE_SUBSCRIBE) ||
+        (mode_ == BRIDGE_MODE_AUTO && subscription_mode_active_)),
+      mqtt_bridge_polling_.polling_list_complete,
+      subscription_activity_detected_,
+      mqtt::global_mqtt_client);
+}
+
+void GeappliancesBridge::run_all_managers()
+{
+  autodiscovery_manager_.run();
+  device_identity_manager_.run();
+  feature_bit_manager_.run();
 }
 
 }  // namespace geappliances_bridge
