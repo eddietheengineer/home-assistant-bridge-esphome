@@ -1,11 +1,13 @@
 /*!
  * @file
- * @brief Appliance autodiscovery state machine.
+ * @brief MQTT connection lifecycle handlers.
  *
- * Sends GEA3 (then GEA2) broadcast reads of ERD 0x0008 (appliance type) to
- * find the first responding board on the bus.  On success it records the
- * board's address, selects the active ERD client, and hands off to the
- * feature-bit reading phase.
+ * Handles MQTT (re)connection and disconnection events.  On reconnect,
+ * pending ERD updates are flushed.  On disconnect, the MQTT client adapter
+ * and bridge HSMs are notified so they can enter their reconnect states.
+ *
+ * NOTE: Despite the filename prefix "geappliances_bridge_", this file does
+ * NOT contain autodiscovery logic — that lives in autodiscovery_manager.cpp.
  */
 
 #include "geappliances_bridge.h"

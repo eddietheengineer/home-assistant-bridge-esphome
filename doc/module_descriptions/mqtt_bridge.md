@@ -16,8 +16,8 @@ Manages the GEA3 ERD subscription lifecycle in subscription mode. Subscribes to 
 ```
 sub_state_top (parent state — handles publication and write signals globally)
   ├─ state_subscribing
-  │    ├─ entry: clear ERD set
   │    ├─ entry / timer_expired / subscription_failed: attempt subscribe()
+  │    ├─ subscription_host_came_online: clear ERD set, then attempt subscribe()
   │    ├─ subscription_added_or_retained → state_subscribed
   │    └─ exit: disarm timer
   │
@@ -43,7 +43,7 @@ Shared signals (handled in `mqtt_bridge_common.h`):
 
 ## Key Design Decisions
 
-- **ERD set tracking**: A `std::set<tiny_erd_t>` tracks which ERDs have been registered with the MQTT client. On entry to `state_subscribing` (e.g., after reconnect), the set is cleared so ERDs are re-registered — this matters because the MQTT broker may have dropped subscriptions during disconnect.
+- **ERD set tracking**: A `std::set<tiny_erd_t>` tracks which ERDs have been registered with the MQTT client. The set is only cleared on `signal_subscription_host_came_online` (appliance restart) — NOT on `signal_mqtt_disconnected` (transient MQTT reconnect). Clearing on every MQTT reconnect causes every ERD to be re-registered as subscription publications arrive, creating slow-looking logs (~2-3 s per ERD).
 - **30-second retention**: The subscription is retained every 30 seconds (`subscription_retention_period`) to keep the appliance publishing ERD values. If retention fails, the bridge transitions back to `state_subscribing`.
 - **1-second resubscribe delay**: If `subscribe()` fails, the bridge waits 1 second (`resubscribe_delay`) before retrying.
 - **Clean destroy**: All three event subscriptions (ERD activity, write request, MQTT disconnect) are unsubscribed before freeing the ERD set, preventing use-after-free if events fire after destroy.

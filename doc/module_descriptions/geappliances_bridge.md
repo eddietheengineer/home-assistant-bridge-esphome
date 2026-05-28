@@ -11,7 +11,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `setup()` | Initialize timer group, UART adapters, ERD clients, GEA interfaces, managers |
 | `loop()` | Drive protocol stack and startup HSM |
 | `dump_config()` | Log current configuration and state |
-| `get_setup_priority()` | Returns `setup_priority::DATA` (600) — after UART, before MQTT |
+| `get_setup_priority()` | Returns `setup_priority::DATA` (600) — after MQTT (50), same as UART |
 | `teardown()` | Clean up HA discovery, bridges, and MQTT adapter |
 
 ### Configuration Setters (called from `__init__.py` code generation)
@@ -33,9 +33,9 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 
 | Method | Description |
 |--------|-------------|
-| `on_mqtt_connected_()` | Handle MQTT (re)connection — initialize adapter, flush pending updates |
-| `notify_mqtt_disconnected_()` | Notify adapter of disconnect |
+| `on_mqtt_connected_()` | Handle MQTT (re)connection — flush pending updates (in `geappliances_bridge_mqtt_connection.cpp`) |
 | `handle_erd_client_activity_(args)` | Route ERD activity to appropriate manager (autodiscovery, device ID, feature bits) |
+| `should_route_to_feature_bits_(erd)` | Decide whether an ERD read goes to FeatureBitManager or DeviceIdentityManager |
 | `initialize_mqtt_client_()` | Create and configure the MQTT client adapter |
 | `initialize_mqtt_bridge_()` | Initialize subscription or polling bridge based on mode |
 | `run_protocol_stack_()` | Drive GEA2/GEA3 hardware (includes GEA2 tight loop) |
@@ -67,6 +67,7 @@ protocol_stack → autodiscovery → device_id → mqtt_client_init
 - All sub-managers: `AutodiscoveryManager`, `DeviceIdentityManager`, `FeatureBitManager`, `HaDiscoveryManager`
 - Adapters: `esphome_uart_adapter`, `esphome_mqtt_client_adapter`, `gea2_erd_client_adapter`
 - Bridges: `mqtt_bridge`, `mqtt_bridge_polling`
+- `mqtt_bridge_common.h` — shared signals, timing constants, and utility templates
 - `tiny_hsm`, `tiny_timer` — state machine and timer infrastructure
 
 ## Key Design Decisions

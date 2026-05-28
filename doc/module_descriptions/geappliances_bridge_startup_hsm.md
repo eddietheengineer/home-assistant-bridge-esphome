@@ -35,8 +35,8 @@ startup_state_top (root — handles entry/exit, defers all other signals)
   │    └─ entry → immediately transition to autodiscovery
   │
   ├─ startup_state_autodiscovery
-  │    ├─ run_loop: run AutodiscoveryManager
-  │    └─ complete/failed/signal → device_id
+  │    ├─ run_loop: run AutodiscoveryManager (retries indefinitely)
+  │    └─ complete/signal → device_id
   │
   ├─ startup_state_device_id
   │    ├─ entry: init DeviceIdentityManager, start timeout timer
@@ -65,7 +65,10 @@ startup_state_top (root — handles entry/exit, defers all other signals)
   │    └─ transition to running (HA discovery runs in background)
   │
   └─ startup_state_running (steady state)
-       └─ run_loop: log poll state transitions, check subscription activity
+       └─ run_loop: run all managers (autodiscovery, device identity,
+           feature bits, ha discovery), check subscription activity
+           (AUTO mode), maybe start custom ERD polling, log poll state
+           transitions
 ```
 
 ## Dependencies

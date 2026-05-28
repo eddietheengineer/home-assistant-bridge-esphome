@@ -36,18 +36,25 @@ poll_state_top (parent — handles write requests and appliance loss globally)
   │    └→ state_polling
   │
   └─ state_polling (steady state)
-       ├─ polling_timer_expired: restart cycle only when all ERDs have
-       │   completed (success or failure) AND the timer has expired;
-       │   on the first cycle (erd_index == polling_list_count), the
-       │   timer kicks off the first read from ERD[0]
+       ├─ polling_timer_expired: mark polling_timer_armed = false; restart cycle
+       │   only when all ERDs have completed (success or failure) OR no cycle
+       │   is in progress; then re-arm the polling timer
        ├─ read_completed: register on MQTT if deferred (first read for
        │   api_parsed_list or custom_erd_list ERDs), then publish if changed
-       │   (or always), then read next ERD
-       ├─ read_failed: count as completed, then read next ERD
+       │   (or always), then read next ERD; if cycle is complete and
+       │   polling_timer_armed is false, start next cycle immediately
+       ├─ read_failed: count as completed, then read next ERD; same
+       │   immediate-restart logic as read_completed
        ├─ timer_expired (retry): re-arm (ERD client handles retries internally)
        ├─ mqtt_disconnected: continue polling (values are queued)
        └─ appliance_lost (60 s timeout) → state_identify_appliance
 ```
+
+The `polling_timer_armed` flag gates cycle restarts: when the polling timer is armed,
+a completed cycle waits for the timer to fire before starting the next cycle (respecting
+the configured interval). When the timer is not armed (e.g., cycle finishes faster than
+the interval), the next cycle starts immediately. This prevents overlapping cycles while
+allowing fast cycles to chain together without unnecessary delay.
 
 Discovery states use a shared `handle_discovery_list_signals` handler that reads each ERD in the list, adds it to the polling list, publishes the value, and transitions to the next state when done.
 
@@ -70,11 +77,14 @@ Discovery states use a shared `handle_discovery_list_signals` handler that reads
   `send_next_poll_read_request()` for the next ERD.  The retry timer
   (`signal_timer_expired`) re-arms without resending — the ERD client handles
   retries internally (10 × 250ms).
-- **Cycle restarts only when complete AND timer expired**: A new polling cycle
+- **Cycle restarts only when complete AND timer expired (or timer not armed)**: A new polling cycle
   (resetting `erd_index` to 0) starts only when **all** ERDs in the current
   cycle have either read successfully or failed **and** the polling timer
-  (default 10 s) has expired.  This prevents overlapping cycles from building
-  up pressure in the shared GEA3 ERD client queue.
+  (default 10 s) has expired.  The `polling_timer_armed` flag gates this: if
+  the cycle finishes before the timer fires, the next cycle starts immediately
+  (timer is not armed). If the timer is armed, the cycle waits for it to fire.
+  This prevents overlapping cycles from building up pressure in the shared GEA3
+  ERD client queue while allowing fast cycles to chain together without delay.
 - **No overlapping polling cycles**: Because only one read is ever in-flight
   and cycles don't restart until complete, the GEA3 ERD client's fixed-size
   request queue cannot overflow — preventing heap corruption that previously
