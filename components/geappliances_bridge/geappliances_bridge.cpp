@@ -177,17 +177,6 @@ void GeappliancesBridge::setup() {
 }
 
 void GeappliancesBridge::loop() {
-#ifdef USE_ESP32
-  // Reset the task watchdog at the very start of every loop() call.  This
-  // ensures the TWDT budget is renewed before the MQTT check block, which
-  // can block for an extended period when the MQTT broker connection is
-  // established or re-established (wildcard subscribe + pending-update flush).
-  // Without this early reset, the gap from the previous WDT reset (end of
-  // this function) through all other ESPHome component loops and back into
-  // the MQTT check block can exceed the default 5 s TWDT timeout.
-  esp_task_wdt_reset();
-#endif
-
   // Track MQTT connection state and notify the bridge on (re)connect.
   auto mqtt_client = mqtt::global_mqtt_client;
   if (mqtt_client != nullptr) {
