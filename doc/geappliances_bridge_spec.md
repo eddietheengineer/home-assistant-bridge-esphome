@@ -51,24 +51,24 @@ init_device_id_reading(). Receives the configured device ID (if any), the
 active ERD client, and the host address.
 
 **Note:** Does NOT hold an i_mqtt_client_t pointer. Does NOT publish ERD
-values to MQTT.
+values to MQTT. Does NOT write to the ERD publish table.
 
 ### 1.4 ErdRegistry (erd_registry.h / .cpp)
 
-**Role:** Single authoritative source for three ERD sets: valid ERDs (from
-feature bits), string-type ERDs (from generated config), and registered ERDs
-(tracked at runtime by the MQTT adapter).
+**Role:** Authoritative source for valid ERDs (from feature bits) and
+string-type ERDs (from generated config). Registered ERDs are now derived
+from the ERD publish table in the adapter, not tracked separately.
 
-**Owns:** Three std::set<tiny_erd_t> instances and a valid_erds_ready flag.
+**Owns:** Two std::set<tiny_erd_t> instances (valid_erds_, string_erds_)
+and a valid_erds_ready flag.
 
 **Dependencies:** tiny_erd.h (type only).
 
-**Initialization:** ErdRegistry starts empty. It grows organically as ERDs
-are registered by the MQTT adapter (via register_erd() calls from the bridge
-during subscription or polling). String-type ERDs are NOT pre-populated — the
-registry learns string types from the generated config only when the bridge
-initializes. Valid ERDs are populated in initialize_mqtt_bridge_() from
-FeatureBitManager results.
+**Initialization:** ErdRegistry starts empty. Valid ERDs are populated in
+initialize_mqtt_bridge_() from FeatureBitManager results. String-type ERDs
+are populated in initialize_mqtt_bridge_() from generated config. Registered
+ERDs are no longer tracked here -- they are derived from the ERD publish
+table in the adapter (see Section 5.1).
 
 ### 1.5 FeatureBitManager (feature_bit_manager.h / .cpp)
 
@@ -78,34 +78,35 @@ FeatureBitManager results.
 **Owns:** Sequential read state machine, raw ERD data buffers, parsed valid
 ERD set (std::set + std::vector), parse progress state.
 
-**Dependencies:** i_tiny_gea3_erd_client, i_mqtt_client_t (received in init()
-but currently NOT used for publishing -- see Section 5.2).
+**Dependencies:** i_tiny_gea3_erd_client, i_mqtt_client_t.
 
-**Initialization:** Triggered when mqtt_client_adapter_initialized_ becomes true.
-The feature_bits phase starts reading as soon as the adapter is initialized —
-it does not wait for MQTT connection. Receives the active ERD client, host
-address, i_mqtt_client_t pointer, and mqtt_initialized flag.
+**Initialization:** Triggered when mqtt_client_adapter_initialized_ becomes
+true and the ERD publish table is ready. The feature_bits phase starts
+reading as soon as the adapter is initialized -- it does not wait for MQTT
+connection. Receives the active ERD client, host address, i_mqtt_client_t
+pointer, and mqtt_initialized flag.
 
-**Note:** The i_mqtt_client_t pointer is stored but NOT used for publishing
-during the feature_bits phase. The code explicitly avoids calling
-mqtt_client_update_erd() for feature bit ERDs to prevent heap pressure on
-ESP32-C3 (see feature_bit_manager.cpp lines 149-157).
+**Note:** FeatureBitManager calls mqtt_client_update_erd() for every ERD
+read response. This writes the ERD into the publish table in the adapter.
+The adapter handles string conversion and deduplication.
 
 ### 1.6 EsphomeMqttClientAdapter (esphome_mqtt_client_adapter.h / .cpp)
 
-**Role:** Implements i_mqtt_client_t for ESPHome. Queues ERD updates for
-async publish, deduplicates by ERD, subscribes to wildcard write topic,
+**Role:** Implements i_mqtt_client_t for ESPHome. Owns the ERD publish table,
+drains it with round-robin scheduling, subscribes to wildcard write topic,
 routes write commands back via tiny_event.
 
-**Owns:** Pending updates map (keyed by ERD), wildcard_subscribed flag,
-mqtt_connected_at_ms timestamp, two tiny_event instances (write request,
-disconnect), device_id string, ErdRegistry pointer.
+**Owns:** ERD publish table (std::vector of ErdPublishEntry, max 400 entries),
+drain index, wildcard_subscribed flag, mqtt_connected_at_ms timestamp, two
+tiny_event instances (write request, disconnect), device_id string,
+ErdRegistry pointer.
 
 **Dependencies:** esphome::mqtt::global_mqtt_client (direct access),
 ErdRegistry, tiny_event.
 
 **Initialization:** Called from initialize_mqtt_client_(). Receives device ID
-string and ErdRegistry pointer.
+string and ErdRegistry pointer. Creates the ERD publish table (empty vector,
+drain index = 0). The table is ready to accept entries immediately after init.
 
 ### 1.7 MqttBridge (mqtt_bridge.h / .cpp)
 
@@ -145,7 +146,8 @@ mqtt::MQTTClientComponent (for sync fallback), ESP-IDF esp_http_client,
 ESP-IDF cJSON, FreeRTOS.
 
 **Initialization:** Called from initialize_mqtt_bridge_(). Receives device
-info, registered ERD set, and mqtt_adapter pointer.
+info, registered ERDs (from the adapter's publish table), and mqtt_adapter
+pointer.
 
 ### 1.10 Startup HSM (geappliances_bridge_startup_hsm.h / .cpp)
 
@@ -222,6 +224,8 @@ in loop(), which runs before the HSM).
 - run_device_id() -- drives the sequential ERD read state machine
 - ERD client activity events are routed to handle_erd_client_activity_(),
   which delivers read_completed/read_failed to DeviceIdentityManager
+- ERD read responses are NOT written to the publish table (device_id phase
+  ERDs are consumed internally only)
 
 **Exit conditions:**
 - is_device_id_complete() == true (all three ERDs read successfully)
@@ -244,6 +248,7 @@ and is_device_id_phase_timed_out() are not used as exit conditions.
 **Entry action:**
 - initialize_mqtt_client() if not already initialized:
   - Calls esphome_mqtt_client_adapter_init() with the device ID
+  - Creates the ERD publish table (empty vector, drain index = 0, max 400)
   - Sets ErdRegistry pointer on the adapter
   - Sets mqtt_client_adapter_initialized_ = true
 - start_feature_bit_reading():
@@ -253,13 +258,15 @@ and is_device_id_phase_timed_out() are not used as exit conditions.
 
 **Component state on exit:**
 - mqtt_client_adapter_initialized_ == true
-- ErdRegistry is empty (no string ERDs pre-populated, no valid ERDs yet)
+- ERD publish table exists and is empty, ready to accept entries
+- ErdRegistry is empty (no string ERDs, no valid ERDs yet)
 - FeatureBitManager is in READING_0008 state, ready to begin reads
 
 ### 2.5 Phase 5: feature_bits
 
 **Entry conditions:**
 - MQTT client adapter is initialized
+- ERD publish table is created and ready to accept entries
 - FeatureBitManager has been initialized with ERD client and mqtt_client
 
 **Entry action:**
@@ -270,6 +277,8 @@ and is_device_id_phase_timed_out() are not used as exit conditions.
   incremental parsing
 - ERD client activity events are routed to handle_erd_client_activity_(),
   which delivers read_completed/read_failed to FeatureBitManager
+- FeatureBitManager calls mqtt_client_update_erd() for each ERD read response,
+  writing the ERD into the publish table with mqtt_update_required = true
 
 **Exit conditions:**
 - is_feature_bits_complete() == true (all ERD reads have either succeeded
@@ -286,6 +295,7 @@ bridge_init (Section 2.6).
 **Component state on exit:**
 - feature_bit_manager_.get_valid_erds() contains the parsed ERD set
 - feature_bit_manager_.is_valid_list_ready() == true
+- ERD publish table contains entries for the feature bit ERDs that were read
 - ErdRegistry valid_erds_ready is still false (not yet set)
 
 ### 2.6 Phase 6: bridge_init
@@ -304,7 +314,7 @@ bridge_init (Section 2.6).
   connected.
 
 **Note:** This phase is the GATE for MQTT connection. Feature bits may complete
-while MQTT is not yet connected — this phase waits until BOTH feature bits are
+while MQTT is not yet connected -- this phase waits until BOTH feature bits are
 complete AND MQTT is connected before initializing the bridge.
 
 **initialize_mqtt_bridge_() actions:**
@@ -318,7 +328,7 @@ complete AND MQTT is connected before initializing the bridge.
      interface, host address
 5. Set mqtt_bridge_initialized_ = true
 6. If generate_device_config: initialize HaDiscoveryManager with device info,
-   registered ERDs, and mqtt_adapter pointer
+   registered ERDs (from the adapter's publish table), and mqtt_adapter pointer
 
 **Exit:** Transition to subscription_watch
 
@@ -328,6 +338,7 @@ complete AND MQTT is connected before initializing the bridge.
 - ErdRegistry has valid ERDs set (filtering active)
 - ErdRegistry has string ERDs populated
 - HaDiscoveryManager is in WAITING_FOR_READY state (if enabled)
+- ERD publish table contains entries from feature_bits phase + any new ERDs
 
 ### 2.7 Phase 7: subscription_watch
 
@@ -422,30 +433,30 @@ The MQTT FSM has four states, driven in loop() before the startup HSM:
 **FLUSHING:**
 - Entry: subscribe completed
 - Action: call esphome_mqtt_client_adapter_drain_pending_updates() each loop
-- Exit: when drain returns 0 (queue empty), transition to RUNNING
+- Exit: when drain finds no entries with mqtt_update_required = true,
+  transition to RUNNING
 - Fallback: if adapter not initialized, transition to RUNNING immediately
 
 **RUNNING:**
-- Entry: queue empty
+- Entry: no pending updates
 - Action: call esphome_mqtt_client_adapter_drain_pending_updates() each loop
-  (drains any new updates)
+  (drains any new updates from the publish table)
 - Exit: on disconnect, transition to DISCONNECTED
 
-### 3.3 ERD Value Flow in Steady State
+### 3.3 ERD Value Flow
 
-Once the bridge is initialized, ERD values flow through this path:
+The ERD publish table is the single path from ERD data to MQTT:
 
-1. Appliance publishes (subscription) OR bridge polls (polling mode)
-2. ERD client activity event fires (read_completed or
-   subscription_publication_received)
-3. handle_erd_client_activity_() routes the event:
-   - Subscription publications: track activity, reset HA discovery quiet window
-   - Read completions: delivered to the bridge's internal handlers
-4. The bridge (mqtt_bridge or mqtt_bridge_polling) calls
+1. Any ERD read response or subscription publication arrives
+2. The source (FeatureBitManager, mqtt_bridge, or mqtt_bridge_polling) calls
    mqtt_client_update_erd(&mqtt_client_adapter_.interface, erd, data, size)
-5. The adapter queues the update in the pending map (deduplicated by ERD)
-6. The MQTT FSM drains up to 5 pending updates per loop iteration
-7. Each drain publishes to the MQTT broker via the ESPHome MQTT client
+3. The adapter converts the raw bytes to a string (hex or ASCII based on
+   ErdRegistry string-type detection), finds or creates the table entry for
+   this ERD, updates the payload, and sets mqtt_update_required = true
+4. The MQTT FSM drains up to 5 entries per loop iteration using round-robin
+   scheduling (see Section 5.1)
+5. Each drained entry is published to the MQTT broker and its
+   mqtt_update_required is set to false
 
 ---
 
@@ -461,8 +472,7 @@ Once the bridge is initialized, ERD values flow through this path:
 
 - When transitioning from DISCONNECTED to connected:
   - Log "MQTT connected"
-  - Send signal_mqtt_connected to the startup HSM (may unblock feature_bits
-    or bridge_init phases)
+  - Send signal_mqtt_connected to the startup HSM (may unblock bridge_init)
   - Transition FSM to SUBSCRIBING
 
 ### 4.3 Disconnect Edge
@@ -481,9 +491,9 @@ Once the bridge is initialized, ERD values flow through this path:
 - In SUBSCRIBING: the wildcard subscription is idempotent
   (wildcard_subscribed flag prevents re-subscribe). The adapter records
   mqtt_connected_at_ms on first call after reconnect.
-- In FLUSHING: pending updates are drained. The settle delay
-  (mqtt_connected_at_ms) is NOT currently enforced in drain_pending_updates()
-  (the function publishes immediately if connected).
+- In FLUSHING: the drain resumes from the saved drain index, publishing
+  entries that have mqtt_update_required = true. The drain index is NOT
+  reset on reconnect -- it picks up where it left off.
 - ESPHome's MQTT client automatically re-subscribes all registered topics on
   reconnect, so the wildcard write topic subscription persists.
 
@@ -500,51 +510,90 @@ Once the bridge is initialized, ERD values flow through this path:
 
 ## 5. Data Flow Rules
 
-### 5.1 Who Calls mqtt_client_update_erd()
+### 5.1 ERD Publish Table
 
-**Currently:**
-- mqtt_bridge (subscription mode): calls on every ERD publication received
-- mqtt_bridge_polling (polling mode): calls on every ERD read completed
-- FeatureBitManager: does NOT call (explicitly avoided per code comment)
-- DeviceIdentityManager: does NOT call (no mqtt_client pointer)
+The ERD publish table is the core data structure of the EsphomeMqttClientAdapter.
+It replaces the previous pending_updates map and the separate registered_erds
+set.
 
-**During startup (before bridge_init):**
-- No component calls mqtt_client_update_erd()
-- ERD values read during device_id and feature_bits phases are consumed
-  internally by their respective managers and NOT published to MQTT
+**Structure:**
 
-### 5.2 ErdRegistry Filtering
+    std::vector<ErdPublishEntry> publish_table;  // max 400 entries
+    size_t drain_index = 0;  // round-robin position
 
-- The adapter checks erd_registry->is_valid(erd) before queuing an update
-- Before feature_bits completes: valid_erds_ready is false, so is_valid()
-  returns true for ALL ERDs (no filtering)
-- After initialize_mqtt_bridge_() sets valid ERDs: only ERDs in the valid
-  set pass the filter
-- String-type detection (is_string_type()) is always active once string ERDs
-  are populated in mqtt_client_init
+    struct ErdPublishEntry {
+        tiny_erd_t erd;              // ERD identifier
+        std::string payload;         // hex or ASCII string (converted at queue time)
+        bool mqtt_update_required;   // true when payload has changed and needs publishing
+    };
 
-### 5.3 Pending Update Queue
+**Behavior:**
 
-- The adapter uses a std::map<tiny_erd_t, PendingErdUpdate> keyed by ERD
-- Repeated updates for the same ERD overwrite the previous value (dedup)
-- Max 200 pending updates (safety bound)
-- Drain rate: 5 per call, called once per loop iteration in FLUSHING/RUNNING
-  FSM states
-- On full queue: updates are dropped with a warning log
+- The table starts empty after adapter init (mqtt_client_init phase).
+- It begins accepting entries during the feature_bits phase.
+- When mqtt_client_update_erd() is called:
+  - The raw bytes are converted to a string (hex by default, ASCII if
+    ErdRegistry marks the ERD as string-type). String conversion happens
+    BEFORE the table lookup/insert.
+  - The adapter searches the table for an existing entry with the same ERD.
+    Uses a fast lookup (map from erd -> index, or linear scan for small tables).
+  - If found: the payload is replaced and mqtt_update_required is set to true.
+  - If not found and table size < 400: a new entry is appended to the vector
+    with mqtt_update_required = true.
+  - If not found and table size >= 400: the update is silently dropped.
+- No filtering by valid ERDs occurs at the table level. Every ERD that
+  arrives through mqtt_client_update_erd() is accepted. The valid-ERD
+  filter is applied upstream (by the bridge or FeatureBitManager) before
+  calling mqtt_client_update_erd().
 
-### 5.4 Write Result Publishing
+**Drain (round-robin):**
 
-- update_erd_write_result() publishes directly via global_mqtt_client
-  (bypasses the pending update queue)
-- If MQTT is disconnected, the write result is silently dropped
-- This is inconsistent with the pending queue behavior for regular ERD updates
+- Called from the MQTT FSM in FLUSHING and RUNNING states.
+- Starting at drain_index, scan forward through the table (wrapping to 0
+  at the end).
+- Publish up to 5 entries that have mqtt_update_required == true.
+- For each published entry, set mqtt_update_required = false.
+- After publishing 5 entries OR completing a full wrap-around (drain_index
+  returns to where it started), stop.
+- Update drain_index to the position after the last published entry (or
+  the start of the next scan).
+- Returns the count of entries remaining with mqtt_update_required == true.
+  When 0, the FSM transitions from FLUSHING to RUNNING.
 
-### 5.5 HA Discovery Publishing
+**Fairness guarantee:** Every ERD in the table gets a turn to publish,
+regardless of how frequently it updates. A rapidly-changing ERD will not
+starve slower ERDs. The tradeoff is that a hot ERD may wait up to one
+full cycle through the table before its next update is published.
+
+**Registered ERDs:** The set of "registered ERDs" (used by HaDiscoveryManager)
+is derived from the publish table. Every ERD that has an entry in the table
+is considered registered. There is no separate registered_erds set.
+
+### 5.2 Write Result Publishing
+
+- update_erd_write_result() publishes directly via global_mqtt_client,
+  bypassing the publish table entirely.
+- Write results are ephemeral (success/failure of a single write operation)
+  and do not represent persistent state, so they do not belong in the table.
+- If MQTT is disconnected, the write result is silently dropped.
+
+### 5.3 HA Discovery Publishing
 
 - HaDiscoveryManager uses esphome_mqtt_client_adapter_publish() for async
-  publishing when mqtt_adapter_ is non-null
-- Falls back to mqtt_client->publish() directly when mqtt_adapter_ is null
-- Discovery messages are published with retain=true
+  publishing when mqtt_adapter_ is non-null.
+- Falls back to mqtt_client->publish() directly when mqtt_adapter_ is null.
+- Discovery messages are published with retain=true.
+- HA discovery gets its registered ERD list from the adapter's publish table
+  (all ERDs that have entries in the table).
+
+### 5.4 Who Calls mqtt_client_update_erd()
+
+- FeatureBitManager: calls for every ERD read response during the feature_bits
+  phase (starting from mqtt_client_init when the table is ready)
+- mqtt_bridge (subscription mode): calls on every ERD publication received
+- mqtt_bridge_polling (polling mode): calls on every ERD read completed
+- DeviceIdentityManager: does NOT call (device_id phase ERDs are consumed
+  internally only, before the table exists)
 
 ---
 
@@ -563,6 +612,7 @@ The function routes based on these conditions (in order):
    - Track AUTO mode activity detection
    - Reset HA discovery quiet window
    - Only processed when mqtt_bridge_initialized_ is true
+   - The bridge handles mqtt_client_update_erd() internally
 
 2. **Autodiscovery responses (in_gea3_discovery || in_gea2_discovery):**
    - Check for ERD_APPLIANCE_TYPE read_completed
@@ -573,12 +623,12 @@ The function routes based on these conditions (in order):
    - read_completed: route to FeatureBitManager or DeviceIdentityManager
      based on should_route_to_feature_bits_()
    - read_failed: route similarly
-   - These managers handle the values internally (no MQTT publish)
+   - FeatureBitManager calls mqtt_client_update_erd() for its ERD reads
+   - DeviceIdentityManager does NOT call mqtt_client_update_erd()
 
 4. **Post-bridge reads (mqtt_bridge_initialized_):**
-   - The bridge's own event subscriptions handle these (not the bridge's
-     handle_erd_client_activity_() -- the bridges subscribe directly to the
-     ERD client activity event)
+   - The bridge's own event subscriptions handle these (the bridges subscribe
+     directly to the ERD client activity event)
 
 ### 6.3 should_route_to_feature_bits_() Logic
 
@@ -599,8 +649,8 @@ FeatureBitManager once the device ID is resolved.
 
 1. setup() -- initializes timer group, autodiscovery manager, GEA3/GEA2
    components, ERD clients, event subscriptions
-2. mqtt_client_init phase -- initializes MQTT adapter (ErdRegistry pointer
-   only, no string ERDs pre-populated), starts FeatureBitManager
+2. mqtt_client_init phase -- initializes MQTT adapter (creates ERD publish
+   table, sets ErdRegistry pointer), starts FeatureBitManager
 3. bridge_init phase -- applies valid ERD filter, populates string ERDs,
    initializes bridge, initializes HaDiscoveryManager
 
@@ -610,18 +660,21 @@ FeatureBitManager once the device ID is resolved.
 2. mqtt_bridge_destroy() if subscription_bridge_initialized_
 3. mqtt_bridge_polling_destroy() if polling_bridge_initialized_
 4. esphome_mqtt_client_adapter_destroy() if mqtt_client_adapter_initialized_
+   (frees ERD publish table, device_id string, pending resources)
 5. Component::teardown()
 
 ### 7.3 Re-initialization Rules
 
 - The MQTT adapter is initialized exactly once (guarded by
-  mqtt_client_adapter_initialized_)
+  mqtt_client_adapter_initialized_). The ERD publish table is created at
+  init time and persists for the lifetime of the adapter.
 - The bridge is initialized exactly once (guarded by mqtt_bridge_initialized_)
 - In AUTO mode fallback: the subscription bridge is destroyed and a polling
   bridge is created in its place (check_subscription_activity_)
 - Custom ERD polling can be started alongside the subscription bridge
   (start_custom_erd_polling_)
-- ErdRegistry registered_erds are cleared before bridge re-initialization
+- The ERD publish table is NOT cleared on bridge re-initialization. Entries
+  persist across bridge mode changes.
 
 ### 7.4 Bridge Mode Selection
 
@@ -647,10 +700,10 @@ The polling bridge's polling_list_complete field is only accessed when
 mqtt_bridge_initialized_ is true. The subscription activity tracking only
 runs when mqtt_bridge_initialized_ is true.
 
-### I3. ErdRegistry is set before the bridge reads ERDs
-The ErdRegistry pointer is set on the adapter in mqtt_client_init, before
-the bridge is initialized in bridge_init. The valid ERD filter is applied
-in bridge_init, before the bridge starts reading ERDs.
+### I3. ERD publish table is created before feature_bits starts
+The ERD publish table exists and is ready to accept entries before the
+feature_bits phase begins. FeatureBitManager will not start reading until
+the table is created.
 
 ### I4. The startup HSM only uses IBridgeServices
 The startup HSM state functions interact with the bridge exclusively through
@@ -676,24 +729,26 @@ The MQTT FSM only calls esphome_mqtt_client_adapter_notify_disconnected()
 when transitioning from a non-DISCONNECTED state to DISCONNECTED. It does NOT
 call it on reconnect (to avoid triggering GEA2 re-identification).
 
-### I9. FeatureBitManager does not publish during the feature_bits phase
-The manager receives an i_mqtt_client_t pointer but does not call
-mqtt_client_update_erd() for feature bit ERDs. This is intentional to avoid
-heap pressure on ESP32-C3.
+### I9. ERD publish table has a hard cap of 400 entries
+If mqtt_client_update_erd() is called for an ERD not in the table and the
+table already has 400 entries, the update is silently dropped. This bounds
+memory usage.
 
-### I10. DeviceIdentityManager does not publish
-The manager has no i_mqtt_client_t pointer and does not publish ERD values
-to MQTT. Device ID ERDs are consumed internally only.
+### I10. Round-robin drain publishes up to 5 entries per call
+The drain function scans from drain_index, publishes up to 5 entries with
+mqtt_update_required == true, sets them to false, and advances drain_index.
+It stops after 5 publishes or a full wrap-around, whichever comes first.
 
 ### I11. HaDiscoveryManager waits for a ready signal
 In subscription mode: waits for HA_DISCOVERY_QUIET_MS (10s) of no new ERD
 activity, with a HA_DISCOVERY_MAX_WAIT_MS (30s) safety cap.
 In polling mode: waits for polling_list_complete.
+Registered ERDs are derived from the publish table.
 
 ### I12. The bridge_init phase gates on MQTT connection
 The bridge_init phase does not initialize the bridge until BOTH feature bits
 are complete AND MQTT is connected. The feature_bits phase is entirely
-decoupled from MQTT — it completes whenever all ERD reads succeed or fail.
+decoupled from MQTT -- it completes whenever all ERD reads succeed or fail.
 The MQTT connection gate belongs in bridge_init, not feature_bits.
 
 ---
@@ -710,15 +765,20 @@ GeappliancesBridge (owns everything)
   |
   +-- DeviceIdentityManager
   |     +-- i_tiny_gea3_erd_client_t (active client from autodiscovery)
+  |     (does NOT write to publish table)
   |
   +-- FeatureBitManager
   |     +-- i_tiny_gea3_erd_client_t (active client from autodiscovery)
-  |     +-- i_mqtt_client_t (stored but not used for publishing)
+  |     +-- i_mqtt_client_t (calls mqtt_client_update_erd() for each read)
   |
   +-- ErdRegistry
-  |     (no runtime dependencies -- pure data container)
+  |     +-- valid_erds_ (from FeatureBitManager, set in bridge_init)
+  |     +-- string_erds_ (from generated config, set in bridge_init)
+  |     (registered_erds derived from adapter publish table)
   |
   +-- EsphomeMqttClientAdapter
+  |     +-- ERD publish table (vector<ErdPublishEntry>, max 400)
+  |     +-- drain_index (round-robin position)
   |     +-- esphome::mqtt::global_mqtt_client (direct access)
   |     +-- ErdRegistry* (pointer, set in mqtt_client_init)
   |
@@ -733,10 +793,11 @@ GeappliancesBridge (owns everything)
   +-- HaDiscoveryManager
   |     +-- esphome_mqtt_client_adapter_t* (for async publish)
   |     +-- mqtt::MQTTClientComponent* (for sync fallback, passed via run())
+  |     +-- registered ERDs from adapter publish table
   |
   +-- startup_hsm
         +-- IBridgeServices* (back-pointer to GeappliancesBridge)
-        +-- mqtt::global_mqtt_client (for connection checks)
+        +-- mqtt::global_mqtt_client (for connection check in bridge_init)
 ```
 
 ---
@@ -756,17 +817,13 @@ The bridge_init phase checks MQTT connectivity by reading
 mqtt::global_mqtt_client->is_connected() directly, instead of delegating to
 the adapter or the MQTT FSM.
 
-### D3. update_erd_write_result() bypasses the pending queue
-Write results are published directly instead of being queued like regular ERD
-updates. This means they are silently dropped on disconnect.
+### D3. update_erd_write_result() bypasses the publish table
+Write results are published directly instead of going through the publish
+table. This is intentional -- write results are ephemeral and do not
+represent persistent state. However, they are silently dropped on disconnect.
 
-### D4. FeatureBitManager holds an unused i_mqtt_client_t pointer
-The pointer is received in init() but never used for publishing. It exists
-because the original design considered having the manager publish feature bit
-ERDs, but this was abandoned due to heap pressure concerns.
-
-### D5. handle_erd_client_activity_() does not publish ERD values during startup
-ERD values read during device_id and feature_bits phases are consumed
-internally but never queued for MQTT publish. This means there is a gap
-between feature_bits completion and bridge_init where ERD values exist but
-are not published to MQTT.
+### D4. ErdRegistry registered_erds is now derived from the publish table
+The ErdRegistry no longer maintains a separate registered_erds set. Instead,
+HaDiscoveryManager reads registered ERDs from the adapter's publish table.
+This means HA discovery can only discover ERDs that have been seen by the
+adapter (which is correct -- you can't discover an ERD you haven't seen).
