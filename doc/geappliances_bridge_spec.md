@@ -1,8 +1,8 @@
 # GeappliancesBridge Specification
 
-This document defines the current behavior and contractual requirements of the
-geappliances_bridge ESPHome component. All future code changes must maintain
-these invariants unless explicitly approved by the user.
+This document defines the contractual requirements of the geappliances_bridge
+ESPHome component. All future code changes must maintain these invariants
+unless explicitly approved by the user.
 
 ---
 
@@ -63,9 +63,12 @@ feature bits), string-type ERDs (from generated config), and registered ERDs
 
 **Dependencies:** tiny_erd.h (type only).
 
-**Initialization:** String ERDs populated in initialize_mqtt_client_(). Valid
-ERDs populated in initialize_mqtt_bridge_() from FeatureBitManager results.
-Registered ERDs appended by the MQTT adapter on each register_erd() call.
+**Initialization:** ErdRegistry starts empty. It grows organically as ERDs
+are registered by the MQTT adapter (via register_erd() calls from the bridge
+during subscription or polling). String-type ERDs are NOT pre-populated — the
+registry learns string types from the generated config only when the bridge
+initializes. Valid ERDs are populated in initialize_mqtt_bridge_() from
+FeatureBitManager results.
 
 ### 1.5 FeatureBitManager (feature_bit_manager.h / .cpp)
 
@@ -78,9 +81,10 @@ ERD set (std::set + std::vector), parse progress state.
 **Dependencies:** i_tiny_gea3_erd_client, i_mqtt_client_t (received in init()
 but currently NOT used for publishing -- see Section 5.2).
 
-**Initialization:** Called from the startup HSM mqtt_client_init phase via
-start_feature_bit_reading_. Receives the active ERD client, host address,
-i_mqtt_client_t pointer, and mqtt_initialized flag.
+**Initialization:** Triggered when mqtt_client_adapter_initialized_ becomes true.
+The feature_bits phase starts reading as soon as the adapter is initialized —
+it does not wait for MQTT connection. Receives the active ERD client, host
+address, i_mqtt_client_t pointer, and mqtt_initialized flag.
 
 **Note:** The i_mqtt_client_t pointer is stored but NOT used for publishing
 during the feature_bits phase. The code explicitly avoids calling
@@ -151,8 +155,7 @@ based on signals from managers. Enforces timeouts.
 **Owns:** tiny_hsm instance, back-pointer to IBridgeServices.
 
 **Dependencies:** IBridgeServices interface, tiny_hsm, esphome::mqtt::
-global_mqtt_client (for connection checks in feature_bits and bridge_init
-phases).
+global_mqtt_client (for connection check in bridge_init phase only).
 
 ### 1.11 IBridgeServices (i_bridge_services.h)
 
@@ -214,21 +217,20 @@ in loop(), which runs before the HSM).
 **Entry action:**
 - init_device_id_reading() -- initializes DeviceIdentityManager with the
   configured device ID (if any), active ERD client, and host address
-- record_device_id_phase_start() -- starts the 30-second timeout timer
 
 **Per-loop work:**
-- Check phase timeout (30 seconds). If exceeded, transition to mqtt_client_init.
 - run_device_id() -- drives the sequential ERD read state machine
 - ERD client activity events are routed to handle_erd_client_activity_(),
   which delivers read_completed/read_failed to DeviceIdentityManager
 
-**Exit conditions (any of):**
+**Exit conditions:**
 - is_device_id_complete() == true (all three ERDs read successfully)
-- is_device_id_failed() == true (should not occur with indefinite retry)
-- is_device_id_phase_timed_out() == true (30-second timeout)
-- signal_device_id_complete or signal_device_id_failed received from event
-  routing
+- signal_device_id_complete received from event routing
 - Transition to mqtt_client_init
+
+**Note:** There is NO timeout. The manager retries indefinitely until all
+three ERDs (0x0008, 0x0001, 0x0002) are read successfully. is_device_id_failed()
+and is_device_id_phase_timed_out() are not used as exit conditions.
 
 **Component state on exit:**
 - device_identity_manager_.get_device_id() returns a valid string
@@ -242,7 +244,6 @@ in loop(), which runs before the HSM).
 **Entry action:**
 - initialize_mqtt_client() if not already initialized:
   - Calls esphome_mqtt_client_adapter_init() with the device ID
-  - Populates ErdRegistry string ERDs from generated config
   - Sets ErdRegistry pointer on the adapter
   - Sets mqtt_client_adapter_initialized_ = true
 - start_feature_bit_reading():
@@ -252,7 +253,7 @@ in loop(), which runs before the HSM).
 
 **Component state on exit:**
 - mqtt_client_adapter_initialized_ == true
-- ErdRegistry has string ERDs populated, valid ERDs empty
+- ErdRegistry is empty (no string ERDs pre-populated, no valid ERDs yet)
 - FeatureBitManager is in READING_0008 state, ready to begin reads
 
 ### 2.5 Phase 5: feature_bits
@@ -262,36 +263,35 @@ in loop(), which runs before the HSM).
 - FeatureBitManager has been initialized with ERD client and mqtt_client
 
 **Entry action:**
-- record_feature_bits_phase_start() -- starts the 60-second timeout timer
+- None (feature bit reading begins immediately via run_feature_bits())
 
 **Per-loop work:**
-- Check phase timeout (60 seconds). If exceeded, call mark_feature_bits_timed_out().
 - run_feature_bits() -- drives the sequential ERD read state machine and
   incremental parsing
 - ERD client activity events are routed to handle_erd_client_activity_(),
   which delivers read_completed/read_failed to FeatureBitManager
 
 **Exit conditions:**
-- is_feature_bits_complete() == true AND MQTT is connected
-  (mqtt::global_mqtt_client != nullptr && is_connected())
-- OR: signal_feature_bits_complete received AND MQTT is already connected
-- OR: signal_mqtt_connected received AND feature bits are already complete
+- is_feature_bits_complete() == true (all ERD reads have either succeeded
+  or failed because the feature bit is not present on this appliance)
+- signal_feature_bits_complete received from event routing
 - Transition to bridge_init
+
+**Note:** This phase is ENTIRELY DECOUPLED from MQTT connection status.
+It does not check whether MQTT is connected. It completes when all 11
+feature bit ERDs have been processed (read successfully or skipped because
+not supported by the appliance). The MQTT connection gate belongs in
+bridge_init (Section 2.6).
 
 **Component state on exit:**
 - feature_bit_manager_.get_valid_erds() contains the parsed ERD set
 - feature_bit_manager_.is_valid_list_ready() == true
 - ErdRegistry valid_erds_ready is still false (not yet set)
 
-**Note:** The phase gates on BOTH feature bits completion AND MQTT connection.
-If feature bits complete before MQTT connects, the phase waits. If MQTT
-connects before feature bits complete, the phase waits.
-
 ### 2.6 Phase 6: bridge_init
 
 **Entry conditions:**
 - Feature bits are complete
-- MQTT is connected
 - MQTT client adapter is initialized
 
 **Entry action:**
@@ -303,16 +303,21 @@ connects before feature bits complete, the phase waits.
 - On signal_mqtt_connected: same check, allows immediate init if MQTT just
   connected.
 
+**Note:** This phase is the GATE for MQTT connection. Feature bits may complete
+while MQTT is not yet connected — this phase waits until BOTH feature bits are
+complete AND MQTT is connected before initializing the bridge.
+
 **initialize_mqtt_bridge_() actions:**
 1. Apply valid-ERD filter to ErdRegistry (from FeatureBitManager results)
-2. Select operating mode (poll/subscribe/auto based on config and protocol)
-3. Initialize the appropriate bridge:
+2. Populate ErdRegistry string ERDs from generated config
+3. Select operating mode (poll/subscribe/auto based on config and protocol)
+4. Initialize the appropriate bridge:
    - Polling: mqtt_bridge_polling_init() with ERD client, mqtt_client
      adapter interface, polling interval, publish-on-change flag
    - Subscribe: mqtt_bridge_init() with ERD client, mqtt_client adapter
      interface, host address
-4. Set mqtt_bridge_initialized_ = true
-5. If generate_device_config: initialize HaDiscoveryManager with device info,
+5. Set mqtt_bridge_initialized_ = true
+6. If generate_device_config: initialize HaDiscoveryManager with device info,
    registered ERDs, and mqtt_adapter pointer
 
 **Exit:** Transition to subscription_watch
@@ -321,6 +326,7 @@ connects before feature bits complete, the phase waits.
 - mqtt_bridge_initialized_ == true
 - Either subscription_bridge_initialized_ or polling_bridge_initialized_ is true
 - ErdRegistry has valid ERDs set (filtering active)
+- ErdRegistry has string ERDs populated
 - HaDiscoveryManager is in WAITING_FOR_READY state (if enabled)
 
 ### 2.7 Phase 7: subscription_watch
@@ -593,10 +599,10 @@ FeatureBitManager once the device ID is resolved.
 
 1. setup() -- initializes timer group, autodiscovery manager, GEA3/GEA2
    components, ERD clients, event subscriptions
-2. mqtt_client_init phase -- initializes MQTT adapter, ErdRegistry string
-   ERDs, FeatureBitManager
-3. bridge_init phase -- applies valid ERD filter, initializes bridge,
-   initializes HaDiscoveryManager
+2. mqtt_client_init phase -- initializes MQTT adapter (ErdRegistry pointer
+   only, no string ERDs pre-populated), starts FeatureBitManager
+3. bridge_init phase -- applies valid ERD filter, populates string ERDs,
+   initializes bridge, initializes HaDiscoveryManager
 
 ### 7.2 Destruction Order (teardown())
 
@@ -684,10 +690,11 @@ In subscription mode: waits for HA_DISCOVERY_QUIET_MS (10s) of no new ERD
 activity, with a HA_DISCOVERY_MAX_WAIT_MS (30s) safety cap.
 In polling mode: waits for polling_list_complete.
 
-### I12. The feature_bits phase gates on MQTT connection
-The phase does not transition to bridge_init until BOTH feature bits are
-complete AND MQTT is connected. This ensures the bridge is initialized while
-MQTT is available for the subscribe/drain sequence.
+### I12. The bridge_init phase gates on MQTT connection
+The bridge_init phase does not initialize the bridge until BOTH feature bits
+are complete AND MQTT is connected. The feature_bits phase is entirely
+decoupled from MQTT — it completes whenever all ERD reads succeed or fail.
+The MQTT connection gate belongs in bridge_init, not feature_bits.
 
 ---
 
@@ -734,7 +741,7 @@ GeappliancesBridge (owns everything)
 
 ---
 
-## 10. Notes on Current Design Debts
+## 10. Notes on Design Debts
 
 These are known issues that the spec documents as current behavior. They are
 NOT requirements -- they are observations of where the code stands.
@@ -744,8 +751,8 @@ The run() method accepts mqtt::MQTTClientComponent*, and publish_next_entity_()
 has a direct fallback to mqtt_client->publish(). This violates the abstraction
 principle that MQTT operations should go through i_mqtt_client_t.
 
-### D2. Startup HSM directly reads mqtt::global_mqtt_client
-The feature_bits and bridge_init phases check MQTT connectivity by reading
+### D2. Startup HSM directly reads mqtt::global_mqtt_client in bridge_init
+The bridge_init phase checks MQTT connectivity by reading
 mqtt::global_mqtt_client->is_connected() directly, instead of delegating to
 the adapter or the MQTT FSM.
 
