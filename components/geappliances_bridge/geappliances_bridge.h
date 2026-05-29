@@ -1,3 +1,30 @@
+// =============================================================================
+// MODULE GOAL
+// =============================================================================
+// Goal: Coordinate the lifecycle of all bridge components and serve as the
+//       ESPHome component entry point (setup / loop / dump_config).
+//
+// Responsibilities:
+//   - Own and construct all component instances (adapters, managers, bridges)
+//   - Wire components together during setup()
+//   - Drive the GEA2 tight-loop and delegate ongoing work in loop()
+//   - Expose configuration setters called by the ESPHome code generator
+//   - Implement IBridgeServices so the startup HSM can request bridge actions
+//     without depending on this concrete class
+//
+// NOT responsible for:
+//   - Assembling the device ID (DeviceIdentityManager)
+//   - Determining which ERDs are valid (FeatureBitManager / ErdRegistry)
+//   - Publishing HA discovery payloads (HaDiscoveryManager)
+//   - MQTT connection lifecycle (EsphomeMqttClientAdapter)
+//   - Startup phase sequencing (StartupHsm)
+//
+// Dependencies:
+//   - ESPHome UART, MQTT, and Component APIs
+//   - tiny_gea3_interface, tiny_gea2_interface, tiny_gea3_erd_client
+//   - All manager and adapter classes in this component
+// =============================================================================
+
 #pragma once
 
 #include "esphome/core/component.h"
@@ -21,6 +48,9 @@ extern "C" {
 #include "gea2_erd_client_adapter.h"
 
 #include "esphome_uart_adapter.h"
+#include "bridge_mode.h"
+#include "i_bridge_services.h"
+#include "erd_registry.h"
 #include "esphome_mqtt_client_adapter.h"
 #include "device_identity_manager.h"
 #include "feature_bit_manager.h"
@@ -34,37 +64,9 @@ std::string appliance_type_to_string(uint8_t appliance_type);
 namespace esphome {
 namespace geappliances_bridge {
 
-// Operation mode for the bridge
-// Note: These enum values must match MODE_*_VALUE constants in __init__.py
-enum BridgeMode {
-  BRIDGE_MODE_POLL = 0,       // Always use polling mode
-  BRIDGE_MODE_SUBSCRIBE = 1,  // Always use subscription mode
-  BRIDGE_MODE_AUTO = 2        // Auto: try subscription, fallback to polling
-};
+// BridgeMode is now defined in bridge_mode.h (included via i_bridge_services.h).
 
-class GeappliancesBridge : public Component {
-  // Allow the startup HSM state functions to access protected members
-  friend GeappliancesBridge* bridge_from_hsm(tiny_hsm_t* hsm);
-  friend tiny_hsm_result_t startup_state_top(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_protocol_stack(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_autodiscovery(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_device_id(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_mqtt_client_init(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_feature_bits(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_bridge_init(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_subscription_watch(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_ha_discovery(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-  friend tiny_hsm_result_t startup_state_running(
-    tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+class GeappliancesBridge : public Component, public IBridgeServices {
 
  public:
   static constexpr unsigned long baud = 230400;
@@ -91,7 +93,42 @@ class GeappliancesBridge : public Component {
   const std::string& get_generated_device_id() const;
 
  protected:
-  void on_mqtt_connected_();
+  // ── IBridgeServices implementation (called exclusively by the startup HSM) ──
+  void run_autodiscovery() override;
+  bool is_autodiscovery_complete() const override;
+  uint8_t get_discovered_host_address() const override;
+  bool is_discovered_gea2_protocol() const override;
+
+  void init_device_id_reading() override;
+  void run_device_id() override;
+  bool is_device_id_complete() const override;
+  bool is_device_id_failed() const override;
+  void record_device_id_phase_start() override;
+  bool is_device_id_phase_timed_out() const override;
+
+  bool is_mqtt_client_initialized() const override;
+  void initialize_mqtt_client() override;
+
+  void start_feature_bit_reading() override;
+  void run_feature_bits() override;
+  bool is_feature_bits_complete() const override;
+  void mark_feature_bits_timed_out() override;
+  void record_feature_bits_phase_start() override;
+  bool is_feature_bits_phase_timed_out() const override;
+
+  bool is_bridge_initialized() const override;
+  void initialize_mqtt_bridge() override;
+
+  BridgeMode get_mode() const override;
+  bool is_subscription_mode_active() const override;
+
+  void check_subscription_activity() override;
+  void maybe_start_custom_erd_polling() override;
+  void log_poll_state_transitions() override;
+  void run_ha_discovery() override;
+  void run_all_managers() override;
+
+  // ── Internal bridge methods (event callbacks and per-phase helpers) ─────────
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();
   void initialize_mqtt_bridge_();
@@ -99,10 +136,8 @@ class GeappliancesBridge : public Component {
   void maybe_start_custom_erd_polling_();
   void configure_polling_optional_lists_();
   void check_subscription_activity_();
-  // ── Per-phase run_*() methods called from loop() ─────────────────────────
-  void run_protocol_stack_();       // Phase 0: drive GEA2/GEA3 hardware
+  void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
-
   void start_feature_bit_reading_();
   void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   bool should_route_to_feature_bits_(tiny_erd_t erd);
@@ -118,7 +153,15 @@ class GeappliancesBridge : public Component {
   uart::UARTComponent *gea2_uart_{nullptr};
   std::string configured_device_id_;
   uint8_t client_address_{0xE4};
-  bool mqtt_was_connected_{false};
+
+  // States for the non-blocking MQTT (re)connection FSM in loop().
+  enum class MqttConnectionState : uint8_t {
+    DISCONNECTED,  // No MQTT connection (or not yet seen)
+    SUBSCRIBING,   // Connected; waiting for adapter init to subscribe wildcard
+    FLUSHING,      // Subscribed; draining pending ERD update queue
+    RUNNING,       // Steady-state: queue empty, draining new updates each loop
+  };
+  MqttConnectionState mqtt_connection_state_{MqttConnectionState::DISCONNECTED};
   bool mqtt_client_adapter_initialized_{false};
   bool mqtt_bridge_initialized_{false};
   BridgeMode mode_{BRIDGE_MODE_AUTO};
@@ -163,11 +206,9 @@ class GeappliancesBridge : public Component {
   // HA device discovery state is managed by HaDiscoveryManager; the bridge
   // delegates to it rather than maintaining redundant copies.
   const char* last_logged_poll_state_{nullptr};
-  // Shared set of ERDs the device has registered — used by both the MQTT
-  // adapter (for tracking) and the HA discovery manager (for filtering).
-  std::set<tiny_erd_t> ha_registered_erds_;
-  // String-type ERD set for the MQTT adapter (built from ha_string_erd_ids).
-  std::set<tiny_erd_t> ha_string_erds_set_;
+  // ERD registry: single owner of valid-ERD filter, string-type set,
+  // and runtime registered-ERD tracking.
+  ErdRegistry erd_registry_;
 
   // Base URL for the per-category JSONL files.
   // Can be overridden in YAML via ha_discovery_base_url.
@@ -221,8 +262,6 @@ class GeappliancesBridge : public Component {
 
   // Adapter that wraps the GEA2 ERD client as a GEA3 ERD client interface
   gea2_erd_client_adapter_t gea2_erd_client_adapter_;
-
-  i_tiny_gea3_erd_client_t* active_erd_client_{nullptr}; // fallback for manual device_id when autodiscovery is skipped
 
   mqtt_bridge_t mqtt_bridge_;
   mqtt_bridge_polling_t mqtt_bridge_polling_;

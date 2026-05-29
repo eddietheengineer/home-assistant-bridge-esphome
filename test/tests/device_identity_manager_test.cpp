@@ -1,13 +1,16 @@
-/*!
+/*
  * @file
  * @brief Unit tests for the DeviceIdentityManager class.
  *
  * Validates initialization, ERD read sequencing, device ID generation,
- * retry logic, queue retry limits, and configured ID precedence.
+ * indefinite retry logic, queue retry behavior, and configured ID precedence.
+ *
+ * Each identity ERD (0x0008, 0x0001, 0x0002) is retried indefinitely on
+ * failure -- the manager never moves on until it has successfully read all
+ * three. There are no fallback values.
  *
  * Important: on_erd_read_completed() for appliance type and model number
  * internally calls tiny_gea3_erd_client_read() to queue the next ERD.
- * Similarly, on_erd_read_failed() at max retries also queues the next ERD.
  * Tests must set up mock expectations for these internal reads.
  */
 
@@ -21,7 +24,7 @@
 
 using namespace esphome::geappliances_bridge;
 
-/* TEST_GROUP required for TEST(group, name) macro to work —
+/* TEST_GROUP required for TEST(group, name) macro to work --
  * provides the base class that TEST-generated test classes inherit from. */
 TEST_GROUP(device_identity_manager)
 {
@@ -75,7 +78,7 @@ TEST_GROUP(device_identity_manager)
   }
 
   /* Simulate appliance type read completion.
-   * This internally queues a model number read — expect it. */
+   * This internally queues a model number read -- expect it. */
   void trigger_appliance_type_read_completed(const void* data, uint8_t size)
   {
     expect_successful_read(0xC0, ERD_MODEL_NUMBER);
@@ -84,7 +87,7 @@ TEST_GROUP(device_identity_manager)
   }
 
   /* Simulate model number read completion.
-   * This internally queues a serial number read — expect it. */
+   * This internally queues a serial number read -- expect it. */
   void trigger_model_number_read_completed(const void* data, uint8_t size)
   {
     expect_successful_read(0xC0, ERD_SERIAL_NUMBER);
@@ -93,46 +96,18 @@ TEST_GROUP(device_identity_manager)
   }
 
   /* Simulate serial number read completion.
-   * This does NOT queue another read — goes straight to COMPLETE. */
+   * This does NOT queue another read -- goes straight to COMPLETE. */
   void trigger_serial_number_read_completed(const void* data, uint8_t size)
   {
     manager.on_erd_read_completed(ERD_SERIAL_NUMBER,
                                   static_cast<const uint8_t*>(data), size);
   }
 
-  /* Simulate an ERD read failure (below max retries — no internal read). */
+  /* Simulate an ERD read failure. With indefinite retry, this simply
+   * stays in the current READING_* state so run() will retry. */
   void trigger_read_failed(tiny_erd_t erd)
   {
     manager.on_erd_read_failed(erd);
-  }
-
-  /* Simulate appliance type read failure at max retries.
-   * This internally queues a model number read with fallback. */
-  void trigger_appliance_type_read_failed_at_max_retries()
-  {
-    trigger_read_failed(ERD_APPLIANCE_TYPE);
-    trigger_read_failed(ERD_APPLIANCE_TYPE);
-    expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-    trigger_read_failed(ERD_APPLIANCE_TYPE);
-  }
-
-  /* Simulate model number read failure at max retries.
-   * This internally queues a serial number read with fallback. */
-  void trigger_model_number_read_failed_at_max_retries()
-  {
-    trigger_read_failed(ERD_MODEL_NUMBER);
-    trigger_read_failed(ERD_MODEL_NUMBER);
-    expect_successful_read(0xC0, ERD_SERIAL_NUMBER);
-    trigger_read_failed(ERD_MODEL_NUMBER);
-  }
-
-  /* Simulate serial number read failure at max retries.
-   * This does NOT queue another read — goes to COMPLETE with fallback. */
-  void trigger_serial_number_read_failed_at_max_retries()
-  {
-    trigger_read_failed(ERD_SERIAL_NUMBER);
-    trigger_read_failed(ERD_SERIAL_NUMBER);
-    trigger_read_failed(ERD_SERIAL_NUMBER);
   }
 };
 
@@ -170,7 +145,7 @@ TEST(device_identity_manager, init_stores_host_address)
 }
 
 /* ------------------------------------------------------------------ */
-/* run() — ERD read sequencing                                          */
+/* run() -- ERD read sequencing                                         */
 /* ------------------------------------------------------------------ */
 
 TEST(device_identity_manager, run_queues_appliance_type_read_first)
@@ -233,7 +208,7 @@ TEST(device_identity_manager, run_does_nothing_when_erd_client_is_null)
 }
 
 /* ------------------------------------------------------------------ */
-/* on_erd_read_completed() — processing each ERD                        */
+/* on_erd_read_completed() -- processing each ERD                       */
 /* ------------------------------------------------------------------ */
 
 TEST(device_identity_manager, on_erd_read_completed_processes_appliance_type)
@@ -297,7 +272,7 @@ TEST(device_identity_manager, on_erd_read_completed_handles_empty_appliance_type
 }
 
 /* ------------------------------------------------------------------ */
-/* on_erd_read_failed() — retry logic                                   */
+/* on_erd_read_failed() -- indefinite retry logic                       */
 /* ------------------------------------------------------------------ */
 
 TEST(device_identity_manager, on_erd_read_failed_retries_appliance_type_read)
@@ -307,6 +282,18 @@ TEST(device_identity_manager, on_erd_read_failed_retries_appliance_type_read)
   trigger_read_failed(ERD_APPLIANCE_TYPE);
 
   CHECK_EQUAL(DEVICE_ID_STATE_READING_APPLIANCE_TYPE, manager.get_state());
+}
+
+TEST(device_identity_manager, on_erd_read_failed_retries_model_number_read)
+{
+  init_without_configured_id();
+
+  uint8_t at_data[] = {0x06};
+  trigger_appliance_type_read_completed(at_data, 1);
+
+  trigger_read_failed(ERD_MODEL_NUMBER);
+
+  CHECK_EQUAL(DEVICE_ID_STATE_READING_MODEL_NUMBER, manager.get_state());
 }
 
 TEST(device_identity_manager, on_erd_read_failed_retries_serial_number_read)
@@ -322,59 +309,39 @@ TEST(device_identity_manager, on_erd_read_failed_retries_serial_number_read)
   CHECK_EQUAL(DEVICE_ID_STATE_READING_SERIAL_NUMBER, manager.get_state());
 }
 
-TEST(device_identity_manager, on_erd_read_failed_uses_fallback_after_max_retries_for_appliance_type)
+TEST(device_identity_manager, on_erd_read_failed_never_uses_fallback)
 {
+  // Even after many failures, the manager stays in the reading state
+  // and never produces a fallback device ID.
   init_without_configured_id();
 
-  trigger_appliance_type_read_failed_at_max_retries();
+  for (int i = 0; i < 10; i++) {
+    trigger_read_failed(ERD_APPLIANCE_TYPE);
+  }
 
-  CHECK_EQUAL(0xFF, manager.get_appliance_type());
-  CHECK(manager.get_state() == DEVICE_ID_STATE_IDLE ||
-        manager.get_state() == DEVICE_ID_STATE_READING_MODEL_NUMBER);
-}
-
-TEST(device_identity_manager, on_erd_read_failed_uses_fallback_after_max_retries_for_model_number)
-{
-  init_without_configured_id();
-
-  uint8_t at_data[] = {0x06};
-  trigger_appliance_type_read_completed(at_data, 1);
-  trigger_model_number_read_failed_at_max_retries();
-
-  CHECK(strcmp(manager.get_model_number().c_str(), "Unknown") == 0);
-  CHECK(manager.get_state() == DEVICE_ID_STATE_IDLE ||
-        manager.get_state() == DEVICE_ID_STATE_READING_SERIAL_NUMBER);
-}
-
-TEST(device_identity_manager, on_erd_read_failed_uses_fallback_after_max_retries_for_serial_number)
-{
-  init_without_configured_id();
-
-  uint8_t at_data[] = {0x06};
-  trigger_appliance_type_read_completed(at_data, 1);
-  trigger_model_number_read_completed("ABC", 3);
-  trigger_serial_number_read_failed_at_max_retries();
-
-  CHECK(strcmp(manager.get_serial_number().c_str(), "Unknown") == 0);
-  CHECK_TRUE(manager.is_complete());
-  CHECK_EQUAL(DEVICE_ID_STATE_COMPLETE, manager.get_state());
+  CHECK_EQUAL(DEVICE_ID_STATE_READING_APPLIANCE_TYPE, manager.get_state());
+  CHECK_FALSE(manager.is_complete());
+  CHECK_FALSE(manager.is_failed());
+  CHECK(strcmp(manager.get_device_id().c_str(), "") == 0);
 }
 
 /* ------------------------------------------------------------------ */
-/* Queue retry logic                                                    */
+/* Queue retry logic -- indefinite retry, never gives up                */
 /* ------------------------------------------------------------------ */
 
-TEST(device_identity_manager, run_gives_up_after_max_queue_retries)
+TEST(device_identity_manager, run_retries_indefinitely_on_queue_full)
 {
   init_without_configured_id();
 
-  for (uint32_t i = 0; i < DeviceIdentityManager::MAX_QUEUE_RETRIES; i++) {
+  // Even after many queue failures, the manager stays in the reading state.
+  for (uint32_t i = 0; i < 100; i++) {
     expect_failed_read(0xC0, ERD_APPLIANCE_TYPE);
     manager.run();
   }
 
-  CHECK_EQUAL(DEVICE_ID_STATE_FAILED, manager.get_state());
-  CHECK_TRUE(manager.is_failed());
+  CHECK_EQUAL(DEVICE_ID_STATE_READING_APPLIANCE_TYPE, manager.get_state());
+  CHECK_FALSE(manager.is_failed());
+  CHECK_FALSE(manager.is_complete());
 }
 
 TEST(device_identity_manager, run_resets_queue_retry_count_on_success)
@@ -552,55 +519,6 @@ TEST(device_identity_manager, appliance_type_unknown_for_large_value)
   CHECK_EQUAL(0xFF, manager.get_appliance_type());
 }
 
-TEST(device_identity_manager, fallback_device_id_with_unknown_appliance_type)
-{
-  init_without_configured_id();
-
-  trigger_appliance_type_read_failed_at_max_retries();
-
-  uint8_t model_data[] = "ABC";
-  trigger_model_number_read_completed(model_data, 3);
-
-  uint8_t serial_data[] = "SN001";
-  trigger_serial_number_read_completed(serial_data, 5);
-
-  CHECK_TRUE(manager.is_complete());
-  CHECK(strcmp(manager.get_device_id().c_str(), "Unknown_ABC_SN001") == 0);
-}
-
-TEST(device_identity_manager, fallback_device_id_with_unknown_model_and_serial)
-{
-  init_without_configured_id();
-
-  uint8_t at_data[] = {0x06};
-  trigger_appliance_type_read_completed(at_data, 1);
-  trigger_model_number_read_failed_at_max_retries();
-  trigger_serial_number_read_failed_at_max_retries();
-
-  CHECK_TRUE(manager.is_complete());
-  CHECK(strcmp(manager.get_device_id().c_str(), "Dishwasher_Unknown_Unknown") == 0);
-}
-
-/* ------------------------------------------------------------------ */
-/* Retry count reset behavior                                           */
-/* ------------------------------------------------------------------ */
-
-TEST(device_identity_manager, response_retry_count_resets_on_success)
-{
-  init_without_configured_id();
-
-  trigger_read_failed(ERD_APPLIANCE_TYPE);
-  trigger_read_failed(ERD_APPLIANCE_TYPE);
-
-  uint8_t at_data[] = {0x06};
-  trigger_appliance_type_read_completed(at_data, 1);
-
-  trigger_read_failed(ERD_MODEL_NUMBER);
-  trigger_read_failed(ERD_MODEL_NUMBER);
-
-  CHECK_EQUAL(DEVICE_ID_STATE_READING_MODEL_NUMBER, manager.get_state());
-}
-
 /* ------------------------------------------------------------------ */
 /* Sanitization edge cases                                              */
 /* ------------------------------------------------------------------ */
@@ -641,8 +559,8 @@ TEST(device_identity_manager, sanitize_handles_high_bytes_above_0x7E)
   trigger_appliance_type_read_completed(at_data, 1);
   trigger_model_number_read_completed("ABC", 3);
 
-  uint8_t serial_data[] = {0x80, 'S', 'N'};
-  trigger_serial_number_read_completed(serial_data, 3);
+  uint8_t serial_data[] = {0x7F, 'S', 'N', 0xFF};
+  trigger_serial_number_read_completed(serial_data, 4);
 
-  CHECK(strcmp(manager.get_device_id().c_str(), "Dishwasher_ABC__SN") == 0);
+  CHECK(strcmp(manager.get_device_id().c_str(), "Dishwasher_ABC__SN_") == 0);
 }

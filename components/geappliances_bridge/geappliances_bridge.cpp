@@ -177,33 +177,75 @@ void GeappliancesBridge::setup() {
 }
 
 void GeappliancesBridge::loop() {
-  // Track MQTT connection state and notify the bridge on (re)connect.
-  auto mqtt_client = mqtt::global_mqtt_client;
-  if (mqtt_client != nullptr) {
-    bool is_connected = mqtt_client->is_connected();
-    if (is_connected && !this->mqtt_was_connected_) {
-      this->on_mqtt_connected_();
-      // Signal the startup HSM that MQTT is now connected — this may
-      // unblock the feature_bits or bridge_init phases.
-      tiny_hsm_send_signal(&this->startup_hsm_, signal_mqtt_connected, nullptr);
-    } else if (!is_connected && this->mqtt_was_connected_) {
-      // Notify the adapter that MQTT has disconnected so it resets the
-      // connect timestamp and publishes the disconnect event to the bridge
-      // HSMs.  Without this, the adapter would not re-apply the settle delay
-      // or re-subscribe the wildcard write topic after reconnect.
-      if (this->mqtt_client_adapter_initialized_) {
-        esphome_mqtt_client_adapter_notify_disconnected(&this->mqtt_client_adapter_);
+  // ── MQTT Connection FSM ────────────────────────────────────────────────────
+  // A 4-state FSM drives the MQTT (re)connection sequence so that each loop()
+  // call performs at most one MQTT operation, keeping the main loop
+  // non-blocking.
+  //
+  //   DISCONNECTED ─(is_connected)─▶ SUBSCRIBING ─(adapter_init)─▶ FLUSHING ─(empty)─▶ RUNNING
+  //        ▲                                                              │                  │
+  //        └──────────────────────────────────────────────────────────────┴──(disconnect)───┘
+  //
+  // Note: notify_disconnected() is intentionally NOT called on reconnect —
+  // only on genuine connection loss.  Calling it on reconnect caused full GEA2
+  // re-identification inside the GEA2 tight loop, leading to heap corruption
+  // (see iteration_log.md).
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    auto mqtt_client = mqtt::global_mqtt_client;
+    if (mqtt_client != nullptr) {
+      bool is_connected = mqtt_client->is_connected();
+      if (!is_connected) {
+        // Any state → DISCONNECTED on genuine loss of connection.
+        if (this->mqtt_connection_state_ != MqttConnectionState::DISCONNECTED) {
+          this->mqtt_connection_state_ = MqttConnectionState::DISCONNECTED;
+          if (this->mqtt_client_adapter_initialized_) {
+            esphome_mqtt_client_adapter_notify_disconnected(&this->mqtt_client_adapter_);
+          }
+        }
+      } else {
+        switch (this->mqtt_connection_state_) {
+          case MqttConnectionState::DISCONNECTED:
+            // Connect edge: log and signal the startup HSM, then advance to
+            // SUBSCRIBING.  The HSM signal may unblock the feature_bits or
+            // bridge_init phases.
+            ESP_LOGI(TAG, "MQTT connected");
+            tiny_hsm_send_signal(&this->startup_hsm_, signal_mqtt_connected, nullptr);
+            this->mqtt_connection_state_ = MqttConnectionState::SUBSCRIBING;
+            break;
+
+          case MqttConnectionState::SUBSCRIBING:
+            // Wait for adapter initialization, then register the single wildcard
+            // write topic.  Stay in SUBSCRIBING until the adapter is ready so
+            // the subscribe is not skipped when MQTT connects before adapter init.
+            if (this->mqtt_client_adapter_initialized_) {
+              esphome_mqtt_client_adapter_subscribe_write_topic(&this->mqtt_client_adapter_);
+              this->mqtt_connection_state_ = MqttConnectionState::FLUSHING;
+            }
+            break;
+
+          case MqttConnectionState::FLUSHING:
+            // Drain pending ERD updates a few at a time.  Transition to
+            // RUNNING once the queue is empty.
+            if (this->mqtt_client_adapter_initialized_) {
+              if (esphome_mqtt_client_adapter_drain_pending_updates(
+                      &this->mqtt_client_adapter_) == 0) {
+                this->mqtt_connection_state_ = MqttConnectionState::RUNNING;
+              }
+            } else {
+              this->mqtt_connection_state_ = MqttConnectionState::RUNNING;
+            }
+            break;
+
+          case MqttConnectionState::RUNNING:
+            // Steady-state: drain any newly queued ERD updates.
+            if (this->mqtt_client_adapter_initialized_) {
+              esphome_mqtt_client_adapter_drain_pending_updates(&this->mqtt_client_adapter_);
+            }
+            break;
+        }
       }
     }
-    // Drain pending ERD updates a few at a time each loop() call so that the
-    // burst of up to MAX_PENDING_UPDATES publishes after an MQTT reconnect is
-    // spread across multiple loop iterations (avoids a 1+ s stall from
-    // acquiring the IDF MQTT API mutex for each publish in succession).
-    // Also subscribes the wildcard write topic on first connect.
-    if (is_connected && this->mqtt_client_adapter_initialized_) {
-      esphome_mqtt_client_adapter_notify_connected(&this->mqtt_client_adapter_);
-    }
-    this->mqtt_was_connected_ = is_connected;
   }
 
   // ── Startup HSM ────────────────────────────────────────────────────────
@@ -229,9 +271,9 @@ void GeappliancesBridge::loop() {
 
   // Initialize the startup HSM on the first loop() call.
   if (this->startup_hsm_.current == nullptr) {
-    // Set the back-pointer so HSM state functions can access the bridge
-    // without using container_of/offsetof on a non-POD C++ class.
-    set_bridge_instance(this);
+    // Set the back-pointer so HSM state functions can invoke bridge
+    // operations through IBridgeServices without a dependency on internals.
+    set_bridge_services(this);
     tiny_hsm_init(&this->startup_hsm_, &startup_hsm_configuration,
                   startup_state_protocol_stack);
   }
@@ -375,7 +417,7 @@ void GeappliancesBridge::log_poll_state_transitions_()
   const char* new_state = this->mqtt_bridge_polling_.current_state_name;
   if (new_state != nullptr && new_state != this->last_logged_poll_state_) {
     ESP_LOGD(TAG, "Polling bridge state: %s (ERDs registered: %zu)",
-             new_state, this->ha_registered_erds_.size());
+             new_state, this->erd_registry_.registered_erds().size());
     this->last_logged_poll_state_ = new_state;
   }
 }
@@ -471,6 +513,11 @@ bool GeappliancesBridge::should_route_to_feature_bits_(tiny_erd_t erd)
   return feature_bit_active &&
     (is_feature_bit_erd(erd) ||
      (is_device_info_erd(erd) && this->device_identity_manager_.is_complete()));
+}
+
+void GeappliancesBridge::on_ha_discovery_erd_seen_(tiny_erd_t erd)
+{
+  this->ha_discovery_manager_.on_erd_seen(erd);
 }
 
 // ---------------------------------------------------------------------------
@@ -606,6 +653,175 @@ bool GeappliancesBridge::teardown() {
   }
   Component::teardown();
   return true;
+}
+
+// =============================================================================
+// IBridgeServices implementation
+//
+// These thin wrappers are the only entry points the startup HSM is allowed to
+// use when interacting with the bridge. Each delegates to an existing internal
+// method or member, keeping the HSM decoupled from GeappliancesBridge internals.
+// =============================================================================
+
+// -- Autodiscovery ------------------------------------------------------------
+
+void GeappliancesBridge::run_autodiscovery()
+{
+  autodiscovery_manager_.run();
+}
+
+bool GeappliancesBridge::is_autodiscovery_complete() const
+{
+  return autodiscovery_manager_.is_complete();
+}
+
+uint8_t GeappliancesBridge::get_discovered_host_address() const
+{
+  return autodiscovery_manager_.get_host_address();
+}
+
+bool GeappliancesBridge::is_discovered_gea2_protocol() const
+{
+  return autodiscovery_manager_.is_gea2_protocol();
+}
+
+// -- Device ID ----------------------------------------------------------------
+
+void GeappliancesBridge::init_device_id_reading()
+{
+  if (!device_identity_manager_.is_complete() && !device_identity_manager_.is_failed()) {
+    device_identity_manager_.init(
+        configured_device_id_,
+        autodiscovery_manager_.get_active_erd_client(),
+        autodiscovery_manager_.get_host_address());
+  }
+}
+
+void GeappliancesBridge::run_device_id()
+{
+  device_identity_manager_.run();
+}
+
+bool GeappliancesBridge::is_device_id_complete() const
+{
+  return device_identity_manager_.is_complete();
+}
+
+bool GeappliancesBridge::is_device_id_failed() const
+{
+  return device_identity_manager_.is_failed();
+}
+
+void GeappliancesBridge::record_device_id_phase_start()
+{
+  device_id_phase_start_ms_ = millis();
+}
+
+bool GeappliancesBridge::is_device_id_phase_timed_out() const
+{
+  return millis() - device_id_phase_start_ms_ >= DEVICE_ID_PHASE_TIMEOUT_MS;
+}
+
+// -- MQTT client adapter ------------------------------------------------------
+
+bool GeappliancesBridge::is_mqtt_client_initialized() const
+{
+  return mqtt_client_adapter_initialized_;
+}
+
+void GeappliancesBridge::initialize_mqtt_client()
+{
+  initialize_mqtt_client_();
+}
+
+// -- Feature bits -------------------------------------------------------------
+
+void GeappliancesBridge::start_feature_bit_reading()
+{
+  start_feature_bit_reading_();
+}
+
+void GeappliancesBridge::run_feature_bits()
+{
+  feature_bit_manager_.run();
+}
+
+bool GeappliancesBridge::is_feature_bits_complete() const
+{
+  return feature_bit_manager_.is_complete();
+}
+
+void GeappliancesBridge::mark_feature_bits_timed_out()
+{
+  feature_bit_manager_.mark_timed_out();
+}
+
+void GeappliancesBridge::record_feature_bits_phase_start()
+{
+  feature_bits_phase_start_ms_ = millis();
+}
+
+bool GeappliancesBridge::is_feature_bits_phase_timed_out() const
+{
+  return millis() - feature_bits_phase_start_ms_ >= FEATURE_BITS_PHASE_TIMEOUT_MS;
+}
+
+// -- Bridge initialization ----------------------------------------------------
+
+bool GeappliancesBridge::is_bridge_initialized() const
+{
+  return mqtt_bridge_initialized_;
+}
+
+void GeappliancesBridge::initialize_mqtt_bridge()
+{
+  initialize_mqtt_bridge_();
+}
+
+// -- Operating mode -----------------------------------------------------------
+
+BridgeMode GeappliancesBridge::get_mode() const
+{
+  return mode_;
+}
+
+bool GeappliancesBridge::is_subscription_mode_active() const
+{
+  return subscription_mode_active_;
+}
+
+// -- Recurring tasks ----------------------------------------------------------
+
+void GeappliancesBridge::check_subscription_activity()
+{
+  check_subscription_activity_();
+}
+
+void GeappliancesBridge::maybe_start_custom_erd_polling()
+{
+  maybe_start_custom_erd_polling_();
+}
+
+void GeappliancesBridge::log_poll_state_transitions()
+{
+  log_poll_state_transitions_();
+}
+
+void GeappliancesBridge::run_ha_discovery()
+{
+  ha_discovery_manager_.run(
+      !((mode_ == BRIDGE_MODE_SUBSCRIBE) ||
+        (mode_ == BRIDGE_MODE_AUTO && subscription_mode_active_)),
+      mqtt_bridge_polling_.polling_list_complete,
+      subscription_activity_detected_,
+      mqtt::global_mqtt_client);
+}
+
+void GeappliancesBridge::run_all_managers()
+{
+  autodiscovery_manager_.run();
+  device_identity_manager_.run();
+  feature_bit_manager_.run();
 }
 
 }  // namespace geappliances_bridge

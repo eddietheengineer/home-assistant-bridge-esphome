@@ -3,6 +3,29 @@
  * @brief Polls ERDs and publishes to MQTT server (polling mode)
  */
 
+// =============================================================================
+// MODULE GOAL
+// =============================================================================
+// Goal: Periodically poll a list of ERDs from the appliance and publish their
+//       values to MQTT; fulfill write commands received from MQTT.
+//
+// Responsibilities:
+//   - Maintain and iterate a dynamic polling list
+//   - Drive a tiny_hsm for ERD discovery, polling, and appliance-lost recovery
+//   - Accept optional pre-populated lists (api_parsed_list, custom_erd_list)
+//     to skip or augment runtime ERD discovery
+//   - Report polling health metrics (cycle count, last cycle time)
+//
+// NOT responsible for:
+//   - Subscription-mode operation (see mqtt_bridge.h)
+//   - Deciding which ERDs are valid (filtered upstream by i_mqtt_client)
+//   - Bridge initialization or startup phase management
+//
+// Dependencies:
+//   - i_mqtt_client.h, i_tiny_gea3_erd_client.h, tiny_hsm.h, tiny_timer.h
+//   - erd_lists.h (appliance ERD list arrays)
+// =============================================================================
+
 #ifndef mqtt_bridge_polling_h
 #define mqtt_bridge_polling_h
 

@@ -1,16 +1,24 @@
 /*!
  * @file
- * @brief MQTT client adapter initialization and bridge mode management.
+ * @brief Bridge startup initializers and ongoing bridge lifecycle management.
+ *
+ * MODULE GOAL: Own every one-time initialization step for the MQTT client
+ * adapter and the bridge HSMs, plus feature-bit reading startup and the
+ * AUTO-mode subscription-activity watchdog.
+ *
+ * start_feature_bit_reading_() is called by the startup HSM to kick off
+ * the feature-bit ERD reads once the MQTT client adapter is ready.
  *
  * initialize_mqtt_client_() runs once as soon as the device ID is ready
  * (Phase 4), before feature bit reading.  It binds the MQTT client adapter
- * to the device ID, sets up registered-ERD tracking, and configures the
- * string-ERD filter so the adapter is ready to publish ERD values immediately.
+ * to the device ID, sets up the ERD registry (registered-ERD tracking and
+ * string-ERD type detection), and passes the registry to the adapter so it
+ * is ready to publish ERD values immediately.
  *
  * initialize_mqtt_bridge_() runs once after feature bit reading and MQTT are
- * both ready (Phase 6).  It applies the valid-ERD filter (built from feature
- * bit results), selects the operating mode (poll / subscribe / auto), and
- * initializes the appropriate bridge HSMs.
+ * both ready (Phase 6).  It applies the valid-ERD filter to the registry
+ * (built from feature bit results), selects the operating mode
+ * (poll / subscribe / auto), and initializes the appropriate bridge HSMs.
  *
  * check_subscription_activity_() runs every loop() iteration in AUTO mode
  * and falls back to polling if no subscription publications arrive within
@@ -19,12 +27,33 @@
 
 #include "geappliances_bridge.h"
 #include "ha_discovery_config.h"
+#include "appliance_api_feature_lists.h"
+#include "geappliances_bridge_constants.h"
 #include "esphome/core/log.h"
 
 namespace esphome {
 namespace geappliances_bridge {
 
 static const char* const TAG __attribute__((unused)) = "geappliances_bridge";
+
+// ---------------------------------------------------------------------------
+// Startup: kick off feature-bit reading sequence
+// ---------------------------------------------------------------------------
+
+void GeappliancesBridge::start_feature_bit_reading_()
+{
+  // Guard: don't re-initialize if already running or done.
+  if (this->feature_bit_manager_.is_complete() || this->feature_bit_manager_.is_failed() ||
+      this->feature_bit_manager_.is_parse_pending()) {
+    return;
+  }
+  ESP_LOGI(TAG, "Reading device info ERDs for MQTT publish, then appliance API feature bits...");
+  this->feature_bit_manager_.init(
+      this->autodiscovery_manager_.get_active_erd_client(),
+      this->autodiscovery_manager_.get_host_address(),
+      &this->mqtt_client_adapter_.interface,
+      this->mqtt_client_adapter_initialized_);
+}
 
 // ---------------------------------------------------------------------------
 // Phase 4: Initialize the MQTT client adapter (called once from loop())
@@ -39,15 +68,11 @@ void GeappliancesBridge::initialize_mqtt_client_()
   ESP_LOGI(TAG, "Initializing MQTT client adapter with device ID: %s",
            this->device_identity_manager_.get_device_id().c_str());
 
-  // For manual device_id configs where autodiscovery is skipped, set the
-  // active ERD client now so the startup HSM's feature_bits phase can queue reads.
-  // After this, the effective active client is whichever is non-null:
-  // manager value (normal path) or bridge fallback (manual device_id).
+  // For manual device_id configs where autodiscovery is skipped (gea2_uart only,
+  // no GEA3 uart), mark the protocol as GEA2 so run_protocol_stack_() enables
+  // the GEA2 tight loop even before autodiscovery runs.
   if (this->autodiscovery_manager_.get_active_erd_client() == nullptr) {
-    if (this->uart_ != nullptr) {
-      this->active_erd_client_ = &this->erd_client_.interface;
-    } else {
-      this->active_erd_client_  = &this->gea2_erd_client_adapter_.interface;
+    if (this->uart_ == nullptr) {
       this->gea2_protocol_active_ = true;
     }
   }
@@ -56,22 +81,15 @@ void GeappliancesBridge::initialize_mqtt_client_()
   esphome_mqtt_client_adapter_init(&this->mqtt_client_adapter_,
                                    this->device_identity_manager_.get_device_id().c_str());
 
-  // Wire up registered-ERD tracking so every ERD the device registers is
-  // captured for use when filtering HA discovery to supported entities.
-  this->ha_registered_erds_.clear();
-  esphome_mqtt_client_adapter_set_registered_erds_out(
-    &this->mqtt_client_adapter_, &this->ha_registered_erds_);
-
-  // Build the string-type ERD set from the generated config and tell the
-  // adapter so it publishes ASCII text instead of hex for those ERDs.
-  this->ha_string_erds_set_.clear();
-  for (uint16_t i = 0; i < ha_string_erd_count; i++) {
-    this->ha_string_erds_set_.insert(ha_string_erd_ids[i]);
-  }
-  if (!this->ha_string_erds_set_.empty()) {
-    esphome_mqtt_client_adapter_set_string_erds_filter(
-      &this->mqtt_client_adapter_, &this->ha_string_erds_set_);
-  }
+  // Wire up the ERD registry: clears any stale registrations and populates
+  // string-type ERDs from the generated config so the adapter publishes
+  // ASCII text instead of hex for those ERDs.  All three responsibilities
+  // (valid-ERD filtering, string-type detection, registered-ERD tracking)
+  // are owned by the registry and accessed through a single pointer.
+  this->erd_registry_.clear_registered_erds();
+  this->erd_registry_.init_string_erds(ha_string_erd_ids, ha_string_erd_count);
+  esphome_mqtt_client_adapter_set_erd_registry(
+    &this->mqtt_client_adapter_, &this->erd_registry_);
 
   this->mqtt_client_adapter_initialized_ = true;
   ESP_LOGI(TAG, "MQTT client adapter initialized; feature bit ERDs will be published as they are read");
@@ -90,11 +108,11 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
   ESP_LOGI(TAG, "Initializing MQTT bridge");
 
   // Apply the valid-ERD filter when appliance API parsing is enabled and
-  // produced results. An empty set would silently suppress all publishes.
+  // produced results. An empty set is ignored by the registry so all ERDs
+  // continue to be published in that case.
   if (this->appliance_api_parsing_ && this->feature_bit_manager_.is_valid_list_ready() &&\
       !this->feature_bit_manager_.get_valid_erds().empty()) {
-    esphome_mqtt_client_adapter_set_valid_erds_filter(
-      &this->mqtt_client_adapter_, &this->feature_bit_manager_.get_valid_erds());
+    this->erd_registry_.set_valid_erds(this->feature_bit_manager_.get_valid_erds());
     ESP_LOGI(TAG, "Appliance API parsing enabled: publishing filtered to %zu valid ERDs",
              this->feature_bit_manager_.get_valid_erds().size());
   }
@@ -172,9 +190,9 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
         this->device_identity_manager_.get_device_id(),
         this->device_identity_manager_.get_model_number(),
         this->device_identity_manager_.get_serial_number(),
-        this->ha_registered_erds_,
+        this->erd_registry_.registered_erds(),
         true);
-    this->ha_discovery_manager_.set_registered_erds(this->ha_registered_erds_);
+    this->ha_discovery_manager_.set_registered_erds(this->erd_registry_.registered_erds());
     this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
     ESP_LOGI(TAG, "HA discovery deferred: will publish after ERD discovery completes "
                   "(polling mode) or %u s quiet window (subscription mode)",

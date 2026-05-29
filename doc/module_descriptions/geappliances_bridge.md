@@ -33,7 +33,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 
 | Method | Description |
 |--------|-------------|
-| `on_mqtt_connected_()` | Handle MQTT (re)connection — flush pending updates (in `geappliances_bridge_mqtt_connection.cpp`) |
+| `on_mqtt_connected_()` | Handle MQTT (re)connection — flush pending updates |
 | `handle_erd_client_activity_(args)` | Route ERD activity to appropriate manager (autodiscovery, device ID, feature bits) |
 | `should_route_to_feature_bits_(erd)` | Decide whether an ERD read goes to FeatureBitManager or DeviceIdentityManager |
 | `initialize_mqtt_client_()` | Create and configure the MQTT client adapter |
@@ -74,7 +74,7 @@ protocol_stack → autodiscovery → device_id → mqtt_client_init
 
 - **GEA2 tight loop**: When GEA2 is active, a 200 ms wall-clock busy loop ensures the full TX→RX cycle at 19200 baud completes within a single `loop()` call. A manual millisecond counter drives the GEA2 interface's internal timers without starving the shared timer group.
 - **Bridge modes**: Three modes — POLL (always poll), SUBSCRIBE (always subscribe), AUTO (try subscribe, fall back to polling after 30 s if no activity).
-- **Legacy member sync**: During the god class refactoring, legacy member variables are retained and synced from the extracted managers for backward compatibility. These will be removed in a future cleanup.
+- **IBridgeServices interface**: `GeappliancesBridge` implements `IBridgeServices`, the abstract contract consumed by the startup HSM. This eliminates `friend` declarations and lets the HSM be unit-tested with a mock.
 - **Phase timeouts**: Device ID phase has a 30 s timeout, feature bits phase has a 60 s timeout — both prevent the startup HSM from stalling indefinitely.
 
 ## Testing

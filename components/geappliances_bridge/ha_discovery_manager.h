@@ -12,6 +12,29 @@
  * On non-ESP-IDF builds the fetch is a no-op and a warning is logged.
  */
 
+// =============================================================================
+// MODULE GOAL
+// =============================================================================
+// Goal: Publish Home Assistant MQTT discovery payloads for the ERDs that the
+//       bridge has registered at runtime.
+//
+// Responsibilities:
+//   - Wait for a "ready" signal (quiet window or polling cycle complete)
+//   - Spawn a FreeRTOS background task to fetch per-category JSONL definitions
+//   - Parse JSONL lines, match against registered ERDs, build payloads
+//   - Rate-limited publishing of discovery messages to Home Assistant
+//
+// NOT responsible for:
+//   - Determining which ERDs are valid (receives registered ERD set externally)
+//   - Managing bridge lifecycle or MQTT connection state
+//   - Any post-discovery entity updates
+//
+// Dependencies:
+//   - EsphomeMqttClientAdapter (async publish)
+//   - esphome::mqtt::MQTTClientComponent
+//   - FreeRTOS task + queue on ESP-IDF builds
+// =============================================================================
+
 #pragma once
 
 #include <cstdint>
@@ -44,7 +67,6 @@ static constexpr uint32_t HA_ENTITY_PUBLISH_INTERVAL_MS = 50;
 enum HaDiscoveryState {
   HA_DISCOVERY_IDLE,
   HA_DISCOVERY_WAITING_FOR_READY,
-  HA_DISCOVERY_DOWNLOADING,
   HA_DISCOVERY_PUBLISHING,
   HA_DISCOVERY_COMPLETE,
   HA_DISCOVERY_FAILED

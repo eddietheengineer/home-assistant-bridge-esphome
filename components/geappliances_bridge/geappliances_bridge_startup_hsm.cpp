@@ -11,11 +11,12 @@
  * they don't handle, providing a common "root" for any unhandled signals.
  */
 
-#include "geappliances_bridge.h"
+#include "i_bridge_services.h"
 #include "geappliances_bridge_constants.h"
 #include "geappliances_bridge_startup_hsm.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
+#include "esphome/components/mqtt/mqtt_client.h"
 
 extern "C" {
 #include "tiny_utils.h"  // element_count macro
@@ -26,21 +27,20 @@ namespace geappliances_bridge {
 
 static const char* const TAG __attribute__((unused)) = "geappliances_bridge";
 
-// Back-pointer to the bridge instance, set during HSM init.
-// This avoids using container_of (which relies on offsetof) on a
-// non-POD C++ class — offsetof within non-standard-layout types is
-// conditionally-supported and triggers compiler warnings/errors.
-static GeappliancesBridge* g_bridge_instance = nullptr;
+// Back-pointer to the bridge services, set during HSM init.
+// This allows HSM state functions to invoke bridge operations through a
+// stable interface without a compile-time dependency on GeappliancesBridge.
+static IBridgeServices* g_bridge_services = nullptr;
 
-GeappliancesBridge* bridge_from_hsm(tiny_hsm_t* hsm)
+IBridgeServices* services_from_hsm(tiny_hsm_t* hsm)
 {
   (void)hsm;
-  return g_bridge_instance;
+  return g_bridge_services;
 }
 
-void set_bridge_instance(GeappliancesBridge* bridge)
+void set_bridge_services(IBridgeServices* services)
 {
-  g_bridge_instance = bridge;
+  g_bridge_services = services;
 }
 
 
@@ -77,8 +77,8 @@ tiny_hsm_result_t startup_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, c
 
 tiny_hsm_result_t startup_state_protocol_stack(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  GeappliancesBridge* bridge = bridge_from_hsm(hsm);
-  (void)bridge;  /* Used only in ESP_LOG calls below. */
+  IBridgeServices* svc = services_from_hsm(hsm);
+  (void)svc;
   (void)data;
 
   switch (signal) {
@@ -109,7 +109,7 @@ tiny_hsm_result_t startup_state_protocol_stack(tiny_hsm_t* hsm, tiny_hsm_signal_
 
 tiny_hsm_result_t startup_state_autodiscovery(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  GeappliancesBridge* bridge = bridge_from_hsm(hsm);
+  IBridgeServices* svc = services_from_hsm(hsm);
   (void)data;
 
   switch (signal) {
@@ -118,14 +118,14 @@ tiny_hsm_result_t startup_state_autodiscovery(tiny_hsm_t* hsm, tiny_hsm_signal_t
       break;
 
     case signal_run_loop:
-      bridge->autodiscovery_manager_.run();
+      svc->run_autodiscovery();
 
       // Only transition when autodiscovery successfully discovers a board.
       // If no board responds, the manager keeps retrying indefinitely.
-      if (bridge->autodiscovery_manager_.is_complete()) {
+      if (svc->is_autodiscovery_complete()) {
         ESP_LOGI(TAG, "Autodiscovery complete (host=0x%02X, protocol=%s)",
-                 bridge->autodiscovery_manager_.get_host_address(),
-                 bridge->autodiscovery_manager_.is_gea2_protocol() ? "GEA2" : "GEA3");
+                 svc->get_discovered_host_address(),
+                 svc->is_discovered_gea2_protocol() ? "GEA2" : "GEA3");
         tiny_hsm_transition(hsm, startup_state_device_id);
       }
       break;
@@ -133,7 +133,7 @@ tiny_hsm_result_t startup_state_autodiscovery(tiny_hsm_t* hsm, tiny_hsm_signal_t
     case signal_autodiscovery_complete:
       // External signal from autodiscovery callback — transition only if
       // a board was actually discovered (not on failure/no-response).
-      if (bridge->autodiscovery_manager_.is_complete()) {
+      if (svc->is_autodiscovery_complete()) {
         tiny_hsm_transition(hsm, startup_state_device_id);
       }
       break;
@@ -157,42 +157,33 @@ tiny_hsm_result_t startup_state_autodiscovery(tiny_hsm_t* hsm, tiny_hsm_signal_t
 
 tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  GeappliancesBridge* bridge = bridge_from_hsm(hsm);
+  IBridgeServices* svc = services_from_hsm(hsm);
   (void)data;
 
   switch (signal) {
     case tiny_hsm_signal_entry:
-      // Initialize the device identity manager if not already done.
-      if (!bridge->device_identity_manager_.is_complete() && !bridge->device_identity_manager_.is_failed()) {
-        bridge->device_identity_manager_.init(
-            bridge->configured_device_id_,
-            bridge->autodiscovery_manager_.get_active_erd_client(),
-            bridge->autodiscovery_manager_.get_host_address());
-      }
-      // Start the phase timeout timer.
-      bridge->device_id_phase_start_ms_ = millis();
+      svc->init_device_id_reading();
+      svc->record_device_id_phase_start();
       // If a device_id is pre-configured, the manager is already complete
-      // from init().  Sync the final_device_id_ and transition.
-      if (bridge->device_identity_manager_.is_complete()) {
+      // from init().  Transition immediately.
+      if (svc->is_device_id_complete()) {
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       }
       break;
 
     case signal_run_loop:
       // Check for phase timeout — prevent indefinite stalls.
-      if (millis() - bridge->device_id_phase_start_ms_ >= bridge->DEVICE_ID_PHASE_TIMEOUT_MS) {
-        ESP_LOGW(TAG, "Device ID phase timed out after %u ms, using fallback",
-                 static_cast<unsigned>(bridge->DEVICE_ID_PHASE_TIMEOUT_MS));
+      if (svc->is_device_id_phase_timed_out()) {
+        ESP_LOGW(TAG, "Device ID phase timed out, using fallback");
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
         break;
       }
 
-      bridge->device_identity_manager_.run();
+      svc->run_device_id();
 
-      if (bridge->device_identity_manager_.is_complete()) {
+      if (svc->is_device_id_complete()) {
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
-      } else if (bridge->device_identity_manager_.is_failed()) {
-        // Even on failure, we have a fallback device ID — continue startup.
+      } else if (svc->is_device_id_failed()) {
         ESP_LOGW(TAG, "Device ID generation failed, using fallback");
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       }
@@ -225,17 +216,15 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
 
 tiny_hsm_result_t startup_state_mqtt_client_init(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  GeappliancesBridge* bridge = bridge_from_hsm(hsm);
+  IBridgeServices* svc = services_from_hsm(hsm);
   (void)data;
 
   switch (signal) {
     case tiny_hsm_signal_entry:
-      if (!bridge->mqtt_client_adapter_initialized_) {
-        bridge->initialize_mqtt_client_();
+      if (!svc->is_mqtt_client_initialized()) {
+        svc->initialize_mqtt_client();
       }
-      // Start feature bit reading in parallel — it can proceed while we wait
-      // for MQTT to connect.
-      bridge->start_feature_bit_reading_();
+      svc->start_feature_bit_reading();
       tiny_hsm_transition(hsm, startup_state_feature_bits);
       break;
 
@@ -258,31 +247,25 @@ tiny_hsm_result_t startup_state_mqtt_client_init(tiny_hsm_t* hsm, tiny_hsm_signa
 
 tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  GeappliancesBridge* bridge = bridge_from_hsm(hsm);
+  IBridgeServices* svc = services_from_hsm(hsm);
   (void)data;
 
   switch (signal) {
     case tiny_hsm_signal_entry:
       ESP_LOGI(TAG, "Startup: Feature bits phase");
-      bridge->feature_bits_phase_start_ms_ = millis();
+      svc->record_feature_bits_phase_start();
       break;
 
     case signal_run_loop:
       {
-      // Check for phase timeout — prevent indefinite stalls.
-      if (millis() - bridge->feature_bits_phase_start_ms_ >= bridge->FEATURE_BITS_PHASE_TIMEOUT_MS) {
-        ESP_LOGW(TAG, "Feature bits phase timed out after %u ms, continuing without feature filtering",
-                 static_cast<unsigned>(bridge->FEATURE_BITS_PHASE_TIMEOUT_MS));
-        // Mark the manager as complete so is_complete() returns true and
-        // we can transition to bridge_init.
-        bridge->feature_bit_manager_.mark_timed_out();
+      if (svc->is_feature_bits_phase_timed_out()) {
+        ESP_LOGW(TAG, "Feature bits phase timed out, continuing without feature filtering");
+        svc->mark_feature_bits_timed_out();
       }
 
-      bridge->feature_bit_manager_.run();
+      svc->run_feature_bits();
 
-      // Check if we can transition to bridge_init:
-      // Feature bits must be complete AND MQTT must be connected.
-      bool feature_bits_done = bridge->feature_bit_manager_.is_complete();
+      bool feature_bits_done = svc->is_feature_bits_complete();
       bool mqtt_connected = (mqtt::global_mqtt_client != nullptr &&
                              mqtt::global_mqtt_client->is_connected());
 
@@ -293,14 +276,12 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
       break;
 
     case signal_mqtt_connected:
-      // MQTT just connected — check if feature bits are also done.
-      if (bridge->feature_bit_manager_.is_complete()) {
+      if (svc->is_feature_bits_complete()) {
         tiny_hsm_transition(hsm, startup_state_bridge_init);
       }
       break;
 
     case signal_feature_bits_complete:
-      // Feature bits just completed — check if MQTT is connected.
       {
         bool mqtt_connected = (mqtt::global_mqtt_client != nullptr &&
                                mqtt::global_mqtt_client->is_connected());
@@ -329,7 +310,7 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
 
 tiny_hsm_result_t startup_state_bridge_init(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  GeappliancesBridge* bridge = bridge_from_hsm(hsm);
+  IBridgeServices* svc = services_from_hsm(hsm);
   (void)data;
 
   switch (signal) {
@@ -338,27 +319,25 @@ tiny_hsm_result_t startup_state_bridge_init(tiny_hsm_t* hsm, tiny_hsm_signal_t s
       break;
 
     case signal_run_loop:
-      if (!bridge->mqtt_bridge_initialized_ &&
-          bridge->autodiscovery_manager_.is_complete() &&
+      if (!svc->is_bridge_initialized() &&
+          svc->is_autodiscovery_complete() &&
           mqtt::global_mqtt_client != nullptr &&
           mqtt::global_mqtt_client->is_connected()) {
         ESP_LOGI(TAG, "Device ID ready and MQTT connected, initializing MQTT bridge");
-        bridge->initialize_mqtt_bridge_();
+        svc->initialize_mqtt_bridge();
         tiny_hsm_transition(hsm, startup_state_subscription_watch);
       }
       break;
 
     case signal_mqtt_connected:
-      // MQTT just connected — try to initialize bridge now.
-      if (!bridge->mqtt_bridge_initialized_ && bridge->autodiscovery_manager_.is_complete()) {
+      if (!svc->is_bridge_initialized() && svc->is_autodiscovery_complete()) {
         ESP_LOGI(TAG, "MQTT connected, initializing MQTT bridge");
-        bridge->initialize_mqtt_bridge_();
+        svc->initialize_mqtt_bridge();
         tiny_hsm_transition(hsm, startup_state_subscription_watch);
       }
       break;
 
     case signal_bridge_ready:
-      // Bridge was initialized externally — transition.
       tiny_hsm_transition(hsm, startup_state_subscription_watch);
       break;
 
@@ -382,34 +361,30 @@ tiny_hsm_result_t startup_state_bridge_init(tiny_hsm_t* hsm, tiny_hsm_signal_t s
 
 tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  GeappliancesBridge* bridge = bridge_from_hsm(hsm);
+  IBridgeServices* svc = services_from_hsm(hsm);
   (void)data;
 
   switch (signal) {
     case tiny_hsm_signal_entry:
-      // In non-AUTO modes, skip straight to HA discovery.
-      if (bridge->mode_ != BRIDGE_MODE_AUTO) {
-        bridge->maybe_start_custom_erd_polling_();
+      if (svc->get_mode() != BRIDGE_MODE_AUTO) {
+        svc->maybe_start_custom_erd_polling();
         tiny_hsm_transition(hsm, startup_state_ha_discovery);
       }
       break;
 
     case signal_run_loop:
-      if (bridge->mode_ == BRIDGE_MODE_AUTO && bridge->subscription_mode_active_) {
-        bridge->check_subscription_activity_();
+      if (svc->get_mode() == BRIDGE_MODE_AUTO && svc->is_subscription_mode_active()) {
+        svc->check_subscription_activity();
       }
-      bridge->maybe_start_custom_erd_polling_();
-      bridge->log_poll_state_transitions_();
+      svc->maybe_start_custom_erd_polling();
+      svc->log_poll_state_transitions();
 
-      // If subscription fallback happened (or we're not in AUTO mode),
-      // transition to HA discovery.
-      if (bridge->mode_ != BRIDGE_MODE_AUTO || !bridge->subscription_mode_active_) {
+      if (svc->get_mode() != BRIDGE_MODE_AUTO || !svc->is_subscription_mode_active()) {
         tiny_hsm_transition(hsm, startup_state_ha_discovery);
       }
       break;
 
     case signal_subscription_fallback:
-      // AUTO mode subscription timed out — transition to HA discovery.
       tiny_hsm_transition(hsm, startup_state_ha_discovery);
       break;
 
@@ -432,7 +407,7 @@ tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_sig
 
 tiny_hsm_result_t startup_state_ha_discovery(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  GeappliancesBridge* bridge = bridge_from_hsm(hsm);
+  IBridgeServices* svc = services_from_hsm(hsm);
   (void)data;
 
   switch (signal) {
@@ -441,15 +416,7 @@ tiny_hsm_result_t startup_state_ha_discovery(tiny_hsm_t* hsm, tiny_hsm_signal_t 
       break;
 
     case signal_run_loop:
-      bridge->ha_discovery_manager_.run(
-          !((bridge->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-            (bridge->mode_ == BRIDGE_MODE_AUTO && bridge->subscription_mode_active_)),
-          bridge->mqtt_bridge_polling_.polling_list_complete,
-          bridge->subscription_activity_detected_,
-          mqtt::global_mqtt_client);
-
-      // Transition to running — HA discovery runs in the background
-      // and doesn't block startup.
+      svc->run_ha_discovery();
       tiny_hsm_transition(hsm, startup_state_running);
       break;
 
@@ -472,7 +439,7 @@ tiny_hsm_result_t startup_state_ha_discovery(tiny_hsm_t* hsm, tiny_hsm_signal_t 
 
 tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  GeappliancesBridge* bridge = bridge_from_hsm(hsm);
+  IBridgeServices* svc = services_from_hsm(hsm);
   (void)data;
 
   switch (signal) {
@@ -481,24 +448,14 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
       break;
 
     case signal_run_loop:
-      // Steady-state: run all recurring tasks every loop iteration.
-      // (run_protocol_stack_() is called above the HSM for all phases.)
-      bridge->autodiscovery_manager_.run();
-      bridge->device_identity_manager_.run();
-      bridge->feature_bit_manager_.run();
+      svc->run_all_managers();
 
-      if (bridge->mode_ == BRIDGE_MODE_AUTO && bridge->subscription_mode_active_) {
-        bridge->check_subscription_activity_();
+      if (svc->get_mode() == BRIDGE_MODE_AUTO && svc->is_subscription_mode_active()) {
+        svc->check_subscription_activity();
       }
-      bridge->maybe_start_custom_erd_polling_();
-      bridge->log_poll_state_transitions_();
-
-      bridge->ha_discovery_manager_.run(
-          !((bridge->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-            (bridge->mode_ == BRIDGE_MODE_AUTO && bridge->subscription_mode_active_)),
-          bridge->mqtt_bridge_polling_.polling_list_complete,
-          bridge->subscription_activity_detected_,
-          mqtt::global_mqtt_client);
+      svc->maybe_start_custom_erd_polling();
+      svc->log_poll_state_transitions();
+      svc->run_ha_discovery();
       break;
 
     case tiny_hsm_signal_exit:

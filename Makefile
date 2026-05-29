@@ -28,15 +28,13 @@ SRC_FILES := \
   components/geappliances_bridge/feature_bit_manager.cpp \
   components/geappliances_bridge/autodiscovery_manager.cpp \
   components/geappliances_bridge/esphome_mqtt_client_adapter.cpp \
+  components/geappliances_bridge/erd_registry.cpp \
   components/geappliances_bridge/esphome_time_source.cpp \
   components/geappliances_bridge/esphome_uart_adapter.cpp \
   components/geappliances_bridge/ha_discovery_manager.cpp \
   components/geappliances_bridge/geappliances_bridge.cpp \
   components/geappliances_bridge/geappliances_bridge_bridge_init.cpp \
-  components/geappliances_bridge/geappliances_bridge_feature_bits.cpp \
-  components/geappliances_bridge/geappliances_bridge_ha_discovery.cpp \
-  components/geappliances_bridge/geappliances_bridge_startup_hsm.cpp \
-  components/geappliances_bridge/geappliances_bridge_mqtt_connection.cpp
+  components/geappliances_bridge/geappliances_bridge_startup_hsm.cpp
 
 SRCS := $(SRC_FILES) $(shell find $(SRC_DIRS) -maxdepth 1 -name *.cpp -or -name *.c -or -name *.s)
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)

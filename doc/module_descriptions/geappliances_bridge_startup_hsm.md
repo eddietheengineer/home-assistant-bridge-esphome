@@ -8,8 +8,8 @@ Hierarchical state machine that drives the linear startup sequence of the GE App
 
 | Function | Description |
 |----------|-------------|
-| `set_bridge_instance(bridge)` | Set the back-pointer to the bridge instance for HSM state functions |
-| `bridge_from_hsm(hsm)` | Get the bridge instance from an HSM pointer |
+| `set_bridge_services(services)` | Set the `IBridgeServices` back-pointer used by all HSM state functions |
+| `services_from_hsm(hsm)` | Retrieve the `IBridgeServices` pointer from an HSM pointer |
 
 ## Signals
 
@@ -74,9 +74,8 @@ startup_state_top (root — handles entry/exit, defers all other signals)
 ## Dependencies
 
 - `tiny_hsm` — hierarchical state machine framework
-- `GeappliancesBridge` — the bridge class (accessed via `bridge_from_hsm()`)
-- All sub-managers: `AutodiscoveryManager`, `DeviceIdentityManager`, `FeatureBitManager`, `HaDiscoveryManager`
-- ESPHome `mqtt::global_mqtt_client` — MQTT connection state
+- `IBridgeServices` — abstract contract implemented by `GeappliancesBridge`; the HSM is isolated from the concrete class (accessed via `services_from_hsm()`)
+- ESPHome `mqtt::global_mqtt_client` — MQTT connection state check in feature_bits / bridge_init states
 
 ## Key Design Decisions
 

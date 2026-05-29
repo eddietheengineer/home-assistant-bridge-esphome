@@ -1,10 +1,33 @@
-/*!
+/*
  * @file
  * @brief Device identity manager for the GEA bridge.
  *
  * Handles reading appliance type, model number, and serial number ERDs,
  * then assembles a unique MQTT-topic-safe device identifier string.
  */
+
+// =============================================================================
+// MODULE GOAL
+// =============================================================================
+// Goal: Read appliance identity ERDs and assemble a stable, MQTT-topic-safe
+//       unique device identifier string.
+//
+// Responsibilities:
+//   - Read ERDs 0x0008 (appliance type), 0x0001 (model number),
+//     0x0002 (serial number) in sequence, retrying indefinitely on
+//     failure until each reads successfully
+//   - Sanitize raw values into MQTT-safe strings
+//   - Concatenate into a final device ID
+//   - Short-circuit if a device ID is already configured in YAML
+//
+// NOT responsible for:
+//   - Configuring the MQTT adapter with the resulting ID (caller's job)
+//   - Managing bridge lifecycle
+//   - Any ERDs beyond the three identity ERDs
+//
+// Dependencies:
+//   - i_tiny_gea3_erd_client
+// =============================================================================
 
 #ifndef DEVICE_IDENTITY_MANAGER_H
 #define DEVICE_IDENTITY_MANAGER_H
@@ -19,7 +42,7 @@ extern "C" {
 namespace esphome {
 namespace geappliances_bridge {
 
-// Device ID generation states (must match existing enum in geappliances_bridge.h)
+// Device ID generation states
 enum DeviceIdState {
   DEVICE_ID_STATE_IDLE,
   DEVICE_ID_STATE_READING_APPLIANCE_TYPE,
@@ -32,82 +55,87 @@ enum DeviceIdState {
 // Forward declaration
 class GeappliancesBridge;
 
-/*!
+/*
  * Manages device ID generation from appliance identity ERDs.
  *
  * Reads ERDs 0x0008 (appliance type), 0x0001 (model number), and 0x0002
- * (serial number), then assembles a unique device identifier.
- * If a device_id is pre-configured in YAML, the read sequence is skipped.
+ * (serial number), then assembles a unique device identifier. Each ERD is
+ * retried indefinitely on failure -- the manager never moves on until it
+ * has successfully read all three. If a device_id is pre-configured in
+ * YAML, the read sequence is skipped.
  */
 class DeviceIdentityManager {
  public:
-  static constexpr uint32_t MAX_QUEUE_RETRIES = 1000;
-  static constexpr uint32_t MAX_DEVICE_ID_RESPONSE_RETRIES = 3;
-  static constexpr uint32_t LOG_EVERY_N_RETRIES = 50;
+  static constexpr uint32_t LOG_EVERY_N_QUEUE_RETRIES = 50;
 
-  /*!
+  /*
    * Initialize with configured device ID (if any), ERD client, and host address.
    */
   void init(const std::string& configured_id,
             i_tiny_gea3_erd_client_t* erd_client,
             uint8_t host_address);
 
-  /*!
-   * Called from loop(). Attempts to queue the next ERD read if in a READING_* state.
+  /*
+   * Called from loop(). Attempts to queue the next ERD read if in a READING_*
+   * state. Retries indefinitely until all three identity ERDs have been read
+   * successfully.
    */
   void run();
 
-  /*!
+  /*
    * Called when an ERD read completes successfully during device ID generation.
    */
   void on_erd_read_completed(tiny_erd_t erd, const uint8_t* data, uint8_t size);
 
-  /*!
-   * Called when an ERD read fails during device ID generation.
+  /*
+   * Called when an ERD read fails during device ID generation. The failure is
+   * logged and the manager stays in the current READING_* state so run() will
+   * retry. There is no limit -- it retries forever.
    */
   void on_erd_read_failed(tiny_erd_t erd);
 
-  /*!
+  /*
    * Check if device ID generation is complete (success or configured ID).
    */
   bool is_complete() const;
 
-  /*!
-   * Check if device ID generation has failed.
+  /*
+   * Check if device ID generation has failed. (Unreachable with indefinite
+   * retry -- retained for API compatibility.)
    */
   bool is_failed() const;
 
-  /*!
+  /*
    * Get the final device ID string.
    */
   const std::string& get_device_id() const;
 
-  /*!
+  /*
    * Get the appliance type byte.
    */
   uint8_t get_appliance_type() const;
 
-  /*!
+  /*
    * Get the generated device ID (before fallback).
    */
   const std::string& get_generated_device_id() const;
 
-  /*!
+  /*
    * Get the model number string.
    */
   const std::string& get_model_number() const;
 
-  /*!
+  /*
    * Get the serial number string.
    */
   const std::string& get_serial_number() const;
 
-  /*!
+  /*
    * Get the current state.
    */
   DeviceIdState get_state() const { return state_; }
 
-  /*!
+  /*
    * Get the current queue retry count.
    */
   uint32_t get_queue_retry_count() const { return queue_retry_count_; }
@@ -125,7 +153,6 @@ class DeviceIdentityManager {
   std::string model_number_;
   std::string serial_number_;
   uint32_t queue_retry_count_{0};
-  uint32_t response_retries_{0};
   tiny_gea3_erd_client_request_id_t pending_request_id_{0};
 
   i_tiny_gea3_erd_client_t* erd_client_{nullptr};

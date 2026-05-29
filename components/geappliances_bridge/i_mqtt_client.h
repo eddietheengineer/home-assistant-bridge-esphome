@@ -3,6 +3,25 @@
  * @brief MQTT client interface for abstracting MQTT operations
  */
 
+// =============================================================================
+// MODULE GOAL
+// =============================================================================
+// Goal: Define the abstract interface through which mqtt_bridge and
+//       mqtt_bridge_polling report ERD values and receive write commands,
+//       keeping the bridge implementations independent of ESPHome.
+//
+// Responsibilities:
+//   - Declare the i_mqtt_client_t vtable interface
+//   - Provide inline wrappers for each interface method
+//
+// NOT responsible for:
+//   - Any implementation (see EsphomeMqttClientAdapter)
+//   - MQTT connection management
+//
+// Dependencies:
+//   - i_tiny_event.h, i_tiny_gea3_erd_client.h, tiny_erd.h
+// =============================================================================
+
 #ifndef i_mqtt_client_h
 #define i_mqtt_client_h
 

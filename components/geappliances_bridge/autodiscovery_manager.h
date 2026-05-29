@@ -11,6 +11,27 @@
  * getters.
  */
 
+// =============================================================================
+// MODULE GOAL
+// =============================================================================
+// Goal: Locate the connected appliance on the GEA bus by broadcasting to
+//       address 0xFF and recording the first responding device's address,
+//       protocol type, and active ERD client.
+//
+// Responsibilities:
+//   - Manage the GEA3→GEA2 fallback broadcast discovery sequence
+//   - Retry indefinitely until an appliance responds
+//   - Expose the discovered host address and active ERD client via getters
+//
+// NOT responsible for:
+//   - Reading any ERDs beyond ERD_APPLIANCE_TYPE for the broadcast response
+//   - Managing MQTT or bridge connections
+//   - Any post-discovery work
+//
+// Dependencies:
+//   - i_tiny_gea3_erd_client, i_tiny_gea2_erd_client
+// =============================================================================
+
 #pragma once
 
 #include <cstdint>
