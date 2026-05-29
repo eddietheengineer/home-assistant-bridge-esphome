@@ -35,26 +35,9 @@ extern "C" {
 #include "tiny_event.h"
 }
 
-#ifdef USE_ESP_IDF
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
-#endif
-
 struct PendingErdUpdate {
   std::string topic;
   std::string payload;
-};
-
-/*!
- * A (topic, payload, retain) request for the async MQTT publish task.
- * Allocated on the heap and passed via the publish queue.  The background
- * task deletes the request after publishing (or on shutdown).
- */
-struct MqttPublishRequest {
-  std::string topic;
-  std::string payload;
-  bool retain;
 };
 
 typedef struct {
@@ -80,14 +63,6 @@ typedef struct {
   // notify_disconnected()).  Used to gate the pending-update flush so the IDF
   // MQTT task has time to process the broker's reconnect backlog.
   uint32_t mqtt_connected_at_ms;
-#ifdef USE_ESP_IDF
-  // Async MQTT publish: a background FreeRTOS task drains this queue and
-  // calls mqtt_client->publish(), keeping the main ESPHome loop non-blocking.
-  QueueHandle_t publish_queue_;
-  TaskHandle_t  publish_task_;
-  StackType_t*  publish_task_stack_;
-  StaticTask_t* publish_task_tcb_;
-#endif
 } esphome_mqtt_client_adapter_t;
 
 #ifdef __cplusplus
