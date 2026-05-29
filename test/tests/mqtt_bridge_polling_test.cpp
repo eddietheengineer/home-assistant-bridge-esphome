@@ -343,6 +343,17 @@ TEST_GROUP(mqtt_bridge_polling_api_list)
     tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
   }
 
+  void trigger_read_failed_not_supported(tiny_erd_t erd)
+  {
+    tiny_gea3_erd_client_on_activity_args_t args;
+    args.type = tiny_gea3_erd_client_activity_type_read_failed;
+    args.address = 0xC0;
+    args.read_failed.request_id = 0;
+    args.read_failed.erd = erd;
+    args.read_failed.reason = tiny_gea3_erd_client_read_failure_reason_not_supported;
+    tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
+  }
+
   void should_request_read(uint8_t address, tiny_erd_t erd)
   {
     mock()
@@ -462,9 +473,10 @@ TEST(mqtt_bridge_polling_api_list, should_restart_poll_cycle_on_polling_timer)
   when_a_poll_read_completes(0xC0, api_erd_2, uint8_t(0xBB));
 }
 
-// ERDs in api_parsed_list that do not respond during the probe phase should not
-// be added to the polling list.
-TEST(mqtt_bridge_polling_api_list, should_only_poll_erds_that_respond_during_probe)
+// ERDs in api_parsed_list that do not respond during probe are still added to the
+// polling list (via the _no_register path in state_polling entry) and lazily
+// registered the first time they respond to a poll read.
+TEST(mqtt_bridge_polling_api_list, should_lazily_register_erds_that_did_not_respond_during_probe)
 {
   // api_list with 3 ERDs; the middle one (0x3000) will time out during probe.
   const tiny_erd_t api_list_3[3] = {api_erd_1, 0x3000, api_erd_2};
@@ -481,17 +493,65 @@ TEST(mqtt_bridge_polling_api_list, should_only_poll_erds_that_respond_during_pro
   trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
   after(retry_delay * applianceApiFeatureErdCount);
   uint8_t probe_val = 0x01;
-  trigger_read_completed(0xC0, api_erd_1, &probe_val, sizeof(probe_val));  // added
-  after(retry_delay);                                                        // 0x3000 times out
-  trigger_read_completed(0xC0, api_erd_2, &probe_val, sizeof(probe_val));  // added
+  trigger_read_completed(0xC0, api_erd_1, &probe_val, sizeof(probe_val));  // registered immediately
+  after(retry_delay);                                                        // 0x3000 probe times out
+  trigger_read_completed(0xC0, api_erd_2, &probe_val, sizeof(probe_val));  // registered immediately
   mock().enable();
 
-  // Polling timer fires: only api_erd_1 and api_erd_2 in polling list (0x3000 excluded)
+  // state_polling entry: api_erd_1 and api_erd_2 already in erd_set (skipped).
+  // 0x3000 not in erd_set → added via _no_register → pending_registration_set.
+  // Polling timer fires: all 3 ERDs read simultaneously.
+  should_request_read(0xC0, api_erd_1);
+  should_request_read(0xC0, api_erd_2);
+  should_request_read(0xC0, 0x3000);
+  after(polling_interval);
+
+  // api_erd_1 and api_erd_2 already registered during probe — just publishes.
+  should_update_erd(api_erd_1, uint8_t(0xAA));
+  when_a_poll_read_completes(0xC0, api_erd_1, uint8_t(0xAA));
+
+  should_update_erd(api_erd_2, uint8_t(0xBB));
+  when_a_poll_read_completes(0xC0, api_erd_2, uint8_t(0xBB));
+
+  // 0x3000 was not registered during probe — lazily registered on first poll response.
+  should_register_erd(0x3000);
+  should_update_erd(0x3000, uint8_t(0xCC));
+  when_a_poll_read_completes(0xC0, 0x3000, uint8_t(0xCC));
+}
+
+// An ERD that the appliance explicitly rejects with "not_supported" during probe
+// must never appear in the polling list — not even for lazy registration.
+TEST(mqtt_bridge_polling_api_list, should_permanently_exclude_erds_rejected_as_not_supported_during_probe)
+{
+  // api_list with 3 ERDs; the middle one (0x3000) is explicitly rejected.
+  const tiny_erd_t api_list_3[3] = {api_erd_1, 0x3000, api_erd_2};
+
+  should_request_read(0xFF, 0x0008);
+  when_the_bridge_is_initialized();
+  self.api_parsed_list       = api_list_3;
+  self.api_parsed_list_count = 3;
+
+  // Feature-bit ERDs time out, probe phase begins.
+  // api_erd_1 responds, 0x3000 is explicitly rejected, api_erd_2 responds.
+  mock().disable();
+  uint8_t appliance_type = 0x03;
+  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
+  after(retry_delay * applianceApiFeatureErdCount);
+  uint8_t probe_val = 0x01;
+  trigger_read_completed(0xC0, api_erd_1, &probe_val, sizeof(probe_val));  // registered immediately
+  trigger_read_failed_not_supported(0x3000);                                // permanently excluded
+  trigger_read_completed(0xC0, api_erd_2, &probe_val, sizeof(probe_val));  // registered immediately
+  mock().enable();
+
+  // state_polling entry: api_erd_1, 0x3000, and api_erd_2 are all checked against erd_set.
+  // api_erd_1 and api_erd_2: already in erd_set (probe success) → skipped.
+  // 0x3000: also in erd_set (probe not_supported) → skipped, NOT added to polling list.
+  // Polling timer fires: only api_erd_1 and api_erd_2 are polled.
   should_request_read(0xC0, api_erd_1);
   should_request_read(0xC0, api_erd_2);
   after(polling_interval);
 
-  // Both already registered during probe — no register_erd expected
+  // Both already registered during probe — just publishes.
   should_update_erd(api_erd_1, uint8_t(0xAA));
   when_a_poll_read_completes(0xC0, api_erd_1, uint8_t(0xAA));
 

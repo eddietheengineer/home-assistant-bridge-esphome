@@ -211,6 +211,20 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
       }
       break;
 
+    case signal_read_failed:
+      disarm_timer(self);
+      // If the appliance explicitly rejects the ERD (not_supported), mark it
+      // in erd_set so the state_polling entry dedup loop does not add it.
+      // retries_exhausted means the GEA3 client timed out — the ERD may still
+      // be in the queue and could respond later; do NOT exclude it here.
+      if (args->read_failed.reason == tiny_gea3_erd_client_read_failure_reason_not_supported) {
+        erd_set(self).insert(args->read_failed.erd);
+      }
+      if (!send_next_read_request(self)) {
+        tiny_hsm_transition(hsm, self->next_discovery_state);
+      }
+      break;
+
     default:
       return tiny_hsm_result_signal_deferred;
   }
@@ -429,17 +443,6 @@ static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_s
     return tiny_hsm_result_signal_consumed;
   }
 
-  if (signal == signal_timer_expired) {
-    // Probe timed out: the appliance did not respond for this ERD.
-    // Mark it as "seen" in erd_set so the state_polling entry dedup loop
-    // does not re-add it to the polling list.
-    erd_set(self).insert(self->appliance_erd_list[self->erd_index]);
-    if (!send_next_read_request(self)) {
-      tiny_hsm_transition(hsm, self->next_discovery_state);
-    }
-    return tiny_hsm_result_signal_consumed;
-  }
-
   return handle_discovery_list_signals(hsm, signal, data);
 }
 
@@ -477,9 +480,10 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       erd_cache(self).clear();
       // api_parsed_list ERDs that were successfully probed in state_probe_api_parsed_erds
       // are already in erd_set and erd_polling_list — the dedup check below silently
-      // skips them.  ERDs that timed out during probe (or that arrived via the
+      // skips them.  ERDs that did not respond during probe (or that arrived via the
       // init_at_address shortcut that bypasses probe entirely) are not yet in erd_set
-      // and are added here with deferred MQTT registration.
+      // and are added here with deferred MQTT registration.  They will be lazily
+      // registered the first time they respond to a poll read.
       if (self->api_parsed_list != nullptr) {
         for (uint16_t i = 0; i < self->api_parsed_list_count; i++) {
           add_erd_to_polling_list_no_register(self, self->api_parsed_list[i]);
