@@ -364,7 +364,7 @@ extern "C" size_t esphome_mqtt_client_adapter_get_pending_update_count(
 }
 
 extern "C" void esphome_mqtt_client_adapter_publish(
-  esphome_mqtt_client_adapter_t* self,
+  esphome_mqtt_client_adapter_t* /*self*/,
   const std::string& topic,
   const std::string& payload,
   bool retain)

@@ -214,7 +214,7 @@ void GeappliancesBridge::configure_polling_optional_lists_()
     this->mqtt_bridge_polling_.api_parsed_list       = this->feature_bit_manager_.get_valid_erds_vec().data();
     this->mqtt_bridge_polling_.api_parsed_list_count =
       static_cast<uint16_t>(this->feature_bit_manager_.get_valid_erds_vec().size());
-    ESP_LOGI(TAG, "Polling with API-parsed list of %u ERDs (discovery skipped)",
+    ESP_LOGI(TAG, "Polling with API-parsed list of %u ERDs (ERDs will be probed before polling)",
              this->mqtt_bridge_polling_.api_parsed_list_count);
   }
 
