@@ -177,13 +177,36 @@ void GeappliancesBridge::setup() {
 }
 
 void GeappliancesBridge::loop() {
-  // ── 1. Protocol stack (unchanged) ──────────────────────────────────────
-  // Drive the GEA2/GEA3 protocol stack on every loop iteration so that
-  // UART bytes are processed and ERD read responses are delivered to the
-  // active manager (autodiscovery, device ID, feature bits, polling bridge).
-  this->run_protocol_stack_();
+  // Track MQTT connection state and notify the bridge on (re)connect.
+  auto mqtt_client = mqtt::global_mqtt_client;
+  if (mqtt_client != nullptr) {
+    bool is_connected = mqtt_client->is_connected();
+    if (is_connected && !this->mqtt_was_connected_) {
+      this->on_mqtt_connected_();
+      // Signal the startup HSM that MQTT is now connected — this may
+      // unblock the feature_bits or bridge_init phases.
+      tiny_hsm_send_signal(&this->startup_hsm_, signal_mqtt_connected, nullptr);
+    } else if (!is_connected && this->mqtt_was_connected_) {
+      // Notify the adapter that MQTT has disconnected so it resets the
+      // connect timestamp and publishes the disconnect event to the bridge
+      // HSMs.  Without this, the adapter would not re-apply the settle delay
+      // or re-subscribe the wildcard write topic after reconnect.
+      if (this->mqtt_client_adapter_initialized_) {
+        esphome_mqtt_client_adapter_notify_disconnected(&this->mqtt_client_adapter_);
+      }
+    }
+    // Drain pending ERD updates a few at a time each loop() call so that the
+    // burst of up to MAX_PENDING_UPDATES publishes after an MQTT reconnect is
+    // spread across multiple loop iterations (avoids a 1+ s stall from
+    // acquiring the IDF MQTT API mutex for each publish in succession).
+    // Also subscribes the wildcard write topic on first connect.
+    if (is_connected && this->mqtt_client_adapter_initialized_) {
+      esphome_mqtt_client_adapter_notify_connected(&this->mqtt_client_adapter_);
+    }
+    this->mqtt_was_connected_ = is_connected;
+  }
 
-  // ── 2. Startup HSM ──────────────────────────────────────────────────────
+  // ── Startup HSM ────────────────────────────────────────────────────────
   // The bridge progresses through a linear sequence of startup phases via
   // a tiny_hsm-based state machine.  Each state handles its own entry/exit
   // logic and waits for signals from managers before transitioning.
@@ -193,6 +216,16 @@ void GeappliancesBridge::loop() {
   //           → BRIDGE_INIT → SUBSCRIPTION_WATCH → HA_DISCOVERY → HEAP
   //           → RUNNING (steady-state)
   // ────────────────────────────────────────────────────────────────────────
+
+  // Drive the GEA2/GEA3 protocol stack on every loop iteration so that
+  // UART bytes are processed and ERD read responses are delivered to the
+  // active manager (autodiscovery, device ID, feature bits, polling bridge).
+  this->run_protocol_stack_();
+#ifdef USE_ESP32
+  // Feed the task watchdog after the protocol stack — the GEA2 tight loop
+  // can run for 200 ms wall-clock time, exceeding the default TWDT timeout.
+  esp_task_wdt_reset();
+#endif
 
   // Initialize the startup HSM on the first loop() call.
   if (this->startup_hsm_.current == nullptr) {
@@ -211,67 +244,12 @@ void GeappliancesBridge::loop() {
   if (hsm_elapsed >= 1000) {
     ESP_LOGW(TAG, "Long HSM run_loop: %ums", hsm_elapsed);
   }
-
-  // ── 3. MQTT state machine ───────────────────────────────────────────────
-  // Manages the MQTT connection lifecycle independently of the startup HSM.
-  // Breaks the heavy (re)connection block into distinct phases so each
-  // loop() tick does a tiny slice of work and yields immediately.
-  //
-  // States: DISCONNECTED → SUBSCRIBING → FLUSHING_BACKLOG → READY
-  // On disconnect, resets to DISCONNECTED and restarts on next connect.
-  // ────────────────────────────────────────────────────────────────────────
-
-  auto mqtt_client = mqtt::global_mqtt_client;
-
-  // Guard: MQTT disconnected
-  if (mqtt_client == nullptr || !mqtt_client->is_connected()) {
-    if (this->mqtt_state_ != MqttBridgeState::DISCONNECTED) {
-      ESP_LOGD(TAG, "MQTT disconnected. Resetting bridge state.");
-      this->mqtt_state_ = MqttBridgeState::DISCONNECTED;
-      if (this->mqtt_client_adapter_initialized_) {
-        esphome_mqtt_client_adapter_notify_disconnected(&this->mqtt_client_adapter_);
-      }
-    }
-    return;
-  }
-
-  // MQTT is connected -- state machine execution
-  switch (this->mqtt_state_) {
-    case MqttBridgeState::DISCONNECTED:
-      // Just connected -- transition to subscribing
-      ESP_LOGI(TAG, "MQTT connected! Starting setup phase...");
-      // Signal the startup HSM that MQTT is now connected — this may
-      // unblock the feature_bits or bridge_init phases.
-      tiny_hsm_send_signal(&this->startup_hsm_, signal_mqtt_connected, nullptr);
-      this->mqtt_state_ = MqttBridgeState::SUBSCRIBING;
-      break;
-
-    case MqttBridgeState::SUBSCRIBING:
-      // Subscribe wildcard write topic (one-time, handled by adapter)
-      // and record the connect timestamp for settle delay.
-      // Only proceed if the adapter is initialized (bridge_init may not
-      // have run yet during early startup).
-      if (this->mqtt_client_adapter_initialized_) {
-        esphome_mqtt_client_adapter_notify_connected(&this->mqtt_client_adapter_);
-        this->mqtt_state_ = MqttBridgeState::FLUSHING_BACKLOG;
-      }
-      break;
-
-    case MqttBridgeState::FLUSHING_BACKLOG:
-      // Flush pending ERD updates in small chunks (5 per tick)
-      if (this->flush_pending_chunk_(5)) {
-        ESP_LOGI(TAG, "Bridge fully synchronized and ready.");
-        this->mqtt_state_ = MqttBridgeState::READY;
-      }
-      break;
-
-    case MqttBridgeState::READY:
-      // Steady-state: the startup HSM's running state handles recurring
-      // tasks (managers, subscription activity, polling, HA discovery).
-      // This state is a no-op — the MQTT connection is healthy and the
-      // bridge is fully operational.
-      break;
-  }
+#ifdef USE_ESP32
+  // Feed the task watchdog after the HSM run_loop signal — in steady-state
+  // this drains pending MQTT updates (each acquiring the IDF MQTT mutex)
+  // and can block for hundreds of milliseconds.
+  esp_task_wdt_reset();
+#endif
 }
 
 // ---------------------------------------------------------------------------
@@ -378,21 +356,6 @@ void GeappliancesBridge::run_protocol_stack_()
              loop_elapsed, this->mode_ == BRIDGE_MODE_SUBSCRIBE ? "sub" : (this->mode_ == BRIDGE_MODE_AUTO ? "auto" : "poll"),
              this->mqtt_bridge_initialized_ ? "yes" : "no");
   }
-}
-
-// ---------------------------------------------------------------------------
-// MQTT state machine helpers
-// ---------------------------------------------------------------------------
-
-bool GeappliancesBridge::flush_pending_chunk_(uint8_t chunk_size)
-{
-  // Delegate to the mqtt_client_adapter to flush 'chunk_size' pending
-  // updates per call.  Returns true when the pending_updates map is empty.
-  // The adapter already enforces MAX_FLUSH_PER_CALL internally, but we
-  // call it once per tick to drive the chunked drain.
-  esphome_mqtt_client_adapter_notify_connected(&this->mqtt_client_adapter_);
-  return esphome_mqtt_client_adapter_get_pending_update_count(
-           &this->mqtt_client_adapter_) == 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -513,6 +476,37 @@ bool GeappliancesBridge::should_route_to_feature_bits_(tiny_erd_t erd)
 // ---------------------------------------------------------------------------
 // MQTT event callbacks
 // ---------------------------------------------------------------------------
+
+void GeappliancesBridge::on_mqtt_connected_()
+{
+  ESP_LOGI(TAG, "MQTT connected, flushing pending updates");
+
+  // Flush any pending ERD updates that were queued while MQTT was disconnected.
+  if (this->mqtt_bridge_initialized_) {
+    esphome_mqtt_client_adapter_notify_connected(&this->mqtt_client_adapter_);
+  }
+
+  // Do NOT call notify_mqtt_disconnected_() here. Calling it on every MQTT
+  // (re)connect was the primary crash source for GEA2 devices:
+  //
+  //   1. It sent signal_mqtt_disconnected to the HSM, forcing the polling
+  //      bridge back to state_identify_appliance and triggering full GEA2
+  //      re-identification (~3 s) plus feature-ERD re-reads (~1.75 s more).
+  //
+  //   2. The state_polling re-entry happened inside tiny_timer_group_run(),
+  //      which is called from within the 200 ms GEA2 tight loop. On first
+  //      boot (erd_set empty) this ran 56 subscribe() calls — each allocating
+  //      heap — while the GEA2 loop blocked FreeRTOS context switches. This
+  //      produced a 499 ms spike, 26 dropped MQTT SUBACK events, and a race
+  //      with the IDF MQTT task that corrupted the heap.
+  //
+  // ESPHome's MQTT client automatically re-sends SUBSCRIBE packets for all
+  // tracked topics when it reconnects, so no explicit resubscription is needed
+  // here. ERD values queued during MQTT downtime are flushed above via
+  // notify_connected. If the appliance is genuinely lost, signal_appliance_lost
+  // fires after 60 s (polling) or signal_subscription_host_came_online handles
+  // it (subscription bridge).
+}
 
 void GeappliancesBridge::on_ha_discovery_erd_seen_(tiny_erd_t erd)
 {
