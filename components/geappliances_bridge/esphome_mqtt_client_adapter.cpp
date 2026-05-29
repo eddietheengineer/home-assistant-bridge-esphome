@@ -314,9 +314,10 @@ extern "C" void esphome_mqtt_client_adapter_notify_disconnected(
   tiny_event_publish(&self->on_mqtt_disconnect_event, nullptr);
 }
 
-extern "C" void esphome_mqtt_client_adapter_notify_connected(
+extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
   esphome_mqtt_client_adapter_t* self)
 {
+  // Record the connect timestamp on first call after each reconnect.
   if (self->mqtt_connected_at_ms == 0) {
     self->mqtt_connected_at_ms = esphome::millis();
   }
@@ -396,16 +397,20 @@ extern "C" void esphome_mqtt_client_adapter_notify_connected(
       self->wildcard_subscribed = true;
     }
   }
+}
 
+extern "C" size_t esphome_mqtt_client_adapter_drain_pending_updates(
+  esphome_mqtt_client_adapter_t* self)
+{
   // Flush up to MAX_FLUSH_PER_CALL pending ERD updates per call.
-  // loop() calls this every iteration while MQTT is connected so the full
-  // backlog drains across multiple loop cycles without stalling the loop.
+  // Returns the number of updates still pending after this call so callers
+  // can detect when the queue is empty (return value == 0).
   if (self->pending_updates == nullptr || self->pending_updates->empty()) {
-    return;
+    return 0;
   }
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client == nullptr || !mqtt_client->is_connected()) {
-    return;
+    return self->pending_updates->size();
   }
   size_t flushed = 0;
   while (!self->pending_updates->empty() && flushed < MAX_FLUSH_PER_CALL) {
@@ -417,6 +422,14 @@ extern "C" void esphome_mqtt_client_adapter_notify_connected(
   if (flushed > 0 && self->pending_updates->empty()) {
     ESP_LOGV(TAG, "Flushed all pending ERD updates");
   }
+  return self->pending_updates->size();
+}
+
+extern "C" void esphome_mqtt_client_adapter_notify_connected(
+  esphome_mqtt_client_adapter_t* self)
+{
+  esphome_mqtt_client_adapter_subscribe_write_topic(self);
+  esphome_mqtt_client_adapter_drain_pending_updates(self);
 }
 
 extern "C" void esphome_mqtt_client_adapter_destroy(

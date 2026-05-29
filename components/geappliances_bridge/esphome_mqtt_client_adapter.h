@@ -108,6 +108,23 @@ void esphome_mqtt_client_adapter_notify_disconnected(
 void esphome_mqtt_client_adapter_notify_connected(
   esphome_mqtt_client_adapter_t* self);
 
+/*!
+ * Subscribe the single wildcard write topic (geappliances/{id}/erd/+/write).
+ * Idempotent — does nothing after the first successful subscribe.  Records
+ * mqtt_connected_at_ms on first call after each reconnect.
+ * Called by the bridge MQTT FSM in the SUBSCRIBING state.
+ */
+void esphome_mqtt_client_adapter_subscribe_write_topic(
+  esphome_mqtt_client_adapter_t* self);
+
+/*!
+ * Flush up to MAX_FLUSH_PER_CALL pending ERD updates to the broker.
+ * Returns the number of updates still pending after this call; 0 means
+ * the queue is empty.  Called by the bridge MQTT FSM in FLUSHING / RUNNING.
+ */
+size_t esphome_mqtt_client_adapter_drain_pending_updates(
+  esphome_mqtt_client_adapter_t* self);
+
 void esphome_mqtt_client_adapter_destroy(
   esphome_mqtt_client_adapter_t* self);
 

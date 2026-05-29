@@ -129,7 +129,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void run_all_managers() override;
 
   // ── Internal bridge methods (event callbacks and per-phase helpers) ─────────
-  void on_mqtt_connected_();
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();
   void initialize_mqtt_bridge_();
@@ -154,7 +153,15 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   uart::UARTComponent *gea2_uart_{nullptr};
   std::string configured_device_id_;
   uint8_t client_address_{0xE4};
-  bool mqtt_was_connected_{false};
+
+  // States for the non-blocking MQTT (re)connection FSM in loop().
+  enum class MqttConnectionState : uint8_t {
+    DISCONNECTED,  // No MQTT connection (or not yet seen)
+    SUBSCRIBING,   // Connected; waiting for adapter init to subscribe wildcard
+    FLUSHING,      // Subscribed; draining pending ERD update queue
+    RUNNING,       // Steady-state: queue empty, draining new updates each loop
+  };
+  MqttConnectionState mqtt_connection_state_{MqttConnectionState::DISCONNECTED};
   bool mqtt_client_adapter_initialized_{false};
   bool mqtt_bridge_initialized_{false};
   BridgeMode mode_{BRIDGE_MODE_AUTO};
