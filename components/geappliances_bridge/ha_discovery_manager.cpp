@@ -17,6 +17,7 @@
 #  include "freertos/task.h"
 #  include "freertos/queue.h"
 #  include "esp_heap_caps.h"
+#  include "esp_task_wdt.h"
 #endif
 
 namespace esphome {
@@ -71,17 +72,30 @@ void HaDiscoveryManager::cleanup()
     // after it drains existing items.
     xQueueSend(this->queue_, &sentinel, 0);
 
+    // Drain all remaining items from the queue before waiting for the task.
+    // If the fetch task is blocked on xQueueSend() (queue full), this
+    // unblocks it so it can finish and call vTaskDelete().
+    {
+      HaDiscoveryItem* item = nullptr;
+      while (xQueueReceive(this->queue_, &item, 0) == pdTRUE) {
+        if (item != nullptr) delete item;
+      }
+    }
+    // Re-send the sentinel now that space is guaranteed.
+    xQueueSend(this->queue_, &sentinel, 0);
+
     // Wait for the task to actually terminate before freeing its stack/TCB.
     // Without this, freeing the stack while the task is still executing
     // causes a use-after-free crash.
     if (this->task_handle_ != nullptr) {
       // Poll with a generous timeout (up to 5 s) to wait for the task
-    // to call vTaskDelete().  The task deletes itself after sending the
-    // sentinel to the queue, so we wait until the handle becomes NULL.
+      // to call vTaskDelete().  The task deletes itself after sending the
+      // sentinel to the queue, so we wait until the handle becomes NULL.
       // Use subtraction to avoid millis() overflow (deadline = start + 5000
       // wraps incorrectly when millis() is near UINT32_MAX).
       uint32_t start = millis();
       while (this->task_handle_ != nullptr && millis() - start < 5000) {
+        esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(10));
       }
       if (this->task_handle_ != nullptr) {
@@ -177,7 +191,7 @@ void HaDiscoveryManager::publish_ha_discovery_(mqtt::MQTTClientComponent* mqtt_c
   }
 
   this->registered_erds_snapshot_ = this->registered_erds_;
-  this->state_ = HA_DISCOVERY_DOWNLOADING;
+  this->state_ = HA_DISCOVERY_PUBLISHING;
 
   this->task_stack_ = static_cast<StackType_t*>(
     heap_caps_malloc(HA_FETCH_STACK_SIZE * sizeof(StackType_t), MALLOC_CAP_INTERNAL));
