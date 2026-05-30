@@ -77,6 +77,9 @@ tiny_hsm_result_t startup_state_top(
 tiny_hsm_result_t startup_state_protocol_stack(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
+tiny_hsm_result_t startup_state_startup_delay(
+  tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+
 tiny_hsm_result_t startup_state_autodiscovery(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 

@@ -1,9 +1,10 @@
-/*!
+/*!\
  * @file
  * @brief Unit tests for the AutodiscoveryManager class.
  *
- * Validates initialization, state machine transitions, broadcast handling,
- * retry logic, and completion behavior.
+ * Validates initialization, self-driving state machine transitions,
+ * broadcast handling via event subscriptions, retry logic, and
+ * completion behavior.
  */
 
 #include "CppUTest/TestHarness.h"
@@ -15,9 +16,11 @@
 #endif
 
 #include "autodiscovery_manager.h"
+#include "esphome_time_source.h"
 #include "double/esphome_hal_double.hpp"
 #include "double/tiny_gea3_erd_client_double.hpp"
 #include "double/tiny_gea2_erd_client_double.hpp"
+#include "tiny_timer.h"
 
 #include "geappliances_bridge_constants.h"
 
@@ -30,6 +33,7 @@ TEST_GROUP(autodiscovery_manager)
   tiny_gea3_erd_client_double_t gea3_client;
   tiny_gea2_erd_client_double_t gea2_client;
   tiny_gea3_erd_client_double_t gea2_adapter;
+  tiny_timer_group_t timer_group;
   bool callback_called;
 
   void setup()
@@ -40,6 +44,9 @@ TEST_GROUP(autodiscovery_manager)
     tiny_gea3_erd_client_double_init(&gea2_adapter);
     callback_called = false;
     esphome_hal_double_set_millis(0);
+
+    // Initialize a minimal time source for the timer group.
+    tiny_timer_group_init(&timer_group, esphome_time_source_init());
   }
 
   void teardown()
@@ -49,7 +56,8 @@ TEST_GROUP(autodiscovery_manager)
 
   void init_both_uart()
   {
-    manager.init(&gea3_client.interface,
+    manager.init(&timer_group,
+                 &gea3_client.interface,
                  &gea2_client.interface,
                  &gea2_adapter.interface,
                  true,  /* has_gea3_uart */
@@ -59,7 +67,8 @@ TEST_GROUP(autodiscovery_manager)
 
   void init_gea3_only()
   {
-    manager.init(&gea3_client.interface,
+    manager.init(&timer_group,
+                 &gea3_client.interface,
                  nullptr,
                  nullptr,
                  true,   /* has_gea3_uart */
@@ -69,9 +78,10 @@ TEST_GROUP(autodiscovery_manager)
 
   void init_gea2_only()
   {
-    manager.init(nullptr,
-                 &gea2_client.interface,
+    manager.init(&timer_group,
                  nullptr,
+                 &gea2_client.interface,
+                 &gea2_adapter.interface,  // GEA2 adapter (wraps GEA2 client as GEA3 interface)
                  false,  /* has_gea3_uart */
                  true,   /* has_gea2_uart */
                  [this]() { callback_called = true; });
@@ -98,16 +108,46 @@ TEST_GROUP(autodiscovery_manager)
       .ignoreOtherParameters()
       .andReturnValue(true);
   }
+
+  /* Simulate a broadcast response by triggering the ERD client activity event. */
+  void simulate_broadcast_response(uint8_t address, uint8_t appliance_type, bool is_gea3)
+  {
+    tiny_gea3_erd_client_on_activity_args_t args;
+    args.type = tiny_gea3_erd_client_activity_type_read_completed;
+    args.address = address;
+    args.read_completed.request_id = 0;
+    args.read_completed.erd = ERD_APPLIANCE_TYPE;
+    uint8_t data[1] = { appliance_type };
+    args.read_completed.data = data;
+    args.read_completed.data_size = 1;
+
+    // Use the double's trigger function to publish to the correct client.
+    if (is_gea3) {
+      tiny_gea3_erd_client_double_trigger_activity_event(&gea3_client, &args);
+    } else {
+      tiny_gea3_erd_client_double_trigger_activity_event(&gea2_adapter, &args);
+    }
+  }
+
+  /* Advance timers by running the timer group (services expired timers). */
+  void advance_timers()
+  {
+    // tiny_timer_group_run services at most one timer per call.
+    // We call it a few times to drain any pending timers.
+    for (int i = 0; i < 10; i++) {
+      tiny_timer_group_run(&timer_group);
+    }
+  }
 };
 
 /* ------------------------------------------------------------------ */
 /* Initialization                                                       */
 /* ------------------------------------------------------------------ */
 
-TEST(autodiscovery_manager, init_sets_state_to_waiting_5s)
+TEST(autodiscovery_manager, init_sets_state_to_idle)
 {
   init_both_uart();
-  CHECK_EQUAL(AUTODISCOVERY_WAITING_5S, manager.get_state());
+  CHECK_EQUAL(AUTODISCOVERY_IDLE, manager.get_state());
 }
 
 TEST(autodiscovery_manager, init_stores_host_address_as_zero)
@@ -122,299 +162,210 @@ TEST(autodiscovery_manager, init_stores_active_erd_client_as_null)
   CHECK(manager.get_active_erd_client() == nullptr);
 }
 
-TEST(autodiscovery_manager, init_sets_retry_count_to_zero)
+TEST(autodiscovery_manager, start_transitions_to_gea3_broadcast_when_both_uart)
 {
   init_both_uart();
-  CHECK_EQUAL(0, manager.get_retry_count());
-}
-
-TEST(autodiscovery_manager, init_is_not_complete)
-{
-  init_both_uart();
-  CHECK_FALSE(manager.is_complete());
-  CHECK_FALSE(manager.is_failed());  // is_failed() always returns false — retries indefinitely
-}
-
-TEST(autodiscovery_manager, is_failed_always_returns_false)
-{
-  init_both_uart();
-  CHECK_FALSE(manager.is_failed());
-
-  /* Even after many timeouts with no response, is_failed() stays false */
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
-  manager.run();  /* → GEA3_BROADCAST_PENDING */
   expect_gea3_broadcast_read();
-  uint32_t gea3_time = AUTODISCOVERY_STARTUP_DELAY_MS + 100;
-  esphome_hal_double_set_millis(gea3_time);
-  manager.run();  /* → GEA3_BROADCAST_WAITING */
-
-  /* Timeout with no response → retry GEA2 */
-  esphome_hal_double_set_millis(gea3_time + AUTODISCOVERY_BROADCAST_WINDOW_MS);
-  manager.run();  /* → GEA2_BROADCAST_PENDING */
-  expect_gea2_broadcast_read();
-  uint32_t gea2_time = gea3_time + AUTODISCOVERY_BROADCAST_WINDOW_MS + 100;
-  esphome_hal_double_set_millis(gea2_time);
-  manager.run();  /* → GEA2_BROADCAST_WAITING */
-
-  /* Timeout again with no response → retry GEA3 */
-  esphome_hal_double_set_millis(gea2_time + AUTODISCOVERY_BROADCAST_WINDOW_MS);
-  manager.run();  /* → GEA3_BROADCAST_PENDING */
-  expect_gea3_broadcast_read();
-  uint32_t gea3_time2 = gea2_time + AUTODISCOVERY_BROADCAST_WINDOW_MS + 100;
-  esphome_hal_double_set_millis(gea3_time2);
-  manager.run();  /* → GEA3_BROADCAST_WAITING */
-
-  CHECK_FALSE(manager.is_failed());
-  CHECK_FALSE(manager.is_complete());
-  /* Should still be in a retrying state, not COMPLETE */
-  CHECK(manager.get_state() != AUTODISCOVERY_COMPLETE);
+  manager.start();
+  CHECK_EQUAL(AUTODISCOVERY_GEA3_BROADCAST_WAITING, manager.get_state());
 }
 
-/* ------------------------------------------------------------------ */
-/* WAITING_5S → GEA3/GEA2 BROADCAST_PENDING                           */
-/* ------------------------------------------------------------------ */
-
-TEST(autodiscovery_manager, run_transitions_to_gea3_broadcast_after_5s)
-{
-  init_both_uart();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
-  manager.run();
-  CHECK_EQUAL(AUTODISCOVERY_GEA3_BROADCAST_PENDING, manager.get_state());
-}
-
-TEST(autodiscovery_manager, run_does_not_transition_before_5s)
-{
-  init_both_uart();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS - 1);
-  manager.run();
-  CHECK_EQUAL(AUTODISCOVERY_WAITING_5S, manager.get_state());
-}
-
-TEST(autodiscovery_manager, run_transitions_to_gea2_if_no_gea3_uart)
+TEST(autodiscovery_manager, start_transitions_to_gea2_broadcast_when_gea2_only)
 {
   init_gea2_only();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
-  manager.run();
-  CHECK_EQUAL(AUTODISCOVERY_GEA2_BROADCAST_PENDING, manager.get_state());
+  expect_gea2_broadcast_read();
+  manager.start();
+  CHECK_EQUAL(AUTODISCOVERY_GEA2_BROADCAST_WAITING, manager.get_state());
 }
 
-/* ------------------------------------------------------------------ */
-/* GEA3 BROADCAST PENDING → WAITING                                     */
-/* ------------------------------------------------------------------ */
-
-TEST(autodiscovery_manager, gea3_pending_sends_broadcast_and_waits)
+TEST(autodiscovery_manager, start_is_idempotent)
 {
   init_both_uart();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
-  manager.run();  /* → GEA3_BROADCAST_PENDING */
   expect_gea3_broadcast_read();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS + 100);
-  manager.run();  /* → GEA3_BROADCAST_WAITING */
+  manager.start();
+  CHECK_EQUAL(AUTODISCOVERY_GEA3_BROADCAST_WAITING, manager.get_state());
+
+  // Second call should be a no-op.
+  manager.start();
   CHECK_EQUAL(AUTODISCOVERY_GEA3_BROADCAST_WAITING, manager.get_state());
 }
 
 /* ------------------------------------------------------------------ */
-/* on_broadcast_response handling                                       */
+/* GEA3 discovery success                                               */
 /* ------------------------------------------------------------------ */
 
-TEST(autodiscovery_manager, on_broadcast_response_sets_gea3_discovery)
+TEST(autodiscovery_manager, gea3_discovery_completes_on_broadcast_response)
 {
   init_both_uart();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
-  manager.run();  /* → GEA3_BROADCAST_PENDING */
   expect_gea3_broadcast_read();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS + 100);
-  manager.run();  /* → GEA3_BROADCAST_WAITING */
+  manager.start();  /* -> GEA3_BROADCAST_WAITING */
 
-  manager.on_broadcast_response(0xB8, 0x03, true);
+  // Simulate a broadcast response arriving via the event subscription.
+  simulate_broadcast_response(0xB8, 0x03, true);
+
+  // Advance timers to trigger the broadcast window expiry.
+  esphome_hal_double_set_millis(AUTODISCOVERY_BROADCAST_WINDOW_MS + 100);
+  advance_timers();
+
+  CHECK_EQUAL(AUTODISCOVERY_COMPLETE, manager.get_state());
   CHECK_EQUAL(0xB8, manager.get_host_address());
   CHECK_EQUAL(&gea3_client.interface, manager.get_active_erd_client());
   CHECK_FALSE(manager.is_gea2_protocol());
+  CHECK_TRUE(callback_called);
 }
 
-TEST(autodiscovery_manager, on_broadcast_response_sets_gea2_discovery)
+/* ------------------------------------------------------------------ */
+/* GEA2 discovery success (after GEA3 timeout)                          */
+/* ------------------------------------------------------------------ */
+
+TEST(autodiscovery_manager, gea2_discovery_after_gea3_timeout)
 {
   init_both_uart();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
-  manager.run();  /* → GEA3_BROADCAST_PENDING */
+
+  // GEA3 broadcast.
   expect_gea3_broadcast_read();
-  uint32_t gea3_time = AUTODISCOVERY_STARTUP_DELAY_MS + 100;
-  esphome_hal_double_set_millis(gea3_time);
-  manager.run();  /* → GEA3_BROADCAST_WAITING */
+  manager.start();  /* -> GEA3_BROADCAST_WAITING */
 
-  /* GEA3 times out with no response → GEA2 */
-  esphome_hal_double_set_millis(gea3_time + AUTODISCOVERY_BROADCAST_WINDOW_MS);
-  manager.run();  /* → GEA2_BROADCAST_PENDING */
-  expect_gea2_broadcast_read();
-  uint32_t gea2_time = gea3_time + AUTODISCOVERY_BROADCAST_WINDOW_MS + 100;
-  esphome_hal_double_set_millis(gea2_time);
-  manager.run();  /* → GEA2_BROADCAST_WAITING */
+  // GEA3 times out with no response -> retries GEA2.
+  expect_gea2_broadcast_read();  // GEA2 broadcast after GEA3 timeout.
+  esphome_hal_double_set_millis(AUTODISCOVERY_BROADCAST_WINDOW_MS + 100);
+  advance_timers();
 
-  manager.on_broadcast_response(0xB8, 0x03, false);
+  // Now we should be in GEA2_BROADCAST_WAITING.
+  CHECK(manager.get_state() == AUTODISCOVERY_GEA2_BROADCAST_WAITING);
+
+  // Simulate a GEA2 broadcast response.
+  simulate_broadcast_response(0xB8, 0x03, false);
+
+  // Advance timers to trigger the broadcast window expiry.
+  esphome_hal_double_set_millis(esphome_hal_double_get_millis() + AUTODISCOVERY_BROADCAST_WINDOW_MS + 100);
+  advance_timers();
+
+  CHECK_EQUAL(AUTODISCOVERY_COMPLETE, manager.get_state());
   CHECK_EQUAL(0xB8, manager.get_host_address());
   CHECK_EQUAL(&gea2_adapter.interface, manager.get_active_erd_client());
-  /* gea2_protocol_active_ is set in run() on completion, not in on_broadcast_response() */
-  CHECK_FALSE(manager.is_gea2_protocol());
+  CHECK_TRUE(manager.is_gea2_protocol());
+  CHECK_TRUE(callback_called);
 }
 
-TEST(autodiscovery_manager, on_broadcast_response_ignores_wrong_protocol)
+/* ------------------------------------------------------------------ */
+/* Wrong protocol response is ignored                                   */
+/* ------------------------------------------------------------------ */
+
+TEST(autodiscovery_manager, wrong_protocol_response_ignored)
 {
   init_both_uart();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
-  manager.run();  /* → GEA3_BROADCAST_PENDING */
   expect_gea3_broadcast_read();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS + 100);
-  manager.run();  /* → GEA3_BROADCAST_WAITING */
+  manager.start();  /* -> GEA3_BROADCAST_WAITING */
 
-  /* GEA2 response during GEA3 window is ignored */
-  manager.on_broadcast_response(0xB8, 0x03, false);
+  // A GEA2 response during GEA3 window should be ignored.
+  simulate_broadcast_response(0xB8, 0x03, false);
+
+  // The manager should still be waiting (not complete).
+  CHECK_EQUAL(AUTODISCOVERY_GEA3_BROADCAST_WAITING, manager.get_state());
   CHECK(manager.get_active_erd_client() == nullptr);
 }
 
 /* ------------------------------------------------------------------ */
-/* Completion flow                                                        */
+/* Retry logic: GEA3-only retries GEA3                                  */
 /* ------------------------------------------------------------------ */
-
-TEST(autodiscovery_manager, gea3_discovery_completes_on_timeout)
-{
-  init_both_uart();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
-  manager.run();  /* → GEA3_BROADCAST_PENDING */
-  expect_gea3_broadcast_read();
-  uint32_t broadcast_time = AUTODISCOVERY_STARTUP_DELAY_MS + 100;
-  esphome_hal_double_set_millis(broadcast_time);
-  manager.run();  /* → GEA3_BROADCAST_WAITING */
-
-  /* Receive response */
-  manager.on_broadcast_response(0xB8, 0x03, true);
-
-  /* Timeout the window - should complete */
-  esphome_hal_double_set_millis(broadcast_time + AUTODISCOVERY_BROADCAST_WINDOW_MS);
-  manager.run();
-
-  CHECK_EQUAL(AUTODISCOVERY_COMPLETE, manager.get_state());
-  CHECK_TRUE(callback_called);
-}
-
-TEST(autodiscovery_manager, gea2_discovery_completes_on_timeout)
-{
-  init_both_uart();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
-  manager.run();  /* → GEA3_BROADCAST_PENDING */
-  expect_gea3_broadcast_read();
-  uint32_t gea3_time = AUTODISCOVERY_STARTUP_DELAY_MS + 100;
-  esphome_hal_double_set_millis(gea3_time);
-  manager.run();  /* → GEA3_BROADCAST_WAITING */
-
-  /* GEA3 times out with no response → GEA2 */
-  esphome_hal_double_set_millis(gea3_time + AUTODISCOVERY_BROADCAST_WINDOW_MS);
-  manager.run();  /* → GEA2_BROADCAST_PENDING */
-  expect_gea2_broadcast_read();
-  uint32_t gea2_time = gea3_time + AUTODISCOVERY_BROADCAST_WINDOW_MS + 100;
-  esphome_hal_double_set_millis(gea2_time);
-  manager.run();  /* → GEA2_BROADCAST_WAITING */
-
-  /* Receive GEA2 response */
-  manager.on_broadcast_response(0xB8, 0x03, false);
-
-  /* Timeout the window - should complete */
-  esphome_hal_double_set_millis(gea2_time + AUTODISCOVERY_BROADCAST_WINDOW_MS);
-  manager.run();
-
-  CHECK_EQUAL(AUTODISCOVERY_COMPLETE, manager.get_state());
-  CHECK_TRUE(manager.is_gea2_protocol());
-}
-
-TEST(autodiscovery_manager, run_does_nothing_when_complete)
-{
-  init_both_uart();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
-  manager.run();
-  expect_gea3_broadcast_read();
-  uint32_t broadcast_time = AUTODISCOVERY_STARTUP_DELAY_MS + 100;
-  esphome_hal_double_set_millis(broadcast_time);
-  manager.run();
-
-  manager.on_broadcast_response(0xB8, 0x03, true);
-  esphome_hal_double_set_millis(broadcast_time + AUTODISCOVERY_BROADCAST_WINDOW_MS);
-  manager.run();
-
-  CHECK_EQUAL(AUTODISCOVERY_COMPLETE, manager.get_state());
-
-  /* Further runs should be no-ops */
-  esphome_hal_double_set_millis(esphome_hal_double_get_millis() + 10000);
-  manager.run();
-  CHECK_EQUAL(AUTODISCOVERY_COMPLETE, manager.get_state());
-}
-
-/* ------------------------------------------------------------------ */
-/* Retry logic                                                          */
-/* ------------------------------------------------------------------ */
-
-TEST(autodiscovery_manager, run_retries_gea3_then_gea2_on_timeout)
-{
-  init_both_uart();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
-  manager.run();  /* → GEA3_BROADCAST_PENDING */
-  expect_gea3_broadcast_read();
-  uint32_t gea3_time = AUTODISCOVERY_STARTUP_DELAY_MS + 100;
-  esphome_hal_double_set_millis(gea3_time);
-  manager.run();  /* → GEA3_BROADCAST_WAITING */
-
-  /* Timeout with no response → GEA2 */
-  esphome_hal_double_set_millis(gea3_time + AUTODISCOVERY_BROADCAST_WINDOW_MS);
-  manager.run();  /* → GEA2_BROADCAST_PENDING */
-  expect_gea2_broadcast_read();
-  uint32_t gea2_time = gea3_time + AUTODISCOVERY_BROADCAST_WINDOW_MS + 100;
-  esphome_hal_double_set_millis(gea2_time);
-  manager.run();  /* → GEA2_BROADCAST_WAITING */
-
-  CHECK_EQUAL(1, manager.get_retry_count());
-}
 
 TEST(autodiscovery_manager, gea3_only_retries_gea3)
 {
   init_gea3_only();
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
-  manager.run();  /* → GEA3_BROADCAST_PENDING */
-  expect_gea3_broadcast_read();
-  uint32_t gea3_time = AUTODISCOVERY_STARTUP_DELAY_MS + 100;
-  esphome_hal_double_set_millis(gea3_time);
-  manager.run();  /* → GEA3_BROADCAST_WAITING */
 
-  /* Timeout with no response → retry GEA3 */
-  esphome_hal_double_set_millis(gea3_time + AUTODISCOVERY_BROADCAST_WINDOW_MS);
-  manager.run();  /* → GEA3_BROADCAST_PENDING (retry) */
+  // First GEA3 broadcast.
   expect_gea3_broadcast_read();
-  uint32_t gea3_time2 = gea3_time + AUTODISCOVERY_BROADCAST_WINDOW_MS + 100;
-  esphome_hal_double_set_millis(gea3_time2);
-  manager.run();  /* → GEA3_BROADCAST_WAITING */
+  manager.start();  /* -> GEA3_BROADCAST_WAITING */
 
-  CHECK_EQUAL(1, manager.get_retry_count());
+  // Timeout -> retry GEA3 (timer callback calls run() which sends another read).
+  expect_gea3_broadcast_read();  // Second broadcast after retry.
+  esphome_hal_double_set_millis(AUTODISCOVERY_BROADCAST_WINDOW_MS + 100);
+  advance_timers();
+
+  // Should be back in GEA3_BROADCAST_WAITING (after sending another read).
+  CHECK(manager.get_state() == AUTODISCOVERY_GEA3_BROADCAST_WAITING);
+  CHECK(manager.get_active_erd_client() == nullptr);
+  CHECK_FALSE(callback_called);
 }
 
 /* ------------------------------------------------------------------ */
-/* Null callback handling                                               */
+/* Completion with null callback                                        */
 /* ------------------------------------------------------------------ */
 
 TEST(autodiscovery_manager, completion_with_null_callback_does_not_crash)
 {
-  manager.init(&gea3_client.interface,
+  manager.init(&timer_group,
+               &gea3_client.interface,
                &gea2_client.interface,
                &gea2_adapter.interface,
                true, true,
                nullptr);  /* No callback */
 
-  esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS);
-  manager.run();
   expect_gea3_broadcast_read();
-  uint32_t broadcast_time = AUTODISCOVERY_STARTUP_DELAY_MS + 100;
-  esphome_hal_double_set_millis(broadcast_time);
-  manager.run();
+  manager.start();
 
-  manager.on_broadcast_response(0xB8, 0x03, true);
-  esphome_hal_double_set_millis(broadcast_time + AUTODISCOVERY_BROADCAST_WINDOW_MS);
-  manager.run();
+  simulate_broadcast_response(0xB8, 0x03, true);
+  esphome_hal_double_set_millis(AUTODISCOVERY_BROADCAST_WINDOW_MS + 100);
+  advance_timers();
 
   CHECK_EQUAL(AUTODISCOVERY_COMPLETE, manager.get_state());
+}
+
+/* ------------------------------------------------------------------ */
+/* Complete state is terminal                                           */
+/* ------------------------------------------------------------------ */
+
+TEST(autodiscovery_manager, complete_state_is_terminal)
+{
+  init_both_uart();
+  expect_gea3_broadcast_read();
+  manager.start();
+
+  simulate_broadcast_response(0xB8, 0x03, true);
+  esphome_hal_double_set_millis(AUTODISCOVERY_BROADCAST_WINDOW_MS + 100);
+  advance_timers();
+
+  CHECK_EQUAL(AUTODISCOVERY_COMPLETE, manager.get_state());
+
+  // Further timer advances should not change state.
+  esphome_hal_double_set_millis(esphome_hal_double_get_millis() + 100000);
+  advance_timers();
+  CHECK_EQUAL(AUTODISCOVERY_COMPLETE, manager.get_state());
+}
+
+/* ------------------------------------------------------------------ */
+/* is_gea2_protocol returns correct value                               */
+/* ------------------------------------------------------------------ */
+
+TEST(autodiscovery_manager, is_gea2_protocol_false_for_gea3_discovery)
+{
+  init_both_uart();
+  expect_gea3_broadcast_read();
+  manager.start();
+
+  simulate_broadcast_response(0xB8, 0x03, true);
+  esphome_hal_double_set_millis(AUTODISCOVERY_BROADCAST_WINDOW_MS + 100);
+  advance_timers();
+
+  CHECK_FALSE(manager.is_gea2_protocol());
+}
+
+TEST(autodiscovery_manager, is_gea2_protocol_true_for_gea2_discovery)
+{
+  init_both_uart();
+
+  // GEA3 times out.
+  expect_gea3_broadcast_read();
+  manager.start();
+  expect_gea2_broadcast_read();  // GEA2 broadcast after GEA3 timeout.
+  esphome_hal_double_set_millis(AUTODISCOVERY_BROADCAST_WINDOW_MS + 100);
+  advance_timers();
+
+  // GEA2 succeeds.
+  simulate_broadcast_response(0xB8, 0x03, false);
+  esphome_hal_double_set_millis(esphome_hal_double_get_millis() + AUTODISCOVERY_BROADCAST_WINDOW_MS + 100);
+  advance_timers();
+
+  CHECK_TRUE(manager.is_gea2_protocol());
 }

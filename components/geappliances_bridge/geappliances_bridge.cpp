@@ -64,8 +64,9 @@ void GeappliancesBridge::setup() {
   // Initialize timer group
   tiny_timer_group_init(&this->timer_group_, esphome_time_source_init());
 
-  // Initialize autodiscovery manager
+  // Initialize autodiscovery manager (timer-driven, self-driving)
   this->autodiscovery_manager_.init(
+      &this->timer_group_,
       this->uart_ != nullptr ? &this->erd_client_.interface : nullptr,
       this->gea2_uart_ != nullptr ? &this->gea2_erd_client_.interface : nullptr,
       this->gea2_uart_ != nullptr ? &this->gea2_erd_client_adapter_.interface : nullptr,
@@ -168,8 +169,7 @@ void GeappliancesBridge::setup() {
   }
   // device_id_state_ stays IDLE until autodiscovery completes
 
-  // Start the boot stabilization delay before autodiscovery traffic.
-  // (AutodiscoveryManager uses AUTODISCOVERY_STARTUP_DELAY_MS internally)
+  // The startup HSM handles the boot stabilization delay before autodiscovery.
   ESP_LOGI(TAG, "Waiting %u seconds before starting autodiscovery...",
            AUTODISCOVERY_STARTUP_DELAY_MS / 1000);
 
@@ -441,22 +441,6 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
     this->on_ha_discovery_erd_seen_(args->subscription_publication_received.erd);
   }
 
-  // Handle autodiscovery: first responder on GEA3 or GEA2 broadcast
-  bool in_gea3_discovery = (this->autodiscovery_manager_.get_state() == AUTODISCOVERY_GEA3_BROADCAST_WAITING);
-  bool in_gea2_discovery = (this->autodiscovery_manager_.get_state() == AUTODISCOVERY_GEA2_BROADCAST_WAITING);
-  if (in_gea3_discovery || in_gea2_discovery) {
-    if (args->type == tiny_gea3_erd_client_activity_type_read_completed &&
-        args->read_completed.erd == ERD_APPLIANCE_TYPE &&
-        this->autodiscovery_manager_.get_active_erd_client() == nullptr &&
-        args->read_completed.data_size >= 1) {
-      uint8_t app_type = reinterpret_cast<const uint8_t*>(args->read_completed.data)[0];
-      ESP_LOGD(TAG, "Board discovered: address=0x%02X appliance_type=%u (%s)",
-               args->address, app_type, appliance_type_to_string(app_type).c_str());
-      this->autodiscovery_manager_.on_broadcast_response(args->address, app_type, in_gea3_discovery);
-    }
-    return;
-  }
-
   // Device ID + feature bit reads (after discovery, before bridge init)
   if (!this->mqtt_bridge_initialized_ && args->address == this->autodiscovery_manager_.get_host_address()) {
     if (args->type == tiny_gea3_erd_client_activity_type_read_completed) {
@@ -531,7 +515,7 @@ void GeappliancesBridge::dump_config() {
   if (this->gea2_uart_ != nullptr) {
     ESP_LOGCONFIG(TAG, "  GEA2 UART: configured (baud %u)", 19200u);
   }
-  if (this->autodiscovery_manager_.is_complete()) {
+  if (this->autodiscovery_manager_.get_state() == AUTODISCOVERY_COMPLETE) {
     ESP_LOGCONFIG(TAG, "  Active Protocol: %s", this->autodiscovery_manager_.is_gea2_protocol() ? "GEA2" : "GEA3");
   }
 
@@ -589,6 +573,7 @@ void GeappliancesBridge::dump_config() {
 #pragma GCC diagnostic pop
 #endif
   if (this->startup_hsm_.current == startup_state_protocol_stack)       phase_str = "Protocol Stack";
+  else if (this->startup_hsm_.current == startup_state_startup_delay)   phase_str = "Startup Delay";
   else if (this->startup_hsm_.current == startup_state_autodiscovery)    phase_str = "Autodiscovery";
   else if (this->startup_hsm_.current == startup_state_device_id)        phase_str = "Device ID";
   else if (this->startup_hsm_.current == startup_state_mqtt_client_init) phase_str = "MQTT Client Init";
@@ -640,12 +625,12 @@ bool GeappliancesBridge::teardown() {
 
 void GeappliancesBridge::run_autodiscovery()
 {
-  autodiscovery_manager_.run();
+  autodiscovery_manager_.start();
 }
 
 bool GeappliancesBridge::is_autodiscovery_complete() const
 {
-  return autodiscovery_manager_.is_complete();
+  return autodiscovery_manager_.get_state() == AUTODISCOVERY_COMPLETE;
 }
 
 uint8_t GeappliancesBridge::get_discovered_host_address() const
@@ -772,7 +757,6 @@ void GeappliancesBridge::run_ha_discovery()
 
 void GeappliancesBridge::run_all_managers()
 {
-  autodiscovery_manager_.run();
   feature_bit_manager_.run();
 }
 

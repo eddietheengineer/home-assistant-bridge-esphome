@@ -2,45 +2,54 @@
 
 ## Purpose
 
-Manages the appliance autodiscovery process on the GEA bus. After a 5-second startup delay, it broadcasts ERD 0x0008 (appliance type) requests to discover connected GEA3 or GEA2 appliance boards, with retry logic and protocol fallback.
+Manages the appliance autodiscovery process on the GEA bus. Fully self-driving: owns its own timers and event subscriptions. The bridge calls `start()` to begin discovery; the manager fires `on_complete_cb` when a board is found, with retry logic and protocol fallback.
 
 ## Public API
 
 | Method | Description |
 |--------|-------------|
-| `init(gea3_client, gea2_client, gea2_adapter, has_gea3, has_gea2, on_complete_cb)` | Initialize with ERD clients, UART availability flags, and completion callback |
+| `init(timer_group, gea3_client, gea2_client, gea2_adapter, has_gea3, has_gea2, on_complete_cb)` | Initialize with timer group, ERD clients, UART availability flags, and completion callback |
+| `start()` | Begin autodiscovery. Idempotent if already past IDLE. |
 | `get_host_address()` | Returns the discovered appliance address |
 | `get_active_erd_client()` | Returns the ERD client for the discovered protocol |
+| `is_gea2_protocol()` | Returns `true` if a GEA2 appliance was discovered |
 | `get_state()` | Returns the current `AutodiscoveryState` |
 
 ## State Machine
 
 ```
-AUTODISCOVERY_WAITING_5S
-  └─ after 5 s delay →
+AUTODISCOVERY_IDLE
+  └─ start() called →
     AUTODISCOVERY_GEA3_BROADCAST_PENDING → AUTODISCOVERY_GEA3_BROADCAST_WAITING
-      ├─ response received → AUTODISCOVERY_COMPLETE
-      └─ timeout → retry indefinitely → GEA2 fallback or re-try GEA3
+      ├─ response received (via event subscription) → (marked, waits for timer)
+      ├─ timer fires, response marked → AUTODISCOVERY_COMPLETE
+      └─ timer fires, no response → retry indefinitely → GEA2 fallback or re-try GEA3
 
     AUTODISCOVERY_GEA2_BROADCAST_PENDING → AUTODISCOVERY_GEA2_BROADCAST_WAITING
-      ├─ response received → AUTODISCOVERY_COMPLETE (gea2_protocol_active = true)
-      └─ timeout → retry indefinitely → GEA3 fallback or re-try GEA2
+      ├─ response received (via event subscription) → (marked, waits for timer)
+      ├─ timer fires, response marked → AUTODISCOVERY_COMPLETE (gea2_protocol_active = true)
+      └─ timer fires, no response → retry indefinitely → GEA3 fallback or re-try GEA2
 
 AUTODISCOVERY_COMPLETE (terminal state — only reached on successful discovery)
 ```
 
+The 5-second startup delay before `start()` is handled by the startup HSM (`startup_state_startup_delay`), not by this module.
+
 Constants:
-- `AUTODISCOVERY_STARTUP_DELAY_MS = 5000` — initial delay before first broadcast
-- `AUTODISCOVERY_BROADCAST_WINDOW_MS = 5000` — wait window for response
+- `AUTODISCOVERY_BROADCAST_WINDOW_MS = 5000` — wait window for response after each broadcast
+
 ## Dependencies
 
 - `tiny_gea3_erd_client` — GEA3 ERD client interface
 - `tiny_gea2_erd_client` — GEA2 ERD client interface
-- `esphome::millis()` — timing
+- `tiny_timer` — one-shot timers for broadcast windows
+- `tiny_event` / `tiny_event_subscription` — ERD client activity event subscriptions
 - `geappliances_bridge_constants.h` — `GEA_BROADCAST_ADDRESS`, `ERD_APPLIANCE_TYPE`
 
 ## Key Design Decisions
 
+- **Fully self-driving**: The manager subscribes directly to ERD client activity events and uses timer-based state transitions. The bridge does not poll `run()` or route ERD client activity to the manager.
+- **Separate GEA3/GEA2 callbacks**: Two distinct subscription callbacks (`on_gea3_activity_`, `on_gea2_activity_`) ensure a response on one protocol is not misattributed to the other.
 - **Infinite retries**: The manager never gives up — if no board responds, it keeps retrying indefinitely, alternating between GEA3 and GEA2 (if both UARTs are configured). The startup HSM will not transition past the autodiscovery phase until a valid board is discovered.
 - **Protocol fallback**: If both GEA3 and GEA2 UARTs are configured, failure to find a GEA3 board falls back to GEA2 (and vice versa) before retrying the same protocol.
 - **Single response wins**: The first valid broadcast response sets the host address; subsequent responses are ignored.
@@ -48,4 +57,4 @@ Constants:
 
 ## Testing
 
-Covered by integration tests in `test/tests/` that exercise the full startup sequence. The state machine transitions are tested implicitly through the bridge's autodiscovery flow.
+Covered by unit tests in `test/tests/autodiscovery_manager_test.cpp` that exercise the full self-driving flow: `init()`, `start()`, event-based broadcast responses, timer-driven completion, retry logic, and protocol fallback.
