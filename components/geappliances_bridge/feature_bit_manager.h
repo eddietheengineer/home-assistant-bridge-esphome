@@ -2,9 +2,16 @@
  * @file
  * @brief Feature bit manager for the GEA bridge.
  *
- * Handles reading and parsing of appliance API feature bit ERDs
- * (0x0092-0x0097, 0x0109-0x010D), building a filtered ERD list
- * for polling mode and gating HA discovery.
+ * Fully self-driving: owns its own timers and event subscriptions.
+ * Reads and parses appliance API feature bit ERDs (0x0092-0x010D),
+ * building a filtered ERD list for polling mode and gating HA discovery.
+ *
+ * The bridge calls init() to configure, then start() to begin reading.
+ * The manager subscribes to ERD client activity events and drives
+ * the read sequence autonomously.  When all ERDs have been read,
+ * it uses a periodic timer to perform incremental parsing (one step
+ * per tick) to avoid triggering the ESP32 Task Watchdog Timer.
+ * The bridge polls get_state() to check progress.
  */
 
 // =============================================================================
@@ -15,7 +22,8 @@
 //
 // Responsibilities:
 //   - Read the 11 feature bit ERDs (0x0092-0x0097, 0x0109-0x010D) in sequence
-//   - Incrementally parse bitmasks into ERD sets across multiple loop() calls
+//   - Own event subscription to ERD client activity (self-driving)
+//   - Incrementally parse bitmasks into ERD sets across multiple timer ticks
 //     to avoid triggering the ESP32 Task Watchdog Timer
 //   - Expose the resulting valid ERD set and string ERD set via getters
 //
@@ -26,6 +34,7 @@
 //
 // Dependencies:
 //   - i_tiny_gea3_erd_client
+//   - tiny_event, tiny_event_subscription, tiny_timer
 //   - appliance_api_feature_lists.h (compile-time bitmask descriptors)
 // =============================================================================
 
@@ -38,16 +47,16 @@
 #include <string>
 
 extern "C" {
-#include "tiny_gea3_erd_client.h"
+#include "i_tiny_gea3_erd_client.h"
+#include "tiny_event.h"
+#include "tiny_event_subscription.h"
+#include "tiny_timer.h"
 }
-
-#include "i_mqtt_client.h"
 
 namespace esphome {
 namespace geappliances_bridge {
 
 enum FeatureBitState {
-  FEATURE_BIT_STATE_IDLE,
   FEATURE_BIT_STATE_READING_0008,
   FEATURE_BIT_STATE_READING_0001,
   FEATURE_BIT_STATE_READING_0002,
@@ -62,9 +71,8 @@ enum FeatureBitState {
   FEATURE_BIT_STATE_READING_010B,
   FEATURE_BIT_STATE_READING_010C,
   FEATURE_BIT_STATE_READING_010D,
-  FEATURE_BIT_STATE_IN_FLIGHT,
+  FEATURE_BIT_STATE_PARSING,
   FEATURE_BIT_STATE_COMPLETE,
-  FEATURE_BIT_STATE_FAILED,
 };
 
 /*!
@@ -72,36 +80,61 @@ enum FeatureBitState {
  */
 class FeatureBitManager {
  public:
-  static constexpr uint32_t MAX_QUEUE_RETRIES = 1000;
-  static constexpr uint32_t LOG_EVERY_N_RETRIES = 50;
-  // How many common feature descriptors to process per parse_and_log_feature_bits_() call.
-  // 17 total descriptors; processing 4 per call spreads the heap allocations across
-  // ~5 loop() iterations instead of doing all 30+ std::set::insert() calls at once,
-  // which avoids triggering the Task Watchdog Timer on ESP32-C3.
+  // How many common feature descriptors to process per parse tick.
+  // 17 total descriptors; processing 4 per tick spreads the heap allocations
+  // across ~5 timer callbacks instead of doing all 30+ std::set::insert() calls
+  // at once, which avoids triggering the Task Watchdog Timer on ESP32-C3.
   static constexpr uint16_t COMMON_PARSE_PER_CALL = 4;
+
+  // Timer interval for incremental parsing (milliseconds).
+  static constexpr uint32_t PARSE_TICK_MS = 5;
 
   void init(i_tiny_gea3_erd_client_t* erd_client,
             uint8_t host_address,
-            i_mqtt_client_t* mqtt_client,
-            bool mqtt_initialized);
+            tiny_timer_group_t* timer_group);
 
-  void run();
-
-  void on_erd_read_completed(tiny_erd_t erd, const uint8_t* data, uint8_t size);
-  void on_erd_read_failed(tiny_erd_t erd);
-
-  bool is_complete() const;
-  bool is_failed() const;
-  bool is_parse_pending() const;
-
-  // Mark the manager as complete (with whatever data has been collected so far).
-  // Used when the phase times out — the bridge should continue startup rather
-  // than hang indefinitely waiting for ERD reads that will never arrive.
-  void mark_timed_out();
+  /// Start the feature-bit reading sequence.  Idempotent if already past the first state.
+  void start();
 
   const std::set<tiny_erd_t>& get_valid_erds() const;
   const std::vector<tiny_erd_t>& get_valid_erds_vec() const;
-  bool is_valid_list_ready() const;
+
+  FeatureBitState get_state() const { return state_; }
+
+ private:
+  /// Called from the ERD client activity subscription callback.
+  void on_erd_activity_(const void* args);
+
+  /// Handle a successful ERD read (store data, advance state).
+  void handle_read_completed_(tiny_erd_t erd, const void* data, uint8_t size);
+
+  /// Timer callback for incremental parsing (static for tiny_timer API).
+  static void parse_timer_callback_(void* context);
+
+  /// Drive one step of incremental parsing.
+  void parse_next_step_();
+
+  /// Start the periodic parse timer (called when transitioning to PARSING).
+  void start_parse_timer_();
+
+  /// Map a READING state to the ERD value and queue the read.
+  void queue_erd_read_();
+
+  /// Advance state to the next ERD in the sequence (on failure or skip).
+  void skip_to_next_erd_(tiny_erd_t failed_erd);
+
+  FeatureBitState state_{FEATURE_BIT_STATE_READING_0008};
+  bool read_queued_{false};  // true while a read is in-flight (guards idempotent start/queue)
+
+  i_tiny_gea3_erd_client_t* erd_client_{nullptr};
+  uint8_t host_address_{0};
+  tiny_timer_group_t* timer_group_{nullptr};
+
+  // Event subscription for ERD client activity
+  tiny_event_subscription_t erd_activity_subscription_;
+
+  // Timer for incremental parsing
+  tiny_timer_t parse_timer_;
 
   struct FeatureBitErdData {
     uint8_t erd_0092[8]{};
@@ -128,34 +161,15 @@ class FeatureBitManager {
     uint8_t erd_010D_size{0};
   };
 
-  const FeatureBitErdData& get_erd_data() const { return erd_data_; }
-
-  FeatureBitState get_state() const { return state_; }
-  uint32_t get_queue_retry_count() const { return queue_retry_count_; }
-
- private:
-  void skip_to_next_feature_erd_(tiny_erd_t failed_erd);
-  void parse_and_log_feature_bits_();
-
-  FeatureBitState state_{FEATURE_BIT_STATE_IDLE};
-  uint32_t queue_retry_count_{0};
-  bool parse_pending_{false};
-  uint8_t parse_erd_idx_{0};  // which appliance ERD we're parsing next (0-9)
-  uint16_t common_parse_idx_{0};  // which common feature descriptor we're parsing next (0-17)
-  bool parse_common_done_{false};  // whether ERD 0x0092 common features are parsed
-
   FeatureBitErdData erd_data_;
 
   std::set<tiny_erd_t> valid_erds_;
   std::vector<tiny_erd_t> valid_erds_vec_;
   bool valid_list_ready_{false};
 
-  i_tiny_gea3_erd_client_t* erd_client_{nullptr};
-  uint8_t host_address_{0};
-  i_mqtt_client_t* mqtt_client_{nullptr};
-  bool mqtt_initialized_{false};
-
-  tiny_gea3_erd_client_request_id_t pending_request_id_{0};
+  uint8_t parse_erd_idx_{0};  // which appliance ERD we're parsing next (0-9)
+  uint16_t common_parse_idx_{0};  // which common feature descriptor we're parsing next (0-17)
+  bool parse_common_done_{false};  // whether ERD 0x0092 common features are parsed
 };
 
 }  // namespace geappliances_bridge

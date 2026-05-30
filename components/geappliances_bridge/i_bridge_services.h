@@ -60,18 +60,10 @@ class IBridgeServices {
 
   // -- Feature bits ----------------------------------------------------------
 
-  /// Begin the feature-bit reading sequence.
+  /// Begin the feature-bit reading sequence (self-driving, no further polling needed).
   virtual void start_feature_bit_reading() = 0;
-  /// Run one tick of the feature-bit manager.
-  virtual void run_feature_bits() = 0;
-  /// Returns true once all feature-bit ERDs have been read (or timed out).
+  /// Returns true once all feature-bit ERDs have been read and parsed.
   virtual bool is_feature_bits_complete() const = 0;
-  /// Force the feature-bit manager into its timed-out/complete state.
-  virtual void mark_feature_bits_timed_out() = 0;
-  /// Record the timestamp when the feature-bits phase begins (for timeout).
-  virtual void record_feature_bits_phase_start() = 0;
-  /// Returns true if the feature-bits phase has exceeded its timeout.
-  virtual bool is_feature_bits_phase_timed_out() const = 0;
 
   // -- Bridge initialization -------------------------------------------------
 

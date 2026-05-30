@@ -8,9 +8,8 @@ Reads and parses appliance API feature bit ERDs (0x0092 through 0x010D), buildin
 
 | Method | Description |
 |--------|-------------|
-| `init(erd_client, host_address)` | Initialize with ERD client, host address |
-| `on_erd_read_completed(erd, data, size)` | Store raw ERD data and queue next read |
-| `on_erd_read_failed(erd)` | Skip to next ERD in sequence |
+| `init(erd_client, host_address, timer_group)` | Initialize with ERD client, host address, and timer group. Subscribes to ERD client activity events. |
+| `start()` | Start the feature-bit reading sequence. Idempotent with `read_queued_` guard. |
 | `get_valid_erds()` | Returns the set of valid ERDs built from feature bits |
 | `get_valid_erds_vec()` | Returns the valid ERDs as a sorted vector (for C API) |
 | `get_state()` | Returns the current `FeatureBitState` |
@@ -31,21 +30,47 @@ FEATURE_BIT_STATE_READING_0008  (appliance type, re-read)
 Any read failure → skip to next ERD in sequence
 ```
 
-Parsing is incremental — one ERD per `loop()` call — to avoid triggering ESPHome's 30 ms loop watchdog (the full parse can take 1+ seconds).
+### Self-Driving Architecture
+
+The manager is fully self-driving with no polling from the bridge:
+
+1. **`init()`** subscribes to `tiny_gea3_erd_client_on_activity` events and stores the `tiny_timer_group_t*`
+2. **`start()`** queues the first ERD read (0x0008). Uses `read_queued_` guard for idempotency - calling `start()` multiple times before the first read completes does not double-queue.
+3. **Event handler `on_erd_activity_()`** drives the read sequence:
+   - On `read_completed`: stores ERD data, advances state, queues next read via `queue_erd_read_()`
+   - On `read_failed`: calls `skip_to_next_erd_()` to advance state and queue next read
+   - Each completed or failed read immediately triggers the next read in the sequence
+4. **After last ERD (0x010D)**: transitions to `FEATURE_BIT_STATE_PARSING` and arms a periodic timer (5ms interval) for incremental parsing
+5. **Timer callback `parse_next_step_()`** drives incremental parsing:
+   - First tick: clears valid_erds_, validates erd_0092 size
+   - Next ticks: processes common feature descriptors (4 per tick via `COMMON_PARSE_PER_CALL`)
+   - Next ticks: processes one appliance ERD (0x0093-0x010D) per tick
+   - Final tick: adds mandatory ERDs, builds valid_erds_vec_, sets `valid_list_ready_ = true`, stops timer, transitions to COMPLETE
+6. **Bridge polls `get_state()`** to check progress (HSM checks for COMPLETE)
+
+### Parsing Details
+
+- **Common features (ERD 0x0092)**: Parsed first, processes 17 descriptors at 4 per tick (~5 ticks total)
+- **Appliance features (ERD 0x0093-0x010D)**: Parsed one per tick (10 ticks total), matched against descriptor tables by appliance type and version
+- **Mandatory ERDs**: Always included in final list regardless of feature bits: 0x0001, 0x0002, 0x0008, 0x0092-0x0097, 0x0109-0x010D (14 total)
+- **Total parsing ticks**: ~16 ticks (1 init + 4 common + 10 appliance + 1 final) at 5ms each = ~80ms
+
+### Key Design Decisions
+
+- **No timeout**: The feature bits phase has no timeout. Reads retry indefinitely until they succeed or the appliance is lost (handled by the HSM).
+- **No MQTT dependency**: Removed `i_mqtt_client` dependency. The manager only needs the ERD client and timer group.
+- **No `run()` method**: The manager is fully event-driven and timer-driven. The bridge does not poll `run()`.
+- **Queue retry tolerance**: Each ERD read is retried if the queue is full. The `read_queued_` flag guards against double-queuing.
+- **Incremental parsing**: Uses `tiny_timer` with 5ms interval to spread heap allocations across multiple ticks, avoiding the ESP32 Task Watchdog Timer.
+- **Idempotent start**: `read_queued_` flag ensures `start()` can be called multiple times safely (e.g., from HSM entry + bridge loop).
 
 ## Dependencies
 
 - `tiny_gea3_erd_client` — ERD client interface
+- `tiny_event`, `tiny_event_subscription`, `tiny_timer` — event subscription and timer infrastructure
 - `appliance_api_feature_lists.h` — generated descriptor tables for feature bit parsing
 - `geappliances_bridge_constants.h` — ERD constants
 
-## Key Design Decisions
-
-- **Deferred parsing**: The `parse_pending_` flag is set when all ERDs are read, but actual parsing happens incrementally in `run()` (one ERD per `loop()` call). This prevents blocking the ESPHome loop for too long.
-- **Queue retry tolerance**: Each ERD read is retried up to 1000 times if the queue is full, then skipped. This handles busy bus conditions without stalling the entire sequence.
-- **Mandatory ERDs**: The final valid ERD list always includes the feature bit ERDs themselves (0x0092–0x010D) plus identity ERDs (0x0001, 0x0002, 0x0008), regardless of feature bit values.
-- **Common features first**: ERD 0x0092 (common features) is parsed first, then appliance-specific ERDs (0x0093–0x010D) are matched against descriptor tables by appliance type and version.
-
 ## Testing
 
-Covered by integration tests in `test/tests/` through the full startup sequence. The parsing logic is tested against known feature bit patterns for various appliance types.
+Covered by dedicated unit tests in `test/tests/feature_bit_manager_test.cpp` (20+ tests covering initialization, start idempotency, event-driven read sequencing, failure handling, timer-driven incremental parsing, and valid ERD list generation). Also covered by integration tests through the full startup sequence.

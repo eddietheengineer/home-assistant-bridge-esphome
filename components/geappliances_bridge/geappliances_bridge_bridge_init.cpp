@@ -43,16 +43,16 @@ static const char* const TAG __attribute__((unused)) = "geappliances_bridge";
 void GeappliancesBridge::start_feature_bit_reading_()
 {
   // Guard: don't re-initialize if already running or done.
-  if (this->feature_bit_manager_.is_complete() || this->feature_bit_manager_.is_failed() ||
-      this->feature_bit_manager_.is_parse_pending()) {
+  FeatureBitState state = this->feature_bit_manager_.get_state();
+  if (state == FEATURE_BIT_STATE_PARSING || state == FEATURE_BIT_STATE_COMPLETE) {
     return;
   }
   ESP_LOGI(TAG, "Reading device info ERDs for MQTT publish, then appliance API feature bits...");
   this->feature_bit_manager_.init(
       this->autodiscovery_manager_.get_active_erd_client(),
       this->autodiscovery_manager_.get_host_address(),
-      &this->mqtt_client_adapter_.interface,
-      this->mqtt_client_adapter_initialized_);
+      &this->timer_group_);
+  this->feature_bit_manager_.start();
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
   // Apply the valid-ERD filter when appliance API parsing is enabled and
   // produced results. An empty set is ignored by the registry so all ERDs
   // continue to be published in that case.
-  if (this->appliance_api_parsing_ && this->feature_bit_manager_.is_valid_list_ready() &&\
+  if (this->appliance_api_parsing_ && this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE &&\
       !this->feature_bit_manager_.get_valid_erds().empty()) {
     this->erd_registry_.set_valid_erds(this->feature_bit_manager_.get_valid_erds());
     ESP_LOGI(TAG, "Appliance API parsing enabled: publishing filtered to %zu valid ERDs",
@@ -209,7 +209,7 @@ void GeappliancesBridge::configure_polling_optional_lists_()
   // Set the API-parsed list before any events fire. state_identify_appliance
   // only checks api_parsed_list in signal_read_completed, so setting it here
   // (synchronously, before any events) is safe.
-  if (this->appliance_api_parsing_ && this->feature_bit_manager_.is_valid_list_ready() &&\
+  if (this->appliance_api_parsing_ && this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE &&\
       !this->feature_bit_manager_.get_valid_erds_vec().empty()) {
     this->mqtt_bridge_polling_.api_parsed_list       = this->feature_bit_manager_.get_valid_erds_vec().data();
     this->mqtt_bridge_polling_.api_parsed_list_count =

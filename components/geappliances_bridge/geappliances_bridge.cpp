@@ -443,19 +443,15 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
     this->on_ha_discovery_erd_seen_(args->subscription_publication_received.erd);
   }
 
-  // Device ID + feature bit reads (after discovery, before bridge init)
+  // Device ID reads (after discovery, before bridge init)
+  // Note: FeatureBitManager subscribes directly to ERD client activity events,
+  // so the bridge no longer routes feature bit ERDs to it.
   if (!this->mqtt_bridge_initialized_ && args->address == this->autodiscovery_manager_.get_host_address()) {
     if (args->type == tiny_gea3_erd_client_activity_type_read_completed) {
       tiny_erd_t erd = args->read_completed.erd;
       const uint8_t* data = reinterpret_cast<const uint8_t*>(args->read_completed.data);
       uint8_t size = args->read_completed.data_size;
-      if (this->should_route_to_feature_bits_(erd)) {
-        this->feature_bit_manager_.on_erd_read_completed(erd, data, size);
-        if (this->feature_bit_manager_.is_complete()) {
-          // Signal the startup HSM that feature bits are ready.
-          tiny_hsm_send_signal(&this->startup_hsm_, signal_feature_bits_complete, nullptr);
-        }
-      } else {
+      if (!this->should_route_to_feature_bits_(erd)) {
         this->device_identity_manager_.on_erd_read_completed(erd, data, size);
         if (this->device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE) {
           // Signal the startup HSM that device ID is ready.
@@ -464,13 +460,7 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
       }
     } else if (args->type == tiny_gea3_erd_client_activity_type_read_failed) {
       tiny_erd_t erd = args->read_failed.erd;
-      if (this->should_route_to_feature_bits_(erd)) {
-        this->feature_bit_manager_.on_erd_read_failed(erd);
-        // If feature bits failed, signal the HSM so it can continue.
-        if (this->feature_bit_manager_.is_failed()) {
-          tiny_hsm_send_signal(&this->startup_hsm_, signal_feature_bits_complete, nullptr);
-        }
-      } else {
+      if (!this->should_route_to_feature_bits_(erd)) {
         this->device_identity_manager_.on_erd_read_failed(erd);
       }
     }
@@ -483,11 +473,9 @@ bool GeappliancesBridge::should_route_to_feature_bits_(tiny_erd_t erd)
     return e == ERD_APPLIANCE_TYPE || e == ERD_MODEL_NUMBER || e == ERD_SERIAL_NUMBER;
   };
 
-  // Feature bits are "active" if the manager has been initialized but not
-  // yet completed or failed (i.e., still in the middle of reading ERDs).
-  bool feature_bit_active = !this->feature_bit_manager_.is_complete() &&
-                            !this->feature_bit_manager_.is_failed() &&
-                            !this->feature_bit_manager_.is_parse_pending();
+  // Feature bits are "active" if the manager is in a READING state or PARSING.
+  FeatureBitState state = this->feature_bit_manager_.get_state();
+  bool feature_bit_active = (state != FEATURE_BIT_STATE_COMPLETE);
   return feature_bit_active &&
     (is_feature_bit_erd(erd) ||
      (is_device_info_erd(erd) && this->device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE));
@@ -553,7 +541,7 @@ void GeappliancesBridge::dump_config() {
     ESP_LOGCONFIG(TAG, "  Only Publish On Change: %s", this->polling_only_publish_on_change_ ? "yes" : "no");
   }
   ESP_LOGCONFIG(TAG, "  Appliance API Parsing: %s", this->appliance_api_parsing_ ? "enabled" : "disabled");
-  if (this->feature_bit_manager_.is_valid_list_ready()) {
+  if (this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE) {
     ESP_LOGCONFIG(TAG, "  Appliance API Valid ERDs: %zu", this->feature_bit_manager_.get_valid_erds().size());
   }
   if (!this->custom_erds_vec_.empty()) {
@@ -681,29 +669,9 @@ void GeappliancesBridge::start_feature_bit_reading()
   start_feature_bit_reading_();
 }
 
-void GeappliancesBridge::run_feature_bits()
-{
-  feature_bit_manager_.run();
-}
-
 bool GeappliancesBridge::is_feature_bits_complete() const
 {
-  return feature_bit_manager_.is_complete();
-}
-
-void GeappliancesBridge::mark_feature_bits_timed_out()
-{
-  feature_bit_manager_.mark_timed_out();
-}
-
-void GeappliancesBridge::record_feature_bits_phase_start()
-{
-  feature_bits_phase_start_ms_ = millis();
-}
-
-bool GeappliancesBridge::is_feature_bits_phase_timed_out() const
-{
-  return millis() - feature_bits_phase_start_ms_ >= FEATURE_BITS_PHASE_TIMEOUT_MS;
+  return feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE;
 }
 
 void GeappliancesBridge::record_startup_delay_start()
@@ -769,7 +737,8 @@ void GeappliancesBridge::run_ha_discovery()
 
 void GeappliancesBridge::run_all_managers()
 {
-  feature_bit_manager_.run();
+  // FeatureBitManager is self-driving (owns its own timers and event subscriptions).
+  // No polling needed from the bridge loop.
 }
 
 }  // namespace geappliances_bridge

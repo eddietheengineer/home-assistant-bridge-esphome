@@ -261,8 +261,9 @@ tiny_hsm_result_t startup_state_mqtt_client_init(tiny_hsm_t* hsm, tiny_hsm_signa
 // ============================================================================
 // Phase 5: Feature Bits — read appliance API feature bit ERDs
 //
-// Runs the FeatureBitManager each loop iteration.  Transitions to
-// bridge_init when feature bits are complete AND MQTT is connected.
+// FeatureBitManager is self-driving (owns its own timers and event subscriptions).
+// The HSM only polls is_feature_bits_complete() to know when to transition.
+// Transitions to bridge_init when feature bits are complete AND MQTT is connected.
 // ============================================================================
 
 tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
@@ -273,18 +274,10 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
   switch (signal) {
     case tiny_hsm_signal_entry:
       ESP_LOGI(TAG, "Startup: Feature bits phase");
-      svc->record_feature_bits_phase_start();
       break;
 
     case signal_run_loop:
       {
-      if (svc->is_feature_bits_phase_timed_out()) {
-        ESP_LOGW(TAG, "Feature bits phase timed out, continuing without feature filtering");
-        svc->mark_feature_bits_timed_out();
-      }
-
-      svc->run_feature_bits();
-
       bool feature_bits_done = svc->is_feature_bits_complete();
       bool mqtt_connected = (mqtt::global_mqtt_client != nullptr &&
                              mqtt::global_mqtt_client->is_connected());
