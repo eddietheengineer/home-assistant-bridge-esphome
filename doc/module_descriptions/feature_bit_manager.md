@@ -37,6 +37,9 @@ The manager is fully self-driving with no polling from the bridge:
 1. **`init()`** subscribes to `tiny_gea3_erd_client_on_activity` events and stores the `tiny_timer_group_t*`
 2. **`start()`** queues the first ERD read (0x0008). Uses `read_queued_` guard for idempotency - calling `start()` multiple times before the first read completes does not double-queue.
 3. **Event handler `on_erd_activity_()`** drives the read sequence:
+   - Filters events by `address == host_address_` to ignore responses for other appliances
+   - Ignores all events once in PARSING or COMPLETE state to prevent state machine corruption
+   - If `read_queued_` is false (queue was full on last attempt), retries `queue_erd_read_()` immediately
    - On `read_completed`: stores ERD data, advances state, queues next read via `queue_erd_read_()`
    - On `read_failed`: calls `skip_to_next_erd_()` to advance state and queue next read
    - Each completed or failed read immediately triggers the next read in the sequence
@@ -57,10 +60,12 @@ The manager is fully self-driving with no polling from the bridge:
 
 ### Key Design Decisions
 
-- **No timeout**: The feature bits phase has no timeout. Reads retry indefinitely until they succeed or the appliance is lost (handled by the HSM).
+- **No timeout**: The feature bits phase has no timeout. The HSM handles appliance loss.
 - **No MQTT dependency**: Removed `i_mqtt_client` dependency. The manager only needs the ERD client and timer group.
 - **No `run()` method**: The manager is fully event-driven and timer-driven. The bridge does not poll `run()`.
-- **Queue retry tolerance**: Each ERD read is retried if the queue is full. The `read_queued_` flag guards against double-queuing.
+- **Read failure**: Each ERD read that fails is skipped (not retried). The manager advances to the next ERD in the sequence.
+- **Queue full retry**: If `tiny_gea3_erd_client_read()` returns false (queue full), the manager stays in the current READING state. The next ERD client activity event triggers `on_erd_activity_()` which retries the queued read. This provides implicit retry without blocking.
+- **Event filtering**: `on_erd_activity_()` filters by `address == host_address_` and ignores events once in PARSING/COMPLETE states to prevent state machine corruption from unrelated ERD activity.
 - **Incremental parsing**: Uses `tiny_timer` with 5ms interval to spread heap allocations across multiple ticks, avoiding the ESP32 Task Watchdog Timer.
 - **Idempotent start**: `read_queued_` flag ensures `start()` can be called multiple times safely (e.g., from HSM entry + bridge loop).
 

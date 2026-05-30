@@ -42,9 +42,10 @@ static const char* const TAG __attribute__((unused)) = "geappliances_bridge";
 
 void GeappliancesBridge::start_feature_bit_reading_()
 {
-  // Guard: don't re-initialize if already running or done.
+  // Guard: don't re-initialize if already running, parsing, or done.
+  // Any READING_* state means the manager is actively processing - don't reset it.
   FeatureBitState state = this->feature_bit_manager_.get_state();
-  if (state == FEATURE_BIT_STATE_PARSING || state == FEATURE_BIT_STATE_COMPLETE) {
+  if (state != FEATURE_BIT_STATE_READING_0008) {
     return;
   }
   ESP_LOGI(TAG, "Reading device info ERDs for MQTT publish, then appliance API feature bits...");

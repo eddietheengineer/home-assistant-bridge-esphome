@@ -25,6 +25,11 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
                               uint8_t host_address,
                               tiny_timer_group_t* timer_group)
 {
+  if (erd_client == nullptr) {
+    ESP_LOGE(TAG, "init() called with null erd_client");
+    return;
+  }
+
   this->erd_client_    = erd_client;
   this->host_address_  = host_address;
   this->timer_group_   = timer_group;
@@ -55,6 +60,10 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
 
 void FeatureBitManager::start()
 {
+  // Defensive: don't dereference null erd_client_
+  if (this->erd_client_ == nullptr) {
+    return;
+  }
   // Idempotent: only queue the first read if we're at the start and haven't queued yet.
   if (this->state_ != FEATURE_BIT_STATE_READING_0008 || this->read_queued_) {
     return;
@@ -80,6 +89,23 @@ void FeatureBitManager::on_erd_activity_(const void* args)
 {
   const tiny_gea3_erd_client_on_activity_args_t* a =
     reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(args);
+
+  // Ignore events for other appliances (e.g., GEA2 adapter responses)
+  if (a->address != this->host_address_) {
+    return;
+  }
+
+  // Ignore events once we're done reading (PARSING or COMPLETE).
+  // The parse timer handles the PARSING phase independently.
+  if (this->state_ == FEATURE_BIT_STATE_PARSING || this->state_ == FEATURE_BIT_STATE_COMPLETE) {
+    return;
+  }
+
+  // If we haven't queued a read yet (queue was full), retry now.
+  if (!this->read_queued_) {
+    this->queue_erd_read_();
+    return;
+  }
 
   if (a->type == tiny_gea3_erd_client_activity_type_read_completed) {
     this->handle_read_completed_(a->read_completed.erd,
