@@ -1,4 +1,4 @@
-/*!\
+/*!
  * @file
  * @brief AutodiscoveryManager implementation.
  *
@@ -109,18 +109,6 @@ void AutodiscoveryManager::timer_callback_(void* context)
     // No response -- retry with fallback logic.
     self->schedule_next_broadcast_();
   }
-}
-
-// =============================================================================
-// ERD client activity subscription callbacks (static wrappers)
-// =============================================================================
-
-void AutodiscoveryManager::erd_client_activity_callback_(void* context, const void* args)
-{
-  (void)context;
-  (void)args;
-  // This static callback is no longer used directly.
-  // Use on_gea3_activity_() or on_gea2_activity_() instead.
 }
 
 void AutodiscoveryManager::on_gea3_activity_(const void* args)

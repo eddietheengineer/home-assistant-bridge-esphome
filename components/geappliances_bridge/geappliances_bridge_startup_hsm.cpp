@@ -106,21 +106,20 @@ tiny_hsm_result_t startup_state_protocol_stack(tiny_hsm_t* hsm, tiny_hsm_signal_
 // to respond to broadcast requests.
 // ============================================================================
 
-static uint32_t g_startup_delay_start_ms = 0;
-
 tiny_hsm_result_t startup_state_startup_delay(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
+  IBridgeServices* svc = services_from_hsm(hsm);
   (void)data;
 
   switch (signal) {
     case tiny_hsm_signal_entry:
-      g_startup_delay_start_ms = esphome::millis();
+      svc->record_startup_delay_start();
       ESP_LOGI(TAG, "Startup: %u second stabilization delay",
                static_cast<unsigned>(AUTODISCOVERY_STARTUP_DELAY_MS / 1000));
       break;
 
     case signal_run_loop:
-      if (esphome::millis() - g_startup_delay_start_ms >= AUTODISCOVERY_STARTUP_DELAY_MS) {
+      if (svc->is_startup_delay_elapsed()) {
         tiny_hsm_transition(hsm, startup_state_autodiscovery);
       }
       break;

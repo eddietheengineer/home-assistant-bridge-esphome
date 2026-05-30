@@ -85,6 +85,13 @@ class IBridgeServices {
   virtual BridgeMode get_mode() const = 0;
   virtual bool is_subscription_mode_active() const = 0;
 
+  // -- Startup delay ---------------------------------------------------------
+
+  /// Record the timestamp when the startup delay phase begins.
+  virtual void record_startup_delay_start() = 0;
+  /// Returns true if the startup delay has elapsed.
+  virtual bool is_startup_delay_elapsed() const = 0;
+
   // -- Recurring tasks (called from subscription_watch / running states) ------
 
   /// Check subscription activity and fall back to polling if timed out.

@@ -111,6 +111,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void record_feature_bits_phase_start() override;
   bool is_feature_bits_phase_timed_out() const override;
 
+  void record_startup_delay_start() override;
+  bool is_startup_delay_elapsed() const override;
+
   bool is_bridge_initialized() const override;
   void initialize_mqtt_bridge() override;
 
@@ -181,6 +184,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // indefinitely in any phase that waits for ERD reads.
   static constexpr uint32_t FEATURE_BITS_PHASE_TIMEOUT_MS = 60000;  // 60 s
   uint32_t feature_bits_phase_start_ms_{0};
+  uint32_t startup_delay_start_ms_{0};
 
   // GEA2 tight-loop duration: covers the full TX→RX cycle at 19200 baud
   // (see doc/geappliances_bridge.md section 13 for detailed explanation)

@@ -1,4 +1,4 @@
-/*!\
+/*!
  * @file
  * @brief Unit tests for the AutodiscoveryManager class.
  *

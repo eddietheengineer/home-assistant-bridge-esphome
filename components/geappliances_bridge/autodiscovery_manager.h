@@ -1,4 +1,4 @@
-/*!\
+/*!
  * @file
  * @brief AutodiscoveryManager - appliance autodiscovery state machine.
  *
@@ -93,9 +93,6 @@ class AutodiscoveryManager {
 
   /// Called from the GEA2 adapter activity subscription callback.
   void on_gea2_activity_(const void* args);
-
-  /// Called from the ERD client activity subscription callback (legacy, kept for compat).
-  static void erd_client_activity_callback_(void* context, const void* args);
 
   /// Determine which broadcast to attempt next and transition.
   void schedule_next_broadcast_();

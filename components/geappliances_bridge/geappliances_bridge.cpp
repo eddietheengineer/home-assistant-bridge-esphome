@@ -706,6 +706,16 @@ bool GeappliancesBridge::is_feature_bits_phase_timed_out() const
   return millis() - feature_bits_phase_start_ms_ >= FEATURE_BITS_PHASE_TIMEOUT_MS;
 }
 
+void GeappliancesBridge::record_startup_delay_start()
+{
+  startup_delay_start_ms_ = millis();
+}
+
+bool GeappliancesBridge::is_startup_delay_elapsed() const
+{
+  return millis() - startup_delay_start_ms_ >= AUTODISCOVERY_STARTUP_DELAY_MS;
+}
+
 // -- Bridge initialization ----------------------------------------------------
 
 bool GeappliancesBridge::is_bridge_initialized() const
