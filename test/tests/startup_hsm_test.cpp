@@ -91,6 +91,15 @@ class MockBridgeServices : public IBridgeServices {
   BridgeMode get_mode() const override { return BRIDGE_MODE_AUTO; }
   bool is_subscription_mode_active() const override { return true; }
 
+  // -- Startup delay ----------------------------------------------------------
+  void record_startup_delay_start() override {
+    mock().actualCall("record_startup_delay_start").onObject(this);
+  }
+  bool is_startup_delay_elapsed() const override {
+    return mock().actualCall("is_startup_delay_elapsed").onObject(this)
+               .returnBoolValueOrDefault(false);
+  }
+
   // -- Recurring tasks --------------------------------------------------------
   void check_subscription_activity() override {}
   void maybe_start_custom_erd_polling() override {}
