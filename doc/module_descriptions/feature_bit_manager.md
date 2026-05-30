@@ -2,18 +2,17 @@
 
 ## Purpose
 
-Reads and parses appliance API feature bit ERDs (0x0092 through 0x010D), building a filtered list of valid ERDs that the appliance supports. This list is used by the polling bridge to only poll ERDs that are actually registered, and by the MQTT adapter to filter published values.
+Reads and parses appliance API feature bit ERDs (0x0092 through 0x010D), building a filtered list of valid ERDs that the appliance supports. Fully self-driving: owns its own timers and event subscriptions. This list is used by the polling bridge to only poll ERDs that are actually registered, and by the MQTT adapter to filter published values.
 
 ## Public API
 
 | Method | Description |
 |--------|-------------|
-| `init(erd_client, host_address, mqtt_client, mqtt_initialized)` | Initialize with ERD client, host address, and optional MQTT client |
+| `init(erd_client, host_address)` | Initialize with ERD client, host address |
 | `on_erd_read_completed(erd, data, size)` | Store raw ERD data and queue next read |
 | `on_erd_read_failed(erd)` | Skip to next ERD in sequence |
 | `get_valid_erds()` | Returns the set of valid ERDs built from feature bits |
 | `get_valid_erds_vec()` | Returns the valid ERDs as a sorted vector (for C API) |
-| `get_erd_data()` | Returns raw ERD data for legacy sync |
 | `get_state()` | Returns the current `FeatureBitState` |
 
 ## State Machine
