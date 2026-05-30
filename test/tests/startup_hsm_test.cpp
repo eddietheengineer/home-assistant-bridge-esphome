@@ -47,22 +47,8 @@ class MockBridgeServices : public IBridgeServices {
   void init_device_id_reading() override {
     mock().actualCall("init_device_id_reading").onObject(this);
   }
-  void run_device_id() override {
-    mock().actualCall("run_device_id").onObject(this);
-  }
   bool is_device_id_complete() const override {
     return mock().actualCall("is_device_id_complete").onObject(this)
-               .returnBoolValueOrDefault(false);
-  }
-  bool is_device_id_failed() const override {
-    return mock().actualCall("is_device_id_failed").onObject(this)
-               .returnBoolValueOrDefault(false);
-  }
-  void record_device_id_phase_start() override {
-    mock().actualCall("record_device_id_phase_start").onObject(this);
-  }
-  bool is_device_id_phase_timed_out() const override {
-    return mock().actualCall("is_device_id_phase_timed_out").onObject(this)
                .returnBoolValueOrDefault(false);
   }
 
@@ -174,59 +160,61 @@ TEST_GROUP(startup_hsm)
 };
 
 // =============================================================================
-// Device ID phase — timeout path
+// Device ID phase — manager completes synchronously during init (entry path)
 // =============================================================================
 
-TEST(startup_hsm, device_id_phase_timeout_transitions_to_feature_bits)
+TEST(startup_hsm, device_id_phase_complete_on_entry_transitions_to_mqtt_client_init)
 {
-  // HSM entry into startup_state_device_id sends:
-  //   init_device_id_reading, record_device_id_phase_start, is_device_id_complete
+  // HSM entry calls init_device_id_reading, then checks is_device_id_complete.
+  // If complete immediately (e.g. all ERDs read during init), transition right away.
   mock().expectOneCall("init_device_id_reading").onObject(&svc);
-  mock().expectOneCall("record_device_id_phase_start").onObject(&svc);
-  mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(false);
+  mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(true);
+  expect_mqtt_client_init_and_feature_bits_entry();
 
   tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_device_id);
 
-  // When run_loop fires and the phase has timed out, the HSM must transition
-  // immediately to startup_state_mqtt_client_init (and then feature_bits).
-  mock()
-    .expectOneCall("is_device_id_phase_timed_out")
-    .onObject(&svc)
-    .andReturnValue(true);
-  expect_mqtt_client_init_and_feature_bits_entry();
-
-  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
-
-  // Verify: current state is startup_state_feature_bits (mqtt_client_init is
-  // a transient state that transitions during its own entry signal).
   CHECK(hsm.current == startup_state_feature_bits);
-
   mock().checkExpectations();
 }
 
 // =============================================================================
-// Device ID phase — happy path (complete without timeout)
+// Device ID phase — manager completes on run_loop (self-driving)
 // =============================================================================
 
-TEST(startup_hsm, device_id_phase_complete_transitions_to_feature_bits)
+TEST(startup_hsm, device_id_phase_complete_on_run_loop_transitions_to_feature_bits)
 {
-  // Entry expects
+  // Entry: init_device_id_reading called, not yet complete.
   mock().expectOneCall("init_device_id_reading").onObject(&svc);
-  mock().expectOneCall("record_device_id_phase_start").onObject(&svc);
   mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(false);
 
   tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_device_id);
 
-  // run_loop: no timeout, manager completes normally
-  mock()
-    .expectOneCall("is_device_id_phase_timed_out")
-    .onObject(&svc)
-    .andReturnValue(false);
-  mock().expectOneCall("run_device_id").onObject(&svc);
+  // run_loop: manager is self-driving, just check if complete.
   mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(true);
   expect_mqtt_client_init_and_feature_bits_entry();
 
   tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
+
+  CHECK(hsm.current == startup_state_feature_bits);
+  mock().checkExpectations();
+}
+
+// =============================================================================
+// Device ID phase — external signal_device_id_complete transitions immediately
+// =============================================================================
+
+TEST(startup_hsm, device_id_phase_signal_complete_transitions_to_mqtt_client_init)
+{
+  // Entry: init_device_id_reading called, not yet complete.
+  mock().expectOneCall("init_device_id_reading").onObject(&svc);
+  mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(false);
+
+  tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_device_id);
+
+  // External signal from ERD callback — transition immediately.
+  expect_mqtt_client_init_and_feature_bits_entry();
+
+  tiny_hsm_send_signal(&hsm, signal_device_id_complete, nullptr);
 
   CHECK(hsm.current == startup_state_feature_bits);
   mock().checkExpectations();

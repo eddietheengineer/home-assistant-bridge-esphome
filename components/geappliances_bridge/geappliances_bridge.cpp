@@ -471,7 +471,7 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
         }
       } else {
         this->device_identity_manager_.on_erd_read_completed(erd, data, size);
-        if (this->device_identity_manager_.is_complete()) {
+        if (this->device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE) {
           // Signal the startup HSM that device ID is ready.
           tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_complete, nullptr);
         }
@@ -485,15 +485,7 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
           tiny_hsm_send_signal(&this->startup_hsm_, signal_feature_bits_complete, nullptr);
         }
       } else {
-        ESP_LOGW(TAG, "Failed to read ERD 0x%04X for device ID generation (reason: %u), will retry",
-                 erd, args->read_failed.reason);
         this->device_identity_manager_.on_erd_read_failed(erd);
-        if (this->device_identity_manager_.is_complete()) {
-          // Signal the startup HSM that device ID is ready (even on failure, we have a fallback).
-          tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_complete, nullptr);
-        } else if (this->device_identity_manager_.is_failed()) {
-          tiny_hsm_send_signal(&this->startup_hsm_, signal_device_id_failed, nullptr);
-        }
       }
     }
   }
@@ -512,21 +504,12 @@ bool GeappliancesBridge::should_route_to_feature_bits_(tiny_erd_t erd)
                             !this->feature_bit_manager_.is_parse_pending();
   return feature_bit_active &&
     (is_feature_bit_erd(erd) ||
-     (is_device_info_erd(erd) && this->device_identity_manager_.is_complete()));
+     (is_device_info_erd(erd) && this->device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE));
 }
 
 void GeappliancesBridge::on_ha_discovery_erd_seen_(tiny_erd_t erd)
 {
   this->ha_discovery_manager_.on_erd_seen(erd);
-}
-
-// ---------------------------------------------------------------------------
-// Public getter for the auto-generated device ID
-// ---------------------------------------------------------------------------
-
-const std::string& GeappliancesBridge::get_generated_device_id() const
-{
-  return this->device_identity_manager_.get_device_id();
 }
 
 void GeappliancesBridge::dump_config() {
@@ -539,16 +522,6 @@ void GeappliancesBridge::dump_config() {
     if (!device_id.empty()) {
       ESP_LOGCONFIG(TAG, "  Device ID: %s", device_id.c_str());
     }
-    const std::string& generated_id = this->device_identity_manager_.get_generated_device_id();
-    if (!generated_id.empty()) {
-      ESP_LOGCONFIG(TAG, "  Generated Device ID: %s", generated_id.c_str());
-      ESP_LOGCONFIG(TAG, "    Appliance Type: %u", this->device_identity_manager_.get_appliance_type());
-      ESP_LOGCONFIG(TAG, "    Model Number: %s", this->device_identity_manager_.get_model_number().c_str());
-      ESP_LOGCONFIG(TAG, "    Serial Number: %s", this->device_identity_manager_.get_serial_number().c_str());
-    }
-  }
-  if (this->device_identity_manager_.is_failed()) {
-    ESP_LOGCONFIG(TAG, "  Device ID Generation: FAILED (see logs for details)");
   }
   ESP_LOGCONFIG(TAG, "  Client Address: 0x%02X", this->client_address_);
   ESP_LOGCONFIG(TAG, "  Host Address: 0x%02X", this->autodiscovery_manager_.get_host_address());
@@ -689,7 +662,7 @@ bool GeappliancesBridge::is_discovered_gea2_protocol() const
 
 void GeappliancesBridge::init_device_id_reading()
 {
-  if (!device_identity_manager_.is_complete() && !device_identity_manager_.is_failed()) {
+  if (device_identity_manager_.get_state() != DEVICE_ID_STATE_COMPLETE) {
     device_identity_manager_.init(
         configured_device_id_,
         autodiscovery_manager_.get_active_erd_client(),
@@ -697,29 +670,9 @@ void GeappliancesBridge::init_device_id_reading()
   }
 }
 
-void GeappliancesBridge::run_device_id()
-{
-  device_identity_manager_.run();
-}
-
 bool GeappliancesBridge::is_device_id_complete() const
 {
-  return device_identity_manager_.is_complete();
-}
-
-bool GeappliancesBridge::is_device_id_failed() const
-{
-  return device_identity_manager_.is_failed();
-}
-
-void GeappliancesBridge::record_device_id_phase_start()
-{
-  device_id_phase_start_ms_ = millis();
-}
-
-bool GeappliancesBridge::is_device_id_phase_timed_out() const
-{
-  return millis() - device_id_phase_start_ms_ >= DEVICE_ID_PHASE_TIMEOUT_MS;
+  return device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE;
 }
 
 // -- MQTT client adapter ------------------------------------------------------
@@ -820,7 +773,6 @@ void GeappliancesBridge::run_ha_discovery()
 void GeappliancesBridge::run_all_managers()
 {
   autodiscovery_manager_.run();
-  device_identity_manager_.run();
   feature_bit_manager_.run();
 }
 

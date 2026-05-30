@@ -46,18 +46,10 @@ class IBridgeServices {
 
   // -- Device ID -------------------------------------------------------------
 
-  /// Initialize device-ID reading (idempotent when already complete/failed).
+  /// Initialize device-ID reading (idempotent when already complete).
   virtual void init_device_id_reading() = 0;
-  /// Run one tick of the device identity manager.
-  virtual void run_device_id() = 0;
   /// Returns true once the device ID has been determined.
   virtual bool is_device_id_complete() const = 0;
-  /// Returns true if device-ID reading failed (fallback ID in use).
-  virtual bool is_device_id_failed() const = 0;
-  /// Record the timestamp when the device-ID phase begins (for timeout).
-  virtual void record_device_id_phase_start() = 0;
-  /// Returns true if the device-ID phase has exceeded its timeout.
-  virtual bool is_device_id_phase_timed_out() const = 0;
 
   // -- MQTT client adapter ---------------------------------------------------
 

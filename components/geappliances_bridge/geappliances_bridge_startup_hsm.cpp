@@ -163,37 +163,21 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
   switch (signal) {
     case tiny_hsm_signal_entry:
       svc->init_device_id_reading();
-      svc->record_device_id_phase_start();
-      // If a device_id is pre-configured, the manager is already complete
-      // from init().  Transition immediately.
+      // If a device_id is pre-configured and the manager completes synchronously
+      // during init(), transition immediately.
       if (svc->is_device_id_complete()) {
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       }
       break;
 
     case signal_run_loop:
-      // Check for phase timeout — prevent indefinite stalls.
-      if (svc->is_device_id_phase_timed_out()) {
-        ESP_LOGW(TAG, "Device ID phase timed out, using fallback");
-        tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
-        break;
-      }
-
-      svc->run_device_id();
-
+      // Manager is fully self-driving — just check if it completed.
       if (svc->is_device_id_complete()) {
-        tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
-      } else if (svc->is_device_id_failed()) {
-        ESP_LOGW(TAG, "Device ID generation failed, using fallback");
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       }
       break;
 
     case signal_device_id_complete:
-      tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
-      break;
-
-    case signal_device_id_failed:
       tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       break;
 

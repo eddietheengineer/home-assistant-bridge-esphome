@@ -89,8 +89,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void add_custom_erd(uint16_t erd) { this->custom_erds_vec_.push_back(static_cast<tiny_erd_t>(erd)); }
   void set_ha_discovery_base_url(const std::string& url) { this->ha_discovery_base_url_ = url; }
 
-  // Public getter for the auto-generated device ID (used by external consumers)
-  const std::string& get_generated_device_id() const;
+
 
  protected:
   // ── IBridgeServices implementation (called exclusively by the startup HSM) ──
@@ -100,11 +99,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool is_discovered_gea2_protocol() const override;
 
   void init_device_id_reading() override;
-  void run_device_id() override;
   bool is_device_id_complete() const override;
-  bool is_device_id_failed() const override;
-  void record_device_id_phase_start() override;
-  bool is_device_id_phase_timed_out() const override;
 
   bool is_mqtt_client_initialized() const override;
   void initialize_mqtt_client() override;
@@ -184,9 +179,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   // Startup phase timeouts — prevent the startup HSM from stalling
   // indefinitely in any phase that waits for ERD reads.
-  static constexpr uint32_t DEVICE_ID_PHASE_TIMEOUT_MS = 30000;  // 30 s
   static constexpr uint32_t FEATURE_BITS_PHASE_TIMEOUT_MS = 60000;  // 60 s
-  uint32_t device_id_phase_start_ms_{0};
   uint32_t feature_bits_phase_start_ms_{0};
 
   // GEA2 tight-loop duration: covers the full TX→RX cycle at 19200 baud

@@ -56,7 +56,6 @@ enum {
   signal_run_loop = tiny_hsm_signal_user_start,  // Drive ongoing work in current state
   signal_autodiscovery_complete,                  // Autodiscovery found (or gave up on) appliance
   signal_device_id_complete,                      // Device ID ready (read or pre-configured)
-  signal_device_id_failed,                        // Device ID read failed, using fallback
   signal_mqtt_connected,                          // MQTT broker connection established
   signal_feature_bits_complete,                   // All feature bit ERDs read and parsed
   signal_bridge_ready,                            // MQTT bridge (poll/subscribe) initialized
