@@ -35,6 +35,10 @@ SRC_FILES := \
   components/geappliances_bridge/global_state_registry.cpp \
   components/geappliances_bridge/erd_state_table.cpp \
   components/geappliances_bridge/write_queue.cpp \
+  components/geappliances_bridge/subscription_handler.cpp \
+  components/geappliances_bridge/polling_handler.cpp \
+  components/geappliances_bridge/write_handler.cpp \
+  components/geappliances_bridge/appliance_side_state_machine.cpp \
   components/geappliances_bridge/geappliances_bridge.cpp \
   components/geappliances_bridge/geappliances_bridge_bridge_init.cpp \
   components/geappliances_bridge/geappliances_bridge_startup_hsm.cpp
