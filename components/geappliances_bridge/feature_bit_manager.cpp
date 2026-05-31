@@ -286,7 +286,7 @@ void FeatureBitManager::queue_erd_read_()
     // Queue is full — arm a one-shot retry timer so we don't stall
     // indefinitely when no other ERD activity occurs.
     ESP_LOGD(TAG, "Queue full for %s, scheduling retry in %u ms",
-             feature_name, static_cast<uint>(QUEUE_RETRY_MS));
+             feature_name, static_cast<uint32_t>(QUEUE_RETRY_MS));
     tiny_timer_start(this->timer_group_,
                      &this->queue_retry_timer_,
                      QUEUE_RETRY_MS,
