@@ -52,6 +52,8 @@ extern "C" {
 #include "i_bridge_services.h"
 #include "erd_registry.h"
 #include "esphome_mqtt_client_adapter.h"
+#include "erd_data_bus.h"
+#include "mqtt_connection_manager.h"
 #include "device_identity_manager.h"
 #include "feature_bit_manager.h"
 #include "autodiscovery_manager.h"
@@ -148,14 +150,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   std::string configured_device_id_;
   uint8_t client_address_{0xE4};
 
-  // States for the non-blocking MQTT (re)connection FSM in loop().
-  enum class MqttConnectionState : uint8_t {
-    DISCONNECTED,  // No MQTT connection (or not yet seen)
-    SUBSCRIBING,   // Connected; waiting for adapter init to subscribe wildcard
-    FLUSHING,      // Subscribed; draining pending ERD update queue
-    RUNNING,       // Steady-state: queue empty, draining new updates each loop
-  };
-  MqttConnectionState mqtt_connection_state_{MqttConnectionState::DISCONNECTED};
   bool mqtt_client_adapter_initialized_{false};
   bool mqtt_bridge_initialized_{false};
   BridgeMode mode_{BRIDGE_MODE_AUTO};
@@ -270,6 +264,10 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   tiny_event_subscription_t erd_client_activity_subscription_;
   tiny_event_subscription_t gea2_activity_subscription_;
+  tiny_event_subscription_t mqtt_connected_subscription_;
+
+  ErdDataBus erd_data_bus_;
+  MqttConnectionManager mqtt_connection_manager_;
 };
 
 }  // namespace geappliances_bridge

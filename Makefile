@@ -32,6 +32,8 @@ SRC_FILES := \
   components/geappliances_bridge/esphome_time_source.cpp \
   components/geappliances_bridge/esphome_uart_adapter.cpp \
   components/geappliances_bridge/ha_discovery_manager.cpp \
+  components/geappliances_bridge/erd_data_bus.cpp \
+  components/geappliances_bridge/mqtt_connection_manager.cpp \
   components/geappliances_bridge/geappliances_bridge.cpp \
   components/geappliances_bridge/geappliances_bridge_bridge_init.cpp \
   components/geappliances_bridge/geappliances_bridge_startup_hsm.cpp
