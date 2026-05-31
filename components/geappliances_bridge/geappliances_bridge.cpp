@@ -175,8 +175,9 @@ void GeappliancesBridge::setup() {
   ESP_LOGI(TAG, "Waiting %u seconds before starting autodiscovery...",
            AUTODISCOVERY_STARTUP_DELAY_MS / 1000);
 
-  // Initialize the startup HSM. Must be done after all managers are set up so
-  // that timer-driven callbacks can signal the HSM from the very first loop().
+  // Initialize the startup HSM. Done in setup() so timer-driven callbacks
+  // (including from MqttConnectionManager) can signal the HSM immediately
+  // after setup() completes, rather than waiting for the first loop().
   set_bridge_services(this);
   tiny_hsm_init(&this->startup_hsm_, &startup_hsm_configuration,
                 startup_state_protocol_stack);
@@ -220,8 +221,9 @@ void GeappliancesBridge::loop() {
   // Drive the GEA2/GEA3 protocol stack on every loop iteration so that
   // UART bytes are processed and ERD read responses are delivered to the
   // active manager (autodiscovery, device ID, feature bits, polling bridge).
-  // tiny_timer_group_run() is called inside run_protocol_stack_(), which
-  // fires the MqttConnectionManager's 1 ms periodic tick (among others).
+  // run_protocol_stack_() calls tiny_timer_group_run() internally, which
+  // processes all registered timers including the MqttConnectionManager's
+  // 1 ms periodic tick.
   this->run_protocol_stack_();
 #ifdef USE_ESP32
   // Feed the task watchdog after the protocol stack — the GEA2 tight loop
