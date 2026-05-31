@@ -639,7 +639,7 @@ bool GeappliancesBridge::is_startup_delay_elapsed() const
 
 bool GeappliancesBridge::is_bridge_initialized() const
 {
-  return mqtt_fsm_ != nullptr;
+  return mqtt_bridge_initialized_;
 }
 
 void GeappliancesBridge::initialize_mqtt_bridge()

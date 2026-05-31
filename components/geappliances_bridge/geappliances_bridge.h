@@ -161,6 +161,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   // States for the non-blocking MQTT (re)connection FSM in loop().
   bool mqtt_client_adapter_initialized_{false};
+  bool mqtt_bridge_initialized_{false};  // True after initialize_mqtt_bridge_() completes
   bool mqtt_was_connected_{false};  // Tracks previous connection state for edge detection
   BridgeMode mode_{BRIDGE_MODE_AUTO};
   uint32_t polling_interval_ms_{10000};

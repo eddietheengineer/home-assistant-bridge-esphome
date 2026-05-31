@@ -213,6 +213,8 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
                   "(polling mode) or %u s quiet window (subscription mode)",
              HA_DISCOVERY_QUIET_MS / 1000);
   }
+
+  this->mqtt_bridge_initialized_ = true;
 }
 
 // ---------------------------------------------------------------------------
