@@ -73,6 +73,13 @@ void esphome_mqtt_client_adapter_init(
   esphome_mqtt_client_adapter_t* self,
   const char* device_id);
 
+/*!
+ * Returns true if the underlying ESPHome MQTT client is connected.
+ * Safe to call before init() — returns false.
+ */
+bool esphome_mqtt_client_adapter_is_connected(
+  const esphome_mqtt_client_adapter_t* self);
+
 void esphome_mqtt_client_adapter_set_erd_registry(
   esphome_mqtt_client_adapter_t* self,
   esphome::geappliances_bridge::ErdRegistry* erd_registry);

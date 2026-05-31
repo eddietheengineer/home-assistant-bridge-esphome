@@ -204,6 +204,14 @@ extern "C" void esphome_mqtt_client_adapter_init(
   tiny_event_init(&self->on_mqtt_disconnect_event);
 }
 
+extern "C" bool esphome_mqtt_client_adapter_is_connected(
+  const esphome_mqtt_client_adapter_t* self)
+{
+  (void)self;
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  return mqtt_client != nullptr && mqtt_client->is_connected();
+}
+
 extern "C" void esphome_mqtt_client_adapter_set_erd_registry(
   esphome_mqtt_client_adapter_t* self,
   esphome::geappliances_bridge::ErdRegistry* erd_registry)
