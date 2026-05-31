@@ -50,6 +50,22 @@ static constexpr uint32_t AUTODISCOVERY_STARTUP_DELAY_MS = 5000;
 static constexpr uint8_t APPLIANCE_FEATURE_ERD_SIZE = 8;
 
 // ---------------------------------------------------------------------------
+// ErdStateTable / WriteQueue shared constants
+// ---------------------------------------------------------------------------
+
+// Maximum ERD value size in bytes. Covers all known appliances; protocol max
+// is 255 bytes. Stored inline to avoid per-ERD heap allocation on ESP32.
+static constexpr uint8_t MAX_ERD_VALUE_SIZE = 32;
+
+// Maximum number of ERD entries in the ErdStateTable. Allocated at boot as a
+// static array. ERDs are stored in insertion order with an index table for
+// O(1) lookup.
+static constexpr size_t MAX_ERD_ENTRIES = 300;
+
+// Maximum pending write commands in the WriteQueue.
+static constexpr size_t MAX_PENDING_WRITES = 16;
+
+// ---------------------------------------------------------------------------
 // Inline helper functions
 // ---------------------------------------------------------------------------
 

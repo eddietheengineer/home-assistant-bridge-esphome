@@ -15,6 +15,13 @@
 //   - Reading ERDs from the appliance (FeatureBitManager does that)
 //   - Publishing MQTT messages (EsphomeMqttClientAdapter does that)
 //   - Any bridge lifecycle management
+//   - Runtime ERD values or publish flags (ErdStateTable does that)
+//
+// NOTE: ErdRegistry and ErdStateTable are separate concerns. ErdRegistry is
+//       metadata-only (valid ERD set, string-typed ERDs, registered ERDs).
+//       ErdStateTable is runtime state only (current values, publish flags).
+//       ErdStateTable does NOT validate against ErdRegistry::is_valid() —
+//       unknown ERDs cannot corrupt state.
 //
 // Dependencies:
 //   - tiny_erd.h (tiny_erd_t type)
