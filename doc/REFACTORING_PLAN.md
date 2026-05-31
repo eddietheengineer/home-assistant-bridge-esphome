@@ -18,20 +18,19 @@ A centralized registry of all ERDs with metadata:
 - **ERD ID** - unique identifier
 - **Current Value** - latest data from appliance or subscription
 - **Publish Flag** - indicates data needs to be published to MQTT
-- **Timestamp** - when the value last changed
-- **Change Tracking** - whether value has changed since last publish
 
 **Responsibilities:**
 - Single source of truth for ERD data
 - Accessible from both appliance and MQTT sides
-- Thread-safe reads/writes (or atomic operations)
 - Fire events when values change
-- Clear publish flag on MQTT broker ACK (event-driven)
+- Clear publish flag after publishing (synchronous — no broker ACK callback available)
 
 **Usage:**
-- Appliance-side: writes updated ERD values → sets publish flag
-- MQTT-side: reads flagged entries → publishes → clears flag when MQTT broker ACKs
-- On MQTT reconnect: MQTT side iterates flagged entries (those that changed during disconnect)
+- Appliance-side (subscription): writes updated ERD value → sets publish flag only if value changed
+- Appliance-side (poll, `only_publish_on_change = true`): same — sets flag only if value changed
+- Appliance-side (poll, `only_publish_on_change = false`): writes updated ERD value + unconditionally sets publish flag
+- MQTT-side: reads flagged entries → publishes → clears flag immediately after publish call
+- On MQTT reconnect: MQTT side iterates all flagged entries (flags persist while disconnected — no separate tracking needed)
 
 ### Tier 2: Global State Registry
 Subscribable global variables for bridge-level state:
@@ -93,12 +92,12 @@ Publishes ERD updates to MQTT broker and routes write commands to appliance.
 - Subscribe to write-command topics
 - Check ERD state table for flagged entries
 - Publish flagged ERDs (via MQTT client)
-- Clear publish flags when MQTT broker ACKs (event-driven, no timer blocking)
+- Clear publish flags synchronously after calling `publish()` (QoS=0; no broker ACK callback available)
 - Route write commands to write queue
 
 **Dependencies:**
 - MQTT client
-- ERD state table (read flagged entries, write/clear flags on ACK)
+- ERD state table (read flagged entries, clear flags synchronously after publish)
 - Global state registry (read device ID)
 - Write queue (write)
 
@@ -113,7 +112,7 @@ Small, focused modules with limited scope, easy to test:
 
 **MQTT-Side Modules (new):**
 - `WriteRouter` - routes write commands to write queue
-- `MqttSideStateMachine` - manages MQTT lifecycle, publishes flagged ERDs, clears flags on ACK
+- `MqttSideStateMachine` - manages MQTT lifecycle, publishes flagged ERDs, clears flags synchronously after publish
 
 **Existing modules to refactor:**
 - `ErdRegistry` - update to work with new ErdStateTable
@@ -126,6 +125,18 @@ Small, focused modules with limited scope, easy to test:
 - `HaDiscoveryManager` - defer to later phase
 
 ## Implementation Strategy
+
+Each phase has a detailed implementation document with full interface specs, design rationale, and a completion checklist:
+
+| Phase | Document | Summary |
+|-------|----------|---------|
+| 1 | [phase-1-foundation.md](phase-1-foundation.md) | Core data structures: `GlobalStateRegistry`, `ErdStateTable`, `WriteQueue` |
+| 2 | [phase-2-appliance-side.md](phase-2-appliance-side.md) | Appliance-side handlers and `ApplianceSideStateMachine` |
+| 3 | [phase-3-mqtt-side.md](phase-3-mqtt-side.md) | `WriteRouter`, `MqttSideStateMachine`; delete old C bridges |
+| 4 | [phase-4-integration.md](phase-4-integration.md) | Wire FSMs into `GeappliancesBridge`; fix startup HSM |
+| 5 | [phase-5-testing.md](phase-5-testing.md) | Unit, integration, and backward-compatibility tests |
+
+The sections below are a concise summary of each phase. See the linked documents for full details.
 
 ### Phase 1: Foundation (Global State & ERD State Table)
 1. Create `GlobalStateRegistry` class
@@ -166,14 +177,14 @@ Small, focused modules with limited scope, easy to test:
    - Decouples MQTT-side from appliance implementation
 
 2. Extract MQTT logic into `MqttSideStateMachine`
-   - Consumes ERD state table (read flagged entries, clear flags on ACK)
+   - Consumes ERD state table (read flagged entries, clears flags synchronously after each publish)
    - Handles MQTT connection lifecycle
    - Routes write commands to write queue
-   - Clears publish flags when MQTT broker ACKs (event-driven, non-blocking)
+   - Clears publish flags synchronously after each `publish()` call (QoS=0; no ACK callback exists)
 
 3. Update `EsphomeMqttClientAdapter`
    - Adapt to work with new state table structure
-   - Hook MQTT broker ACK callback to trigger flag-clear events
+   - No ACK callback to hook — flag clearing is handled by `MqttSideStateMachine` synchronously
    - Remove direct appliance integration
 
 ### Phase 4: Startup & Coordination
@@ -218,7 +229,7 @@ Small, focused modules with limited scope, easy to test:
 | **Isolated FSMs** | Each FSM owns its complexity; easier to reason about; can be tested independently |
 | **ERD state table as source of truth** | Single point of truth; MQTT side doesn't need to know appliance protocol; appliance side doesn't care about MQTT |
 | **Global state registry** | Read-only values like device ID and connection status are needed everywhere; centralized subscription avoids passing params through many layers |
-| **Publish flags instead of queues** | Bounds memory (one flag per ERD); simpler recovery on reconnect; deduplication built-in |
+| **Publish flags — `publish_flag` only** | `publish_flag` is both the change tracker and the reconnect-recovery mechanism. It stays set while MQTT is disconnected and is cleared synchronously after `publish()`. No separate `changed_since_last_publish` field needed. `only_publish_on_change` is enforced by the appliance side: SubscriptionHandler/PollingHandler call `set_publish_flag()` unconditionally or only on change, keeping the MQTT side simple. |
 | **Fixed-size ERD value buffers** | Avoids per-ERD heap allocation and fragmentation on ESP32; ERD values are bounded at 255 bytes max; `MAX_ERD_VALUE_SIZE = 32` covers all known appliances |
 | **Synchronous publish-flag clearing** | ESPHome MQTT publish is fire-and-forget at QoS=0; no broker ACK callback is available. Flags are cleared immediately after `publish()` returns. Reconnect resilience comes from the flag persisting until publish is *called*, not until it is *acknowledged*. |
 | **GEA2 tight loop stays in GeappliancesBridge** | The 200 ms busy-loop is a hardware constraint that must run before any FSM loop() calls. Neither `ApplianceSideStateMachine` nor `MqttSideStateMachine` may own or replicate it. |
@@ -422,27 +433,29 @@ struct ErdEntry {
   tiny_erd_t erd_id;
   uint8_t value[MAX_ERD_VALUE_SIZE]; // Raw ERD data
   uint8_t value_size;
-  bool publish_flag;               // True = needs MQTT publish
-  uint32_t timestamp_ms;           // When value last changed (millis())
+  bool publish_flag; // True = needs MQTT publish; persists while disconnected
 };
 ```
 
 **Methods to implement:**
 
 *Write operations (appliance-side calls these):*
-- `void update_erd_value(tiny_erd_t erd_id, const std::vector<uint8_t>& value)`
-  - If value differs from stored, set `publish_flag = true`
-  - Update timestamp
-  - Fire `on_erd_changed` event
+- `void update_erd_value(tiny_erd_t erd_id, const uint8_t* value, uint8_t size)`
+  - Stores the new value
+  - Sets `publish_flag = true` **only if the value differs** from the stored value
+  - Fires `on_erd_changed` event
+  - Used by SubscriptionHandler and PollingHandler (with `only_publish_on_change = true`)
+- `void set_publish_flag(tiny_erd_t erd_id)`
+  - Unconditionally sets `publish_flag = true` without changing the stored value
+  - Used by PollingHandler when `only_publish_on_change = false` (called after `update_erd_value`)
 
 *Read operations (MQTT-side calls these):*
 - `std::vector<tiny_erd_t> get_flagged_erds() const` - return all ERDs with `publish_flag == true`
-- `const std::vector<uint8_t>& get_erd_value(tiny_erd_t erd_id) const` - read current value
-- `void clear_publish_flag(tiny_erd_t erd_id)` - called after MQTT broker ACKs
+- `const uint8_t* get_erd_value(tiny_erd_t erd_id, uint8_t& size_out) const` - read current value
+- `void clear_publish_flag(tiny_erd_t erd_id)` - called immediately after publish
 
 *Query operations:*
 - `bool has_flag(tiny_erd_t erd_id) const`
-- `uint32_t get_timestamp(tiny_erd_t erd_id) const`
 
 **Events:**
 - `on_erd_changed(tiny_erd_t erd_id)` - fired when value updated with new data
@@ -781,10 +794,12 @@ Modify the startup FSM to populate the GlobalStateRegistry as it discovers appli
 **Expected output:** `test/test_erd_state_table.cpp`
 
 **Test cases:**
-- Value updates trigger change event
-- Publish flag set when new value written
-- Publish flag cleared via `clear_publish_flag()`
+- `update_erd_value()` with a new value sets `publish_flag = true`
+- `update_erd_value()` with the same value leaves `publish_flag = false`
+- `set_publish_flag()` sets flag unconditionally even when value unchanged
+- `clear_publish_flag()` clears the flag after publishing
 - `get_flagged_erds()` returns only flagged entries
+- `on_erd_changed` fires only when value actually differs
 - Values larger than `MAX_ERD_VALUE_SIZE` are rejected or truncated safely
 
 ---
@@ -809,7 +824,9 @@ Modify the startup FSM to populate the GlobalStateRegistry as it discovers appli
 
 **Test cases:**
 - Poll interval triggers poll
-- Poll response updates state table
+- Poll response with changed value: `update_erd_value()` called → flag set
+- Poll response with same value, `only_publish_on_change = true`: flag stays clear
+- Poll response with same value, `only_publish_on_change = false`: `set_publish_flag()` called → flag set
 - Can add/remove ERDs from poll list
 - Poll retries on failure
 
@@ -852,7 +869,7 @@ Modify the startup FSM to populate the GlobalStateRegistry as it discovers appli
 - Connecting → Subscribing when connected
 - Subscribing → Running when subscribed
 - Running publishes flagged ERDs
-- Flag cleared when broker ACK received
+- Flag cleared synchronously after `publish()` is called (no broker ACK)
 - Disconnection pauses publishing, reconnect resumes
 - Accumulated flags published on reconnect
 
@@ -881,8 +898,7 @@ Modify the startup FSM to populate the GlobalStateRegistry as it discovers appli
 3. Simulate ERD subscription update
 4. Verify state table updated with value
 5. Verify MQTT FSM publishes to broker
-6. Simulate broker ACK
-7. Verify publish flag cleared
+6. Verify publish flag cleared synchronously after `publish()` returns (no ACK step needed)
 
 ---
 
