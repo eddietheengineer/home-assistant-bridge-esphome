@@ -58,11 +58,22 @@ void GeappliancesBridge::start_feature_bit_reading_()
   if (this->feature_bit_reading_started_) {
     return;
   }
+
+  // Guard: only proceed once a valid ERD client is available. If the client
+  // is null (e.g. autodiscovery not yet complete), leave the flag unset so
+  // the next loop() call retries rather than getting permanently stuck.
+  i_tiny_gea3_erd_client_t* erd_client = this->autodiscovery_manager_.get_active_erd_client();
+  if (erd_client == nullptr) {
+    return;
+  }
+
+  // Set the flag only after confirming init() will succeed, so that a
+  // transient null-client on an earlier call does not permanently block retry.
   this->feature_bit_reading_started_ = true;
 
   ESP_LOGI(TAG, "Reading device info ERDs for MQTT publish, then appliance API feature bits...");
   this->feature_bit_manager_.init(
-      this->autodiscovery_manager_.get_active_erd_client(),
+      erd_client,
       this->autodiscovery_manager_.get_host_address(),
       &this->timer_group_);
   this->feature_bit_manager_.start();
