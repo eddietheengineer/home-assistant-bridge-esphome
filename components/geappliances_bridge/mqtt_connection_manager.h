@@ -3,7 +3,7 @@
  * @brief Timer-driven MQTT connection FSM.
  *
  * MqttConnectionManager owns the 4-state MQTT connection FSM that was
- * previously embedded in GeappliancesBridge::loop(). It registers a 1 ms
+ * previously embedded in GeappliancesBridge::loop(). It registers a 100 ms
  * periodic timer in the shared timer_group so the FSM runs automatically
  * without any manual dispatch in loop().
  *

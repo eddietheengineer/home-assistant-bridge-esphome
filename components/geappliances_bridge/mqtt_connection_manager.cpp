@@ -28,7 +28,7 @@ void MqttConnectionManager::init(
   tiny_event_init(&on_connected_);
   tiny_event_init(&on_disconnected_);
 
-  tiny_timer_start_periodic(timer_group_, &timer_, 1, this, tick_callback);
+  tiny_timer_start_periodic(timer_group_, &timer_, 100, this, tick_callback);
 }
 
 void MqttConnectionManager::destroy()
