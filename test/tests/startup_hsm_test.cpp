@@ -93,7 +93,15 @@ class MockBridgeServices : public IBridgeServices {
   void log_poll_state_transitions() override {}
   void run_ha_discovery() override {}
   void run_all_managers() override {}
+
+  // -- Global state registry --------------------------------------------------
+  const std::string& get_device_id_string() const override { return empty_string_; }
+  GlobalStateRegistry* get_global_registry() override { return nullptr; }
+
+  static std::string empty_string_;
 };
+
+std::string MockBridgeServices::empty_string_ = "";
 
 // =============================================================================
 // HsmMockMqttClient — minimal stub for esphome::mqtt::MQTTClientComponent

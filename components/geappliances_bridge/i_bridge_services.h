@@ -23,11 +23,14 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include "bridge_mode.h"
 
 namespace esphome {
 namespace geappliances_bridge {
+
+class GlobalStateRegistry;
 
 class IBridgeServices {
  public:
@@ -50,6 +53,8 @@ class IBridgeServices {
   virtual void init_device_id_reading() = 0;
   /// Returns true once the device ID has been determined.
   virtual bool is_device_id_complete() const = 0;
+  /// Returns the assembled device ID string (valid when is_device_id_complete()).
+  virtual const std::string& get_device_id_string() const = 0;
 
   // -- MQTT client adapter ---------------------------------------------------
 
@@ -71,6 +76,11 @@ class IBridgeServices {
   virtual bool is_bridge_initialized() const = 0;
   /// Initialize the MQTT bridge in the mode selected by configuration.
   virtual void initialize_mqtt_bridge() = 0;
+
+  // -- Global state registry -------------------------------------------------
+
+  /// Get the global state registry (populated during startup).
+  virtual GlobalStateRegistry* get_global_registry() = 0;
 
   // -- Operating mode --------------------------------------------------------
 
