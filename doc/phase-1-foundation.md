@@ -49,7 +49,7 @@ All code in this project runs in the single ESPHome main loop task. The only cro
 Create a C++ class that manages subscribable global state variables accessible to all modules. The StartupHsm sets these values; the FSMs read them.
 
 **Values to store:**
-- `device_id` (std::string) — set once by StartupHsm after assembly; write-once, no subscription needed
+- `device_id` (std::string) — set once by StartupHsm after assembly; fires `on_device_id_ready()` so AutodiscoveryManager and MQTT-side modules can react
 - `appliance_address` (uint8_t) — set by AutodiscoveryManager when found
 - `gea_protocol_type` (uint8_t or enum) — set when GEA2 or GEA3 detected
 - `bridge_mode` (enum: `STARTING`, `RUNNING`, `ERROR`) — updated as startup progresses
@@ -64,7 +64,7 @@ BridgeMode get_bridge_mode() const;
 
 **Write methods** (called only during startup/initialization):
 ```cpp
-void set_device_id(const std::string& id);        // write-once; no notify
+void set_device_id(const std::string& id);        // write-once; fires on_device_id_ready()
 void set_appliance_address(uint8_t addr);          // notifies subscribers
 void set_gea_protocol_type(uint8_t type);          // notifies subscribers
 void set_bridge_mode(BridgeMode mode);             // notifies subscribers
@@ -72,6 +72,7 @@ void set_bridge_mode(BridgeMode mode);             // notifies subscribers
 
 **Event accessors** (typed per-field, not string-keyed):
 ```cpp
+i_tiny_event_t* on_device_id_ready();             // fires once when device_id is first set
 i_tiny_event_t* on_appliance_address_changed();
 i_tiny_event_t* on_gea_protocol_type_changed();
 i_tiny_event_t* on_bridge_mode_changed();
@@ -88,7 +89,10 @@ The core shared data structure between appliance-side and MQTT-side. Stores curr
 
 **Data structure:**
 ```cpp
+// Defined in shared gea_constants.h (not erd_state_table.h) so WriteQueue can
+// reference it without a cross-module dependency.
 static constexpr uint8_t MAX_ERD_VALUE_SIZE = 32;
+static constexpr size_t MAX_ERD_ENTRIES = 300;
 
 struct ErdEntry {
   tiny_erd_t erd_id;
@@ -97,6 +101,8 @@ struct ErdEntry {
   bool publish_flag; // true = needs MQTT publish; persists while MQTT disconnected
 };
 ```
+
+Storage: flat array of `ErdEntry[MAX_ERD_ENTRIES]` allocated at boot (stack/static). ERDs are stored in insertion order — no requirement for contiguous ERD IDs. An index table (vector of indices into the flat array, keyed by ERD ID) provides O(1) lookup without per-ERD heap allocation.
 
 **Write operations** (called by appliance-side handlers):
 ```cpp
@@ -112,7 +118,9 @@ void set_publish_flag(tiny_erd_t erd_id);
 
 **Read operations** (called by MQTT-side FSM):
 ```cpp
-// Returns all ERDs with publish_flag==true
+// Returns all ERDs with publish_flag==true. Allocates a std::vector on each
+// call — acceptable at this scale (max 300 entries, 2 bytes each = 600 bytes,
+// called once per MQTT publish cycle, not in a tight loop).
 std::vector<tiny_erd_t> get_flagged_erds() const;
 
 // Returns pointer to stored value and its size; nullptr if ERD not found
@@ -140,7 +148,7 @@ i_tiny_event_t* on_erd_changed(); // args: tiny_erd_t erd_id
 ### Todo 1.3: Verify `ErdRegistry` Alongside `ErdStateTable`
 **ID:** `verify-erd-registry`
 **Depends on:** `erd-state-table`
-**Output:** No new files; minor update to `erd_registry.h` only if filtering hook is added
+**Output:** No new files; add clarifying comments to both headers
 
 `ErdRegistry` and `ErdStateTable` are separate concerns and must remain so:
 - `ErdRegistry` — metadata only: which ERDs are valid, string-typed, registered at runtime
@@ -148,8 +156,8 @@ i_tiny_event_t* on_erd_changed(); // args: tiny_erd_t erd_id
 
 **What to do:**
 1. Confirm existing `ErdRegistry` tests still pass unchanged (`make test`)
-2. Optionally pass an `ErdRegistry*` to `ErdStateTable` so `update_erd_value()` can call `ErdRegistry::is_valid()` to reject unknown ERDs (optional guard, not required for correctness)
-3. Add a comment to both headers clarifying their distinct roles
+2. Add a comment to both headers clarifying their distinct roles
+3. `ErdStateTable` does NOT need to validate against `ErdRegistry::is_valid()` — unknown ERDs cannot corrupt state
 
 ---
 
@@ -163,14 +171,14 @@ A simple bounded FIFO for write commands. Must exist before Phase 2 (`WriteHandl
 ```cpp
 struct WriteCommand {
   tiny_erd_t erd_id;
-  uint8_t value[MAX_ERD_VALUE_SIZE]; // MAX_ERD_VALUE_SIZE defined in erd_state_table.h
+  uint8_t value[MAX_ERD_VALUE_SIZE]; // MAX_ERD_VALUE_SIZE from gea_constants.h
   uint8_t value_size;
   uint8_t appliance_address;
 };
 
 class WriteQueue {
 public:
-  bool push(const WriteCommand& cmd); // returns false if full
+  bool push(const WriteCommand& cmd); // returns false if full — caller retries
   bool pop(WriteCommand& cmd_out);    // returns false if empty
   bool is_empty() const;
   size_t size() const;
@@ -179,20 +187,23 @@ public:
 };
 ```
 
-All access is from the ESPHome main loop task — no mutex needed.
+All access is from the ESPHome main loop task — no mutex needed. When `push()` returns false (queue full), the caller is responsible for retrying on the next main loop iteration.
 
 ---
 
 ## Phase Completion Checklist
 
+- [ ] `gea_constants.h` created with `MAX_ERD_VALUE_SIZE` and `MAX_ERD_ENTRIES`
 - [ ] `global_state_registry.h/.cpp` compiles cleanly
 - [ ] `erd_state_table.h/.cpp` compiles cleanly
 - [ ] `write_queue.h/.cpp` compiles cleanly
 - [ ] Existing `ErdRegistry` tests still pass: `make test`
-- [ ] Unit tests written for `GlobalStateRegistry` (see Phase 5 Todo 5.1)
-- [ ] Unit tests written for `ErdStateTable` (see Phase 5 Todo 5.2)
+- [ ] Unit tests written for `GlobalStateRegistry` (TDD alongside implementation)
+- [ ] Unit tests written for `ErdStateTable` (TDD alongside implementation)
+- [ ] Unit tests written for `WriteQueue` (TDD alongside implementation)
 - [ ] No `std::vector` heap allocations per ERD in `ErdEntry`
 - [ ] No mutex added to `ErdStateTable` or `GlobalStateRegistry`
+- [ ] Full 4-gate verification passed via `gea-bridge-verify` skill (tests, compile all 7 configs, OTA flash all 7 devices, runtime log verification)
 
 ---
 
