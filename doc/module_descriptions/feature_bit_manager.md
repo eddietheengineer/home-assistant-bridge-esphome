@@ -45,7 +45,7 @@ The manager is fully self-driving with no polling from the bridge:
    - Each completed or failed read immediately triggers the next read in the sequence
 4. **After last ERD (0x010D)**: transitions to `FEATURE_BIT_STATE_PARSING` and arms a periodic timer (5ms interval) for incremental parsing
 5. **Timer callback `parse_next_step_()`** drives incremental parsing:
-   - First tick: clears valid_erds_, validates erd_0092 size
+   - First tick: clears valid_erds_ and initializes parsing state
    - Next ticks: processes common feature descriptors (4 per tick via `COMMON_PARSE_PER_CALL`)
    - Next ticks: processes one appliance ERD (0x0093-0x010D) per tick
    - Final tick: adds mandatory ERDs, builds valid_erds_vec_, sets `valid_list_ready_ = true`, stops timer, transitions to COMPLETE
@@ -56,7 +56,7 @@ The manager is fully self-driving with no polling from the bridge:
 - **Common features (ERD 0x0092)**: Parsed first, processes 17 descriptors at 4 per tick (~5 ticks total)
 - **Appliance features (ERD 0x0093-0x010D)**: Parsed one per tick (10 ticks total), matched against descriptor tables by appliance type and version
 - **Mandatory ERDs**: Always included in final list regardless of feature bits: 0x0001, 0x0002, 0x0008, 0x0092-0x0097, 0x0109-0x010D (14 total)
-- **Total parsing ticks**: ~16 ticks (1 init + 4 common + 10 appliance + 1 final) at 5ms each = ~80ms
+- **Total parsing ticks**: ~16 ticks (5 common + 10 appliance + 1 final; init happens in the first tick) at 5ms each = ~80ms
 
 ### Key Design Decisions
 

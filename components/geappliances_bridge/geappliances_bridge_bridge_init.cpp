@@ -45,9 +45,7 @@ void GeappliancesBridge::start_feature_bit_reading_()
   // Guard: don't re-initialize if the manager has already started.
   // Any READING_* state means the manager is actively processing,
   // PARSING/COMPLETE mean it's past the reading phase.
-  // The manager's read_queued_ flag (exposed via state != READING_0008
-  // OR state == READING_0008 with a read already queued) protects against
-  // re-init while the first read is in-flight.
+  // Note: the feature_bit_reading_started_ flag prevents re-init while the first read is in-flight.
   FeatureBitState state = this->feature_bit_manager_.get_state();
   if (state != FEATURE_BIT_STATE_READING_0008) {
     return;
