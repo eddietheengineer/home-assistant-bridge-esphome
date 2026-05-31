@@ -42,12 +42,26 @@ static const char* const TAG __attribute__((unused)) = "geappliances_bridge";
 
 void GeappliancesBridge::start_feature_bit_reading_()
 {
-  // Guard: don't re-initialize if already running, parsing, or done.
-  // Any READING_* state means the manager is actively processing - don't reset it.
+  // Guard: don't re-initialize if the manager has already started.
+  // Any READING_* state means the manager is actively processing,
+  // PARSING/COMPLETE mean it's past the reading phase.
+  // The manager's read_queued_ flag (exposed via state != READING_0008
+  // OR state == READING_0008 with a read already queued) protects against
+  // re-init while the first read is in-flight.
   FeatureBitState state = this->feature_bit_manager_.get_state();
   if (state != FEATURE_BIT_STATE_READING_0008) {
     return;
   }
+  // Additional guard: if start() was already called and the first read
+  // is in-flight, the manager is still in READING_0008 but read_queued_
+  // is true. We can't check read_queued_ directly (it's private), but
+  // we track whether we've already kicked off feature bit reading via
+  // the feature_bit_reading_started_ flag.
+  if (this->feature_bit_reading_started_) {
+    return;
+  }
+  this->feature_bit_reading_started_ = true;
+
   ESP_LOGI(TAG, "Reading device info ERDs for MQTT publish, then appliance API feature bits...");
   this->feature_bit_manager_.init(
       this->autodiscovery_manager_.get_active_erd_client(),

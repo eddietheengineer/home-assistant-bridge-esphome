@@ -176,8 +176,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool custom_erd_polling_started_{false};  // Guard to prevent re-initialization
   static constexpr uint32_t SUBSCRIPTION_TIMEOUT_MS = 10000; // 10 seconds
 
-  // Startup phase timeouts — prevent the startup HSM from stalling
-  // indefinitely in any phase that waits for ERD reads.
+  // Startup phase delay tracking
   uint32_t startup_delay_start_ms_{0};
 
   // GEA2 tight-loop duration: covers the full TX→RX cycle at 19200 baud
@@ -190,6 +189,11 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   // Feature bit manager (extracted from god class)
   FeatureBitManager feature_bit_manager_;
+
+  // Guard to prevent re-initializing feature bit reading mid-sequence.
+  // start_feature_bit_reading_() checks this flag so it won't re-init()
+  // if called again while the first ERD read is still in-flight.
+  bool feature_bit_reading_started_{false};
 
   // Feature bit reading state machine (runs after autodiscovery, before device ID gen)
   // The FeatureBitManager owns the valid ERD list and ready flag; use its getters directly.

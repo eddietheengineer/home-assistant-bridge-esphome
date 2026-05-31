@@ -29,6 +29,10 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
     ESP_LOGE(TAG, "init() called with null erd_client");
     return;
   }
+  if (timer_group == nullptr) {
+    ESP_LOGE(TAG, "init() called with null timer_group");
+    return;
+  }
 
   this->erd_client_    = erd_client;
   this->host_address_  = host_address;
@@ -101,18 +105,28 @@ void FeatureBitManager::on_erd_activity_(const void* args)
     return;
   }
 
+  // Determine which ERD we're currently waiting for.
+  tiny_erd_t expected_erd = this->get_expected_erd_();
+
   // If we haven't queued a read yet (queue was full), retry now.
   if (!this->read_queued_) {
     this->queue_erd_read_();
     return;
   }
 
+  // Only process events for the ERD we're actually waiting for.
+  // This prevents unrelated reads (e.g., from the polling bridge) from
+  // clearing read_queued_ and corrupting the read sequence.
   if (a->type == tiny_gea3_erd_client_activity_type_read_completed) {
-    this->handle_read_completed_(a->read_completed.erd,
-                                  a->read_completed.data,
-                                  a->read_completed.data_size);
+    if (a->read_completed.erd == expected_erd) {
+      this->handle_read_completed_(a->read_completed.erd,
+                                    a->read_completed.data,
+                                    a->read_completed.data_size);
+    }
   } else if (a->type == tiny_gea3_erd_client_activity_type_read_failed) {
-    this->skip_to_next_erd_(a->read_failed.erd);
+    if (a->read_failed.erd == expected_erd) {
+      this->skip_to_next_erd_(a->read_failed.erd);
+    }
   }
 }
 
@@ -263,14 +277,70 @@ void FeatureBitManager::queue_erd_read_()
   }
 
   // Try to queue the read. If the queue is full, stay in the current state
-  // and retry on the next ERD client activity event.
+  // and schedule a retry timer.
   tiny_gea3_erd_client_request_id_t req_id;
   if (tiny_gea3_erd_client_read(this->erd_client_, &req_id, this->host_address_, feature_erd)) {
     ESP_LOGD(TAG, "Queued read for %s", feature_name);
     this->read_queued_ = true;
+  } else {
+    // Queue is full — arm a one-shot retry timer so we don't stall
+    // indefinitely when no other ERD activity occurs.
+    ESP_LOGD(TAG, "Queue full for %s, scheduling retry in %u ms",
+             feature_name, static_cast<uint>(QUEUE_RETRY_MS));
+    tiny_timer_start(this->timer_group_,
+                     &this->queue_retry_timer_,
+                     QUEUE_RETRY_MS,
+                     this,
+                     FeatureBitManager::queue_retry_timer_callback_);
   }
-  // If queue is full, we stay in the current READING state. The next event
-  // (any ERD activity) will re-trigger this method and retry the queue.
+}
+
+// =============================================================================
+// Map a READING state to the ERD value (for event filtering)
+// =============================================================================
+
+tiny_erd_t FeatureBitManager::get_expected_erd_() const
+{
+  switch (this->state_) {
+    case FEATURE_BIT_STATE_READING_0008: return ERD_APPLIANCE_TYPE;
+    case FEATURE_BIT_STATE_READING_0001: return ERD_MODEL_NUMBER;
+    case FEATURE_BIT_STATE_READING_0002: return ERD_SERIAL_NUMBER;
+    case FEATURE_BIT_STATE_READING_0092: return ERD_COMMON_FEATURE_API;
+    case FEATURE_BIT_STATE_READING_0093: return ERD_APPLIANCE_FEATURE_API_0;
+    case FEATURE_BIT_STATE_READING_0094: return ERD_APPLIANCE_FEATURE_API_1;
+    case FEATURE_BIT_STATE_READING_0095: return ERD_APPLIANCE_FEATURE_API_2;
+    case FEATURE_BIT_STATE_READING_0096: return ERD_APPLIANCE_FEATURE_API_3;
+    case FEATURE_BIT_STATE_READING_0097: return ERD_APPLIANCE_FEATURE_API_4;
+    case FEATURE_BIT_STATE_READING_0109: return ERD_APPLIANCE_FEATURE_API_5;
+    case FEATURE_BIT_STATE_READING_010A: return ERD_APPLIANCE_FEATURE_API_6;
+    case FEATURE_BIT_STATE_READING_010B: return ERD_APPLIANCE_FEATURE_API_7;
+    case FEATURE_BIT_STATE_READING_010C: return ERD_APPLIANCE_FEATURE_API_8;
+    case FEATURE_BIT_STATE_READING_010D: return ERD_APPLIANCE_FEATURE_API_9;
+    default: return 0;  // Not in a READING state
+  }
+}
+
+// =============================================================================
+// Queue retry timer callback
+// =============================================================================
+
+void FeatureBitManager::queue_retry_timer_callback_(void* context)
+{
+  reinterpret_cast<FeatureBitManager*>(context)->queue_retry_();
+}
+
+void FeatureBitManager::queue_retry_()
+{
+  // Don't retry if we've moved past the READING state (e.g., an event
+  // arrived and completed the read before the timer fired).
+  if (this->state_ == FEATURE_BIT_STATE_PARSING || this->state_ == FEATURE_BIT_STATE_COMPLETE) {
+    return;
+  }
+  if (this->read_queued_) {
+    // Read was already queued by an intervening event — nothing to do.
+    return;
+  }
+  this->queue_erd_read_();
 }
 
 // =============================================================================

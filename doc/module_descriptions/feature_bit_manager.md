@@ -64,8 +64,8 @@ The manager is fully self-driving with no polling from the bridge:
 - **No MQTT dependency**: Removed `i_mqtt_client` dependency. The manager only needs the ERD client and timer group.
 - **No `run()` method**: The manager is fully event-driven and timer-driven. The bridge does not poll `run()`.
 - **Read failure**: Each ERD read that fails is skipped (not retried). The manager advances to the next ERD in the sequence.
-- **Queue full retry**: If `tiny_gea3_erd_client_read()` returns false (queue full), the manager stays in the current READING state. The next ERD client activity event triggers `on_erd_activity_()` which retries the queued read. This provides implicit retry without blocking.
-- **Event filtering**: `on_erd_activity_()` filters by `address == host_address_` and ignores events once in PARSING/COMPLETE states to prevent state machine corruption from unrelated ERD activity.
+- **Queue full retry**: If `tiny_gea3_erd_client_read()` returns false (queue full), the manager arms a one-shot retry timer (50ms). If an ERD activity event arrives before the timer fires and queues the read, the timer becomes a no-op. This prevents indefinite stalling when the queue is persistently full with no other activity.
+- **Event filtering**: `on_erd_activity_()` filters by `address == host_address_` AND verifies the event's ERD matches the one the current READING state expects. Unrelated reads (e.g., from the polling bridge) are ignored. Events in PARSING/COMPLETE states are also ignored to prevent state machine corruption.
 - **Incremental parsing**: Uses `tiny_timer` with 5ms interval to spread heap allocations across multiple ticks, avoiding the ESP32 Task Watchdog Timer.
 - **Idempotent start**: `read_queued_` flag ensures `start()` can be called multiple times safely (e.g., from HSM entry + bridge loop).
 

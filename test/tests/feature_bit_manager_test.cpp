@@ -1,4 +1,20 @@
-/*!\n * @file\n * @brief Unit tests for the self-driving FeatureBitManager class.\n *\n * Validates initialization, start(), event-driven ERD read sequencing (14 ERDs),\n * state transitions, failure handling, timer-driven incremental parsing, and\n * valid ERD list generation.\n *\n * The manager is fully self-driving: it subscribes to ERD client activity events\n * and uses a periodic timer for incremental parsing.  Tests trigger events via\n * tiny_gea3_erd_client_double_trigger_activity_event() and drive the parse timer\n * via tiny_timer_group_double_elapse_time().\n *\n * Note: Production headers with STL containers (<set>, <vector>) must be\n * included BEFORE CppUTest headers to avoid conflicts with CppUTest's\n * custom 'new' macro which breaks placement-new in standard library headers.\n */
+/*!\
+ * @file
+ * @brief Unit tests for the self-driving FeatureBitManager class.
+ *
+ * Validates initialization, start(), event-driven ERD read sequencing (14 ERDs),
+ * state transitions, failure handling, timer-driven incremental parsing, and
+ * valid ERD list generation.
+ *
+ * The manager is fully self-driving: it subscribes to ERD client activity events
+ * and uses a periodic timer for incremental parsing.  Tests trigger events via
+ * tiny_gea3_erd_client_double_trigger_activity_event() and drive the parse timer
+ * via tiny_timer_group_double_elapse_time().
+ *
+ * Note: Production headers with STL containers (<set>, <vector>) must be
+ * included BEFORE CppUTest headers to avoid conflicts with CppUTest's
+ * custom 'new' macro which breaks placement-new in standard library headers.
+ */
 
 #include "feature_bit_manager.h"
 #include "geappliances_bridge_constants.h"
@@ -541,6 +557,88 @@ TEST(feature_bit_manager, queue_full_keeps_current_state)
 
   // State remains READING_0008 when queue is full.
   CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+
+  // Elapse 50ms to trigger the retry timer, which attempts another read (also failing).
+  expect_failed_read(0xC0, ERD_APPLIANCE_TYPE);
+  tiny_timer_group_double_elapse_time(&timer_group, 50);
+
+  // State still READING_0008 after the retry also fails.
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+}
+
+/* ------------------------------------------------------------------ */
+/* Queue retry timer behavior                                           */
+/* ------------------------------------------------------------------ */
+
+TEST(feature_bit_manager, queue_full_retry_timer_retries_on_elapse)
+{
+  init_manager();
+
+  // start() tries to queue a read but the queue is full.
+  expect_failed_read(0xC0, ERD_APPLIANCE_TYPE);
+  manager.start();
+
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+
+  // Elapse 50ms to trigger the retry timer, which attempts another read (also failing).
+  expect_failed_read(0xC0, ERD_APPLIANCE_TYPE);
+  tiny_timer_group_double_elapse_time(&timer_group, 50);
+
+  // State is still READING_0008 after the retry also fails.
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+}
+
+TEST(feature_bit_manager, queue_retry_timer_noop_when_already_queued)
+{
+  init_manager();
+
+  // start() tries to queue a read but the queue is full, arming the retry timer.
+  expect_failed_read(0xC0, ERD_APPLIANCE_TYPE);
+  manager.start();
+
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+
+  // An activity event arrives before the timer fires. Since read_queued_ is false,
+  // on_erd_activity_ retries the queue and it succeeds this time. The event
+  // itself is NOT processed (method returns early after queuing).
+  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  uint8_t data[1] = {0x06};
+  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
+
+  // Now read_queued_ is true. A second activity event processes the completion.
+  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
+  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
+
+  // Now read_queued_ is true (ERD_MODEL_NUMBER is in-flight).
+  // Elapse 50ms — the retry timer fires but queue_retry_() sees
+  // read_queued_ == true and does nothing.
+  tiny_timer_group_double_elapse_time(&timer_group, 50);
+
+  // No additional read mock needed — the timer was a no-op.
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0001, manager.get_state());
+}
+
+/* ------------------------------------------------------------------ */
+/* ERD event filtering                                                  */
+/* ------------------------------------------------------------------ */
+
+TEST(feature_bit_manager, unrelated_erd_events_are_ignored)
+{
+  init_manager();
+
+  // start() queues a read for ERD_APPLIANCE_TYPE successfully.
+  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  manager.start();
+
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+
+  // Trigger a read_completed for ERD_COMMON_FEATURE_API — wrong ERD,
+  // we're waiting for ERD_APPLIANCE_TYPE. It should be silently ignored.
+  uint8_t data[8] = {0};
+  trigger_read_completed(ERD_COMMON_FEATURE_API, data, 8);
+
+  // State should remain READING_0008; no additional read queued.
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
 }
 
 /* ------------------------------------------------------------------ */
@@ -856,4 +954,9 @@ TEST(feature_bit_manager, common_parse_per_call_is_4)
 TEST(feature_bit_manager, parse_tick_ms_is_5)
 {
   CHECK_EQUAL(5u, FeatureBitManager::PARSE_TICK_MS);
+}
+
+TEST(feature_bit_manager, queue_retry_ms_is_50)
+{
+  CHECK_EQUAL(50u, FeatureBitManager::QUEUE_RETRY_MS);
 }

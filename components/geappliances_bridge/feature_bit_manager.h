@@ -89,6 +89,9 @@ class FeatureBitManager {
   // Timer interval for incremental parsing (milliseconds).
   static constexpr uint32_t PARSE_TICK_MS = 5;
 
+  // Delay before retrying a failed queue operation (milliseconds).
+  static constexpr uint32_t QUEUE_RETRY_MS = 50;
+
   void init(i_tiny_gea3_erd_client_t* erd_client,
             uint8_t host_address,
             tiny_timer_group_t* timer_group);
@@ -120,8 +123,17 @@ class FeatureBitManager {
   /// Map a READING state to the ERD value and queue the read.
   void queue_erd_read_();
 
+  /// Return the ERD this READING state is waiting for (for event filtering).
+  tiny_erd_t get_expected_erd_() const;
+
   /// Advance state to the next ERD in the sequence (on failure or skip).
   void skip_to_next_erd_(tiny_erd_t failed_erd);
+
+  /// One-shot retry timer callback (static for tiny_timer API).
+  static void queue_retry_timer_callback_(void* context);
+
+  /// Retry queue_erd_read_ after a queue-full delay.
+  void queue_retry_();
 
   FeatureBitState state_{FEATURE_BIT_STATE_READING_0008};
   bool read_queued_{false};  // true while a read is in-flight (guards idempotent start/queue)
@@ -135,6 +147,9 @@ class FeatureBitManager {
 
   // Timer for incremental parsing
   tiny_timer_t parse_timer_;
+
+  // One-shot retry timer for queue-full scenario
+  tiny_timer_t queue_retry_timer_;
 
   struct FeatureBitErdData {
     uint8_t erd_0092[8]{};
