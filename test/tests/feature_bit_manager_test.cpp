@@ -512,10 +512,9 @@ TEST(feature_bit_manager, incremental_parsing_completes_with_timer_elapse)
   CHECK_EQUAL(FEATURE_BIT_STATE_PARSING, manager.get_state());
 
   // Elapse enough timer ticks to complete all parsing.
-  // Common features: ceil(16 / COMMON_PARSE_PER_CALL) = ceil(16/4) = 4 ticks
+  // Common features: ceil(17 / COMMON_PARSE_PER_CALL) = ceil(17/4) = 5 ticks
   // Appliance ERDs: 10 ticks (one per ERD)
   // Finalization: 1 tick
-  // Init: 1 tick
   // Total: 16 ticks * PARSE_TICK_MS (5ms) = 80ms
   tiny_timer_group_double_elapse_time(&timer_group, 80);
 
