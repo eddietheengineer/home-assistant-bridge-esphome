@@ -214,20 +214,24 @@ Small, focused modules with limited scope, easy to test:
 
 | Decision | Rationale |
 |----------|-----------|
-| **Push model (events)** | Modules react immediately to changes; easier to test than polling; decouples timing |
+| **Push model (typed events)** | Modules react immediately to changes; easier to test than polling; decouples timing. Uses typed `tiny_event_t` per field — not string-keyed subscriptions — for compile-time safety. |
 | **Isolated FSMs** | Each FSM owns its complexity; easier to reason about; can be tested independently |
 | **ERD state table as source of truth** | Single point of truth; MQTT side doesn't need to know appliance protocol; appliance side doesn't care about MQTT |
 | **Global state registry** | Read-only values like device ID and connection status are needed everywhere; centralized subscription avoids passing params through many layers |
 | **Publish flags instead of queues** | Bounds memory (one flag per ERD); simpler recovery on reconnect; deduplication built-in |
+| **Fixed-size ERD value buffers** | Avoids per-ERD heap allocation and fragmentation on ESP32; ERD values are bounded at 255 bytes max; `MAX_ERD_VALUE_SIZE = 32` covers all known appliances |
+| **Synchronous publish-flag clearing** | ESPHome MQTT publish is fire-and-forget at QoS=0; no broker ACK callback is available. Flags are cleared immediately after `publish()` returns. Reconnect resilience comes from the flag persisting until publish is *called*, not until it is *acknowledged*. |
+| **GEA2 tight loop stays in GeappliancesBridge** | The 200 ms busy-loop is a hardware constraint that must run before any FSM loop() calls. Neither `ApplianceSideStateMachine` nor `MqttSideStateMachine` may own or replicate it. |
 
 ## Risks & Mitigations
 
 | Risk | Mitigation |
 |------|-----------|
 | **Increased complexity during refactor** | Phase approach; keep old code working while adding new; run tests frequently |
-| **Thread safety of shared state** | Use atomic operations or locks where needed; document synchronization assumptions |
+| **GEA2 tight loop regression** | Preserve `run_protocol_stack_()` call order in `GeappliancesBridge::loop()` as first operation; add a regression test for GEA2 timing |
 | **Event subscription overhead** | Lazy initialization; profiling to catch memory leaks; unsubscribe on module shutdown |
-| **Reconnect edge cases** | Extensive testing of disconnect→reconnect scenarios; flag state must be durable |
+| **Reconnect edge cases** | Extensive testing of disconnect→reconnect scenarios; flag state must be durable across reconnect |
+| **ErdEntry buffer overflow** | Assert or clamp in `update_erd_value()` if incoming value exceeds `MAX_ERD_VALUE_SIZE`; log a warning |
 
 ## Open Questions to Clarify Later
 
@@ -235,6 +239,127 @@ Small, focused modules with limited scope, easy to test:
 2. Multi-appliance support: should each appliance get its own state table, or one global table with appliance-ID keys?
 
 ---
+
+## Codebase Analysis: Design Issues & Gaps
+
+*This section documents issues found during review of the current implementation. Each issue must be resolved before or during the relevant implementation phase.*
+
+### Critical Issues
+
+#### 1. Dependency Ordering Bug: `WriteQueue` Belongs in Phase 1
+
+`WriteHandler` (Todo 2.3) and `WriteRouter` (Todo 3.1) both depend on `WriteQueue`, but `WriteQueue` is currently placed in Phase 4 (Todo 4.1). This breaks the dependency chain — you cannot implement the handlers in Phase 2/3 without the queue they consume from/write to.
+
+**Fix:** Move `WriteQueue` to Phase 1 as Todo 1.4, before all handler todos. (Already applied in the todos below.)
+
+---
+
+#### 2. MQTT Broker ACK Callbacks Are Not Available in ESPHome
+
+`MqttSideStateMachine` proposes an `on_mqtt_ack(topic)` method to clear publish flags after broker acknowledgment. However, `esphome::mqtt::MQTTClientComponent::publish()` is fire-and-forget at QoS=0 with no per-message ACK callback. There is no hook available to know when the broker has confirmed receipt.
+
+The current code already handles this correctly: `esphome_mqtt_client_adapter_drain_pending_updates()` calls `publish()` and removes the entry from the `pending_updates` map in the same call. Reconnect resilience is handled by the map persisting while disconnected.
+
+**Fix:** Change "clear publish flag on broker ACK" to "clear publish flag immediately after calling `publish()`." Remove `on_mqtt_ack()` from the `MqttSideStateMachine` interface. Document that publish-flag clearing is synchronous — flags survive until publish is actually called, which is sufficient for reconnect recovery.
+
+---
+
+#### 3. GEA2 Tight Loop Is Incompatible with a Simple `loop()` Pattern
+
+The plan proposes `ApplianceSideStateMachine::loop()` as a fast, non-blocking call. However, `GeappliancesBridge::run_protocol_stack_()` runs a **200 ms wall-clock busy loop** for GEA2 (required by the half-duplex 19200 baud protocol). This loop blocks the entire main task for its duration.
+
+This is not a concern `ApplianceSideStateMachine` should own — it belongs at the `GeappliancesBridge` level where protocol selection (GEA2 vs GEA3) is known.
+
+**Fix:** Explicitly document that `run_protocol_stack_()` remains in `GeappliancesBridge::loop()` and is called *before* both FSM `loop()` calls. `ApplianceSideStateMachine` and `MqttSideStateMachine` must not drive or duplicate the protocol stack.
+
+---
+
+### Important Issues
+
+#### 4. Existing C-Based Bridges Are Not Addressed
+
+`mqtt_bridge_t` (subscription mode) and `mqtt_bridge_polling_t` (polling mode) are existing C state machines that perform both appliance-side ERD reading AND MQTT publishing in one unit. The plan introduces `SubscriptionHandler`, `PollingHandler`, and `MqttSideStateMachine` without ever stating what happens to the existing bridges.
+
+Without a clear decision, implementation risks duplicating logic or creating conflicting code paths.
+
+**Fix:** State explicitly: `mqtt_bridge.c` and `mqtt_bridge_polling.c` will be **replaced** (not wrapped) by the new C++ handlers. Phase 2 extracts their appliance-side reading logic into `SubscriptionHandler`/`PollingHandler`. Phase 3 extracts their MQTT publishing logic into `MqttSideStateMachine`. The old files are deleted at the end of Phase 3.
+
+---
+
+#### 5. String-Keyed Subscriptions in `GlobalStateRegistry` Are Error-Prone
+
+The plan proposes `subscribe_to(const std::string& key, Callback callback)`. String keys are:
+- Prone to runtime typos that the compiler cannot catch
+- More expensive than typed dispatch at runtime
+- Inconsistent with the codebase's use of typed `tiny_event_t` / `tiny_event_subscription_t` pairs (see `on_write_request_event`, `on_mqtt_disconnect_event`, etc.)
+
+**Fix:** Replace string-keyed subscriptions with typed per-field events — one `tiny_event_t` per subscribable field — or a C++ typed observer. For example:
+```cpp
+i_tiny_event_t* on_appliance_address_changed();
+i_tiny_event_t* on_bridge_mode_changed();
+```
+This matches the idiom used throughout the existing codebase and catches subscriber typos at compile time.
+
+---
+
+#### 6. `std::vector<uint8_t>` per ERD Causes Heap Fragmentation
+
+Storing ERD values as `std::vector<uint8_t>` allocates one heap object per ERD. With 100+ ERDs registered at runtime this creates significant heap fragmentation on ESP32. ERD values in this protocol are small (typically ≤ 10 bytes; absolute max 255 bytes).
+
+**Fix:** Use a fixed-size inline buffer in `ErdEntry`:
+```cpp
+static constexpr uint8_t MAX_ERD_VALUE_SIZE = 32;
+struct ErdEntry {
+  tiny_erd_t erd_id;
+  uint8_t value[MAX_ERD_VALUE_SIZE];
+  uint8_t value_size;
+  bool publish_flag;
+  uint32_t timestamp_ms;
+};
+```
+If values larger than `MAX_ERD_VALUE_SIZE` are ever needed, document that as a separate concern.
+
+---
+
+#### 7. Thread Safety Scope Is Overstated
+
+The plan adds mutex locks to both `GlobalStateRegistry` and `ErdStateTable` for "concurrent reads during normal operation." In practice, all logic in this project runs in the single-threaded ESPHome main loop task. The one cross-task boundary is the async MQTT publish path (`esphome_mqtt_client_adapter_publish()`), which already uses a FreeRTOS queue as its thread-crossing mechanism.
+
+Adding full mutex locking to every ERD read/write in `ErdStateTable` and `GlobalStateRegistry` introduces latency and lock-contention risk for no benefit in a main-loop-only architecture.
+
+**Fix:** Document the actual threading model: both `ErdStateTable` and `GlobalStateRegistry` are accessed exclusively from the ESPHome main loop task — no mutex needed. The FreeRTOS queue in `EsphomeMqttClientAdapter` remains the sole thread-crossing boundary and already handles its own synchronization.
+
+---
+
+### Minor Issues
+
+#### 8. Static Global `g_bridge_services` Blocks Unit Testing
+
+`geappliances_bridge_startup_hsm.cpp` holds a file-scope static `g_bridge_services` pointer set via `set_bridge_services()`. This prevents independent unit testing of the startup HSM — any test that instantiates the HSM will share state with any other test in the same binary.
+
+**Fix:** Store the `IBridgeServices*` in the HSM's context field (or a wrapper struct) rather than as a file-scope static. This is a low-risk, contained change that should be part of the startup HSM refactor in Phase 4.
+
+---
+
+#### 9. `ErdRegistry` Refactoring Description Conflates Metadata with Values
+
+Todo 1.3 says to refactor `ErdRegistry` to "read from both tables." But `ErdRegistry` tracks only metadata (valid ERDs, string-typed ERDs, registered ERDs). It has no concept of ERD values. There is no meaningful integration with `ErdStateTable` for metadata lookup.
+
+**Fix:** `ErdRegistry` and `ErdStateTable` remain separate concerns. Rewrite Todo 1.3 as: *"Verify `ErdRegistry` works correctly alongside the new `ErdStateTable` — no structural changes needed. Confirm that `ErdStateTable` calls `ErdRegistry::is_valid()` before storing an ERD value (optional filtering layer)."*
+
+---
+
+#### 10. `HaDiscoveryManager` Integration Gap During Interim Phases
+
+`HaDiscoveryManager` currently receives ERD-seen notifications via `on_ha_discovery_erd_seen_()` called from `GeappliancesBridge::handle_erd_client_activity_()`. In the target architecture it should subscribe to `ErdStateTable.on_erd_changed` events. But the plan defers this to a later phase without specifying the interim wiring.
+
+**Fix:** Explicitly note: during Phases 2–3, `HaDiscoveryManager` continues to be driven by `handle_erd_client_activity_()` in `GeappliancesBridge` unchanged. Migration to `ErdStateTable` event subscriptions is a separate future todo, tracked separately.
+
+---
+
+#### 11. The Inline `MqttConnectionState` FSM Already Exists
+
+The `MqttConnectionState` enum (DISCONNECTED → SUBSCRIBING → FLUSHING → RUNNING) in `GeappliancesBridge::loop()` is functionally the `MqttSideStateMachine` described in the plan. Phase 3 should acknowledge this and frame the work as **extracting** this existing inline FSM into a standalone class rather than writing it from scratch.
 
 ---
 
@@ -257,10 +382,11 @@ Create a C++ class that manages subscribable global state variables accessible t
   - `gea_protocol_type` (uint8_t or enum) - set when GEA2 or GEA3 detected
   - `bridge_mode` (enum) - set as startup progresses (STARTING → RUNNING → ERROR)
 
-- Implement subscription mechanism:
-  - `subscribe_to(const std::string& key, Callback callback)` - register for change notifications
-  - `unsubscribe_from(const std::string& key)` - unregister callback
-  - `notify_subscribers(const std::string& key)` - call all subscribed callbacks
+- Implement subscription mechanism using typed per-field events (not string keys — see Issue #5):
+  - `i_tiny_event_t* on_appliance_address_changed()` - subscribe to address updates
+  - `i_tiny_event_t* on_gea_protocol_type_changed()` - subscribe to protocol detection
+  - `i_tiny_event_t* on_bridge_mode_changed()` - subscribe to mode transitions
+  - (device_id is write-once; no subscription needed)
 
 - Implement read accessors:
   - `const std::string& get_device_id() const`
@@ -274,7 +400,7 @@ Create a C++ class that manages subscribable global state variables accessible t
   - `void set_gea_protocol_type(uint8_t type)` - triggers notify
   - `void set_bridge_mode(BridgeMode mode)` - triggers notify
 
-**Thread safety:** Use mutex locks for concurrent reads during normal operation (multiple modules may read simultaneously)
+**Thread safety:** No mutex needed — all callers run in the ESPHome main loop task (see Issue #7).
 
 **Testing notes:** This will need unit tests for subscription/notification behavior
 
@@ -290,12 +416,14 @@ Create a C++ class that manages all ERD state. This is the core shared data stru
 
 **Data structure (per ERD):**
 ```cpp
+// Fixed-size buffer avoids per-ERD heap allocation (see Issue #6).
+static constexpr uint8_t MAX_ERD_VALUE_SIZE = 32;
 struct ErdEntry {
   tiny_erd_t erd_id;
-  std::vector<uint8_t> value;      // Raw ERD data
+  uint8_t value[MAX_ERD_VALUE_SIZE]; // Raw ERD data
+  uint8_t value_size;
   bool publish_flag;               // True = needs MQTT publish
   uint32_t timestamp_ms;           // When value last changed (millis())
-  bool changed_since_last_publish;  // Track if changed during disconnect
 };
 ```
 
@@ -319,29 +447,64 @@ struct ErdEntry {
 **Events:**
 - `on_erd_changed(tiny_erd_t erd_id)` - fired when value updated with new data
 
-**Thread safety:** Use mutex for all access (both appliance-side and MQTT-side may access concurrently)
+**Thread safety:** No mutex needed — all callers run in the ESPHome main loop task (see Issue #7).
 
 ---
 
-### Todo 1.3: Refactor ErdRegistry Integration
-**ID:** `refactor-erd-registry`  
+### Todo 1.3: Verify ErdRegistry Alongside ErdStateTable
+**ID:** `verify-erd-registry`  
 **Depends on:** `erd-state-table`  
-**Expected output:** Updated `erd_registry.cpp` to use new ErdStateTable
+**Expected output:** No new files; updated `erd_registry.h` only if a filtering hook is added
 
 **Detailed Description:**
-Update the existing `ErdRegistry` class to integrate with the new `ErdStateTable` while maintaining its current interface and responsibilities.
+`ErdRegistry` and `ErdStateTable` are separate concerns and must remain so (see Issue #9):
+- `ErdRegistry` — metadata only: which ERDs are valid, string-typed, registered at runtime
+- `ErdStateTable` — runtime state only: current values, publish flags, timestamps
 
-**Current responsibilities (keep these):**
-- Store valid-ERD set (filtered from FeatureBitManager)
-- Store string-type ERD set (from generated ha_string_erd_ids[])
-- Track registered ERDs at runtime
+There is no structural integration needed. The one optional interaction is an early filter:
+when `ErdStateTable::update_erd_value()` is called, it may consult `ErdRegistry::is_valid()` to
+reject ERDs that are not in the valid set. This is an optimization, not a requirement.
 
-**New integration:**
-- Add a pointer to the `ErdStateTable` (injected during initialization)
-- When methods like `is_valid()`, `is_string_type()` are called, they may now query the state table
-- No breaking changes to existing public interface
+**What to do:**
+- Confirm existing `ErdRegistry` tests still pass (no changes expected)
+- Optionally add a `ErdRegistry*` pointer to `ErdStateTable` for the `is_valid()` filter
+- Document clearly that `ErdRegistry` does **not** store or read ERD values
 
-**Test:** Ensure existing tests still pass after refactoring
+**Test:** Run existing `make test` to confirm no regressions.
+
+---
+
+### Todo 1.4: Create WriteQueue
+**ID:** `write-queue`  
+**Depends on:** Nothing  
+**Expected output:** `write_queue.h` and `write_queue.cpp`
+
+**Detailed Description:**
+Create a simple FIFO queue for write commands. This must exist before Phase 2 and Phase 3, since
+both `WriteHandler` (Phase 2) and `WriteRouter` (Phase 3) depend on it. (Moved here from Phase 4 — see Issue #1.)
+
+**What it should do:**
+- FIFO queue of `WriteCommand` structs
+- Bounded size (e.g., max 16 pending writes) to prevent unbounded memory use
+- All access from the main ESPHome loop task (no mutex needed)
+- Simple push/pop/peek interface
+
+```cpp
+struct WriteCommand {
+  tiny_erd_t erd_id;
+  uint8_t value[MAX_ERD_VALUE_SIZE];
+  uint8_t value_size;
+  uint8_t appliance_address;
+};
+
+class WriteQueue {
+public:
+  bool push(const WriteCommand& cmd);  // Returns false if full
+  bool pop(WriteCommand& cmd);         // Returns false if empty
+  bool is_empty() const;
+  size_t size() const;
+};
+```
 
 ---
 
@@ -353,7 +516,7 @@ Update the existing `ErdRegistry` class to integrate with the new `ErdStateTable
 **Expected output:** `subscription_handler.h` and `subscription_handler.cpp`
 
 **Detailed Description:**
-Extract subscription logic from current `mqtt_bridge.c` into a standalone module that updates the ERD state table.
+Extract the appliance-side subscription logic from `mqtt_bridge.c` into a standalone module that writes to the ERD state table. This **replaces** `mqtt_bridge.c` for the appliance side — `mqtt_bridge.c` owns both subscription *and* MQTT publishing; `SubscriptionHandler` owns only subscription. MQTT publishing moves to `MqttSideStateMachine` in Phase 3 (see Issue #4).
 
 **What it should do:**
 - Maintain subscription state (which ERDs are subscribed)
@@ -385,7 +548,7 @@ public:
 **Expected output:** `polling_handler.h` and `polling_handler.cpp`
 
 **Detailed Description:**
-Extract polling logic from current `mqtt_bridge_polling.c` into a standalone module that updates the ERD state table.
+Extract the appliance-side polling logic from `mqtt_bridge_polling.c` into a standalone module that writes to the ERD state table. This **replaces** `mqtt_bridge_polling.c` for the appliance side — the existing polling bridge owns both polling *and* MQTT publishing; `PollingHandler` owns only polling. MQTT publishing moves to `MqttSideStateMachine` in Phase 3 (see Issue #4).
 
 **What it should do:**
 - Maintain polling state (timer, which ERDs are polled)
@@ -414,7 +577,7 @@ public:
 
 ### Todo 2.3: Create WriteHandler Module
 **ID:** `write-handler`  
-**Depends on:** `erd-state-table`, `global-state-registry`  
+**Depends on:** `erd-state-table`, `global-state-registry`, `write-queue`  
 **Expected output:** `write_handler.h` and `write_handler.cpp`
 
 **Detailed Description:**
@@ -428,11 +591,7 @@ Create a new module that consumes write commands from a write queue and sends th
 
 **Public interface:**
 ```cpp
-struct WriteCommand {
-  tiny_erd_t erd_id;
-  std::vector<uint8_t> value;
-  uint8_t appliance_address;
-};
+// WriteCommand is defined in write_queue.h (fixed-size buffer, see Todo 1.4)
 
 class WriteHandler {
 public:
@@ -529,28 +688,20 @@ public:
 **Expected output:** `mqtt_side_state_machine.h` and `mqtt_side_state_machine.cpp`
 
 **Detailed Description:**
-Create the MQTT-side FSM that manages publishing ERD updates and handling broker ACKs.
+Extract and formalize the MQTT-side FSM. **Note:** This FSM already exists as the inline `MqttConnectionState` enum (DISCONNECTED → SUBSCRIBING → FLUSHING → RUNNING) in `GeappliancesBridge::loop()` (see Issue #11). Phase 3 extracts that existing logic into a standalone class — it is not written from scratch. Additionally, `mqtt_bridge.c` and `mqtt_bridge_polling.c` will be deleted after their MQTT-publishing logic is folded into this FSM.
 
-**States:**
-- **Idle** - waiting for MQTT client initialization
-- **Connecting** - attempting to connect to broker
-- **Subscribing** - setting up write-command subscriptions
-- **Running** - continuously:
-  - Check for flagged ERDs in state table
-  - Publish them to MQTT
-  - Wait for broker ACK event
-  - Clear flag when ACK received
+**States (map directly from existing inline FSM):**
+- **Disconnected** - no MQTT connection (replaces `MqttConnectionState::DISCONNECTED`)
+- **Subscribing** - connected; registering wildcard write topic (replaces `SUBSCRIBING`)
+- **Flushing** - subscribed; draining pending ERD updates (replaces `FLUSHING`)
+- **Running** - steady-state; draining new ERD updates each loop (replaces `RUNNING`)
 
 **Key behavior:**
 - When MQTT connects, transition to Subscribing
-- When subscriptions set up, transition to Running
-- In Running, loop through `erd_state_table->get_flagged_erds()`
-- For each flagged ERD:
-  1. Publish to `geappliances/{device_id}/erd/{erd_id}/value`
-  2. Wait for MQTT broker ACK callback
-  3. Call `erd_state_table->clear_publish_flag(erd_id)`
-- On MQTT disconnect, stay in Running but no publishes (flags accumulate)
-- On MQTT reconnect, resume publishing accumulated flags
+- When wildcard write topic registered, transition to Flushing
+- In Flushing/Running, call `erd_state_table->get_flagged_erds()`, publish each, and `clear_publish_flag()` **immediately after calling publish()** — ESPHome does not provide per-message broker ACK callbacks (QoS=0); clearing is synchronous (see Issue #2)
+- On MQTT disconnect, transition to Disconnected; flags accumulate in state table
+- On MQTT reconnect, resume from Subscribing; accumulated flags published
 
 **Public interface:**
 ```cpp
@@ -565,7 +716,7 @@ public:
   State get_current_state() const;
   void on_mqtt_connected();
   void on_mqtt_disconnected();
-  void on_mqtt_ack(const std::string& topic);  // Called by MQTT adapter
+  // Note: no on_mqtt_ack() — ESPHome publish is fire-and-forget at QoS=0
 };
 ```
 
@@ -573,51 +724,39 @@ public:
 
 ## Phase 4: Integration & Orchestration
 
-### Todo 4.1: Create WriteQueue
-**ID:** `write-queue`  
-**Depends on:** Nothing  
-**Expected output:** `write_queue.h` and `write_queue.cpp`
-
-**Detailed Description:**
-Create a simple thread-safe queue for write commands (appliance-side consumes, MQTT-side produces).
-
-**What it should do:**
-- FIFO queue of WriteCommand structs
-- Thread-safe push/pop
-- Simple, similar to current pending-updates pattern
-
----
-
-### Todo 4.2: Update GeappliancesBridge Orchestration
+### Todo 4.1: Update GeappliancesBridge Orchestration
 **ID:** `bridge-orchestration`  
 **Depends on:** `appliance-fsm`, `mqtt-fsm`  
 **Expected output:** Updated `geappliances_bridge.cpp` and `geappliances_bridge.h`
 
 **Detailed Description:**
-Refactor the main bridge class to initialize and drive both FSMs in the main loop.
+Refactor the main bridge class to initialize and drive both FSMs in the main loop. After this todo, `mqtt_bridge.c` and `mqtt_bridge_polling.c` are deleted (their logic has moved to the new handlers and `MqttSideStateMachine`).
 
 **What needs to change:**
 - Initialize `GlobalStateRegistry` and `ErdStateTable` in `setup()`
 - Create appliance-side FSM, polling handler, subscription handler, write handler
 - Create MQTT-side FSM, write router
-- In `loop()`, call both FSMs' `loop()` methods
+- In `loop()`, preserve `run_protocol_stack_()` as the first call (before FSM loops) — the GEA2 200 ms tight loop must not move into any FSM (see Issue #3)
+- Replace the inline `MqttConnectionState` FSM in `loop()` with `MqttSideStateMachine::loop()`
 - Wire up event callbacks (MQTT connect/disconnect → FSM notifications)
+- Delete `mqtt_bridge.c`, `mqtt_bridge_polling.c` and their headers
 
 ---
 
-### Todo 4.3: Update StartupHsm for GlobalStateRegistry
+### Todo 4.2: Update StartupHsm for GlobalStateRegistry
 **ID:** `startup-hsm-refactor`  
 **Depends on:** `global-state-registry`  
 **Expected output:** Updated `geappliances_bridge_startup_hsm.cpp`
 
 **Detailed Description:**
-Modify the startup FSM to populate the GlobalStateRegistry as it discovers appliance details.
+Modify the startup FSM to populate the GlobalStateRegistry as it discovers appliance details. Also fix the static global `g_bridge_services` (see Issue #8).
 
 **What needs to change:**
 - After device ID is assembled → `registry->set_device_id(device_id)`
 - After appliance address found → `registry->set_appliance_address(addr)`
 - After GEA2/GEA3 detected → `registry->set_gea_protocol_type(type)`
 - As startup progresses → `registry->set_bridge_mode(NEW_MODE)`
+- Move `IBridgeServices*` from file-scope static `g_bridge_services` into the `tiny_hsm_t` context field (or a wrapper struct) to eliminate the global — this enables independent unit testing of the HSM
 
 ---
 
@@ -631,9 +770,8 @@ Modify the startup FSM to populate the GlobalStateRegistry as it discovers appli
 **Test cases:**
 - Reads return correct values after set
 - Subscriptions fire callbacks on value change
-- Multiple subscribers for same key all called
+- Multiple subscribers for same field all called
 - Unsubscribe prevents callback firing
-- Thread safety: concurrent reads don't corrupt state
 
 ---
 
@@ -647,7 +785,7 @@ Modify the startup FSM to populate the GlobalStateRegistry as it discovers appli
 - Publish flag set when new value written
 - Publish flag cleared via `clear_publish_flag()`
 - `get_flagged_erds()` returns only flagged entries
-- Thread safety: concurrent reads/writes don't corrupt
+- Values larger than `MAX_ERD_VALUE_SIZE` are rejected or truncated safely
 
 ---
 
