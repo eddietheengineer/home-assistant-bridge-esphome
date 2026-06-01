@@ -38,15 +38,41 @@ TEST(appliance_side_state_machine, starts_in_idle_state)
 TEST(appliance_side_state_machine, transitions_to_running_on_address)
 {
   ApplianceSideStateMachine fsm(&state_table_, &registry_, &queue_, nullptr);
+  ApplianceSideConfig cfg;
+  cfg.enable_subscriptions = false;
+  cfg.enable_polling = false;
+  cfg.polling_interval_ms = 10000;
+  cfg.only_publish_on_change = false;
+  cfg.subscription_erds = {};
+  cfg.polling_erds = {};
+  fsm.set_config(cfg);
   registry_.set_appliance_address(0xC0);
   fsm.loop();
   CHECK_EQUAL(static_cast<int>(ApplianceSideState::RUNNING),
               static_cast<int>(fsm.get_current_state()));
 }
 
+TEST(appliance_side_state_machine, stays_idle_without_config)
+{
+  ApplianceSideStateMachine fsm(&state_table_, &registry_, &queue_, nullptr);
+  registry_.set_appliance_address(0xC0);
+  fsm.loop();
+  // Stays idle because set_config() was never called
+  CHECK_EQUAL(static_cast<int>(ApplianceSideState::IDLE),
+              static_cast<int>(fsm.get_current_state()));
+}
+
 TEST(appliance_side_state_machine, stays_idle_without_address)
 {
   ApplianceSideStateMachine fsm(&state_table_, &registry_, &queue_, nullptr);
+  ApplianceSideConfig cfg;
+  cfg.enable_subscriptions = false;
+  cfg.enable_polling = false;
+  cfg.polling_interval_ms = 10000;
+  cfg.only_publish_on_change = false;
+  cfg.subscription_erds = {};
+  cfg.polling_erds = {};
+  fsm.set_config(cfg);
   fsm.loop();
   CHECK_EQUAL(static_cast<int>(ApplianceSideState::IDLE),
               static_cast<int>(fsm.get_current_state()));

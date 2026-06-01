@@ -110,6 +110,7 @@ class ApplianceSideStateMachine {
 
   ApplianceSideState current_state_;
   ApplianceSideConfig config_;
+  bool config_set_{false};  // True after set_config() called; guards early transition
 
   SubscriptionHandler* subscription_handler_;
   PollingHandler* polling_handler_;

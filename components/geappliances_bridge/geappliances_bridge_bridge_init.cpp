@@ -239,10 +239,6 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       this->appliance_fsm_->set_config(cfg);
       this->appliance_fsm_->set_timer_group(&this->timer_group_);
     }
-    // Start the subscription handler so it begins processing publications.
-    if (this->subscription_handler_ != nullptr) {
-      this->subscription_handler_->start(this->autodiscovery_manager_.get_host_address());
-    }
   } else if (this->mode_ == BRIDGE_MODE_AUTO) {
     mode_name = "auto (starting with subscription)";
     this->subscription_mode_active_ = true;
@@ -260,10 +256,6 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       cfg.polling_erds = this->feature_bit_manager_.get_valid_erds_vec();
       this->appliance_fsm_->set_config(cfg);
       this->appliance_fsm_->set_timer_group(&this->timer_group_);
-    }
-    // Start the subscription handler so it begins processing publications.
-    if (this->subscription_handler_ != nullptr) {
-      this->subscription_handler_->start(this->autodiscovery_manager_.get_host_address());
     }
   }
 

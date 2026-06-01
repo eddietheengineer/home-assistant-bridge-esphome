@@ -13,7 +13,8 @@ ApplianceSideStateMachine::ApplianceSideStateMachine(ErdStateTable* state_table,
       write_queue_(write_queue),
       erd_client_(erd_client),
       current_state_(ApplianceSideState::IDLE),
-      config_(),
+      config_{false, false, 0, false, {}, {}},
+      config_set_(false),
       subscription_handler_(nullptr),
       polling_handler_(nullptr),
       write_handler_(nullptr),
@@ -47,6 +48,7 @@ ApplianceSideStateMachine::~ApplianceSideStateMachine()
 void ApplianceSideStateMachine::set_config(const ApplianceSideConfig& config)
 {
   config_ = config;
+  config_set_ = true;
 
   // Apply polling config to the bridge-owned handler
   if (config_.enable_polling && polling_handler_ != nullptr) {
@@ -75,8 +77,10 @@ void ApplianceSideStateMachine::loop()
 {
   switch (current_state_) {
     case ApplianceSideState::IDLE:
-      // Check if appliance has been discovered
-      if (registry_->get_appliance_address() != 0) {
+      // Only transition to RUNNING after set_config() has been called AND
+      // the appliance has been discovered.  This prevents the FSM from
+      // starting handlers with an uninitialized config (garbage booleans).
+      if (config_set_ && registry_->get_appliance_address() != 0) {
         transition_to(ApplianceSideState::RUNNING);
       }
       break;
@@ -121,8 +125,8 @@ void ApplianceSideStateMachine::on_appliance_address_changed(void* context,
   (void)args;
 
   if (current_state_ == ApplianceSideState::IDLE) {
-    uint8_t addr = registry_->get_appliance_address();
-    if (addr != 0) {
+    // Only transition after set_config() has been called.
+    if (config_set_ && registry_->get_appliance_address() != 0) {
       transition_to(ApplianceSideState::RUNNING);
     }
   } else if (current_state_ == ApplianceSideState::ERROR) {
