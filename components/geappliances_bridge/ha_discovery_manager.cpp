@@ -5,6 +5,7 @@
 
 #include "ha_discovery_manager.h"
 #include "esphome_mqtt_client_adapter.h"
+#include "erd_payload_formatter.h"
 #include "esphome/core/log.h"
 #include "esphome/components/mqtt/mqtt_client.h"
 #include <cstring>
@@ -383,14 +384,17 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
   }
   char erd_id_str[5]; snprintf(erd_id_str, sizeof(erd_id_str), "%04x", erd_id);
   bool is_request = (role[0] == 'r');
+  // Use build_erd_topic() to ensure state_topic exactly matches the actual
+  // MQTT publish topic used by MqttSideStateMachine. This prevents the
+  // mismatch where HA discovery advertises one topic but the bridge publishes
+  // to a different topic, causing entities to never receive updates.
   std::string state_topic, command_topic;
   if (is_request && paired[0] != '\0') {
     uint16_t paired_id = static_cast<uint16_t>(strtol(paired, nullptr, 16));
-    char paired_id_str[5]; snprintf(paired_id_str, sizeof(paired_id_str), "%04x", paired_id);
-    state_topic = "geappliances/" + device_id + "/erd/0x" + std::string(paired_id_str) + "/value";
+    state_topic = build_erd_topic(device_id, paired_id);
     command_topic = "geappliances/" + device_id + "/erd/0x" + erd_id_str + "/write";
   } else {
-    state_topic = "geappliances/" + device_id + "/erd/0x" + erd_id_str + "/value";
+    state_topic = build_erd_topic(device_id, erd_id);
     command_topic = "geappliances/" + device_id + "/erd/0x" + erd_id_str + "/write";
   }
   const char* field_id = get_str("fi");
