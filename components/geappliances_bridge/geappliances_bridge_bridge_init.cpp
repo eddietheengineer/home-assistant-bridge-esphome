@@ -234,7 +234,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       cfg.enable_polling = false;
       cfg.polling_interval_ms = this->polling_interval_ms_;
       cfg.only_publish_on_change = this->polling_only_publish_on_change_;
-      cfg.subscription_erds = {};
+      cfg.subscription_erds = this->feature_bit_manager_.get_valid_erds_vec();
       cfg.polling_erds = {};
       this->appliance_fsm_->set_config(cfg);
       this->appliance_fsm_->set_timer_group(&this->timer_group_);
@@ -252,7 +252,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       cfg.enable_polling = true;
       cfg.polling_interval_ms = this->polling_interval_ms_;
       cfg.only_publish_on_change = this->polling_only_publish_on_change_;
-      cfg.subscription_erds = {};
+      cfg.subscription_erds = this->feature_bit_manager_.get_valid_erds_vec();
       cfg.polling_erds = this->feature_bit_manager_.get_valid_erds_vec();
       this->appliance_fsm_->set_config(cfg);
       this->appliance_fsm_->set_timer_group(&this->timer_group_);

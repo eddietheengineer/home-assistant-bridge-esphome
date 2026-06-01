@@ -55,7 +55,9 @@ class SubscriptionHandler {
   ~SubscriptionHandler();
 
   // Initialize and start subscribing at the given appliance address.
-  void start(uint8_t address);
+  // valid_erds: optional list of ERDs to read initially after subscription
+  //             is established.  Pass empty to skip the initial read.
+  void start(uint8_t address, const std::vector<tiny_erd_t>& valid_erds = {});
 
   // Stop and clean up.
   void stop();
@@ -90,6 +92,11 @@ class SubscriptionHandler {
   tiny_hsm_t hsm_;
 
   std::set<tiny_erd_t> known_erds_;
+
+  // ERDs to read after subscription is established (populated ErdStateTable).
+  std::vector<tiny_erd_t> valid_erds_to_read_;
+  size_t initial_read_index_{0};
+  bool initial_read_pending_{false};
 
   // HSM signal IDs (defined at namespace scope so friend functions can see them)
   static const tiny_hsm_signal_t signal_subscription_added_or_retained;

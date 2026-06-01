@@ -36,6 +36,8 @@ static const tiny_hsm_signal_t signal_subscription_failed = tiny_hsm_signal_user
 static const tiny_hsm_signal_t signal_subscription_publication_received = tiny_hsm_signal_user_start + 2;
 static const tiny_hsm_signal_t signal_subscription_host_came_online = tiny_hsm_signal_user_start + 3;
 static const tiny_hsm_signal_t signal_timer_expired = tiny_hsm_signal_user_start + 4;
+static const tiny_hsm_signal_t signal_read_completed = tiny_hsm_signal_user_start + 5;
+static const tiny_hsm_signal_t signal_read_failed = tiny_hsm_signal_user_start + 6;
 
 // Static const member definitions (required for ODR)
 const tiny_hsm_signal_t SubscriptionHandler::signal_subscription_added_or_retained = signal_subscription_added_or_retained;
@@ -71,10 +73,13 @@ SubscriptionHandler::~SubscriptionHandler()
   }
 }
 
-void SubscriptionHandler::start(uint8_t address)
+void SubscriptionHandler::start(uint8_t address, const std::vector<tiny_erd_t>& valid_erds)
 {
   address_ = address;
   known_erds_.clear();
+  valid_erds_to_read_ = valid_erds;
+  initial_read_index_ = 0;
+  initial_read_pending_ = false;
   s_active_handler = this;
   tiny_hsm_init(&hsm_, &sub_hsm_config, state_subscribing);
 }
@@ -124,6 +129,14 @@ void SubscriptionHandler::on_erd_client_activity_(void* context, const void* arg
 
     case tiny_gea3_erd_client_activity_type_subscription_host_came_online:
       tiny_hsm_send_signal(&self->hsm_, signal_subscription_host_came_online, nullptr);
+      break;
+
+    case tiny_gea3_erd_client_activity_type_read_completed:
+      tiny_hsm_send_signal(&self->hsm_, signal_read_completed, args);
+      break;
+
+    case tiny_gea3_erd_client_activity_type_read_failed:
+      tiny_hsm_send_signal(&self->hsm_, signal_read_failed, args);
       break;
 
     default:
@@ -214,14 +227,66 @@ tiny_hsm_result_t state_subscribed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, co
 {
   (void)hsm;
   SubscriptionHandler* self = s_active_handler;
-  (void)data;
 
   switch (signal) {
     case tiny_hsm_signal_entry:
-      // Arm periodic retention timer
-      tiny_timer_start_periodic(self->timer_group_, &self->timer_, SUB_RETENTION_PERIOD_MS, self,
-                                SubscriptionHandler::on_retention_timer_);
+      // If there are valid ERDs to read initially, start reading them one by one.
+      // This populates ErdStateTable with current values so they're published
+      // to MQTT even if the appliance never sends subscription updates for them.
+      if (!self->valid_erds_to_read_.empty() && self->initial_read_index_ == 0) {
+        self->initial_read_pending_ = true;
+        tiny_erd_t erd = self->valid_erds_to_read_[self->initial_read_index_];
+        tiny_gea3_erd_client_request_id_t rid;
+        (void)tiny_gea3_erd_client_read(self->erd_client_, &rid, self->address_, erd);
+      } else {
+        // No initial reads needed — arm periodic retention timer immediately
+        tiny_timer_start_periodic(self->timer_group_, &self->timer_, SUB_RETENTION_PERIOD_MS, self,
+                                  SubscriptionHandler::on_retention_timer_);
+      }
       break;
+
+    case signal_read_completed: {
+      if (!self->initial_read_pending_) {
+        return tiny_hsm_result_signal_deferred;
+      }
+      const auto* args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
+      // Write to state table — sets publish_flag so MqttSideStateMachine publishes it
+      self->state_table_->update_erd_value(
+        args->read_completed.erd,
+        reinterpret_cast<const uint8_t*>(args->read_completed.data),
+        args->read_completed.data_size);
+      self->known_erds_.insert(args->read_completed.erd);
+      self->initial_read_index_++;
+      // Continue reading next ERD
+      if (self->initial_read_index_ < self->valid_erds_to_read_.size()) {
+        tiny_erd_t erd = self->valid_erds_to_read_[self->initial_read_index_];
+        tiny_gea3_erd_client_request_id_t rid;
+        (void)tiny_gea3_erd_client_read(self->erd_client_, &rid, self->address_, erd);
+      } else {
+        // All initial reads complete — arm retention timer and enter steady state
+        self->initial_read_pending_ = false;
+        tiny_timer_start_periodic(self->timer_group_, &self->timer_, SUB_RETENTION_PERIOD_MS, self,
+                                  SubscriptionHandler::on_retention_timer_);
+      }
+    } break;
+
+    case signal_read_failed: {
+      if (!self->initial_read_pending_) {
+        return tiny_hsm_result_signal_deferred;
+      }
+      // Skip this ERD and continue with the next one
+      self->initial_read_index_++;
+      if (self->initial_read_index_ < self->valid_erds_to_read_.size()) {
+        tiny_erd_t erd = self->valid_erds_to_read_[self->initial_read_index_];
+        tiny_gea3_erd_client_request_id_t rid;
+        (void)tiny_gea3_erd_client_read(self->erd_client_, &rid, self->address_, erd);
+      } else {
+        // All initial reads complete (some may have failed) — arm retention timer
+        self->initial_read_pending_ = false;
+        tiny_timer_start_periodic(self->timer_group_, &self->timer_, SUB_RETENTION_PERIOD_MS, self,
+                                  SubscriptionHandler::on_retention_timer_);
+      }
+    } break;
 
     case signal_timer_expired:
       tiny_gea3_erd_client_retain_subscription(self->erd_client_, self->address_);
