@@ -14,6 +14,7 @@
 #include "i_bridge_services.h"
 #include "geappliances_bridge_constants.h"
 #include "geappliances_bridge_startup_hsm.h"
+#include "global_state_registry.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 #include "esphome/components/mqtt/mqtt_client.h"
@@ -83,6 +84,10 @@ tiny_hsm_result_t startup_state_protocol_stack(tiny_hsm_t* hsm, tiny_hsm_signal_
 
   switch (signal) {
     case tiny_hsm_signal_entry:
+      // Populate global registry: bridge is starting
+      if (auto* registry = svc->get_global_registry()) {
+        registry->set_bridge_state(BridgeState::STARTING);
+      }
       // Transition to the startup delay state.  The delay gives the appliance
       // board time to stabilize before we start broadcasting.
       tiny_hsm_transition(hsm, startup_state_startup_delay);
@@ -162,6 +167,11 @@ tiny_hsm_result_t startup_state_autodiscovery(tiny_hsm_t* hsm, tiny_hsm_signal_t
         ESP_LOGI(TAG, "Autodiscovery complete (host=0x%02X, protocol=%s)",
                  svc->get_discovered_host_address(),
                  svc->is_discovered_gea2_protocol() ? "GEA2" : "GEA3");
+        // Populate global registry with autodiscovery results
+        if (auto* registry = svc->get_global_registry()) {
+          registry->set_appliance_address(svc->get_discovered_host_address());
+          registry->set_gea_protocol_type(svc->is_discovered_gea2_protocol() ? 2 : 3);
+        }
         tiny_hsm_transition(hsm, startup_state_device_id);
       }
       break;
@@ -170,6 +180,11 @@ tiny_hsm_result_t startup_state_autodiscovery(tiny_hsm_t* hsm, tiny_hsm_signal_t
       // External signal from autodiscovery callback — transition only if
       // a board was actually discovered (not on failure/no-response).
       if (svc->is_autodiscovery_complete()) {
+        // Populate global registry with autodiscovery results
+        if (auto* registry = svc->get_global_registry()) {
+          registry->set_appliance_address(svc->get_discovered_host_address());
+          registry->set_gea_protocol_type(svc->is_discovered_gea2_protocol() ? 2 : 3);
+        }
         tiny_hsm_transition(hsm, startup_state_device_id);
       }
       break;
@@ -202,6 +217,10 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
       // If a device_id is pre-configured and the manager completes synchronously
       // during init(), transition immediately.
       if (svc->is_device_id_complete()) {
+        // Populate global registry with device ID
+        if (auto* registry = svc->get_global_registry()) {
+          registry->set_device_id(svc->get_device_id_string());
+        }
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       }
       break;
@@ -209,11 +228,19 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
     case signal_run_loop:
       // Manager is fully self-driving — just check if it completed.
       if (svc->is_device_id_complete()) {
+        // Populate global registry with device ID
+        if (auto* registry = svc->get_global_registry()) {
+          registry->set_device_id(svc->get_device_id_string());
+        }
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       }
       break;
 
     case signal_device_id_complete:
+      // Populate global registry with device ID
+      if (auto* registry = svc->get_global_registry()) {
+        registry->set_device_id(svc->get_device_id_string());
+      }
       tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       break;
 
@@ -458,6 +485,10 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
   switch (signal) {
     case tiny_hsm_signal_entry:
       ESP_LOGI(TAG, "Bridge is now in steady-state operation");
+      // Populate global registry: bridge is now running
+      if (auto* registry = svc->get_global_registry()) {
+        registry->set_bridge_state(BridgeState::RUNNING);
+      }
       break;
 
     case signal_run_loop:

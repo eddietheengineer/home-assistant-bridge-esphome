@@ -21,8 +21,6 @@ SRC_DIRS := \
   test/simulation \
 
 SRC_FILES := \
-  components/geappliances_bridge/mqtt_bridge.cpp \
-  components/geappliances_bridge/mqtt_bridge_polling.cpp \
   components/geappliances_bridge/gea2_erd_client_adapter.cpp \
   components/geappliances_bridge/device_identity_manager.cpp \
   components/geappliances_bridge/feature_bit_manager.cpp \
@@ -33,12 +31,15 @@ SRC_FILES := \
   components/geappliances_bridge/esphome_uart_adapter.cpp \
   components/geappliances_bridge/ha_discovery_manager.cpp \
   components/geappliances_bridge/global_state_registry.cpp \
+  components/geappliances_bridge/erd_payload_formatter.cpp \
   components/geappliances_bridge/erd_state_table.cpp \
   components/geappliances_bridge/write_queue.cpp \
+  components/geappliances_bridge/write_router.cpp \
   components/geappliances_bridge/subscription_handler.cpp \
   components/geappliances_bridge/polling_handler.cpp \
   components/geappliances_bridge/write_handler.cpp \
   components/geappliances_bridge/appliance_side_state_machine.cpp \
+  components/geappliances_bridge/mqtt_side_state_machine.cpp \
   components/geappliances_bridge/geappliances_bridge.cpp \
   components/geappliances_bridge/geappliances_bridge_bridge_init.cpp \
   components/geappliances_bridge/geappliances_bridge_startup_hsm.cpp

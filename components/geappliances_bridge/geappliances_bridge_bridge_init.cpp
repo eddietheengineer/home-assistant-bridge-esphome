@@ -117,6 +117,44 @@ void GeappliancesBridge::initialize_mqtt_client_()
 
   this->mqtt_client_adapter_initialized_ = true;
   ESP_LOGI(TAG, "MQTT client adapter initialized; feature bit ERDs will be published as they are read");
+
+  // ── Construct new FSM-based modules ────────────────────────────────────────
+  // All modules are constructed now that the adapter is initialized.
+
+  // Global state registry
+  global_registry_ = std::make_unique<GlobalStateRegistry>();
+  global_registry_->set_device_id(this->device_identity_manager_.get_device_id());
+  global_registry_->set_appliance_address(this->autodiscovery_manager_.get_host_address());
+  global_registry_->set_gea_protocol_type(this->gea2_protocol_active_ ? 2 : 3);
+
+  // Shared state structures
+  erd_state_table_ = std::make_unique<ErdStateTable>();
+  write_queue_ = std::make_unique<WriteQueue>();
+
+  // Construct mode-appropriate handlers
+  if (mode_ == BRIDGE_MODE_SUBSCRIBE || mode_ == BRIDGE_MODE_AUTO) {
+    subscription_handler_ = std::make_unique<SubscriptionHandler>(
+      &this->erd_client_.interface, erd_state_table_.get(), &this->timer_group_);
+  }
+  if (mode_ == BRIDGE_MODE_POLL || mode_ == BRIDGE_MODE_AUTO) {
+    polling_handler_ = std::make_unique<PollingHandler>(
+      &this->erd_client_.interface, erd_state_table_.get(),
+      this->polling_interval_ms_, this->polling_only_publish_on_change_);
+  }
+  write_handler_ = std::make_unique<WriteHandler>(&this->erd_client_.interface, write_queue_.get());
+
+  // Appliance-side FSM (takes ownership of the handlers)
+  appliance_fsm_ = std::make_unique<ApplianceSideStateMachine>(
+    erd_state_table_.get(), global_registry_.get(), write_queue_.get(),
+    &this->erd_client_.interface);
+
+  // Write router (requires adapter to be initialized)
+  write_router_ = std::make_unique<WriteRouter>(&this->mqtt_client_adapter_.interface, write_queue_.get());
+
+  // MQTT-side FSM
+  mqtt_fsm_ = std::make_unique<MqttSideStateMachine>(
+    erd_state_table_.get(), global_registry_.get(), &this->erd_registry_,
+    &this->mqtt_client_adapter_, write_router_.get());
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +163,7 @@ void GeappliancesBridge::initialize_mqtt_client_()
 
 void GeappliancesBridge::initialize_mqtt_bridge_()
 {
-  if (!this->mqtt_client_adapter_initialized_ || this->mqtt_bridge_initialized_) {
+  if (!this->mqtt_client_adapter_initialized_) {
     return;
   }
 
@@ -142,70 +180,34 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
   }
 
   // Select operating mode.
-  bool        use_polling = false;
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-but-set-variable"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-#endif
-  const char* mode_name   = "unknown";
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
+  const char* mode_name = "unknown";
 
   if (this->autodiscovery_manager_.is_gea2_protocol()) {
-    use_polling = true;
-    mode_name   = "polling (GEA2 - subscriptions not supported)";
+    mode_name = "polling (GEA2 - subscriptions not supported)";
   } else if (this->mode_ == BRIDGE_MODE_POLL) {
-    use_polling = true;
-    mode_name   = "polling";
+    mode_name = "polling";
   } else if (this->mode_ == BRIDGE_MODE_SUBSCRIBE) {
-    use_polling = false;
-    mode_name   = "subscription";
-  } else if (this->mode_ == BRIDGE_MODE_AUTO) {
-    use_polling                          = false;
-    mode_name                            = "auto (starting with subscription)";
-    this->subscription_mode_active_      = true;
+    mode_name = "subscription";
+    this->subscription_mode_active_ = true;
     this->subscription_activity_detected_ = false;
-    this->subscription_start_time_       = millis();
-  }
-
-  ESP_LOGI(TAG, "Using %s mode with polling interval: %u ms", mode_name, this->polling_interval_ms_);
-
-  // Initialize the appropriate bridge(s).
-  if (use_polling) {
-    mqtt_bridge_polling_init(
-      &this->mqtt_bridge_polling_,
-      &this->timer_group_,
-      this->autodiscovery_manager_.get_active_erd_client(),
-      &this->mqtt_client_adapter_.interface,
-      this->polling_interval_ms_,
-      this->polling_only_publish_on_change_);
-    this->polling_bridge_initialized_ = true;
-    this->configure_polling_optional_lists_();
-  } else {
-    mqtt_bridge_init(
-      &this->mqtt_bridge_,
-      &this->timer_group_,
-      this->autodiscovery_manager_.get_active_erd_client(),
-      &this->mqtt_client_adapter_.interface,
-      this->autodiscovery_manager_.get_host_address());
-    this->subscription_bridge_initialized_ = true;
-
-    if (!this->custom_erds_vec_.empty()) {
-      this->custom_erd_subscription_seen_erds_.clear();
-      this->custom_erd_subscription_last_activity_ = millis();
-      ESP_LOGI(TAG, "Custom ERD polling (%zu ERD(s)) will start after subscription settles",
-               this->custom_erds_vec_.size());
+    this->subscription_start_time_ = millis();
+    // Start the subscription handler so it begins processing publications.
+    if (this->subscription_handler_ != nullptr) {
+      this->subscription_handler_->start(this->autodiscovery_manager_.get_host_address());
+    }
+  } else if (this->mode_ == BRIDGE_MODE_AUTO) {
+    mode_name = "auto (starting with subscription)";
+    this->subscription_mode_active_ = true;
+    this->subscription_activity_detected_ = false;
+    this->subscription_start_time_ = millis();
+    // Start the subscription handler so it begins processing publications.
+    if (this->subscription_handler_ != nullptr) {
+      this->subscription_handler_->start(this->autodiscovery_manager_.get_host_address());
     }
   }
 
-  this->mqtt_bridge_initialized_ = true;
-  ESP_LOGI(TAG, "MQTT bridge initialized successfully");
+  ESP_LOGI(TAG, "Using %s mode with polling interval: %u ms", mode_name, this->polling_interval_ms_);
+  (void)mode_name; // Suppress -Wunused-but-set-variable (ESP_LOGI may not reference it in all builds)
 
   // Defer HA device discovery until ERD registration has settled.
   if (this->generate_device_config_) {
@@ -222,6 +224,8 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
                   "(polling mode) or %u s quiet window (subscription mode)",
              HA_DISCOVERY_QUIET_MS / 1000);
   }
+
+  this->mqtt_bridge_initialized_ = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -230,91 +234,21 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
 
 void GeappliancesBridge::configure_polling_optional_lists_()
 {
-  // Set the API-parsed list before any events fire. state_identify_appliance
-  // only checks api_parsed_list in signal_read_completed, so setting it here
-  // (synchronously, before any events) is safe.
-  if (this->appliance_api_parsing_ && this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE &&\
-      !this->feature_bit_manager_.get_valid_erds_vec().empty()) {
-    this->mqtt_bridge_polling_.api_parsed_list       = this->feature_bit_manager_.get_valid_erds_vec().data();
-    this->mqtt_bridge_polling_.api_parsed_list_count =
-      static_cast<uint16_t>(this->feature_bit_manager_.get_valid_erds_vec().size());
-    ESP_LOGI(TAG, "Polling with API-parsed list of %u ERDs (ERDs will be probed before polling)",
-             this->mqtt_bridge_polling_.api_parsed_list_count);
-  }
-
-  if (!this->custom_erds_vec_.empty()) {
-    this->mqtt_bridge_polling_.custom_erd_list       = this->custom_erds_vec_.data();
-    this->mqtt_bridge_polling_.custom_erd_list_count =
-      static_cast<uint16_t>(this->custom_erds_vec_.size());
-    ESP_LOGI(TAG, "Polling with %u custom ERD(s)", this->mqtt_bridge_polling_.custom_erd_list_count);
-  }
+  // No-op: polling list configuration is now handled by the new FSM architecture.
 }
 
 // ---------------------------------------------------------------------------
 // Start custom ERD polling bridge (deferred: called after subscription settles)
 // ---------------------------------------------------------------------------
-// When in subscription mode with custom ERDs, this starts a polling bridge
-// that polls only the custom ERDs alongside the subscription bridge.
-// The subscription bridge continues to handle all standard ERDs, while the
-// polling bridge handles custom ERDs that may not be covered by subscription.
-// The polling list is allocated to the exact size needed.
-// ---------------------------------------------------------------------------
 
 void GeappliancesBridge::start_custom_erd_polling_()
 {
-  if (this->custom_erds_vec_.empty()) {
-    return;
-  }
-  // Do NOT destroy the subscription bridge - it continues to handle all
-  // standard ERD publications. The polling bridge runs alongside it, only
-  // polling the custom ERDs that may not be covered by subscription.
-  // Both bridges subscribe to the same ERD client activity event, but they
-  // handle different event types (subscription vs read_completed).
-
-  ESP_LOGI(TAG, "Started custom ERD polling (%zu ERD(s)) alongside subscription bridge",
-           this->custom_erds_vec_.size());
-
-  // Initialize a polling bridge with the custom ERDs as the api_parsed_list.
-  // This skips discovery states and goes straight to polling with an exact-size list.
-  mqtt_bridge_polling_init_at_address(
-    &this->mqtt_bridge_polling_,
-    &this->timer_group_,
-    this->autodiscovery_manager_.get_active_erd_client(),
-    &this->mqtt_client_adapter_.interface,
-    this->polling_interval_ms_,
-    this->polling_only_publish_on_change_,
-    this->autodiscovery_manager_.get_host_address(),
-    this->custom_erds_vec_.data(),
-    static_cast<uint16_t>(this->custom_erds_vec_.size()));
-  this->custom_erd_polling_started_ = true;
-  this->polling_bridge_initialized_ = true;
+  // No-op: custom ERD polling is now handled by the new FSM architecture.
 }
 
 void GeappliancesBridge::maybe_start_custom_erd_polling_()
 {
-  if (this->custom_erds_vec_.empty() ||
-      !this->mqtt_bridge_initialized_ ||
-      this->custom_erd_polling_started_) {
-    return;
-  }
-
-  bool in_subscription_mode = (this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-                              (this->mode_ == BRIDGE_MODE_AUTO && this->subscription_mode_active_);
-  if (!in_subscription_mode) {
-    return;
-  }
-
-  bool subscription_confirmed = (this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-                                this->subscription_activity_detected_;
-  if (!subscription_confirmed) {
-    return;
-  }
-
-  if (millis() - this->custom_erd_subscription_last_activity_ < HA_DISCOVERY_QUIET_MS) {
-    return;
-  }
-
-  this->start_custom_erd_polling_();
+  // No-op: custom ERD polling is now handled by the new FSM architecture.
 }
 
 // ---------------------------------------------------------------------------
@@ -336,28 +270,6 @@ void GeappliancesBridge::check_subscription_activity_()
   ESP_LOGW(TAG, "No subscription activity detected after %u seconds, falling back to polling mode",
            SUBSCRIPTION_TIMEOUT_MS / 1000);
 
-  // Tear down the subscription bridge.
-  mqtt_bridge_destroy(&this->mqtt_bridge_);
-  this->subscription_bridge_initialized_ = false;
-
-  // Destroy any existing polling bridge (e.g., from custom ERD polling)
-  // before re-initializing to avoid leaking heap allocations.
-  if (this->custom_erd_polling_started_) {
-    mqtt_bridge_polling_destroy(&this->mqtt_bridge_polling_);
-    this->custom_erd_polling_started_ = false;
-    this->polling_bridge_initialized_ = false;
-  }
-
-  // Stand up the polling bridge.
-  mqtt_bridge_polling_init(
-    &this->mqtt_bridge_polling_,
-    &this->timer_group_,
-    this->autodiscovery_manager_.get_active_erd_client(),
-    &this->mqtt_client_adapter_.interface,
-    this->polling_interval_ms_,
-    this->polling_only_publish_on_change_);
-  this->polling_bridge_initialized_ = true;
-  this->configure_polling_optional_lists_();
   this->subscription_mode_active_ = false;
 
   // Signal the startup HSM that subscription fallback has occurred.
