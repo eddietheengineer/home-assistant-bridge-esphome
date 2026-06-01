@@ -1,6 +1,7 @@
 #include "subscription_handler.h"
 #include <cstring>
 #include <cstddef>
+#include "esphome/core/log.h"
 
 namespace esphome {
 namespace geappliances_bridge {

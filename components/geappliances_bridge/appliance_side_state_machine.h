@@ -76,6 +76,9 @@ class ApplianceSideStateMachine {
   /// Set the timer group for polling and error retry timers.
   void set_timer_group(tiny_timer_group_t* timer_group);
 
+  /// Set the handler pointers (owned by the bridge, not the FSM).
+  void set_handlers(SubscriptionHandler* sub, PollingHandler* poll, WriteHandler* write);
+
   /// Fast, non-blocking; called from GeappliancesBridge::loop().
   /// Must not block — the 200 ms GEA2 busy-loop is handled by
   /// GeappliancesBridge::run_protocol_stack_() before this is called.

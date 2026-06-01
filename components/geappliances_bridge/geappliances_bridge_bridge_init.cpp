@@ -152,10 +152,13 @@ void GeappliancesBridge::initialize_mqtt_client_()
   }
   write_handler_ = std::make_unique<WriteHandler>(active_client, write_queue_.get());
 
-  // Appliance-side FSM (takes ownership of the handlers)
+  // Appliance-side FSM (takes ownership of the handlers via set_handlers)
   appliance_fsm_ = std::make_unique<ApplianceSideStateMachine>(
     erd_state_table_.get(), global_registry_.get(), write_queue_.get(),
     active_client);
+  appliance_fsm_->set_handlers(subscription_handler_.get(),
+                               polling_handler_.get(),
+                               write_handler_.get());
 
   // Write router (requires adapter to be initialized)
   write_router_ = std::make_unique<WriteRouter>(&this->mqtt_client_adapter_.interface, write_queue_.get());

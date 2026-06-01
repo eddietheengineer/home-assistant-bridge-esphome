@@ -54,7 +54,14 @@ TEST(appliance_side_state_machine, stays_idle_without_address)
 
 TEST(appliance_side_state_machine, set_config_applies_polling)
 {
-  ApplianceSideStateMachine fsm(&state_table_, &registry_, &queue_, nullptr);
+  ErdStateTable st;
+  GlobalStateRegistry reg;
+  WriteQueue q;
+  PollingHandler poll_handler(nullptr, &st, 60000, false);
+
+  ApplianceSideStateMachine fsm(&st, &reg, &q, nullptr);
+  fsm.set_handlers(nullptr, &poll_handler, nullptr);
+
   ApplianceSideConfig config;
   config.enable_subscriptions = false;
   config.enable_polling = true;
@@ -64,16 +71,14 @@ TEST(appliance_side_state_machine, set_config_applies_polling)
   config.polling_erds.push_back(0x1002);
   fsm.set_config(config);
 
-  PollingHandler* ph = fsm.get_polling_handler();
-  CHECK(ph != nullptr);
-  CHECK_EQUAL(2, ph->get_polling_erds().size());
-  CHECK_EQUAL(10000, ph->get_polling_interval());
+  CHECK_EQUAL(2, poll_handler.get_polling_erds().size());
+  CHECK_EQUAL(10000, poll_handler.get_polling_interval());
 }
 
-TEST(appliance_side_state_machine, get_handlers_return_non_null)
+TEST(appliance_side_state_machine, handlers_null_until_set)
 {
   ApplianceSideStateMachine fsm(&state_table_, &registry_, &queue_, nullptr);
-  CHECK(fsm.get_subscription_handler() != nullptr);
-  CHECK(fsm.get_polling_handler() != nullptr);
-  CHECK(fsm.get_write_handler() != nullptr);
+  CHECK(fsm.get_subscription_handler() == nullptr);
+  CHECK(fsm.get_polling_handler() == nullptr);
+  CHECK(fsm.get_write_handler() == nullptr);
 }

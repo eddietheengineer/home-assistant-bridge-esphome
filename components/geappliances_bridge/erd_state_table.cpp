@@ -1,5 +1,6 @@
 #include "erd_state_table.h"
 #include <cstring>
+#include "esphome/core/log.h"
 
 namespace esphome {
 namespace geappliances_bridge {

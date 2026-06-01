@@ -13,14 +13,19 @@ ApplianceSideStateMachine::ApplianceSideStateMachine(ErdStateTable* state_table,
       write_queue_(write_queue),
       erd_client_(erd_client),
       current_state_(ApplianceSideState::IDLE),
+      config_(),
+      subscription_handler_(nullptr),
+      polling_handler_(nullptr),
+      write_handler_(nullptr),
+      appliance_address_sub_(),
       timer_group_(nullptr),
+      error_retry_timer_(),
       error_retry_timer_running_(false)
 {
-  // Allocate handlers on heap — they're owned by the FSM
-  subscription_handler_ = new SubscriptionHandler(erd_client_, state_table_, nullptr);
-  polling_handler_ = new PollingHandler(erd_client_, state_table_,
-                                        60000, false);  // defaults
-  write_handler_ = new WriteHandler(erd_client_, write_queue_);
+  // Handlers are created and owned by the bridge (GeappliancesBridge).
+  // The FSM delegates to them via set_handlers().
+  // This avoids duplicate handler instances and the s_active_handler static
+  // pointer race between bridge-owned and FSM-owned handlers.
 
   // Subscribe to appliance address changes
   tiny_event_subscription_init(&appliance_address_sub_, this,
@@ -36,17 +41,15 @@ ApplianceSideStateMachine::~ApplianceSideStateMachine()
 {
   tiny_event_unsubscribe(registry_->on_appliance_address_changed(),
                          &appliance_address_sub_);
-  delete subscription_handler_;
-  delete polling_handler_;
-  delete write_handler_;
+  // Handlers are owned by the bridge, not the FSM.
 }
 
 void ApplianceSideStateMachine::set_config(const ApplianceSideConfig& config)
 {
   config_ = config;
 
-  // Apply polling config
-  if (config_.enable_polling) {
+  // Apply polling config to the bridge-owned handler
+  if (config_.enable_polling && polling_handler_ != nullptr) {
     for (tiny_erd_t erd : config_.polling_erds) {
       polling_handler_->add_erd_to_poll(erd);
     }
@@ -57,6 +60,15 @@ void ApplianceSideStateMachine::set_config(const ApplianceSideConfig& config)
 void ApplianceSideStateMachine::set_timer_group(tiny_timer_group_t* timer_group)
 {
   timer_group_ = timer_group;
+}
+
+void ApplianceSideStateMachine::set_handlers(SubscriptionHandler* sub,
+                                              PollingHandler* poll,
+                                              WriteHandler* write)
+{
+  subscription_handler_ = sub;
+  polling_handler_ = poll;
+  write_handler_ = write;
 }
 
 void ApplianceSideStateMachine::loop()
@@ -71,7 +83,9 @@ void ApplianceSideStateMachine::loop()
 
     case ApplianceSideState::RUNNING:
       // Process writes
-      write_handler_->process_writes();
+      if (write_handler_ != nullptr) {
+        write_handler_->process_writes();
+      }
       break;
 
     case ApplianceSideState::ERROR:
@@ -166,21 +180,25 @@ void ApplianceSideStateMachine::transition_to(ApplianceSideState next)
 void ApplianceSideStateMachine::start_handlers()
 {
   uint8_t addr = registry_->get_appliance_address();
-  write_handler_->set_appliance_address(addr);
+  if (write_handler_ != nullptr) {
+    write_handler_->set_appliance_address(addr);
+  }
 
-  if (config_.enable_subscriptions) {
+  if (config_.enable_subscriptions && subscription_handler_ != nullptr) {
     subscription_handler_->start(addr);
   }
 
-  if (config_.enable_polling && timer_group_) {
+  if (config_.enable_polling && timer_group_ != nullptr && polling_handler_ != nullptr) {
     polling_handler_->start(timer_group_, addr);
   }
 }
 
 void ApplianceSideStateMachine::stop_handlers()
 {
-  subscription_handler_->stop();
-  if (timer_group_) {
+  if (subscription_handler_ != nullptr) {
+    subscription_handler_->stop();
+  }
+  if (timer_group_ != nullptr && polling_handler_ != nullptr) {
     polling_handler_->stop(timer_group_);
   }
 }
