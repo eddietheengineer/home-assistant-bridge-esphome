@@ -188,11 +188,22 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     mode_name = "polling";
   } else if (this->mode_ == BRIDGE_MODE_SUBSCRIBE) {
     mode_name = "subscription";
+    this->subscription_mode_active_ = true;
+    this->subscription_activity_detected_ = false;
+    this->subscription_start_time_ = millis();
+    // Start the subscription handler so it begins processing publications.
+    if (this->subscription_handler_ != nullptr) {
+      this->subscription_handler_->start(this->autodiscovery_manager_.get_host_address());
+    }
   } else if (this->mode_ == BRIDGE_MODE_AUTO) {
     mode_name = "auto (starting with subscription)";
     this->subscription_mode_active_ = true;
     this->subscription_activity_detected_ = false;
     this->subscription_start_time_ = millis();
+    // Start the subscription handler so it begins processing publications.
+    if (this->subscription_handler_ != nullptr) {
+      this->subscription_handler_->start(this->autodiscovery_manager_.get_host_address());
+    }
   }
 
   ESP_LOGI(TAG, "Using %s mode with polling interval: %u ms", mode_name, this->polling_interval_ms_);
