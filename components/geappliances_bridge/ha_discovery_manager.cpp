@@ -385,7 +385,9 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
   bool is_request = (role[0] == 'r');
   std::string state_topic, command_topic;
   if (is_request && paired[0] != '\0') {
-    state_topic = "geappliances/" + device_id + "/erd/0x" + std::string(paired) + "/value";
+    uint16_t paired_id = static_cast<uint16_t>(strtol(paired, nullptr, 16));
+    char paired_id_str[5]; snprintf(paired_id_str, sizeof(paired_id_str), "%04x", paired_id);
+    state_topic = "geappliances/" + device_id + "/erd/0x" + std::string(paired_id_str) + "/value";
     command_topic = "geappliances/" + device_id + "/erd/0x" + erd_id_str + "/write";
   } else {
     state_topic = "geappliances/" + device_id + "/erd/0x" + erd_id_str + "/value";
