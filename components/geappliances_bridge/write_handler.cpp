@@ -41,9 +41,14 @@ void WriteHandler::process_writes()
       in_flight.appliance_address = cmd.appliance_address > 0
         ? cmd.appliance_address : appliance_address_;
       in_flight.retries = 0;
+      in_flight.value_size = cmd.value_size;
+      std::memcpy(in_flight.value, cmd.value, cmd.value_size);
       in_flight_.push_back(in_flight);
+    } else {
+      // Client queue full — requeue the command so it is not lost.
+      // It will be retried on the next process_writes() call.
+      write_queue_->push(cmd);
     }
-    // If not queued, the command is dropped (queue will retry on next cycle)
   }
 }
 
@@ -59,12 +64,17 @@ void WriteHandler::on_write_response(tiny_erd_t erd_id, bool success)
     if (!success) {
       it->retries++;
       if (it->retries < MAX_WRITE_RETRIES) {
-        // Re-queue for retry — push back to write queue
-        // Note: In production this would reconstruct the WriteCommand
-        // For now, just remove from in-flight; the caller can re-queue
+        // Re-queue for retry using the stored value/size
+        WriteCommand cmd;
+        cmd.erd_id = it->erd_id;
+        cmd.appliance_address = it->appliance_address;
+        cmd.value_size = it->value_size;
+        std::memcpy(cmd.value, it->value, it->value_size);
+        write_queue_->push(cmd);
         in_flight_.erase(it);
         return;
       }
+      // Max retries reached — remove from in-flight
     }
     // Success or max retries reached — remove from in-flight
     in_flight_.erase(it);

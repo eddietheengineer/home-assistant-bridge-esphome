@@ -209,12 +209,6 @@ void GeappliancesBridge::loop() {
     }
   }
 
-  // ── FSM Loops ──────────────────────────────────────────────────────────────
-  // Drive the appliance-side and MQTT-side state machines each cycle.
-  // ───────────────────────────────────────────────────────────────────────────
-  if (appliance_fsm_) appliance_fsm_->loop();
-  if (mqtt_fsm_) mqtt_fsm_->loop();
-
   // ── Startup HSM ────────────────────────────────────────────────────────
   // The bridge progresses through a linear sequence of startup phases via
   // a tiny_hsm-based state machine.  Each state handles its own entry/exit
@@ -226,9 +220,11 @@ void GeappliancesBridge::loop() {
   //           → RUNNING (steady-state)
   // ────────────────────────────────────────────────────────────────────────
 
-  // Drive the GEA2/GEA3 protocol stack on every loop iteration so that
-  // UART bytes are processed and ERD read responses are delivered to the
-  // active manager (autodiscovery, device ID, feature bits, polling bridge).
+  // Drive the GEA2/GEA3 protocol stack FIRST so that UART bytes are
+  // processed and ERD read responses are delivered to the active manager
+  // (autodiscovery, device ID, feature bits, polling bridge) before the
+  // FSMs make progress.  Running the FSMs first would process stale state
+  // and break the documented GEA2 timing constraint.
   this->run_protocol_stack_();
 #ifdef USE_ESP32
   // Feed the task watchdog after the protocol stack — the GEA2 tight loop
@@ -259,6 +255,15 @@ void GeappliancesBridge::loop() {
   // and can block for hundreds of milliseconds.
   esp_task_wdt_reset();
 #endif
+
+  // ── FSM Loops ──────────────────────────────────────────────────────────────
+  // Drive the appliance-side and MQTT-side state machines AFTER the protocol
+  // stack and HSM have run.  This ensures UART activity and manager callbacks
+  // are delivered before the FSMs make progress, preserving the GEA2 timing
+  // constraint and preventing stale-state processing.
+  // ───────────────────────────────────────────────────────────────────────────
+  if (appliance_fsm_) appliance_fsm_->loop();
+  if (mqtt_fsm_) mqtt_fsm_->loop();
 }
 
 // ---------------------------------------------------------------------------
@@ -678,10 +683,23 @@ void GeappliancesBridge::log_poll_state_transitions()
 
 void GeappliancesBridge::run_ha_discovery()
 {
+  bool is_poll_mode = !((mode_ == BRIDGE_MODE_SUBSCRIBE) ||
+                         (mode_ == BRIDGE_MODE_AUTO && subscription_mode_active_));
+
+  // For polling mode, gate HA discovery until the polling handler has completed
+  // its first cycle. This ensures ERDs have been discovered and registered
+  // before publishing incomplete discovery config to Home Assistant.
+  bool polling_list_complete = true;
+  if (is_poll_mode && appliance_fsm_ != nullptr) {
+    PollingHandler* ph = appliance_fsm_->get_polling_handler();
+    if (ph != nullptr) {
+      polling_list_complete = ph->has_completed_first_cycle();
+    }
+  }
+
   ha_discovery_manager_.run(
-      !((mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-        (mode_ == BRIDGE_MODE_AUTO && subscription_mode_active_)),
-      true,
+      is_poll_mode,
+      polling_list_complete,
       subscription_activity_detected_,
       mqtt::global_mqtt_client);
 }

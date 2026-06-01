@@ -71,6 +71,7 @@ void PollingHandler::poll_now(uint8_t address)
   if (erd_client_ == nullptr || polling_erds_.empty()) {
     return;
   }
+  pending_reads_ = static_cast<uint8_t>(polling_erds_.size());
   for (tiny_erd_t erd : polling_erds_) {
     tiny_gea3_erd_client_request_id_t request_id;
     tiny_gea3_erd_client_read(erd_client_, &request_id, address, erd);
@@ -88,11 +89,23 @@ void PollingHandler::handle_poll_response(tiny_erd_t erd_id,
   if (!only_publish_on_change_) {
     state_table_->set_publish_flag(erd_id);
   }
+  if (pending_reads_ > 0) {
+    pending_reads_--;
+    if (pending_reads_ == 0) {
+      has_completed_first_cycle_ = true;
+    }
+  }
 }
 
 void PollingHandler::handle_poll_failure(tiny_erd_t erd_id)
 {
-  // No-op — the FSM handles error transitions
+  // Decrement pending count so cycle completion is tracked even on failure.
+  if (pending_reads_ > 0) {
+    pending_reads_--;
+    if (pending_reads_ == 0) {
+      has_completed_first_cycle_ = true;
+    }
+  }
   (void)erd_id;
 }
 
@@ -137,6 +150,11 @@ bool PollingHandler::get_only_publish_on_change() const
 const std::vector<tiny_erd_t>& PollingHandler::get_polling_erds() const
 {
   return polling_erds_;
+}
+
+bool PollingHandler::has_completed_first_cycle() const
+{
+  return has_completed_first_cycle_;
 }
 
 void PollingHandler::on_poll_timer_(void* context)

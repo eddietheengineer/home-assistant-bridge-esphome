@@ -87,6 +87,10 @@ class PollingHandler {
   /// Returns the current polling ERD list.
   const std::vector<tiny_erd_t>& get_polling_erds() const;
 
+  /// Returns true if at least one full polling cycle has completed.
+  /// Used by HA discovery to gate publishing until ERDs have been read.
+  bool has_completed_first_cycle() const;
+
  private:
   static void on_poll_timer_(void* context);
   static void on_erd_client_activity_(void* context, const void* args);
@@ -102,6 +106,8 @@ class PollingHandler {
   tiny_timer_t poll_timer_;
   tiny_event_subscription_t erd_client_activity_sub_;
   bool timer_running_;
+  bool has_completed_first_cycle_;
+  uint8_t pending_reads_;  // tracks in-flight reads for cycle completion detection
 };
 
 }  // namespace geappliances_bridge

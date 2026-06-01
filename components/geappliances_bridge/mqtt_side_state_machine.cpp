@@ -93,13 +93,17 @@ void MqttSideStateMachine::on_mqtt_disconnected() {
 
 void MqttSideStateMachine::drain_flagged_erds_() {
   std::vector<tiny_erd_t> flagged = state_table_->get_flagged_erds();
-  bool connected = esphome_mqtt_client_adapter_is_connected(adapter_);
-  if (flagged.empty() || !connected) {
+  if (flagged.empty()) {
     return;
   }
   size_t flushed = 0;
   for (auto erd_id : flagged) {
     if (flushed >= MAX_FLUSH_PER_CALL) {
+      break;
+    }
+    // Check connection before each publish — if MQTT disconnects mid-loop,
+    // the remaining flagged ERDs stay flagged for the next reconnect.
+    if (!esphome_mqtt_client_adapter_is_connected(adapter_)) {
       break;
     }
     uint8_t size = 0;

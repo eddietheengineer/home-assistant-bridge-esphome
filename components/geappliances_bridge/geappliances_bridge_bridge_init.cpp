@@ -27,6 +27,7 @@
 
 #include "geappliances_bridge.h"
 #include "ha_discovery_config.h"
+#include "appliance_side_state_machine.h"
 #include "appliance_api_feature_lists.h"
 #include "geappliances_bridge_constants.h"
 #include "esphome/core/log.h"
@@ -131,22 +132,30 @@ void GeappliancesBridge::initialize_mqtt_client_()
   erd_state_table_ = std::make_unique<ErdStateTable>();
   write_queue_ = std::make_unique<WriteQueue>();
 
+  // Use the active ERD client (may be GEA2 or GEA3 depending on autodiscovery).
+  // For manual device_id configs where autodiscovery was skipped, fall back to
+  // the GEA3 client.
+  i_tiny_gea3_erd_client_t* active_client = this->autodiscovery_manager_.get_active_erd_client();
+  if (active_client == nullptr) {
+    active_client = &this->erd_client_.interface;
+  }
+
   // Construct mode-appropriate handlers
   if (mode_ == BRIDGE_MODE_SUBSCRIBE || mode_ == BRIDGE_MODE_AUTO) {
     subscription_handler_ = std::make_unique<SubscriptionHandler>(
-      &this->erd_client_.interface, erd_state_table_.get(), &this->timer_group_);
+      active_client, erd_state_table_.get(), &this->timer_group_);
   }
   if (mode_ == BRIDGE_MODE_POLL || mode_ == BRIDGE_MODE_AUTO) {
     polling_handler_ = std::make_unique<PollingHandler>(
-      &this->erd_client_.interface, erd_state_table_.get(),
+      active_client, erd_state_table_.get(),
       this->polling_interval_ms_, this->polling_only_publish_on_change_);
   }
-  write_handler_ = std::make_unique<WriteHandler>(&this->erd_client_.interface, write_queue_.get());
+  write_handler_ = std::make_unique<WriteHandler>(active_client, write_queue_.get());
 
   // Appliance-side FSM (takes ownership of the handlers)
   appliance_fsm_ = std::make_unique<ApplianceSideStateMachine>(
     erd_state_table_.get(), global_registry_.get(), write_queue_.get(),
-    &this->erd_client_.interface);
+    active_client);
 
   // Write router (requires adapter to be initialized)
   write_router_ = std::make_unique<WriteRouter>(&this->mqtt_client_adapter_.interface, write_queue_.get());
@@ -184,13 +193,49 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
 
   if (this->autodiscovery_manager_.is_gea2_protocol()) {
     mode_name = "polling (GEA2 - subscriptions not supported)";
+    // Configure and start the appliance FSM for GEA2 polling mode.
+    if (this->appliance_fsm_ != nullptr) {
+      ApplianceSideConfig cfg;
+      cfg.enable_subscriptions = false;
+      cfg.enable_polling = true;
+      cfg.polling_interval_ms = this->polling_interval_ms_;
+      cfg.only_publish_on_change = this->polling_only_publish_on_change_;
+      cfg.subscription_erds = {};
+      cfg.polling_erds = this->feature_bit_manager_.get_valid_erds_vec();
+      this->appliance_fsm_->set_config(cfg);
+      this->appliance_fsm_->set_timer_group(&this->timer_group_);
+    }
   } else if (this->mode_ == BRIDGE_MODE_POLL) {
     mode_name = "polling";
+    // Configure and start the appliance FSM for polling mode.
+    if (this->appliance_fsm_ != nullptr) {
+      ApplianceSideConfig cfg;
+      cfg.enable_subscriptions = false;
+      cfg.enable_polling = true;
+      cfg.polling_interval_ms = this->polling_interval_ms_;
+      cfg.only_publish_on_change = this->polling_only_publish_on_change_;
+      cfg.subscription_erds = {};
+      cfg.polling_erds = this->feature_bit_manager_.get_valid_erds_vec();
+      this->appliance_fsm_->set_config(cfg);
+      this->appliance_fsm_->set_timer_group(&this->timer_group_);
+    }
   } else if (this->mode_ == BRIDGE_MODE_SUBSCRIBE) {
     mode_name = "subscription";
     this->subscription_mode_active_ = true;
     this->subscription_activity_detected_ = false;
     this->subscription_start_time_ = millis();
+    // Configure and start the appliance FSM for subscription mode.
+    if (this->appliance_fsm_ != nullptr) {
+      ApplianceSideConfig cfg;
+      cfg.enable_subscriptions = true;
+      cfg.enable_polling = false;
+      cfg.polling_interval_ms = this->polling_interval_ms_;
+      cfg.only_publish_on_change = this->polling_only_publish_on_change_;
+      cfg.subscription_erds = {};
+      cfg.polling_erds = {};
+      this->appliance_fsm_->set_config(cfg);
+      this->appliance_fsm_->set_timer_group(&this->timer_group_);
+    }
     // Start the subscription handler so it begins processing publications.
     if (this->subscription_handler_ != nullptr) {
       this->subscription_handler_->start(this->autodiscovery_manager_.get_host_address());
@@ -200,6 +245,19 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     this->subscription_mode_active_ = true;
     this->subscription_activity_detected_ = false;
     this->subscription_start_time_ = millis();
+    // Configure and start the appliance FSM for AUTO mode (subscription first,
+    // polling handler ready as fallback).
+    if (this->appliance_fsm_ != nullptr) {
+      ApplianceSideConfig cfg;
+      cfg.enable_subscriptions = true;
+      cfg.enable_polling = true;
+      cfg.polling_interval_ms = this->polling_interval_ms_;
+      cfg.only_publish_on_change = this->polling_only_publish_on_change_;
+      cfg.subscription_erds = {};
+      cfg.polling_erds = this->feature_bit_manager_.get_valid_erds_vec();
+      this->appliance_fsm_->set_config(cfg);
+      this->appliance_fsm_->set_timer_group(&this->timer_group_);
+    }
     // Start the subscription handler so it begins processing publications.
     if (this->subscription_handler_ != nullptr) {
       this->subscription_handler_->start(this->autodiscovery_manager_.get_host_address());

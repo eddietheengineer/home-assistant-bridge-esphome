@@ -54,6 +54,11 @@ void ApplianceSideStateMachine::set_config(const ApplianceSideConfig& config)
   }
 }
 
+void ApplianceSideStateMachine::set_timer_group(tiny_timer_group_t* timer_group)
+{
+  timer_group_ = timer_group;
+}
+
 void ApplianceSideStateMachine::loop()
 {
   switch (current_state_) {

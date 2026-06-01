@@ -73,6 +73,9 @@ class ApplianceSideStateMachine {
   /// Set the configuration (called once during initialization).
   void set_config(const ApplianceSideConfig& config);
 
+  /// Set the timer group for polling and error retry timers.
+  void set_timer_group(tiny_timer_group_t* timer_group);
+
   /// Fast, non-blocking; called from GeappliancesBridge::loop().
   /// Must not block — the 200 ms GEA2 busy-loop is handled by
   /// GeappliancesBridge::run_protocol_stack_() before this is called.

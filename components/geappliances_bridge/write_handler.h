@@ -40,6 +40,8 @@ struct InFlightWrite {
   tiny_erd_t erd_id;
   uint8_t appliance_address;
   uint8_t retries;
+  uint8_t value[MAX_ERD_VALUE_SIZE];
+  uint8_t value_size;
 };
 
 class WriteHandler {

@@ -15,6 +15,11 @@ ErdStateTable::ErdStateTable()
 
 void ErdStateTable::update_erd_value(tiny_erd_t erd_id, const uint8_t* value, uint8_t size)
 {
+  // Guard against null value pointer — malformed appliance data could crash the bridge.
+  if (value == nullptr) {
+    return;
+  }
+
   // Clamp size to MAX_ERD_VALUE_SIZE
   if (size > MAX_ERD_VALUE_SIZE) {
     size = MAX_ERD_VALUE_SIZE;

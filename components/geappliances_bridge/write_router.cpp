@@ -38,11 +38,11 @@ void WriteRouter::on_write_request_handler(void* context, const void* args)
 
   WriteCommand cmd;
   cmd.erd_id = a->erd;
-  cmd.value_size = a->size;
-  cmd.appliance_address = 0xC0;  // Default appliance address
+  cmd.appliance_address = 0;  // Let WriteHandler use its configured address
+  uint8_t copy_size = (a->size < MAX_ERD_VALUE_SIZE) ? a->size : MAX_ERD_VALUE_SIZE;
+  cmd.value_size = copy_size;
 
   // Copy value bytes — clamp to MAX_ERD_VALUE_SIZE
-  uint8_t copy_size = (a->size < MAX_ERD_VALUE_SIZE) ? a->size : MAX_ERD_VALUE_SIZE;
   std::memset(cmd.value, 0, sizeof(cmd.value));
   if (a->value != nullptr && copy_size > 0) {
     std::memcpy(cmd.value, a->value, copy_size);

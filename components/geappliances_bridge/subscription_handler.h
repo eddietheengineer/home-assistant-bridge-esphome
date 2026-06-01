@@ -71,7 +71,6 @@ class SubscriptionHandler {
 
  private:
   // HSM states (friend functions so they can access private members)
-  friend SubscriptionHandler* get_self_from_hsm(tiny_hsm_t* hsm);
   friend tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
   friend tiny_hsm_result_t state_subscribing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
   friend tiny_hsm_result_t state_subscribed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);

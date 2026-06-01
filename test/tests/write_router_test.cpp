@@ -120,7 +120,7 @@ TEST(write_router, populates_appliance_address)
 
   WriteCommand cmd;
   CHECK(queue.pop(cmd));
-  CHECK_EQUAL(0xC0, cmd.appliance_address);
+  CHECK_EQUAL(0, cmd.appliance_address);  // 0 = use WriteHandler's configured address
 }
 
 /* ------------------------------------------------------------------ */
@@ -245,7 +245,7 @@ TEST(write_router, clamps_value_to_max_size)
 
   WriteCommand cmd;
   CHECK(queue.pop(cmd));
-  CHECK_EQUAL(64, cmd.value_size);  // size reports what was requested
-  // But only MAX_ERD_VALUE_SIZE bytes were actually copied
+  CHECK_EQUAL(MAX_ERD_VALUE_SIZE, cmd.value_size);  // clamped to max
+  // Only MAX_ERD_VALUE_SIZE bytes were actually copied
   CHECK_EQUAL(0x1F, cmd.value[MAX_ERD_VALUE_SIZE - 1]);
 }

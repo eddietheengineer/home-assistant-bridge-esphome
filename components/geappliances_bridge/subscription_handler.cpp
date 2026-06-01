@@ -5,16 +5,10 @@
 namespace esphome {
 namespace geappliances_bridge {
 
-// container_of equivalent for C++ (friend of SubscriptionHandler)
-SubscriptionHandler* get_self_from_hsm(tiny_hsm_t* hsm)
-{
-  // hsm_ is the first tiny_hsm_t member after address_ (uint8_t).
-  // Use pointer arithmetic: hsm_ follows address_ in the struct layout.
-  // Simpler: just store a self pointer in the timer context.
-  // For now, use a well-known offset computed at compile time.
-  return reinterpret_cast<SubscriptionHandler*>(
-    reinterpret_cast<char*>(hsm) - reinterpret_cast<char*>(&reinterpret_cast<SubscriptionHandler*>(0)->hsm_));
-}
+// Pointer to the currently active SubscriptionHandler instance.
+// Set in start() and used by the HSM state functions to avoid UB
+// container_of pointer arithmetic on non-standard-layout types.
+static SubscriptionHandler* s_active_handler = nullptr;
 
 // HSM state descriptors
 extern "C" {
@@ -80,11 +74,13 @@ void SubscriptionHandler::start(uint8_t address)
 {
   address_ = address;
   known_erds_.clear();
+  s_active_handler = this;
   tiny_hsm_init(&hsm_, &sub_hsm_config, state_subscribing);
 }
 
 void SubscriptionHandler::stop()
 {
+  s_active_handler = nullptr;
   tiny_timer_stop(timer_group_, &timer_);
 }
 
@@ -152,7 +148,8 @@ void SubscriptionHandler::on_retention_timer_(void* context)
 
 tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  SubscriptionHandler* self = get_self_from_hsm(hsm);
+  (void)hsm;
+  SubscriptionHandler* self = s_active_handler;
 
   switch (signal) {
     case signal_subscription_publication_received: {
@@ -178,7 +175,8 @@ tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const
 
 tiny_hsm_result_t state_subscribing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  SubscriptionHandler* self = get_self_from_hsm(hsm);
+  (void)hsm;
+  SubscriptionHandler* self = s_active_handler;
   (void)data;
 
   switch (signal) {
@@ -213,7 +211,8 @@ tiny_hsm_result_t state_subscribing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, c
 
 tiny_hsm_result_t state_subscribed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  SubscriptionHandler* self = get_self_from_hsm(hsm);
+  (void)hsm;
+  SubscriptionHandler* self = s_active_handler;
   (void)data;
 
   switch (signal) {
