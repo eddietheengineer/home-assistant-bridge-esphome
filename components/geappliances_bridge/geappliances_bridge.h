@@ -33,10 +33,9 @@
 #include <string>
 #include <set>
 #include <vector>
+#include <memory>
 
 extern "C" {
-#include "mqtt_bridge.h"
-#include "mqtt_bridge_polling.h"
 #include "tiny_gea3_erd_client.h"
 #include "tiny_gea3_interface.h"
 #include "tiny_gea2_erd_client.h"
@@ -57,6 +56,15 @@ extern "C" {
 #include "autodiscovery_manager.h"
 #include "ha_discovery_manager.h"
 #include "geappliances_bridge_startup_hsm.h"
+#include "global_state_registry.h"
+#include "erd_state_table.h"
+#include "write_queue.h"
+#include "subscription_handler.h"
+#include "polling_handler.h"
+#include "write_handler.h"
+#include "appliance_side_state_machine.h"
+#include "write_router.h"
+#include "mqtt_side_state_machine.h"
 
 // Forward declaration of the generated function
 std::string appliance_type_to_string(uint8_t appliance_type);
@@ -100,6 +108,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   void init_device_id_reading() override;
   bool is_device_id_complete() const override;
+  const std::string& get_device_id_string() const override;
 
   bool is_mqtt_client_initialized() const override;
   void initialize_mqtt_client() override;
@@ -121,6 +130,8 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void log_poll_state_transitions() override;
   void run_ha_discovery() override;
   void run_all_managers() override;
+
+  GlobalStateRegistry* get_global_registry() override;
 
   // ── Internal bridge methods (event callbacks and per-phase helpers) ─────────
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
@@ -149,15 +160,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   uint8_t client_address_{0xE4};
 
   // States for the non-blocking MQTT (re)connection FSM in loop().
-  enum class MqttConnectionState : uint8_t {
-    DISCONNECTED,  // No MQTT connection (or not yet seen)
-    SUBSCRIBING,   // Connected; waiting for adapter init to subscribe wildcard
-    FLUSHING,      // Subscribed; draining pending ERD update queue
-    RUNNING,       // Steady-state: queue empty, draining new updates each loop
-  };
-  MqttConnectionState mqtt_connection_state_{MqttConnectionState::DISCONNECTED};
   bool mqtt_client_adapter_initialized_{false};
-  bool mqtt_bridge_initialized_{false};
+  bool mqtt_bridge_initialized_{false};  // True after initialize_mqtt_bridge_() completes
+  bool mqtt_was_connected_{false};  // Tracks previous connection state for edge detection
   BridgeMode mode_{BRIDGE_MODE_AUTO};
   uint32_t polling_interval_ms_{10000};
   bool polling_only_publish_on_change_{false};
@@ -258,15 +263,16 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // Adapter that wraps the GEA2 ERD client as a GEA3 ERD client interface
   gea2_erd_client_adapter_t gea2_erd_client_adapter_;
 
-  mqtt_bridge_t mqtt_bridge_;
-  mqtt_bridge_polling_t mqtt_bridge_polling_;
-
-  // Track which bridge(s) were actually initialized so teardown is unambiguous.
-  // A subscription bridge (mqtt_bridge_) is created when use_polling is false.
-  // A polling bridge (mqtt_bridge_polling_) is created when use_polling is true,
-  // or when custom ERD polling is started alongside a subscription bridge.
-  bool subscription_bridge_initialized_{false};
-  bool polling_bridge_initialized_{false};
+  // Phase 4: New FSM-based architecture
+  std::unique_ptr<GlobalStateRegistry> global_registry_;
+  std::unique_ptr<ErdStateTable> erd_state_table_;
+  std::unique_ptr<WriteQueue> write_queue_;
+  std::unique_ptr<SubscriptionHandler> subscription_handler_;
+  std::unique_ptr<PollingHandler> polling_handler_;
+  std::unique_ptr<WriteHandler> write_handler_;
+  std::unique_ptr<ApplianceSideStateMachine> appliance_fsm_;
+  std::unique_ptr<WriteRouter> write_router_;
+  std::unique_ptr<MqttSideStateMachine> mqtt_fsm_;
 
   tiny_event_subscription_t erd_client_activity_subscription_;
   tiny_event_subscription_t gea2_activity_subscription_;

@@ -8,6 +8,9 @@
 #include "mqtt_side_state_machine.h"
 
 #include <string>
+#include "esphome/core/log.h"
+
+static const char* const TAG = "mqtt_fsm";
 
 namespace esphome {
 namespace geappliances_bridge {
@@ -24,6 +27,13 @@ MqttSideStateMachine::MqttSideStateMachine(
       adapter_(adapter),
       write_router_(write_router),
       state_(State::DISCONNECTED) {
+  // If MQTT is already connected when we're constructed, transition immediately.
+  // This handles the common case where MQTT connects during the device_id phase
+  // before the FSM is created in initialize_mqtt_client_().
+  if (esphome_mqtt_client_adapter_is_connected(adapter)) {
+    state_ = State::SUBSCRIBING;
+    ESP_LOGD(TAG, "Constructor: MQTT already connected, starting in SUBSCRIBING");
+  }
 }
 
 void MqttSideStateMachine::loop() {
@@ -33,14 +43,17 @@ void MqttSideStateMachine::loop() {
       break;
 
     case State::SUBSCRIBING:
+      ESP_LOGD(TAG, "SUBSCRIBING: subscribing to write topic");
       esphome_mqtt_client_adapter_subscribe_write_topic(adapter_);
       state_ = State::FLUSHING;
+      ESP_LOGD(TAG, "FLUSHING: flagged ERDs: %zu", state_table_->get_flagged_erds().size());
       break;
 
     case State::FLUSHING:
       drain_flagged_erds_();
       if (state_table_->get_flagged_erds().empty()) {
         state_ = State::RUNNING;
+        ESP_LOGD(TAG, "RUNNING: all flagged ERDs flushed");
       }
       break;
 
@@ -57,6 +70,7 @@ MqttSideStateMachine::State MqttSideStateMachine::get_current_state() const {
 void MqttSideStateMachine::on_mqtt_connected() {
   switch (state_) {
     case State::DISCONNECTED:
+      ESP_LOGD(TAG, "on_mqtt_connected: DISCONNECTED -> SUBSCRIBING");
       state_ = State::SUBSCRIBING;
       break;
 
@@ -65,6 +79,9 @@ void MqttSideStateMachine::on_mqtt_connected() {
     case State::RUNNING:
       // Already connected or in a connected state — go to flushing to
       // re-drain any flags that accumulated during a brief disconnect.
+      ESP_LOGD(TAG, "on_mqtt_connected: %s -> FLUSHING", 
+               state_ == State::SUBSCRIBING ? "SUBSCRIBING" :
+               state_ == State::FLUSHING ? "FLUSHING" : "RUNNING");
       state_ = State::FLUSHING;
       break;
   }
@@ -75,15 +92,20 @@ void MqttSideStateMachine::on_mqtt_disconnected() {
 }
 
 void MqttSideStateMachine::drain_flagged_erds_() {
+  std::vector<tiny_erd_t> flagged = state_table_->get_flagged_erds();
+  bool connected = esphome_mqtt_client_adapter_is_connected(adapter_);
+  if (flagged.empty() || !connected) {
+    return;
+  }
   size_t flushed = 0;
-  for (auto erd_id : state_table_->get_flagged_erds()) {
-    if (!esphome_mqtt_client_adapter_is_connected(adapter_) ||
-        flushed >= MAX_FLUSH_PER_CALL) {
+  for (auto erd_id : flagged) {
+    if (flushed >= MAX_FLUSH_PER_CALL) {
       break;
     }
     uint8_t size = 0;
     const uint8_t* value = state_table_->get_erd_value(erd_id, size);
     if (value == nullptr) {
+      state_table_->clear_publish_flag(erd_id);
       continue;
     }
     std::string topic = build_erd_topic(registry_->get_device_id(), erd_id);
@@ -91,6 +113,9 @@ void MqttSideStateMachine::drain_flagged_erds_() {
     esphome_mqtt_client_adapter_publish(adapter_, topic, payload, true);
     state_table_->clear_publish_flag(erd_id);
     flushed++;
+  }
+  if (flushed > 0) {
+    ESP_LOGI(TAG, "drain: published %u ERDs", flushed);
   }
 }
 
