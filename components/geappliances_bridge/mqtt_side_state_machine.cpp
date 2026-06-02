@@ -18,12 +18,10 @@ namespace geappliances_bridge {
 MqttSideStateMachine::MqttSideStateMachine(
     ErdStateTable* state_table,
     GlobalStateRegistry* registry,
-    ErdRegistry* erd_registry,
     esphome_mqtt_client_adapter_t* adapter,
     WriteRouter* write_router)
     : state_table_(state_table),
       registry_(registry),
-      erd_registry_(erd_registry),
       adapter_(adapter),
       write_router_(write_router),
       state_(State::DISCONNECTED) {
@@ -113,7 +111,7 @@ void MqttSideStateMachine::drain_flagged_erds_() {
       continue;
     }
     std::string topic = build_erd_topic(registry_->get_device_id(), erd_id);
-    std::string payload = format_erd_payload(erd_id, value, size, erd_registry_);
+    std::string payload = format_erd_payload(value, size);
     esphome_mqtt_client_adapter_publish(adapter_, topic, payload, true);
     state_table_->clear_publish_flag(erd_id);
     flushed++;

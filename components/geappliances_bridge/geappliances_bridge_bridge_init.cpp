@@ -165,7 +165,7 @@ void GeappliancesBridge::initialize_mqtt_client_()
 
   // MQTT-side FSM
   mqtt_fsm_ = std::make_unique<MqttSideStateMachine>(
-    erd_state_table_.get(), global_registry_.get(), &this->erd_registry_,
+    erd_state_table_.get(), global_registry_.get(),
     &this->mqtt_client_adapter_, write_router_.get());
 }
 

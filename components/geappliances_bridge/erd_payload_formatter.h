@@ -5,24 +5,21 @@
 //
 // Responsibilities:
 //   - build_erd_topic() — construct "geappliances/{device_id}/erd/0xXXXX/value"
-//   - format_erd_payload() — hex for binary ERDs, ASCII for string-typed ERDs
+//   - format_erd_payload() — hex-encode all ERD values (no string/ASCII branch)
 //
 // NOT responsible for:
 //   - MQTT publishing (handled by MqttSideStateMachine / adapter)
 //   - ERD validation (handled by ErdRegistry)
 //
-// Dependencies:
-//   - ErdRegistry (for is_string_type lookup)
+// Dependencies: none (standalone, no ErdRegistry dependency)
 // =============================================================================
 
 #ifndef GEAPPLIANCES_BRIDGE_ERD_PAYLOAD_FORMATTER_H
 #define GEAPPLIANCES_BRIDGE_ERD_PAYLOAD_FORMATTER_H
 
 #include <cstdint>
-#include <cctype>
 #include <string>
 
-#include "erd_registry.h"
 #include "tiny_erd.h"
 
 namespace esphome {
@@ -33,12 +30,8 @@ namespace geappliances_bridge {
 std::string build_erd_topic(const std::string& device_id, tiny_erd_t erd);
 
 // Returns the MQTT payload string for an ERD value.
-// Uses ErdRegistry::is_string_type() to choose hex vs. ASCII encoding.
-// registry may be nullptr, in which case hex encoding is always used.
-std::string format_erd_payload(tiny_erd_t erd,
-                               const uint8_t* value,
-                               uint8_t size,
-                               ErdRegistry* registry);
+// All ERD values are hex-encoded (no ASCII/string branch).
+std::string format_erd_payload(const uint8_t* value, uint8_t size);
 
 }  // namespace geappliances_bridge
 }  // namespace esphome

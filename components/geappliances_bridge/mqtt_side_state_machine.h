@@ -19,7 +19,6 @@
 // Dependencies:
 //   - ErdStateTable (reads flagged ERDs, clears flags after publish)
 //   - GlobalStateRegistry (device_id for topic construction)
-//   - ErdRegistry (is_string_type for payload formatting)
 //   - esphome_mqtt_client_adapter_t (publish, subscribe, is_connected)
 //   - WriteRouter (constructor parameter for future wiring; no-op in this FSM)
 //
@@ -34,7 +33,6 @@
 
 #include "erd_state_table.h"
 #include "global_state_registry.h"
-#include "erd_registry.h"
 #include "erd_payload_formatter.h"
 #include "esphome_mqtt_client_adapter.h"
 
@@ -58,13 +56,11 @@ class MqttSideStateMachine {
   // Constructor: all dependencies are passed as raw pointers.
   // state_table:  ErdStateTable to read flagged ERDs from
   // registry:     GlobalStateRegistry for device_id
-  // erd_registry: ErdRegistry for is_string_type lookups
   // adapter:      MQTT adapter for publish/subscribe/is_connected
   // write_router: WriteRouter (reserved for future wiring; not used by this FSM)
   MqttSideStateMachine(
     ErdStateTable* state_table,
     GlobalStateRegistry* registry,
-    ErdRegistry* erd_registry,
     esphome_mqtt_client_adapter_t* adapter,
     WriteRouter* write_router);
 
@@ -85,7 +81,6 @@ class MqttSideStateMachine {
 
   ErdStateTable* state_table_;
   GlobalStateRegistry* registry_;
-  ErdRegistry* erd_registry_;
   esphome_mqtt_client_adapter_t* adapter_;
   WriteRouter* write_router_;
 
