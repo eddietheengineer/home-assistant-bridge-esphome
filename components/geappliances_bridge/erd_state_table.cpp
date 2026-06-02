@@ -39,6 +39,7 @@ void ErdStateTable::update_erd_value(tiny_erd_t erd_id, const uint8_t* value, ui
       entry->publish_flag = true;
       tiny_event_publish(&erd_changed_, &erd_id);
     }
+    ESP_LOGD(TAG, "ErdStateTable update 0x%04X: size=%u flag=%d", erd_id, entry->value_size, entry->publish_flag);
   } else {
     // New ERD — add to flat array
     if (entry_count_ >= MAX_ERD_ENTRIES) {
@@ -53,6 +54,7 @@ void ErdStateTable::update_erd_value(tiny_erd_t erd_id, const uint8_t* value, ui
     index_table_[erd_id] = static_cast<uint16_t>(new_idx);
     entry_count_++;
     tiny_event_publish(&erd_changed_, &erd_id);
+    ESP_LOGD(TAG, "ErdStateTable new 0x%04X: size=%u flag=%d", erd_id, entry->value_size, entry->publish_flag);
   }
 }
 
