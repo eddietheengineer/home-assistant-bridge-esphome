@@ -189,7 +189,11 @@ void ApplianceSideStateMachine::start_handlers()
   }
 
   if (config_.enable_subscriptions && subscription_handler_ != nullptr) {
-    subscription_handler_->start(addr, config_.subscription_erds);
+    // Do NOT pass valid_erds for initial reads — the appliance sends a burst
+    // of subscription publications that naturally populate ErdStateTable.
+    // Initial reads would serialize 100+ ERDs at ~500ms each, blocking the
+    // fast path where subscription publications arrive as a rapid burst.
+    subscription_handler_->start(addr, {});
   }
 
   if (config_.enable_polling && timer_group_ != nullptr && polling_handler_ != nullptr) {

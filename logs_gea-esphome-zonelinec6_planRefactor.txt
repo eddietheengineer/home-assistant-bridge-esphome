@@ -1,0 +1,152 @@
+
+[22:13:35.817][S][text_sensor]: 'Reset Reason' >> 'Reboot request from esphome.ota'
+[22:13:40.140][I][autodiscovery:101]: GEA3 board discovered at 0xC0, autodiscovery complete
+[22:13:40.142][I][device_identity:036]: No device_id configured, will auto-generate from identity ERDs
+[22:13:40.389][I][device_identity:048]: Read appliance type: 35
+[22:13:40.715][I][device_identity:054]: Read model number: AVVL24DMXWAK1
+[22:13:41.204][I][device_identity:060]: Read serial number: VZ105631G
+[22:13:41.207][I][device_identity:064]: Generated device ID: ZonelineVertical_AVVL24DMXWAK1_VZ105631G
+[22:13:41.207][I][geappliances_bridge:093]: Initializing MQTT client adapter with device ID: ZonelineVertical_AVVL24DMXWAK1_VZ105631G
+[22:13:41.207][I][geappliances_bridge:120]: MQTT client adapter initialized; feature bit ERDs will be published as they are read
+[22:13:41.211][D][mqtt_fsm:033]: Constructor: MQTT already connected, starting in SUBSCRIBING
+[22:13:41.214][I][geappliances_bridge:075]: Reading device info ERDs for MQTT publish, then appliance API feature bits...
+[22:13:41.214][D][feature_bit:283]: Queued read for appliance type (0x0008)
+[22:13:41.214][I][geappliances_bridge:303]: Startup: Feature bits phase
+[22:13:41.217][D][mqtt_fsm:044]: SUBSCRIBING: subscribing to write topic
+[22:13:41.220][I][geappliances_bridge.mqtt:153]: Subscribing to wildcard write topic: geappliances/ZonelineVertical_AVVL24DMXWAK1_VZ105631G/erd/+/write
+[22:13:41.223][D][mqtt_fsm:047]: FLUSHING: flagged ERDs: 0
+[22:13:41.228][D][debug:060]: Free Heap Size: 114800 bytes
+[22:13:41.235][W][component:389]: debug set Warning flag: unspecified
+[22:13:41.237][D][mqtt_fsm:054]: RUNNING: all flagged ERDs flushed
+[22:13:41.702][D][feature_bit:151]: Re-read appliance type (0x0008): 1 bytes
+[22:13:41.702][D][feature_bit:283]: Queued read for model number (0x0001)
+[22:13:42.191][D][feature_bit:155]: Re-read model number (0x0001): 8 bytes
+[22:13:42.192][D][feature_bit:283]: Queued read for serial number (0x0002)
+[22:13:42.228][W][component:422]: debug cleared Warning flag
+[22:13:42.682][D][feature_bit:159]: Re-read serial number (0x0002): 8 bytes
+[22:13:42.689][D][feature_bit:283]: Queued read for common feature API (0x0092)
+[22:13:43.172][D][feature_bit:165]: Read common feature API (0x0092): 8 bytes
+[22:13:43.181][D][feature_bit:283]: Queued read for appliance feature API 0 (0x0093)
+[22:13:43.662][D][feature_bit:171]: Read appliance feature API 0 (0x0093): 8 bytes
+[22:13:44.645][D][feature_bit:283]: Queued read for appliance feature API 1 (0x0094)
+[22:13:44.645][D][feature_bit:177]: Read appliance feature API 1 (0x0094): 8 bytes
+[22:13:44.645][D][feature_bit:283]: Queued read for appliance feature API 2 (0x0095)
+[22:13:44.645][D][feature_bit:183]: Read appliance feature API 2 (0x0095): 8 bytes
+[22:13:44.648][D][feature_bit:283]: Queued read for appliance feature API 3 (0x0096)
+[22:13:45.125][D][feature_bit:354]: Feature bit ERD 0x0096 failed or not supported, skipping
+[22:13:45.128][D][feature_bit:283]: Queued read for appliance feature API 4 (0x0097)
+[22:13:45.624][D][feature_bit:354]: Feature bit ERD 0x0097 failed or not supported, skipping
+[22:13:45.677][D][feature_bit:283]: Queued read for appliance feature API 5 (0x0109)
+[22:13:46.728][D][feature_bit:354]: Feature bit ERD 0x0109 failed or not supported, skipping
+[22:13:46.729][D][feature_bit:283]: Queued read for appliance feature API 6 (0x010A)
+[22:13:47.171][D][feature_bit:354]: Feature bit ERD 0x010A failed or not supported, skipping
+[22:13:47.217][D][feature_bit:283]: Queued read for appliance feature API 7 (0x010B)
+[22:13:48.158][D][feature_bit:354]: Feature bit ERD 0x010B failed or not supported, skipping
+[22:13:48.159][D][feature_bit:283]: Queued read for appliance feature API 8 (0x010C)
+[22:13:49.320][D][feature_bit:354]: Feature bit ERD 0x010C failed or not supported, skipping
+[22:13:49.323][D][feature_bit:283]: Queued read for appliance feature API 9 (0x010D)
+[22:13:50.483][D][feature_bit:354]: Feature bit ERD 0x010D failed or not supported, skipping
+[22:13:50.520][I][feature_bit:412]: Common feature API (0x0092) value: 0x00000405
+[22:13:50.520][I][feature_bit:429]:   [SET] Common feature: Primary (mask 0x00000001, 4 ERDs)
+[22:13:50.523][I][feature_bit:429]:   [SET] Common feature: Boot Loader (mask 0x00000004, 1 ERDs)
+[22:13:50.594][I][feature_bit:429]:   [SET] Common feature: Reset Information (mask 0x00000400, 4 ERDs)
+[22:13:50.682][I][feature_bit:501]: Appliance feature ERD 0x0093: type 0x0014, version 1, features 0x0002FF7C
+[22:13:50.682][I][feature_bit:509]:   [SET] Zoneline / Stratos Base (mask 0x00000004, 12 ERDs)
+[22:13:50.682][I][feature_bit:509]:   [SET] Zoneline / Stratos Heat Pump (mask 0x00000008, 3 ERDs)
+[22:13:50.682][I][feature_bit:509]:   [SET] Zoneline / Stratos Inverter (mask 0x00000010, 3 ERDs)
+[22:13:50.682][I][feature_bit:509]:   [SET] Zoneline / Stratos EEV (mask 0x00000020, 7 ERDs)
+[22:13:50.682][I][feature_bit:509]:   [SET] Zoneline / Stratos MUA (mask 0x00000040, 7 ERDs)
+[22:13:50.690][I][feature_bit:509]:   [SET] Zoneline / Stratos Dehum (mask 0x00000100, 2 ERDs)
+[22:13:50.690][I][feature_bit:509]:   [SET] Zoneline / Stratos OD Sensors (mask 0x00000200, 2 ERDs)
+[22:13:50.690][I][feature_bit:509]:   [SET] Zoneline / Stratos ID Outlet Sensor (mask 0x00000400, 1 ERDs)
+[22:13:50.690][I][feature_bit:509]:   [SET] Zoneline / Stratos EEV Sensors (mask 0x00000800, 2 ERDs)
+[22:13:50.721][I][feature_bit:509]:   [SET] Zoneline / Stratos OD Coil Liquid Sensor (mask 0x00001000, 1 ERDs)
+[22:13:50.721][I][feature_bit:509]:   [SET] Zoneline / Stratos Humidity Sensor (mask 0x00002000, 2 ERDs)
+[22:13:50.721][I][feature_bit:509]:   [SET] Zoneline / Stratos Base Aux Modes (mask 0x00004000, 16 ERDs)
+[22:13:50.722][I][feature_bit:501]: Appliance feature ERD 0x0094: type 0x0202, version 1, features 0x0000386F
+[22:13:50.726][I][feature_bit:509]:   [SET] HVAC / Base Functionality (mask 0x00000001, 7 ERDs)
+[22:13:50.726][I][feature_bit:509]:   [SET] HVAC / Heat Mode Supported (mask 0x00000002, 6 ERDs)
+[22:13:50.726][I][feature_bit:509]:   [SET] HVAC / Cool Mode Supported (mask 0x00000004, 6 ERDs)
+[22:13:50.726][I][feature_bit:509]:   [SET] HVAC / Fan Mode Supported (mask 0x00000008, 3 ERDs)
+[22:13:51.737][I][feature_bit:509]:   [SET] HVAC / Heating Setpoint Maximum Limit Configurable (mask 0x00000020, 2 ERDs)
+[22:13:51.737][I][feature_bit:509]:   [SET] HVAC / Cooling Setpoint Minimum Limit Configurable (mask 0x00000040, 2 ERDs)
+[22:13:51.737][I][feature_bit:501]: Appliance feature ERD 0x0095: type 0x0302, version 1, features 0x00001000
+[22:13:51.737][I][feature_bit:509]:   [SET] Resource Management / Electrical Energy Usage v2 (mask 0x00001000, 4 ERDs)
+[22:13:51.737][W][component:522]: geappliances_bridge took a long time for an operation (973 ms), max is 30 ms
+[22:13:51.960][I][feature_bit:542]: Feature bit parsing complete: 108 valid ERDs
+[22:13:51.978][I][geappliances_bridge:358]: Startup: Bridge init phase
+[22:13:51.978][I][geappliances_bridge:366]: Device ID ready and MQTT connected, initializing MQTT bridge
+[22:13:53.231][I][geappliances_bridge:182]: Initializing MQTT bridge
+[22:13:53.231][I][geappliances_bridge:262]: Using auto (starting with subscription) mode with polling interval: 10000 ms
+[22:13:53.231][I][geappliances_bridge:391]: Subscription activity detected - subscription mode is working
+[22:14:03.143][D][erd_state_table:059]: ErdStateTable new 0x0001: size=32 flag=1
+[22:14:03.146][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:03.636][D][erd_state_table:059]: ErdStateTable new 0x0002: size=32 flag=1
+[22:14:03.667][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:04.125][D][erd_state_table:059]: ErdStateTable new 0x0007: size=1 flag=1
+[22:14:04.129][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:04.616][D][erd_state_table:059]: ErdStateTable new 0x0008: size=1 flag=1
+[22:14:04.621][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:05.101][D][erd_state_table:059]: ErdStateTable new 0x0030: size=1 flag=1
+[22:14:05.107][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:05.587][D][erd_state_table:059]: ErdStateTable new 0x0035: size=4 flag=1
+[22:14:05.592][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:06.078][D][erd_state_table:059]: ErdStateTable new 0x0092: size=8 flag=1
+[22:14:06.081][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:06.570][D][erd_state_table:059]: ErdStateTable new 0x0093: size=8 flag=1
+[22:14:06.571][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:07.057][D][erd_state_table:059]: ErdStateTable new 0x0094: size=8 flag=1
+[22:14:07.422][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:07.551][D][erd_state_table:059]: ErdStateTable new 0x0095: size=8 flag=1
+[22:14:08.729][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:11.423][D][erd_state_table:059]: ErdStateTable new 0x0700: size=4 flag=1
+[22:14:11.424][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:11.909][D][erd_state_table:059]: ErdStateTable new 0x0701: size=2 flag=1
+[22:14:11.916][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:13.358][D][erd_state_table:059]: ErdStateTable new 0x0702: size=4 flag=1
+[22:14:13.369][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:14.233][D][erd_state_table:059]: ErdStateTable new 0x0703: size=4 flag=1
+[22:14:14.238][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:15.238][D][erd_state_table:059]: ErdStateTable new 0x7010: size=2 flag=1
+[22:14:15.241][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:16.417][D][erd_state_table:059]: ErdStateTable new 0x7100: size=2 flag=1
+[22:14:16.425][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:17.765][D][erd_state_table:059]: ErdStateTable new 0x7101: size=2 flag=1
+[22:14:17.767][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:19.108][D][erd_state_table:059]: ErdStateTable new 0x7102: size=2 flag=1
+[22:14:19.112][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:20.482][D][erd_state_table:059]: ErdStateTable new 0x7103: size=2 flag=1
+[22:14:20.494][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:22.910][D][erd_state_table:059]: ErdStateTable new 0x7104: size=2 flag=1
+[22:14:22.912][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:24.952][D][erd_state_table:059]: ErdStateTable new 0x7106: size=2 flag=1
+[22:14:26.230][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:27.167][D][erd_state_table:059]: ErdStateTable new 0x7108: size=2 flag=1
+[22:14:27.172][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:29.543][D][erd_state_table:059]: ErdStateTable new 0x710B: size=1 flag=1
+[22:14:29.547][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:30.001][I][safe_mode:142]: Boot seems successful; resetting boot loop counter
+[22:14:31.431][S][sensor]: 'Heap Free' >> 109960 B
+[22:14:31.431][S][sensor]: 'Loop Time' >> 975 ms
+[22:14:31.431][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:14:31.431][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:14:31.431][S][sensor]: 'Heap Min Free' >> 72076 B
+[22:14:31.431][S][sensor]: 'Heap Fragmentation' >> 18.3 %
+[22:14:31.958][D][erd_state_table:059]: ErdStateTable new 0x710C: size=2 flag=1
+[22:14:31.958][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:33.961][S][sensor]: 'Uptime Sensor' >> 64 s
+[22:14:34.873][D][preferences:148]: Writing 1 items: 0 cached, 1 written, 0 failed
+[22:14:35.154][D][erd_state_table:059]: ErdStateTable new 0x710D: size=2 flag=1
+[22:14:35.156][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:14:38.051][D][erd_state_table:059]: ErdStateTable new 0x7118: size=2 flag=1
+[22:14:38.095][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:15:31.426][S][sensor]: 'Heap Free' >> 109640 B
+[22:15:31.426][S][sensor]: 'Loop Time' >> 804 ms
+[22:15:31.426][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:15:31.426][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:15:31.426][S][sensor]: 'Heap Min Free' >> 72076 B
+[22:15:31.427][S][sensor]: 'Heap Fragmentation' >> 17.3 %
+[22:15:33.950][S][sensor]: 'Uptime Sensor' >> 124 s
+[22:15:45.794][D][api:223]: Accept 192.168.1.183
+[22:15:45.855][D][api.connection:2458]: aioesphomeapi (192.168.1.183): connected
+[22:15:45.884][D][api.connection:2458]: aioesphomeapi (192.168.1.183): disconnected

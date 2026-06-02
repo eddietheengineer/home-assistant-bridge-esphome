@@ -114,7 +114,7 @@ TEST_GROUP(mqtt_side_state_machine)
   {
     init_adapter();
     fsm = new MqttSideStateMachine(
-      &state_table, &registry, &erd_registry, &adapter, nullptr);
+      &state_table, &registry, &adapter, nullptr);
   }
 };
 
@@ -396,18 +396,16 @@ TEST(mqtt_side_state_machine, publishes_string_erds_as_ascii)
 
   mock_client.connected = true;
 
-  // Register ERD as string type
-  std::set<tiny_erd_t> string_erds;
-  string_erds.insert(0x5001);
-  erd_registry.set_string_erds(string_erds);
-
+  // Note: format_erd_payload() always hex-encodes (no string/ASCII branch).
+  // The ErdRegistry string-ERD feature was removed in the refactoring.
   uint8_t value[] = "Hello";
   state_table.update_erd_value(0x5001, value, 5);
 
   fsm->loop();
 
   CHECK_EQUAL(1u, mock_client.published_topics.size());
-  CHECK(mock_client.published_payloads.back() == "Hello");
+  // "Hello" hex-encoded is "48656c6c6f"
+  CHECK(mock_client.published_payloads.back() == "48656c6c6f");
 }
 
 /* ------------------------------------------------------------------ */

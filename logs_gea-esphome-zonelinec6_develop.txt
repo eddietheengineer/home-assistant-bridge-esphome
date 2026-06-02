@@ -1,0 +1,197 @@
+
+[22:07:08.087][I][mqtt:348]: Connected
+[22:07:08.152][W][component:522]: mqtt took a long time for an operation (107 ms), max is 30 ms
+[22:07:08.157][S][text_sensor]: 'Device Info' >> '2026.5.1|Chip: ESP32-C6 Features:BLE, 2.4GHz WiFi, Other:0x40 Cores:1 Revision:2|CPU Frequency: 160 MHz|Framework: ESP-IDF|ESP-IDF: 5.5.4|EFuse MAC: 58:E6:C5:19:BC:A0|Reset: Reboot request from esphome.ota|Wakeup: undefined'
+[22:07:08.158][S][text_sensor]: 'Reset Reason' >> 'Reboot request from esphome.ota'
+[22:07:08.164][I][geappliances_bridge:214]: MQTT connected
+[22:07:08.179][I][geappliances_bridge:154]: Startup: Autodiscovery phase
+[22:07:08.181][I][autodiscovery:076]: Starting autodiscovery
+[22:07:08.183][I][autodiscovery:218]: Sent GEA3 broadcast (ERD 0x0008) to address 0xFF
+[22:07:08.451][D][autodiscovery:165]: GEA3 board discovered: address=0xC0 appliance_type=35
+[22:07:13.204][I][autodiscovery:101]: GEA3 board discovered at 0xC0, autodiscovery complete
+[22:07:13.207][I][device_identity:036]: No device_id configured, will auto-generate from identity ERDs
+[22:07:13.384][I][device_identity:048]: Read appliance type: 35
+[22:07:13.710][I][device_identity:054]: Read model number: AVVL24DMXWAK1
+[22:07:14.202][I][device_identity:060]: Read serial number: VZ105631G
+[22:07:14.202][I][device_identity:064]: Generated device ID: ZonelineVertical_AVVL24DMXWAK1_VZ105631G
+[22:07:14.202][I][geappliances_bridge:092]: Initializing MQTT client adapter with device ID: ZonelineVertical_AVVL24DMXWAK1_VZ105631G
+[22:07:14.206][I][geappliances_bridge:119]: MQTT client adapter initialized; feature bit ERDs will be published as they are read
+[22:07:14.206][I][geappliances_bridge:074]: Reading device info ERDs for MQTT publish, then appliance API feature bits...
+[22:07:14.213][D][feature_bit:283]: Queued read for appliance type (0x0008)
+[22:07:14.213][I][geappliances_bridge:276]: Startup: Feature bits phase
+[22:07:14.234][I][geappliances_bridge.mqtt:246]: Subscribing to wildcard write topic: geappliances/ZonelineVertical_AVVL24DMXWAK1_VZ105631G/erd/+/write
+[22:07:14.696][D][feature_bit:151]: Re-read appliance type (0x0008): 1 bytes
+[22:07:14.699][D][feature_bit:283]: Queued read for model number (0x0001)
+[22:07:15.183][D][feature_bit:155]: Re-read model number (0x0001): 8 bytes
+[22:07:15.184][D][feature_bit:283]: Queued read for serial number (0x0002)
+[22:07:15.674][D][feature_bit:159]: Re-read serial number (0x0002): 8 bytes
+[22:07:15.678][D][feature_bit:283]: Queued read for common feature API (0x0092)
+[22:07:16.169][D][feature_bit:165]: Read common feature API (0x0092): 8 bytes
+[22:07:16.174][D][feature_bit:283]: Queued read for appliance feature API 0 (0x0093)
+[22:07:16.656][D][feature_bit:171]: Read appliance feature API 0 (0x0093): 8 bytes
+[22:07:17.139][D][feature_bit:283]: Queued read for appliance feature API 1 (0x0094)
+[22:07:17.139][D][feature_bit:177]: Read appliance feature API 1 (0x0094): 8 bytes
+[22:07:17.142][D][feature_bit:283]: Queued read for appliance feature API 2 (0x0095)
+[22:07:17.630][D][feature_bit:183]: Read appliance feature API 2 (0x0095): 8 bytes
+[22:07:17.633][D][feature_bit:283]: Queued read for appliance feature API 3 (0x0096)
+[22:07:18.116][D][feature_bit:354]: Feature bit ERD 0x0096 failed or not supported, skipping
+[22:07:18.120][D][feature_bit:283]: Queued read for appliance feature API 4 (0x0097)
+[22:07:18.621][D][feature_bit:354]: Feature bit ERD 0x0097 failed or not supported, skipping
+[22:07:18.625][D][feature_bit:283]: Queued read for appliance feature API 5 (0x0109)
+[22:07:19.299][D][feature_bit:354]: Feature bit ERD 0x0109 failed or not supported, skipping
+[22:07:19.301][D][feature_bit:283]: Queued read for appliance feature API 6 (0x010A)
+[22:07:20.165][D][feature_bit:354]: Feature bit ERD 0x010A failed or not supported, skipping
+[22:07:20.171][D][feature_bit:283]: Queued read for appliance feature API 7 (0x010B)
+[22:07:21.151][D][feature_bit:354]: Feature bit ERD 0x010B failed or not supported, skipping
+[22:07:21.157][D][feature_bit:283]: Queued read for appliance feature API 8 (0x010C)
+[22:07:22.317][D][feature_bit:354]: Feature bit ERD 0x010C failed or not supported, skipping
+[22:07:22.320][D][feature_bit:283]: Queued read for appliance feature API 9 (0x010D)
+[22:07:23.482][D][feature_bit:354]: Feature bit ERD 0x010D failed or not supported, skipping
+[22:07:23.518][I][feature_bit:412]: Common feature API (0x0092) value: 0x00000405
+[22:07:23.526][I][feature_bit:429]:   [SET] Common feature: Primary (mask 0x00000001, 4 ERDs)
+[22:07:23.526][I][feature_bit:429]:   [SET] Common feature: Boot Loader (mask 0x00000004, 1 ERDs)
+[22:07:23.580][I][feature_bit:429]:   [SET] Common feature: Reset Information (mask 0x00000400, 4 ERDs)
+[22:07:23.678][I][feature_bit:501]: Appliance feature ERD 0x0093: type 0x0014, version 1, features 0x0002FF7C
+[22:07:23.678][I][feature_bit:509]:   [SET] Zoneline / Stratos Base (mask 0x00000004, 12 ERDs)
+[22:07:23.678][I][feature_bit:509]:   [SET] Zoneline / Stratos Heat Pump (mask 0x00000008, 3 ERDs)
+[22:07:23.678][I][feature_bit:509]:   [SET] Zoneline / Stratos Inverter (mask 0x00000010, 3 ERDs)
+[22:07:23.680][I][feature_bit:509]:   [SET] Zoneline / Stratos EEV (mask 0x00000020, 7 ERDs)
+[22:07:23.680][I][feature_bit:509]:   [SET] Zoneline / Stratos MUA (mask 0x00000040, 7 ERDs)
+[22:07:23.680][I][feature_bit:509]:   [SET] Zoneline / Stratos Dehum (mask 0x00000100, 2 ERDs)
+[22:07:23.680][I][feature_bit:509]:   [SET] Zoneline / Stratos OD Sensors (mask 0x00000200, 2 ERDs)
+[22:07:23.682][I][feature_bit:509]:   [SET] Zoneline / Stratos ID Outlet Sensor (mask 0x00000400, 1 ERDs)
+[22:07:23.682][I][feature_bit:509]:   [SET] Zoneline / Stratos EEV Sensors (mask 0x00000800, 2 ERDs)
+[22:07:23.682][I][feature_bit:509]:   [SET] Zoneline / Stratos OD Coil Liquid Sensor (mask 0x00001000, 1 ERDs)
+[22:07:23.682][I][feature_bit:509]:   [SET] Zoneline / Stratos Humidity Sensor (mask 0x00002000, 2 ERDs)
+[22:07:23.726][I][feature_bit:509]:   [SET] Zoneline / Stratos Base Aux Modes (mask 0x00004000, 16 ERDs)
+[22:07:23.726][I][feature_bit:501]: Appliance feature ERD 0x0094: type 0x0202, version 1, features 0x0000386F
+[22:07:23.726][I][feature_bit:509]:   [SET] HVAC / Base Functionality (mask 0x00000001, 7 ERDs)
+[22:07:23.726][I][feature_bit:509]:   [SET] HVAC / Heat Mode Supported (mask 0x00000002, 6 ERDs)
+[22:07:23.726][I][feature_bit:509]:   [SET] HVAC / Cool Mode Supported (mask 0x00000004, 6 ERDs)
+[22:07:23.726][I][feature_bit:509]:   [SET] HVAC / Fan Mode Supported (mask 0x00000008, 3 ERDs)
+[22:07:23.726][I][feature_bit:509]:   [SET] HVAC / Heating Setpoint Maximum Limit Configurable (mask 0x00000020, 2 ERDs)
+[22:07:23.726][I][feature_bit:509]:   [SET] HVAC / Cooling Setpoint Minimum Limit Configurable (mask 0x00000040, 2 ERDs)
+[22:07:23.761][I][feature_bit:501]: Appliance feature ERD 0x0095: type 0x0302, version 1, features 0x00001000
+[22:07:23.762][I][feature_bit:509]:   [SET] Resource Management / Electrical Energy Usage v2 (mask 0x00001000, 4 ERDs)
+[22:07:24.004][I][feature_bit:542]: Feature bit parsing complete: 108 valid ERDs
+[22:07:24.004][I][geappliances_bridge:331]: Startup: Bridge init phase
+[22:07:24.020][I][geappliances_bridge:339]: Device ID ready and MQTT connected, initializing MQTT bridge
+[22:07:24.021][I][geappliances_bridge:132]: Initializing MQTT bridge
+[22:07:24.021][I][geappliances_bridge:177]: Using auto (starting with subscription) mode with polling interval: 10000 ms
+[22:07:24.021][I][geappliances_bridge:202]: Custom ERD polling (33 ERD(s)) will start after subscription settles
+[22:07:24.059][I][geappliances_bridge:208]: MQTT bridge initialized successfully
+[22:07:24.145][I][geappliances_bridge:435]: Subscription activity detected - subscription mode is working
+[22:07:24.232][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7471
+[22:07:24.232][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7472
+[22:07:26.306][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0001
+[22:07:26.598][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0002
+[22:07:26.748][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0004
+[22:07:26.898][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0007
+[22:07:27.045][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0008
+[22:07:27.489][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0030
+[22:07:27.489][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0031
+[22:07:27.489][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0032
+[22:07:27.639][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0035
+[22:07:28.081][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0036
+[22:07:28.081][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0037
+[22:07:28.081][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0038
+[22:07:28.228][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0039
+[22:07:28.674][D][geappliances_bridge.mqtt:064]: Registered ERD 0x003A
+[22:07:28.674][D][geappliances_bridge.mqtt:064]: Registered ERD 0x003B
+[22:07:28.674][D][geappliances_bridge.mqtt:064]: Registered ERD 0x003C
+[22:07:28.820][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0041
+[22:07:29.293][D][geappliances_bridge.mqtt:064]: Registered ERD 0x007F
+[22:07:29.293][D][geappliances_bridge.mqtt:064]: Registered ERD 0x008F
+[22:07:29.293][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0090
+[22:07:29.445][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0092
+[22:07:29.888][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0093
+[22:07:29.888][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0094
+[22:07:29.888][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0095
+[22:07:30.047][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0700
+[22:07:30.481][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0701
+[22:07:30.481][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0702
+[22:07:30.481][D][geappliances_bridge.mqtt:064]: Registered ERD 0x0703
+[22:07:30.628][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7010
+[22:07:31.071][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7011
+[22:07:31.071][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7017
+[22:07:31.071][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7018
+[22:07:31.222][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7100
+[22:07:31.679][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7101
+[22:07:31.679][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7102
+[22:07:31.679][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7103
+[22:07:31.833][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7104
+[22:07:32.272][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7106
+[22:07:32.272][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7107
+[22:07:32.273][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7108
+[22:07:32.420][D][geappliances_bridge.mqtt:064]: Registered ERD 0x710B
+[22:07:32.866][D][geappliances_bridge.mqtt:064]: Registered ERD 0x710C
+[22:07:32.867][D][geappliances_bridge.mqtt:064]: Registered ERD 0x710D
+[22:07:32.867][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7118
+[22:07:33.017][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7120
+[22:07:33.456][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7124
+[22:07:33.456][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7125
+[22:07:33.456][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7130
+[22:07:33.605][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7131
+[22:07:34.046][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7132
+[22:07:34.046][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7133
+[22:07:34.046][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7134
+[22:07:34.196][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7135
+[22:07:34.344][D][geappliances_bridge.mqtt:064]: Registered ERD 0x740F
+[22:07:34.667][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7450
+[22:07:34.667][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7451
+[22:07:34.805][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7452
+[22:07:35.249][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7453
+[22:07:35.249][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7454
+[22:07:35.249][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7455
+[22:07:35.397][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7456
+[22:07:35.839][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7457
+[22:07:35.839][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7458
+[22:07:35.839][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7459
+[22:07:35.991][D][geappliances_bridge.mqtt:064]: Registered ERD 0x745A
+[22:07:36.142][D][geappliances_bridge.mqtt:064]: Registered ERD 0x745B
+[22:07:36.289][D][geappliances_bridge.mqtt:064]: Registered ERD 0x745C
+[22:07:36.435][D][geappliances_bridge.mqtt:064]: Registered ERD 0x745D
+[22:07:37.026][D][geappliances_bridge.mqtt:064]: Registered ERD 0x745E
+[22:07:37.026][D][geappliances_bridge.mqtt:064]: Registered ERD 0x745F
+[22:07:37.026][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7460
+[22:07:37.026][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7461
+[22:07:37.175][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7462
+[22:07:37.329][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7463
+[22:07:37.624][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7464
+[22:07:37.624][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7465
+[22:07:37.774][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7466
+[22:07:38.213][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7467
+[22:07:38.213][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7468
+[22:07:38.213][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7469
+[22:07:38.360][D][geappliances_bridge.mqtt:064]: Registered ERD 0x746A
+[22:07:38.836][D][geappliances_bridge.mqtt:064]: Registered ERD 0x746B
+[22:07:38.836][D][geappliances_bridge.mqtt:064]: Registered ERD 0x746C
+[22:07:38.836][D][geappliances_bridge.mqtt:064]: Registered ERD 0x746D
+[22:07:39.003][D][geappliances_bridge.mqtt:064]: Registered ERD 0x746E
+[22:07:39.768][D][geappliances_bridge.mqtt:064]: Registered ERD 0x746F
+[22:07:39.768][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7470
+[22:07:39.768][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7473
+[22:07:39.916][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7474
+[22:07:40.358][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7475
+[22:07:40.359][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7476
+[22:07:40.359][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7477
+[22:07:40.508][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7478
+[22:07:40.950][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7479
+[22:07:40.950][D][geappliances_bridge.mqtt:064]: Registered ERD 0x750B
+[22:07:40.950][D][geappliances_bridge.mqtt:064]: Registered ERD 0x750C
+[22:07:41.102][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7511
+[22:07:41.249][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7512
+[22:07:41.545][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7513
+[22:07:41.545][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7514
+[22:07:41.693][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7515
+[22:07:42.136][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7516
+[22:07:42.136][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7517
+[22:07:42.136][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7600
+[22:07:42.287][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7601
+[22:07:42.728][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7602
+[22:07:42.728][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7603
+[22:07:42.728][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7610
+[22:07:42.879][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7612
+[22:07:43.321][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7700
+[22:07:43.321][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7701
+[22:07:43.321][D][geappliances_bridge.mqtt:064]: Registered ERD 0x7702
