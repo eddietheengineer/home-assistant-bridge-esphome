@@ -2,6 +2,8 @@
 #include <cstring>
 #include "esphome/core/log.h"
 
+static const char* const TAG __attribute__((unused)) = "erd_state_table";
+
 namespace esphome {
 namespace geappliances_bridge {
 

@@ -1,5 +1,8 @@
 #include "write_router.h"
 #include <cstring>
+#include "esphome/core/log.h"
+
+static const char* const TAG __attribute__((unused)) = "write_router";
 
 namespace esphome {
 namespace geappliances_bridge {
