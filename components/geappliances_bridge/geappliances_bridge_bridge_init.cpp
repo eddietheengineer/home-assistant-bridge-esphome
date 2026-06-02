@@ -247,16 +247,20 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     this->subscription_mode_active_ = true;
     this->subscription_activity_detected_ = false;
     this->subscription_start_time_ = millis();
-    // Configure and start the appliance FSM for AUTO mode (subscription first,
-    // polling handler ready as fallback).
+    // Configure and start the appliance FSM for AUTO mode: subscription only
+    // initially. Polling is enabled later as a fallback if subscription
+    // activity is not detected (via check_subscription_activity_()).
+    // Starting polling immediately would fill the GEA3 send queue with read
+    // requests, blocking subscription publication acknowledgments and causing
+    // the appliance to stop sending subscription updates entirely.
     if (this->appliance_fsm_ != nullptr) {
       ApplianceSideConfig cfg;
       cfg.enable_subscriptions = true;
-      cfg.enable_polling = true;
+      cfg.enable_polling = false;
       cfg.polling_interval_ms = this->polling_interval_ms_;
       cfg.only_publish_on_change = this->polling_only_publish_on_change_;
       cfg.subscription_erds = this->feature_bit_manager_.get_valid_erds_vec();
-      cfg.polling_erds = this->feature_bit_manager_.get_valid_erds_vec();
+      cfg.polling_erds = {};
       this->appliance_fsm_->set_config(cfg);
       this->appliance_fsm_->set_timer_group(&this->timer_group_);
       // Trigger the transition to RUNNING immediately so the SubscriptionHandler
