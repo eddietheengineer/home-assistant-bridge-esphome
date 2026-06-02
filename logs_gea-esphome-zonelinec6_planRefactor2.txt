@@ -1,0 +1,810 @@
+INFO ESPHome 2026.5.1
+INFO Reading configuration /config/esphome/gea-esphome-zonelinec6.yaml...
+INFO Updating https://github.com/eddietheengineer/home-assistant-bridge-esphome.git@planRefactor
+INFO Generating C++ source...
+INFO Fetching ERD definitions from GitHub: https://raw.githubusercontent.com/joshualongenecker/public-appliance-api-documentation/main/appliance_api_erd_definitions.json
+INFO Successfully fetched appliance types from GitHub (fallback)
+INFO Loaded 58 appliance type mappings
+INFO Compiling app... Build path: /data/build/gea-esphome-zonelinec6
+Processing gea-esphome-zonelinec6 (board: seeed_xiao_esp32c6; framework: espidf; platform: https://github.com/pioarduino/platform-espressif32/releases/download/55.03.38-1/platform-espressif32.zip)
+--------------------------------------------------------------------------------
+HARDWARE: ESP32C6 160MHz, 320KB RAM, 4MB Flash
+ - contrib-piohome @ 3.4.4 
+ - framework-espidf @ 3.50504.0 (5.5.4) 
+ - tool-cmake @ 4.0.3 
+ - tool-esp-rom-elfs @ 2024.10.11 
+ - tool-esptoolpy @ 5.2.0 
+ - tool-ninja @ 1.13.1 
+ - tool-riscv32-esp-elf-gdb @ 16.3.0+20250913 
+ - tool-scons @ 4.40801.0 (4.8.1) 
+ - toolchain-riscv32-esp @ 14.2.0+20260121
+Using Python 3.12.10 environment at: /root/.platformio/penv/.espidf-5.5.4
+Reading CMake configuration...
+Dependency Graph
+|-- noise-c @ 0.1.11
+|-- tiny @ 7.3.0+sha.3747b6f
+|-- tiny-gea-api @ 3.0.4+sha.4fa8fee
+|-- public-appliance-api-documentation @ 0.0.0+20260601221229.sha.a70e9c9
+RAM:   [==        ]  24.7% (used 80880 bytes from 327680 bytes)
+Flash: [=======   ]  65.9% (used 1209676 bytes from 1835008 bytes)
+========================= [SUCCESS] Took 8.93 seconds =========================
+INFO Build Info: config_hash=0xc848dbc0 build_time_str=2026-06-01 22:12:21 -0400
+INFO Successfully compiled program.
+INFO Starting looking for IP in topic esphome/discover/gea-esphome-zonelinec6
+INFO Connected to MQTT broker!
+INFO Send discover via MQTT broker topic: esphome/ping/gea-esphome-zonelinec6
+INFO Found IP: ['10.10.10.219']
+INFO Connecting to 10.10.10.219 port 3232...
+INFO Connected to 10.10.10.219
+INFO Uploading /data/build/gea-esphome-zonelinec6/.pioenvs/gea-esphome-zonelinec6/firmware.bin (1210048 bytes)
+Uploading: [============================================================] 100% Done...
+
+INFO Upload took 3.74 seconds, waiting for result...
+INFO OTA successful
+INFO Successfully uploaded program.
+INFO Starting log output from 10.10.10.219 using esphome API
+INFO Successfully resolved gea-esphome-zonelinec6 @ 10.10.10.219 in 0.000s
+INFO Successfully connected to gea-esphome-zonelinec6 @ 10.10.10.219 in 5.133s
+INFO Successful handshake with gea-esphome-zonelinec6 @ 10.10.10.219 in 0.077s
+[22:19:30.823][I][app:151]: ESPHome version 2026.5.1 compiled on 2026-06-01 22:12:21 -0400
+[22:19:30.823][I][app:158]: ESP32 Chip: ESP32-C6 rev0.2, 1 core(s)
+[22:19:30.823][C][logger:219]: Logger:
+[22:19:30.823][C][logger:219]:   Max Level: DEBUG
+[22:19:30.823][C][logger:219]:   Initial Level: DEBUG
+[22:19:30.823][C][logger:226]:   Log Baud Rate: 0
+[22:19:30.823][C][logger:226]:   Hardware UART: USB_SERIAL_JTAG
+[22:19:30.825][C][logger:235]:   Task Log Buffer Size: 768 bytes
+[22:19:30.869][W][component:422]: mqtt cleared Warning flag
+[22:19:30.869][I][mqtt:348]: Connected
+[22:19:30.940][W][component:522]: mqtt took a long time for an operation (104 ms), max is 30 ms
+[22:19:30.962][D][api.connection:2458]: Home Assistant 2026.5.4 (192.168.1.183): connected
+[22:19:30.962][C][uart.idf:254]: UART Bus 0:
+[22:19:30.962][C][uart.idf:152]:   TX Pin: GPIO16
+[22:19:30.962][C][uart.idf:152]:   RX Pin: GPIO17
+[22:19:30.964][C][uart.idf:259]:   RX Buffer Size: 256
+[22:19:30.964][C][uart.idf:259]:   RX Full Threshold: 120
+[22:19:30.964][C][uart.idf:259]:   RX Timeout: 2
+[22:19:30.964][C][uart.idf:268]:   Baud Rate: 230400 baud
+[22:19:30.964][C][uart.idf:268]:   Data Bits: 8
+[22:19:30.964][C][uart.idf:268]:   Parity: NONE
+[22:19:30.964][C][uart.idf:268]:   Stop bits: 1
+[22:19:30.964][C][uart.idf:268]:   Wake on data RX: ENABLED
+[22:19:30.964][I][geappliances_bridge:195]: MQTT connected
+[22:19:30.965][I][geappliances_bridge:159]: Startup: Autodiscovery phase
+[22:19:31.580][I][autodiscovery:076]: Starting autodiscovery
+[22:19:31.580][I][autodiscovery:218]: Sent GEA3 broadcast (ERD 0x0008) to address 0xFF
+[22:19:31.590][W][component:522]: mqtt took a long time for an operation (618 ms), max is 30 ms
+[22:19:31.590][C][uart.idf:254]: UART Bus 1:
+[22:19:31.594][C][uart.idf:152]:   TX Pin: GPIO20
+[22:19:31.594][C][uart.idf:152]:   RX Pin: GPIO18
+[22:19:31.594][C][uart.idf:259]:   RX Buffer Size: 256
+[22:19:31.594][C][uart.idf:259]:   RX Full Threshold: 1
+[22:19:31.594][C][uart.idf:259]:   RX Timeout: 1
+[22:19:31.594][C][uart.idf:268]:   Baud Rate: 19200 baud
+[22:19:31.594][C][uart.idf:268]:   Data Bits: 8
+[22:19:31.594][C][uart.idf:268]:   Parity: NONE
+[22:19:31.594][C][uart.idf:268]:   Stop bits: 1
+[22:19:31.594][C][uart.idf:268]:   Wake on data RX: ENABLED
+[22:19:31.616][C][uptime.sensor:017]: Uptime Sensor 'Uptime Sensor'
+[22:19:31.616][C][uptime.sensor:017]:   State Class: 'total_increasing'
+[22:19:31.616][C][uptime.sensor:017]:   Unit of Measurement: 's'
+[22:19:31.616][C][uptime.sensor:017]:   Accuracy Decimals: 0
+[22:19:31.616][C][uptime.sensor:232]:   Device Class: 'duration'
+[22:19:31.616][C][uptime.sensor:223]:   Icon: 'mdi:timer-outline'
+[22:19:31.616][C][uptime.sensor:019]:   Type: Seconds
+[22:19:31.618][C][geappliances_bridge:446]: GE Appliances Bridge:
+[22:19:31.618][C][geappliances_bridge:456]:   Client Address: 0xE5
+[22:19:31.618][C][geappliances_bridge:457]:   Host Address: 0x00
+[22:19:31.618][C][geappliances_bridge:459]:   GEA3 UART: configured (baud 230400)
+[22:19:31.622][C][geappliances_bridge:493]:   Mode: Auto (Polling - fallback)
+[22:19:31.622][C][geappliances_bridge:496]:   Polling Interval: 10000 ms
+[22:19:31.622][C][geappliances_bridge:497]:   Only Publish On Change: no
+[22:19:31.622][C][geappliances_bridge:499]:   Appliance API Parsing: disabled
+[22:19:31.625][C][geappliances_bridge:504]:   Custom ERDs: 33 configured
+[22:19:31.625][C][geappliances_bridge:531]:   Startup State: Autodiscovery
+[22:19:31.631][C][wifi:1526]: WiFi:
+[22:19:31.631][C][wifi:1526]:   Local MAC: 58:E6:C5:19:BC:A0
+[22:19:31.631][C][wifi:1526]:   Connected: YES
+[22:19:31.631][C][wifi:1237]:   IP Address: 10.10.10.219
+[22:19:31.636][C][wifi:1248]:   SSID: 'NETGEAR112'[redacted]
+[22:19:31.636][C][wifi:1248]:   BSSID: 76:AC:B9:1F:26:FE[redacted]
+[22:19:31.636][C][wifi:1248]:   Hostname: 'gea-esphome-zonelinec6'
+[22:19:31.636][C][wifi:1248]:   Signal strength: -68 dB ▂▄▆█
+[22:19:31.636][C][wifi:1248]:   Channel: 6
+[22:19:31.636][C][wifi:1248]:   Subnet: 255.255.255.0
+[22:19:31.636][C][wifi:1248]:   Gateway: 10.10.10.1
+[22:19:31.636][C][wifi:1248]:   DNS1: 1.1.1.1
+[22:19:31.636][C][wifi:1248]:   DNS2: 0.0.0.0
+[22:19:31.669][C][esphome.ota:097]: Over-The-Air updates:
+[22:19:31.669][C][esphome.ota:097]:   Address: gea-esphome-zonelinec6.local:3232
+[22:19:31.669][C][esphome.ota:097]:   Version: 2
+[22:19:31.669][C][safe_mode:058]: Safe Mode:
+[22:19:31.669][C][safe_mode:058]:   Successful after: 60s
+[22:19:31.669][C][safe_mode:058]:   Invoke after: 10 attempts
+[22:19:31.669][C][safe_mode:058]:   Duration: 300s
+[22:19:31.669][C][safe_mode:079]:   Bootloader rollback: supported
+[22:19:31.674][C][api:238]: Server:
+[22:19:31.674][C][api:238]:   Address: gea-esphome-zonelinec6.local:6053
+[22:19:31.674][C][api:238]:   Listen backlog: 4
+[22:19:31.674][C][api:238]:   Max connections: 5
+[22:19:31.674][C][api:245]:   Noise encryption: YES
+[22:19:31.682][C][mqtt:191]: MQTT:
+[22:19:31.682][C][mqtt:191]:   Server Address: 192.168.1.183:1883 (192.168.1.183)
+[22:19:31.682][C][mqtt:191]:   Username: 'geademo'[redacted]
+[22:19:31.682][C][mqtt:191]:   Client ID: 'gea-esphome-zonelinec6-58e6c519bca0'[redacted]
+[22:19:31.682][C][mqtt:191]:   Clean Session: YES
+[22:19:31.682][C][mqtt:202]:   Discovery IP enabled
+[22:19:31.686][C][mqtt:205]:   Discovery prefix: 'homeassistant'
+[22:19:31.686][C][mqtt:205]:   Discovery retain: YES
+[22:19:31.686][C][mqtt:210]:   Topic Prefix: 'gea-esphome-zonelinec6'
+[22:19:31.686][C][mqtt:212]:   Log Topic: 'gea-esphome-zonelinec6/debug'
+[22:19:31.687][C][mqtt:215]:   Availability: 'gea-esphome-zonelinec6/status'
+[22:19:31.732][C][mdns:230]: mDNS:
+[22:19:31.732][C][mdns:230]:   Hostname: gea-esphome-zonelinec6
+[22:19:31.732][C][mqtt.sensor:027]: MQTT Sensor 'Uptime Sensor':
+[22:19:31.732][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/uptime_sensor/state'
+[22:19:31.737][C][mqtt.text_sensor:024]: MQTT Text Sensor 'Device Info':
+[22:19:31.738][C][mqtt.text_sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/device_info/state'
+[22:19:31.756][C][mqtt.text_sensor:024]: MQTT Text Sensor 'Reset Reason':
+[22:19:31.760][C][mqtt.text_sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/reset_reason/state'
+[22:19:31.777][C][mqtt.sensor:027]: MQTT Sensor 'Heap Free':
+[22:19:31.779][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/heap_free/state'
+[22:19:31.797][C][mqtt.sensor:027]: MQTT Sensor 'Heap Max Block':
+[22:19:31.799][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/heap_max_block/state'
+[22:19:31.813][C][mqtt.sensor:027]: MQTT Sensor 'Heap Fragmentation':
+[22:19:31.816][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/heap_fragmentation/state'
+[22:19:31.832][C][mqtt.sensor:027]: MQTT Sensor 'Heap Min Free':
+[22:19:31.835][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/heap_min_free/state'
+[22:19:31.851][C][mqtt.sensor:027]: MQTT Sensor 'Loop Time':
+[22:19:31.855][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/loop_time/state'
+[22:19:31.857][C][mqtt.sensor:027]: MQTT Sensor 'CPU Frequency':
+[22:19:31.857][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/cpu_frequency/state'
+[22:19:31.857][D][autodiscovery:165]: GEA3 board discovered: address=0xC0 appliance_type=35
+[22:19:31.862][C][debug:017]: Debug component:
+[22:19:31.862][C][debug:016]:   Device info 'Device Info'
+[22:19:31.862][C][debug:223]:     Icon: 'mdi:chip'
+[22:19:31.862][C][debug:017]:   Free space on heap 'Heap Free'
+[22:19:31.862][C][debug:017]:     State Class: 'measurement'
+[22:19:31.862][C][debug:017]:     Unit of Measurement: 'B'
+[22:19:31.862][C][debug:017]:     Accuracy Decimals: 0
+[22:19:31.866][C][debug:223]:     Icon: 'mdi:counter'
+[22:19:31.866][C][debug:017]:   Largest free heap block 'Heap Max Block'
+[22:19:31.866][C][debug:017]:     State Class: 'measurement'
+[22:19:31.866][C][debug:017]:     Unit of Measurement: 'B'
+[22:19:31.866][C][debug:017]:     Accuracy Decimals: 0
+[22:19:31.866][C][debug:223]:     Icon: 'mdi:counter'
+[22:19:31.866][C][debug:017]:   CPU frequency 'CPU Frequency'
+[22:19:31.866][C][debug:017]:     State Class: 'measurement'
+[22:19:31.866][C][debug:017]:     Unit of Measurement: 'Hz'
+[22:19:31.866][C][debug:017]:     Accuracy Decimals: 0
+[22:19:31.867][C][debug:232]:     Device Class: 'frequency'
+[22:19:31.867][C][debug:223]:     Icon: 'mdi:speedometer'
+[22:19:31.867][D][debug:031]: ESPHome version 2026.5.1
+[22:19:31.867][D][debug:035]: Free Heap Size: 250384 bytes
+[22:19:31.873][D][debug:255]: ESP32 debug info:
+[22:19:31.873][D][debug:255]:   Chip: ESP32-C6
+[22:19:31.873][D][debug:255]:   Cores: 1
+[22:19:31.873][D][debug:255]:   Revision: 2
+[22:19:31.873][D][debug:255]:   CPU Frequency: 160 MHz
+[22:19:31.873][D][debug:255]:   ESP-IDF Version: 5.5.4
+[22:19:31.873][D][debug:255]:   EFuse MAC: 58:E6:C5:19:BC:A0
+[22:19:31.873][D][debug:255]:   Reset Reason: Reboot request from esphome.ota
+[22:19:31.873][D][debug:255]:   Wakeup Cause: undefined
+[22:19:31.875][D][debug:275]:   Framework: ESP-IDF
+[22:19:31.889][C][debug:158]: Partition table:
+[22:19:31.889][C][debug:158]:   Name         Type Subtype  Address    Size      
+[22:19:31.889][C][debug:165]:   otadata      1    0        0x00009000 0x00002000
+[22:19:31.889][C][debug:165]:   phy_init     1    1        0x0000B000 0x00001000
+[22:19:31.889][C][debug:165]:   app0         0    16       0x00010000 0x001C0000
+[22:19:31.889][C][debug:165]:   app1         0    17       0x001D0000 0x001C0000
+[22:19:31.889][C][debug:165]:   nvs          1    2        0x00390000 0x00070000
+[22:19:31.966][S][text_sensor]: 'Device Info' >> '2026.5.1|Chip: ESP32-C6 Features:BLE, 2.4GHz WiFi, Other:0x40 Cores:1 Revision:2|CPU Frequency: 160 MHz|Framework: ESP-IDF|ESP-IDF: 5.5.4|EFuse MAC: 58:E6:C5:19:BC:A0|Reset: Reboot request from esphome.ota|Wakeup: undefined'
+[22:19:31.966][S][text_sensor]: 'Reset Reason' >> 'Reboot request from esphome.ota'
+[22:19:35.992][I][autodiscovery:101]: GEA3 board discovered at 0xC0, autodiscovery complete
+[22:19:35.994][I][device_identity:036]: No device_id configured, will auto-generate from identity ERDs
+[22:19:36.285][I][device_identity:048]: Read appliance type: 35
+[22:19:36.773][I][device_identity:054]: Read model number: AVVL24DMXWAK1
+[22:19:37.263][I][device_identity:060]: Read serial number: VZ105631G
+[22:19:37.266][I][device_identity:064]: Generated device ID: ZonelineVertical_AVVL24DMXWAK1_VZ105631G
+[22:19:37.266][I][geappliances_bridge:093]: Initializing MQTT client adapter with device ID: ZonelineVertical_AVVL24DMXWAK1_VZ105631G
+[22:19:37.266][I][geappliances_bridge:120]: MQTT client adapter initialized; feature bit ERDs will be published as they are read
+[22:19:37.267][D][mqtt_fsm:033]: Constructor: MQTT already connected, starting in SUBSCRIBING
+[22:19:37.267][I][geappliances_bridge:075]: Reading device info ERDs for MQTT publish, then appliance API feature bits...
+[22:19:37.267][D][feature_bit:283]: Queued read for appliance type (0x0008)
+[22:19:37.267][I][geappliances_bridge:303]: Startup: Feature bits phase
+[22:19:37.280][D][mqtt_fsm:044]: SUBSCRIBING: subscribing to write topic
+[22:19:37.280][I][geappliances_bridge.mqtt:153]: Subscribing to wildcard write topic: geappliances/ZonelineVertical_AVVL24DMXWAK1_VZ105631G/erd/+/write
+[22:19:37.280][D][mqtt_fsm:047]: FLUSHING: flagged ERDs: 0
+[22:19:37.285][D][debug:060]: Free Heap Size: 114856 bytes
+[22:19:37.287][W][component:389]: debug set Warning flag: unspecified
+[22:19:37.289][D][mqtt_fsm:054]: RUNNING: all flagged ERDs flushed
+[22:19:37.763][D][feature_bit:151]: Re-read appliance type (0x0008): 1 bytes
+[22:19:37.763][D][feature_bit:283]: Queued read for model number (0x0001)
+[22:19:38.264][D][feature_bit:155]: Re-read model number (0x0001): 8 bytes
+[22:19:38.269][D][feature_bit:283]: Queued read for serial number (0x0002)
+[22:19:38.291][W][component:422]: debug cleared Warning flag
+[22:19:38.753][D][feature_bit:159]: Re-read serial number (0x0002): 8 bytes
+[22:19:38.755][D][feature_bit:283]: Queued read for common feature API (0x0092)
+[22:19:39.240][D][feature_bit:165]: Read common feature API (0x0092): 8 bytes
+[22:19:39.243][D][feature_bit:283]: Queued read for appliance feature API 0 (0x0093)
+[22:19:39.735][D][feature_bit:171]: Read appliance feature API 0 (0x0093): 8 bytes
+[22:19:39.737][D][feature_bit:283]: Queued read for appliance feature API 1 (0x0094)
+[22:19:40.218][D][feature_bit:177]: Read appliance feature API 1 (0x0094): 8 bytes
+[22:19:40.221][D][feature_bit:283]: Queued read for appliance feature API 2 (0x0095)
+[22:19:40.705][D][feature_bit:183]: Read appliance feature API 2 (0x0095): 8 bytes
+[22:19:40.708][D][feature_bit:283]: Queued read for appliance feature API 3 (0x0096)
+[22:19:41.193][D][feature_bit:354]: Feature bit ERD 0x0096 failed or not supported, skipping
+[22:19:41.196][D][feature_bit:283]: Queued read for appliance feature API 4 (0x0097)
+[22:19:41.682][D][feature_bit:354]: Feature bit ERD 0x0097 failed or not supported, skipping
+[22:19:41.699][D][feature_bit:283]: Queued read for appliance feature API 5 (0x0109)
+[22:19:42.187][D][feature_bit:354]: Feature bit ERD 0x0109 failed or not supported, skipping
+[22:19:42.190][D][feature_bit:283]: Queued read for appliance feature API 6 (0x010A)
+[22:19:42.692][D][feature_bit:354]: Feature bit ERD 0x010A failed or not supported, skipping
+[22:19:42.697][D][feature_bit:283]: Queued read for appliance feature API 7 (0x010B)
+[22:19:43.191][D][feature_bit:354]: Feature bit ERD 0x010B failed or not supported, skipping
+[22:19:43.241][D][feature_bit:283]: Queued read for appliance feature API 8 (0x010C)
+[22:19:43.674][D][feature_bit:354]: Feature bit ERD 0x010C failed or not supported, skipping
+[22:19:44.356][D][feature_bit:283]: Queued read for appliance feature API 9 (0x010D)
+[22:19:44.356][D][feature_bit:354]: Feature bit ERD 0x010D failed or not supported, skipping
+[22:19:44.356][I][feature_bit:412]: Common feature API (0x0092) value: 0x00000405
+[22:19:44.356][I][feature_bit:429]:   [SET] Common feature: Primary (mask 0x00000001, 4 ERDs)
+[22:19:44.364][I][feature_bit:429]:   [SET] Common feature: Boot Loader (mask 0x00000004, 1 ERDs)
+[22:19:44.421][I][feature_bit:429]:   [SET] Common feature: Reset Information (mask 0x00000400, 4 ERDs)
+[22:19:44.518][I][feature_bit:501]: Appliance feature ERD 0x0093: type 0x0014, version 1, features 0x0002FF7C
+[22:19:44.518][I][feature_bit:509]:   [SET] Zoneline / Stratos Base (mask 0x00000004, 12 ERDs)
+[22:19:44.520][I][feature_bit:509]:   [SET] Zoneline / Stratos Heat Pump (mask 0x00000008, 3 ERDs)
+[22:19:44.520][I][feature_bit:509]:   [SET] Zoneline / Stratos Inverter (mask 0x00000010, 3 ERDs)
+[22:19:44.520][I][feature_bit:509]:   [SET] Zoneline / Stratos EEV (mask 0x00000020, 7 ERDs)
+[22:19:44.520][I][feature_bit:509]:   [SET] Zoneline / Stratos MUA (mask 0x00000040, 7 ERDs)
+[22:19:44.522][I][feature_bit:509]:   [SET] Zoneline / Stratos Dehum (mask 0x00000100, 2 ERDs)
+[22:19:44.522][I][feature_bit:509]:   [SET] Zoneline / Stratos OD Sensors (mask 0x00000200, 2 ERDs)
+[22:19:44.522][I][feature_bit:509]:   [SET] Zoneline / Stratos ID Outlet Sensor (mask 0x00000400, 1 ERDs)
+[22:19:44.522][I][feature_bit:509]:   [SET] Zoneline / Stratos EEV Sensors (mask 0x00000800, 2 ERDs)
+[22:19:44.558][I][feature_bit:509]:   [SET] Zoneline / Stratos OD Coil Liquid Sensor (mask 0x00001000, 1 ERDs)
+[22:19:44.558][I][feature_bit:509]:   [SET] Zoneline / Stratos Humidity Sensor (mask 0x00002000, 2 ERDs)
+[22:19:44.558][I][feature_bit:509]:   [SET] Zoneline / Stratos Base Aux Modes (mask 0x00004000, 16 ERDs)
+[22:19:44.558][I][feature_bit:501]: Appliance feature ERD 0x0094: type 0x0202, version 1, features 0x0000386F
+[22:19:44.562][I][feature_bit:509]:   [SET] HVAC / Base Functionality (mask 0x00000001, 7 ERDs)
+[22:19:44.562][I][feature_bit:509]:   [SET] HVAC / Heat Mode Supported (mask 0x00000002, 6 ERDs)
+[22:19:44.562][I][feature_bit:509]:   [SET] HVAC / Cool Mode Supported (mask 0x00000004, 6 ERDs)
+[22:19:44.562][I][feature_bit:509]:   [SET] HVAC / Fan Mode Supported (mask 0x00000008, 3 ERDs)
+[22:19:44.583][I][feature_bit:509]:   [SET] HVAC / Heating Setpoint Maximum Limit Configurable (mask 0x00000020, 2 ERDs)
+[22:19:44.583][I][feature_bit:509]:   [SET] HVAC / Cooling Setpoint Minimum Limit Configurable (mask 0x00000040, 2 ERDs)
+[22:19:44.597][I][feature_bit:501]: Appliance feature ERD 0x0095: type 0x0302, version 1, features 0x00001000
+[22:19:44.600][I][feature_bit:509]:   [SET] Resource Management / Electrical Energy Usage v2 (mask 0x00001000, 4 ERDs)
+[22:19:44.863][I][feature_bit:542]: Feature bit parsing complete: 108 valid ERDs
+[22:19:44.878][I][geappliances_bridge:358]: Startup: Bridge init phase
+[22:19:44.878][I][geappliances_bridge:366]: Device ID ready and MQTT connected, initializing MQTT bridge
+[22:19:44.878][I][geappliances_bridge:182]: Initializing MQTT bridge
+[22:19:45.952][I][geappliances_bridge:262]: Using auto (starting with subscription) mode with polling interval: 10000 ms
+[22:19:45.952][I][geappliances_bridge:391]: Subscription activity detected - subscription mode is working
+[22:19:55.291][W][component:522]: geappliances_bridge took a long time for an operation (392 ms), max is 30 ms
+[22:19:55.984][D][erd_state_table:059]: ErdStateTable new 0x0001: size=32 flag=1
+[22:19:55.989][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:19:56.488][D][erd_state_table:059]: ErdStateTable new 0x0002: size=32 flag=1
+[22:19:56.502][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:19:56.974][D][erd_state_table:059]: ErdStateTable new 0x0007: size=1 flag=1
+[22:19:56.975][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:19:57.634][D][erd_state_table:059]: ErdStateTable new 0x0008: size=1 flag=1
+[22:19:57.644][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:19:58.473][D][erd_state_table:059]: ErdStateTable new 0x0030: size=1 flag=1
+[22:19:58.477][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:19:59.462][D][erd_state_table:059]: ErdStateTable new 0x0035: size=4 flag=1
+[22:19:59.468][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:20:00.628][D][erd_state_table:059]: ErdStateTable new 0x0092: size=8 flag=1
+[22:20:00.631][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:20:01.792][D][erd_state_table:059]: ErdStateTable new 0x0093: size=8 flag=1
+[22:20:02.950][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:20:03.118][D][erd_state_table:059]: ErdStateTable new 0x0094: size=8 flag=1
+[22:20:04.452][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:20:04.452][D][erd_state_table:059]: ErdStateTable new 0x0095: size=8 flag=1
+[22:20:04.452][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:20:05.774][W][component:522]: geappliances_bridge took a long time for an operation (866 ms), max is 30 ms
+[22:20:21.089][D][erd_state_table:059]: ErdStateTable new 0x0700: size=4 flag=1
+[22:20:21.092][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:20:23.431][D][erd_state_table:059]: ErdStateTable new 0x0701: size=2 flag=1
+[22:20:23.436][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:20:25.785][I][safe_mode:142]: Boot seems successful; resetting boot loop counter
+[22:20:26.586][D][erd_state_table:059]: ErdStateTable new 0x0702: size=4 flag=1
+[22:20:26.590][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:20:27.403][D][preferences:148]: Writing 1 items: 0 cached, 1 written, 0 failed
+[22:20:29.289][D][erd_state_table:059]: ErdStateTable new 0x0703: size=4 flag=1
+[22:20:29.292][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:20:29.391][S][sensor]: 'Heap Free' >> 110228 B
+[22:20:29.391][S][sensor]: 'Loop Time' >> 869 ms
+[22:20:29.391][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:20:29.391][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:20:29.391][S][sensor]: 'Heap Min Free' >> 81648 B
+[22:20:29.391][S][sensor]: 'Heap Fragmentation' >> 17.5 %
+[22:20:30.421][S][sensor]: 'Uptime Sensor' >> 65 s
+[22:20:32.028][D][erd_state_table:059]: ErdStateTable new 0x7010: size=2 flag=1
+[22:20:32.080][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:20:34.922][D][erd_state_table:059]: ErdStateTable new 0x7100: size=2 flag=1
+[22:20:34.922][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:21:29.385][S][sensor]: 'Heap Free' >> 109680 B
+[22:21:29.385][S][sensor]: 'Loop Time' >> 808 ms
+[22:21:29.385][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:21:29.385][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:21:29.385][S][sensor]: 'Heap Min Free' >> 81648 B
+[22:21:29.385][S][sensor]: 'Heap Fragmentation' >> 17.4 %
+[22:21:30.419][S][sensor]: 'Uptime Sensor' >> 125 s
+[22:21:52.283][D][api:223]: Accept 192.168.1.183
+[22:21:52.324][D][api.connection:2458]: aioesphomeapi (192.168.1.183): connected
+[22:21:52.372][D][api.connection:2458]: aioesphomeapi (192.168.1.183): disconnected
+[22:22:29.382][S][sensor]: 'Heap Free' >> 109380 B
+[22:22:29.382][S][sensor]: 'Loop Time' >> 790 ms
+[22:22:29.383][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:22:29.383][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:22:29.383][S][sensor]: 'Heap Min Free' >> 81648 B
+[22:22:29.383][S][sensor]: 'Heap Fragmentation' >> 16.9 %
+[22:22:30.424][S][sensor]: 'Uptime Sensor' >> 185 s
+[22:23:29.394][S][sensor]: 'Heap Free' >> 109092 B
+[22:23:29.394][S][sensor]: 'Loop Time' >> 770 ms
+[22:23:29.394][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:23:29.395][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:23:29.395][S][sensor]: 'Heap Min Free' >> 81648 B
+[22:23:29.395][S][sensor]: 'Heap Fragmentation' >> 16.9 %
+[22:23:30.424][S][sensor]: 'Uptime Sensor' >> 245 s
+[22:23:53.726][D][api:223]: Accept 192.168.1.183
+[22:23:53.763][D][api.connection:2458]: aioesphomeapi (192.168.1.183): connected
+[22:23:53.785][D][api.connection:2458]: aioesphomeapi (192.168.1.183): disconnected
+[22:24:29.390][S][sensor]: 'Heap Free' >> 109020 B
+[22:24:29.390][S][sensor]: 'Loop Time' >> 761 ms
+[22:24:29.390][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:24:29.390][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:24:29.390][S][sensor]: 'Heap Min Free' >> 81648 B
+[22:24:29.390][S][sensor]: 'Heap Fragmentation' >> 16.9 %
+[22:24:30.212][D][wifi:2439]: Roam scan (-68 dBm, attempt 1/3)
+[22:24:30.543][S][sensor]: 'Uptime Sensor' >> 305 s
+[22:25:06.881][D][erd_state_table:059]: ErdStateTable new 0xD02C: size=1 flag=1
+[22:25:07.957][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:08.416][D][erd_state_table:059]: ErdStateTable new 0xD030: size=4 flag=1
+[22:25:08.423][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:10.055][D][erd_state_table:044]: ErdStateTable update 0x0001: size=32 flag=0
+[22:25:10.059][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:10.732][D][erd_state_table:044]: ErdStateTable update 0x0002: size=32 flag=0
+[22:25:10.737][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:11.390][D][erd_state_table:044]: ErdStateTable update 0x0007: size=1 flag=0
+[22:25:11.395][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:12.243][D][erd_state_table:044]: ErdStateTable update 0x0008: size=1 flag=0
+[22:25:12.247][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:13.282][D][erd_state_table:044]: ErdStateTable update 0x0030: size=1 flag=0
+[22:25:13.284][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:14.441][D][erd_state_table:044]: ErdStateTable update 0x0035: size=4 flag=0
+[22:25:14.444][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:16.591][D][erd_state_table:044]: ErdStateTable update 0x0092: size=8 flag=0
+[22:25:16.595][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:18.273][D][erd_state_table:044]: ErdStateTable update 0x0093: size=8 flag=0
+[22:25:18.281][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:20.212][D][erd_state_table:044]: ErdStateTable update 0x0094: size=8 flag=0
+[22:25:20.219][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:22.235][D][erd_state_table:044]: ErdStateTable update 0x0095: size=8 flag=0
+[22:25:22.236][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:29.382][S][sensor]: 'Heap Free' >> 108984 B
+[22:25:29.382][S][sensor]: 'Loop Time' >> 825 ms
+[22:25:29.382][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:25:29.382][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:25:29.382][S][sensor]: 'Heap Min Free' >> 81648 B
+[22:25:29.382][S][sensor]: 'Heap Fragmentation' >> 16.6 %
+[22:25:30.418][S][sensor]: 'Uptime Sensor' >> 365 s
+[22:25:40.452][D][erd_state_table:044]: ErdStateTable update 0x0700: size=4 flag=0
+[22:25:40.454][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:42.828][D][erd_state_table:044]: ErdStateTable update 0x0701: size=2 flag=0
+[22:25:42.832][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:45.207][D][erd_state_table:044]: ErdStateTable update 0x0702: size=4 flag=1
+[22:25:45.210][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:48.398][D][erd_state_table:044]: ErdStateTable update 0x0703: size=4 flag=0
+[22:25:48.398][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:50.940][D][erd_state_table:044]: ErdStateTable update 0x7010: size=2 flag=0
+[22:25:51.189][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:53.643][D][erd_state_table:044]: ErdStateTable update 0x7100: size=2 flag=1
+[22:25:53.644][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:25:55.082][D][api:223]: Accept 192.168.1.183
+[22:25:55.124][D][api.connection:2458]: aioesphomeapi (192.168.1.183): connected
+[22:25:55.162][D][api.connection:2458]: aioesphomeapi (192.168.1.183): disconnected
+[22:25:57.201][D][erd_state_table:059]: ErdStateTable new 0x7101: size=2 flag=1
+[22:25:57.208][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:26:29.383][S][sensor]: 'Heap Free' >> 108948 B
+[22:26:29.383][S][sensor]: 'Loop Time' >> 826 ms
+[22:26:29.383][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:26:29.383][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:26:29.383][S][sensor]: 'Heap Min Free' >> 81648 B
+[22:26:29.383][S][sensor]: 'Heap Fragmentation' >> 16.6 %
+[22:26:30.414][S][sensor]: 'Uptime Sensor' >> 425 s
+[22:27:29.388][S][sensor]: 'Heap Free' >> 108984 B
+[22:27:29.388][S][sensor]: 'Loop Time' >> 810 ms
+[22:27:29.388][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:27:29.388][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:27:29.388][S][sensor]: 'Heap Min Free' >> 81648 B
+[22:27:29.388][S][sensor]: 'Heap Fragmentation' >> 16.6 %
+[22:27:30.412][S][sensor]: 'Uptime Sensor' >> 485 s
+[22:27:55.896][D][api:223]: Accept 192.168.1.183
+[22:27:55.934][D][api.connection:2458]: aioesphomeapi (192.168.1.183): connected
+[22:27:56.760][D][api.connection:2458]: aioesphomeapi (192.168.1.183): disconnected
+[22:28:29.385][S][sensor]: 'Heap Free' >> 108984 B
+[22:28:29.385][S][sensor]: 'Loop Time' >> 782 ms
+[22:28:29.385][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:28:29.385][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:28:29.385][S][sensor]: 'Heap Min Free' >> 81648 B
+[22:28:29.385][S][sensor]: 'Heap Fragmentation' >> 16.6 %
+[22:28:30.415][S][sensor]: 'Uptime Sensor' >> 545 s
+[22:29:29.384][S][sensor]: 'Heap Free' >> 108984 B
+[22:29:29.384][S][sensor]: 'Loop Time' >> 795 ms
+[22:29:29.384][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:29:29.384][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:29:29.384][S][sensor]: 'Heap Min Free' >> 81648 B
+[22:29:29.384][S][sensor]: 'Heap Fragmentation' >> 16.6 %
+[22:29:30.212][D][wifi:2439]: Roam scan (-69 dBm, attempt 2/3)
+[22:29:30.544][S][sensor]: 'Uptime Sensor' >> 605 s
+[22:30:00.656][D][api:223]: Accept 192.168.1.183
+[22:30:00.711][D][api.connection:2458]: aioesphomeapi (192.168.1.183): connected
+[22:30:00.747][D][api.connection:2458]: aioesphomeapi (192.168.1.183): disconnected
+[22:30:22.488][D][erd_state_table:059]: ErdStateTable new 0xD015: size=1 flag=1
+[22:30:22.494][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:30:25.450][D][erd_state_table:044]: ErdStateTable update 0x0001: size=32 flag=0
+[22:30:25.455][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:30:27.276][D][erd_state_table:044]: ErdStateTable update 0x0002: size=32 flag=0
+[22:30:27.280][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:30:28.835][D][erd_state_table:044]: ErdStateTable update 0x0007: size=1 flag=0
+[22:30:28.843][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:30:29.386][S][sensor]: 'Heap Free' >> 108984 B
+[22:30:29.386][S][sensor]: 'Loop Time' >> 775 ms
+[22:30:29.386][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:30:29.386][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:30:29.386][S][sensor]: 'Heap Min Free' >> 81648 B
+[22:30:29.386][S][sensor]: 'Heap Fragmentation' >> 16.6 %
+[22:30:30.343][D][erd_state_table:044]: ErdStateTable update 0x0008: size=1 flag=0
+[22:30:30.344][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:30:30.420][S][sensor]: 'Uptime Sensor' >> 665 s
+[22:30:32.004][D][erd_state_table:044]: ErdStateTable update 0x0030: size=1 flag=0
+[22:30:32.005][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:30:33.844][D][erd_state_table:044]: ErdStateTable update 0x0035: size=4 flag=0
+[22:30:33.845][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:30:35.685][D][erd_state_table:044]: ErdStateTable update 0xD02C: size=1 flag=0
+[22:30:35.689][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:30:38.454][D][erd_state_table:044]: ErdStateTable update 0xD030: size=4 flag=0
+[22:30:38.462][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:30:40.796][D][erd_state_table:044]: ErdStateTable update 0x0092: size=8 flag=0
+[22:30:40.802][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:30:43.126][D][erd_state_table:044]: ErdStateTable update 0x0093: size=8 flag=0
+[22:30:43.128][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:30:45.453][D][erd_state_table:044]: ErdStateTable update 0x0094: size=8 flag=0
+[22:30:45.457][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:30:48.622][D][erd_state_table:044]: ErdStateTable update 0x0095: size=8 flag=0
+[22:30:48.623][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:31:29.376][S][sensor]: 'Heap Free' >> 108984 B
+[22:31:29.376][S][sensor]: 'Loop Time' >> 857 ms
+[22:31:29.376][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:31:29.376][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:31:29.376][S][sensor]: 'Heap Min Free' >> 81648 B
+[22:31:29.376][S][sensor]: 'Heap Fragmentation' >> 16.8 %
+[22:31:30.412][S][sensor]: 'Uptime Sensor' >> 725 s
+[22:32:01.879][D][api:223]: Accept 192.168.1.183
+[22:32:01.935][D][api.connection:2458]: aioesphomeapi (192.168.1.183): connected
+[22:32:01.969][D][api.connection:2458]: aioesphomeapi (192.168.1.183): disconnected
+[22:32:29.379][S][sensor]: 'Heap Free' >> 108984 B
+[22:32:29.379][S][sensor]: 'Loop Time' >> 802 ms
+[22:32:29.379][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:32:29.379][S][sensor]: 'Heap Max Block' >> 88064 B
+[22:32:29.379][S][sensor]: 'Heap Min Free' >> 81648 B
+[22:32:29.379][S][sensor]: 'Heap Fragmentation' >> 16.8 %
+[22:32:30.419][S][sensor]: 'Uptime Sensor' >> 785 s
+[22:32:35.753][D][esphome.ota:602]: Starting handshake from 192.168.1.119
+[22:32:35.780][D][esphome.ota:602]: Starting update from 192.168.1.119
+[22:32:35.782][W][component:389]: esphome.ota set Warning flag: unspecified
+[22:32:37.591][D][esphome.ota:467]: Progress: 0.1%
+[22:32:38.591][D][esphome.ota:467]: Progress: 18.0%
+[22:32:39.598][D][esphome.ota:467]: Progress: 48.5%
+[22:32:40.873][D][esphome.ota:467]: Progress: 77.2%
+[22:32:41.914][I][esphome.ota:496]: Update complete
+[22:32:41.916][W][component:422]: esphome.ota cleared Warning flag
+[22:32:42.010][I][app:271]: Rebooting safely
+[22:32:42.073][D][debug:057]: Storing reboot source: esphome.ota
+INFO Processing expected disconnect from ESPHome API for gea-esphome-zonelinec6 @ 10.10.10.219
+WARNING Disconnected from API
+INFO Successfully resolved gea-esphome-zonelinec6 @ 10.10.10.219 in 0.000s
+INFO Successfully connected to gea-esphome-zonelinec6 @ 10.10.10.219 in 1.065s
+INFO Successful handshake with gea-esphome-zonelinec6 @ 10.10.10.219 in 0.227s
+[22:32:48.386][I][app:151]: ESPHome version 2026.5.1 compiled on 2026-06-01 22:31:06 -0400
+[22:32:48.386][I][app:158]: ESP32 Chip: ESP32-C6 rev0.2, 1 core(s)
+[22:32:48.386][C][logger:219]: Logger:
+[22:32:48.386][C][logger:219]:   Max Level: DEBUG
+[22:32:48.386][C][logger:219]:   Initial Level: DEBUG
+[22:32:48.386][C][logger:226]:   Log Baud Rate: 0
+[22:32:48.386][C][logger:226]:   Hardware UART: USB_SERIAL_JTAG
+[22:32:48.388][C][logger:235]:   Task Log Buffer Size: 768 bytes
+[22:32:48.414][C][uart.idf:254]: UART Bus 0:
+[22:32:48.422][C][uart.idf:152]:   TX Pin: GPIO16
+[22:32:48.422][C][uart.idf:152]:   RX Pin: GPIO17
+[22:32:48.422][C][uart.idf:259]:   RX Buffer Size: 256
+[22:32:48.422][C][uart.idf:259]:   RX Full Threshold: 120
+[22:32:48.422][C][uart.idf:259]:   RX Timeout: 2
+[22:32:48.422][C][uart.idf:268]:   Baud Rate: 230400 baud
+[22:32:48.422][C][uart.idf:268]:   Data Bits: 8
+[22:32:48.422][C][uart.idf:268]:   Parity: NONE
+[22:32:48.422][C][uart.idf:268]:   Stop bits: 1
+[22:32:48.422][C][uart.idf:268]:   Wake on data RX: ENABLED
+[22:32:48.422][C][uart.idf:254]: UART Bus 1:
+[22:32:48.422][C][uart.idf:152]:   TX Pin: GPIO20
+[22:32:48.422][C][uart.idf:152]:   RX Pin: GPIO18
+[22:32:48.438][C][uart.idf:259]:   RX Buffer Size: 256
+[22:32:48.438][C][uart.idf:259]:   RX Full Threshold: 1
+[22:32:48.438][C][uart.idf:259]:   RX Timeout: 1
+[22:32:48.438][C][uart.idf:268]:   Baud Rate: 19200 baud
+[22:32:48.438][C][uart.idf:268]:   Data Bits: 8
+[22:32:48.438][C][uart.idf:268]:   Parity: NONE
+[22:32:48.438][C][uart.idf:268]:   Stop bits: 1
+[22:32:48.438][C][uart.idf:268]:   Wake on data RX: ENABLED
+[22:32:48.438][C][uptime.sensor:017]: Uptime Sensor 'Uptime Sensor'
+[22:32:48.438][C][uptime.sensor:017]:   State Class: 'total_increasing'
+[22:32:48.438][C][uptime.sensor:017]:   Unit of Measurement: 's'
+[22:32:48.438][C][uptime.sensor:017]:   Accuracy Decimals: 0
+[22:32:48.438][C][uptime.sensor:232]:   Device Class: 'duration'
+[22:32:48.458][C][uptime.sensor:223]:   Icon: 'mdi:timer-outline'
+[22:32:48.458][C][uptime.sensor:019]:   Type: Seconds
+[22:32:48.464][C][geappliances_bridge:446]: GE Appliances Bridge:
+[22:32:48.464][C][geappliances_bridge:456]:   Client Address: 0xE5
+[22:32:48.464][C][geappliances_bridge:457]:   Host Address: 0x00
+[22:32:48.464][C][geappliances_bridge:459]:   GEA3 UART: configured (baud 230400)
+[22:32:48.466][C][geappliances_bridge:493]:   Mode: Auto (Polling - fallback)
+[22:32:48.476][C][geappliances_bridge:496]:   Polling Interval: 10000 ms
+[22:32:48.476][C][geappliances_bridge:497]:   Only Publish On Change: no
+[22:32:48.476][C][geappliances_bridge:499]:   Appliance API Parsing: disabled
+[22:32:48.484][C][geappliances_bridge:504]:   Custom ERDs: 33 configured
+[22:32:48.484][C][geappliances_bridge:531]:   Startup State: Autodiscovery
+[22:32:48.495][C][wifi:1526]: WiFi:
+[22:32:48.495][C][wifi:1526]:   Local MAC: 58:E6:C5:19:BC:A0
+[22:32:48.495][C][wifi:1526]:   Connected: YES
+[22:32:48.495][C][wifi:1237]:   IP Address: 10.10.10.219
+[22:32:48.500][C][wifi:1248]:   SSID: 'NETGEAR112'[redacted]
+[22:32:48.500][C][wifi:1248]:   BSSID: 76:AC:B9:1F:26:FE[redacted]
+[22:32:48.500][C][wifi:1248]:   Hostname: 'gea-esphome-zonelinec6'
+[22:32:48.500][C][wifi:1248]:   Signal strength: -68 dB ▂▄▆█
+[22:32:48.500][C][wifi:1248]:   Channel: 6
+[22:32:48.500][C][wifi:1248]:   Subnet: 255.255.255.0
+[22:32:48.500][C][wifi:1248]:   Gateway: 10.10.10.1
+[22:32:48.500][C][wifi:1248]:   DNS1: 1.1.1.1
+[22:32:48.500][C][wifi:1248]:   DNS2: 0.0.0.0
+[22:32:48.517][C][esphome.ota:097]: Over-The-Air updates:
+[22:32:48.517][C][esphome.ota:097]:   Address: gea-esphome-zonelinec6.local:3232
+[22:32:48.517][C][esphome.ota:097]:   Version: 2
+[22:32:48.517][C][safe_mode:058]: Safe Mode:
+[22:32:48.517][C][safe_mode:058]:   Successful after: 60s
+[22:32:48.517][C][safe_mode:058]:   Invoke after: 10 attempts
+[22:32:48.517][C][safe_mode:058]:   Duration: 300s
+[22:32:48.517][C][safe_mode:079]:   Bootloader rollback: supported
+[22:32:48.537][C][api:238]: Server:
+[22:32:48.537][C][api:238]:   Address: gea-esphome-zonelinec6.local:6053
+[22:32:48.537][C][api:238]:   Listen backlog: 4
+[22:32:48.537][C][api:238]:   Max connections: 5
+[22:32:48.557][C][api:245]:   Noise encryption: YES
+[22:32:48.557][C][mqtt:191]: MQTT:
+[22:32:48.557][C][mqtt:191]:   Server Address: 192.168.1.183:1883 (192.168.1.183)
+[22:32:48.557][C][mqtt:191]:   Username: 'geademo'[redacted]
+[22:32:48.557][C][mqtt:191]:   Client ID: 'gea-esphome-zonelinec6-58e6c519bca0'[redacted]
+[22:32:48.557][C][mqtt:191]:   Clean Session: YES
+[22:32:48.558][C][mqtt:202]:   Discovery IP enabled
+[22:32:48.562][C][mqtt:205]:   Discovery prefix: 'homeassistant'
+[22:32:48.562][C][mqtt:205]:   Discovery retain: YES
+[22:32:48.562][C][mqtt:210]:   Topic Prefix: 'gea-esphome-zonelinec6'
+[22:32:48.562][C][mqtt:212]:   Log Topic: 'gea-esphome-zonelinec6/debug'
+[22:32:48.562][C][mqtt:215]:   Availability: 'gea-esphome-zonelinec6/status'
+[22:32:48.576][C][mdns:230]: mDNS:
+[22:32:48.576][C][mdns:230]:   Hostname: gea-esphome-zonelinec6
+[22:32:48.617][C][mqtt.sensor:027]: MQTT Sensor 'Uptime Sensor':
+[22:32:48.618][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/uptime_sensor/state'
+[22:32:48.618][C][mqtt.text_sensor:024]: MQTT Text Sensor 'Device Info':
+[22:32:48.620][C][mqtt.text_sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/device_info/state'
+[22:32:48.633][C][mqtt.text_sensor:024]: MQTT Text Sensor 'Reset Reason':
+[22:32:48.642][C][mqtt.text_sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/reset_reason/state'
+[22:32:48.654][C][mqtt.sensor:027]: MQTT Sensor 'Heap Free':
+[22:32:48.664][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/heap_free/state'
+[22:32:48.675][C][mqtt.sensor:027]: MQTT Sensor 'Heap Max Block':
+[22:32:48.678][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/heap_max_block/state'
+[22:32:48.697][C][mqtt.sensor:027]: MQTT Sensor 'Heap Fragmentation':
+[22:32:48.701][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/heap_fragmentation/state'
+[22:32:48.719][C][mqtt.sensor:027]: MQTT Sensor 'Heap Min Free':
+[22:32:48.722][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/heap_min_free/state'
+[22:32:48.725][C][mqtt.sensor:027]: MQTT Sensor 'Loop Time':
+[22:32:48.735][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/loop_time/state'
+[22:32:48.736][D][autodiscovery:165]: GEA3 board discovered: address=0xC0 appliance_type=35
+[22:32:48.736][C][mqtt.sensor:027]: MQTT Sensor 'CPU Frequency':
+[22:32:48.736][C][mqtt.sensor:043]:   State Topic: 'gea-esphome-zonelinec6/sensor/cpu_frequency/state'
+[22:32:48.749][C][debug:017]: Debug component:
+[22:32:48.753][C][debug:016]:   Device info 'Device Info'
+[22:32:48.753][C][debug:223]:     Icon: 'mdi:chip'
+[22:32:48.753][C][debug:017]:   Free space on heap 'Heap Free'
+[22:32:48.753][C][debug:017]:     State Class: 'measurement'
+[22:32:48.753][C][debug:017]:     Unit of Measurement: 'B'
+[22:32:48.753][C][debug:017]:     Accuracy Decimals: 0
+[22:32:48.762][C][debug:223]:     Icon: 'mdi:counter'
+[22:32:48.762][C][debug:017]:   Largest free heap block 'Heap Max Block'
+[22:32:48.762][C][debug:017]:     State Class: 'measurement'
+[22:32:48.762][C][debug:017]:     Unit of Measurement: 'B'
+[22:32:48.762][C][debug:017]:     Accuracy Decimals: 0
+[22:32:48.762][C][debug:223]:     Icon: 'mdi:counter'
+[22:32:48.763][C][debug:017]:   CPU frequency 'CPU Frequency'
+[22:32:48.763][C][debug:017]:     State Class: 'measurement'
+[22:32:48.763][C][debug:017]:     Unit of Measurement: 'Hz'
+[22:32:48.763][C][debug:017]:     Accuracy Decimals: 0
+[22:32:48.764][C][debug:232]:     Device Class: 'frequency'
+[22:32:48.764][C][debug:223]:     Icon: 'mdi:speedometer'
+[22:32:48.764][D][debug:031]: ESPHome version 2026.5.1
+[22:32:48.764][D][debug:035]: Free Heap Size: 241852 bytes
+[22:32:48.771][D][debug:255]: ESP32 debug info:
+[22:32:48.771][D][debug:255]:   Chip: ESP32-C6
+[22:32:48.771][D][debug:255]:   Cores: 1
+[22:32:48.771][D][debug:255]:   Revision: 2
+[22:32:48.771][D][debug:255]:   CPU Frequency: 160 MHz
+[22:32:48.771][D][debug:255]:   ESP-IDF Version: 5.5.4
+[22:32:48.771][D][debug:255]:   EFuse MAC: 58:E6:C5:19:BC:A0
+[22:32:48.771][D][debug:255]:   Reset Reason: Reboot request from esphome.ota
+[22:32:48.771][D][debug:255]:   Wakeup Cause: undefined
+[22:32:48.772][D][debug:275]:   Framework: ESP-IDF
+[22:32:48.772][C][debug:158]: Partition table:
+[22:32:48.772][C][debug:158]:   Name         Type Subtype  Address    Size      
+[22:32:48.772][C][debug:165]:   otadata      1    0        0x00009000 0x00002000
+[22:32:48.777][C][debug:165]:   phy_init     1    1        0x0000B000 0x00001000
+[22:32:48.777][C][debug:165]:   app0         0    16       0x00010000 0x001C0000
+[22:32:48.777][C][debug:165]:   app1         0    17       0x001D0000 0x001C0000
+[22:32:48.777][C][debug:165]:   nvs          1    2        0x00390000 0x00070000
+[22:32:48.845][S][text_sensor]: 'Device Info' >> '2026.5.1|Chip: ESP32-C6 Features:BLE, 2.4GHz WiFi, Other:0x40 Cores:1 Revision:2|CPU Frequency: 160 MHz|Framework: ESP-IDF|ESP-IDF: 5.5.4|EFuse MAC: 58:E6:C5:19:BC:A0|Reset: Reboot request from esphome.ota|Wakeup: undefined'
+[22:32:48.845][S][text_sensor]: 'Reset Reason' >> 'Reboot request from esphome.ota'
+[22:32:53.349][I][autodiscovery:101]: GEA3 board discovered at 0xC0, autodiscovery complete
+[22:32:53.353][I][device_identity:036]: No device_id configured, will auto-generate from identity ERDs
+[22:32:53.597][I][device_identity:048]: Read appliance type: 35
+[22:32:53.923][I][device_identity:054]: Read model number: AVVL24DMXWAK1
+[22:32:54.414][I][device_identity:060]: Read serial number: VZ105631G
+[22:32:54.419][I][device_identity:064]: Generated device ID: ZonelineVertical_AVVL24DMXWAK1_VZ105631G
+[22:32:54.419][I][geappliances_bridge:093]: Initializing MQTT client adapter with device ID: ZonelineVertical_AVVL24DMXWAK1_VZ105631G
+[22:32:54.419][I][geappliances_bridge:120]: MQTT client adapter initialized; feature bit ERDs will be published as they are read
+[22:32:54.424][D][mqtt_fsm:033]: Constructor: MQTT already connected, starting in SUBSCRIBING
+[22:32:54.427][I][geappliances_bridge:075]: Reading device info ERDs for MQTT publish, then appliance API feature bits...
+[22:32:54.429][D][feature_bit:283]: Queued read for appliance type (0x0008)
+[22:32:54.438][I][geappliances_bridge:303]: Startup: Feature bits phase
+[22:32:54.442][D][mqtt_fsm:044]: SUBSCRIBING: subscribing to write topic
+[22:32:54.442][I][geappliances_bridge.mqtt:153]: Subscribing to wildcard write topic: geappliances/ZonelineVertical_AVVL24DMXWAK1_VZ105631G/erd/+/write
+[22:32:54.442][D][mqtt_fsm:047]: FLUSHING: flagged ERDs: 0
+[22:32:54.447][D][debug:060]: Free Heap Size: 113280 bytes
+[22:32:54.451][W][component:389]: debug set Warning flag: unspecified
+[22:32:54.454][D][mqtt_fsm:054]: RUNNING: all flagged ERDs flushed
+[22:32:54.916][D][feature_bit:151]: Re-read appliance type (0x0008): 1 bytes
+[22:32:54.919][D][feature_bit:283]: Queued read for model number (0x0001)
+[22:32:55.455][W][component:422]: debug cleared Warning flag
+[22:32:55.577][D][feature_bit:155]: Re-read model number (0x0001): 8 bytes
+[22:32:56.418][D][feature_bit:283]: Queued read for serial number (0x0002)
+[22:32:56.418][D][feature_bit:159]: Re-read serial number (0x0002): 8 bytes
+[22:32:56.423][D][feature_bit:283]: Queued read for common feature API (0x0092)
+[22:32:57.418][D][feature_bit:165]: Read common feature API (0x0092): 8 bytes
+[22:32:57.423][D][feature_bit:283]: Queued read for appliance feature API 0 (0x0093)
+[22:32:58.583][D][feature_bit:171]: Read appliance feature API 0 (0x0093): 8 bytes
+[22:32:58.586][D][feature_bit:283]: Queued read for appliance feature API 1 (0x0094)
+[22:32:59.917][D][feature_bit:177]: Read appliance feature API 1 (0x0094): 8 bytes
+[22:32:59.922][D][feature_bit:283]: Queued read for appliance feature API 2 (0x0095)
+[22:33:01.232][D][feature_bit:183]: Read appliance feature API 2 (0x0095): 8 bytes
+[22:33:01.234][D][feature_bit:283]: Queued read for appliance feature API 3 (0x0096)
+[22:33:02.555][D][feature_bit:354]: Feature bit ERD 0x0096 failed or not supported, skipping
+[22:33:02.561][D][feature_bit:283]: Queued read for appliance feature API 4 (0x0097)
+[22:33:03.880][D][feature_bit:354]: Feature bit ERD 0x0097 failed or not supported, skipping
+[22:33:03.882][D][feature_bit:283]: Queued read for appliance feature API 5 (0x0109)
+[22:33:05.222][D][feature_bit:354]: Feature bit ERD 0x0109 failed or not supported, skipping
+[22:33:05.230][D][feature_bit:283]: Queued read for appliance feature API 6 (0x010A)
+[22:33:06.625][D][feature_bit:354]: Feature bit ERD 0x010A failed or not supported, skipping
+[22:33:06.626][D][feature_bit:283]: Queued read for appliance feature API 7 (0x010B)
+[22:33:08.128][D][feature_bit:354]: Feature bit ERD 0x010B failed or not supported, skipping
+[22:33:08.139][D][feature_bit:283]: Queued read for appliance feature API 8 (0x010C)
+[22:33:09.793][D][feature_bit:354]: Feature bit ERD 0x010C failed or not supported, skipping
+[22:33:09.795][D][feature_bit:283]: Queued read for appliance feature API 9 (0x010D)
+[22:33:11.615][D][feature_bit:354]: Feature bit ERD 0x010D failed or not supported, skipping
+[22:33:11.650][I][feature_bit:412]: Common feature API (0x0092) value: 0x00000405
+[22:33:11.654][I][feature_bit:429]:   [SET] Common feature: Primary (mask 0x00000001, 4 ERDs)
+[22:33:11.656][I][feature_bit:429]:   [SET] Common feature: Boot Loader (mask 0x00000004, 1 ERDs)
+[22:33:11.724][I][feature_bit:429]:   [SET] Common feature: Reset Information (mask 0x00000400, 4 ERDs)
+[22:33:11.810][I][feature_bit:501]: Appliance feature ERD 0x0093: type 0x0014, version 1, features 0x0002FF7C
+[22:33:11.813][I][feature_bit:509]:   [SET] Zoneline / Stratos Base (mask 0x00000004, 12 ERDs)
+[22:33:11.817][I][feature_bit:509]:   [SET] Zoneline / Stratos Heat Pump (mask 0x00000008, 3 ERDs)
+[22:33:11.817][I][feature_bit:509]:   [SET] Zoneline / Stratos Inverter (mask 0x00000010, 3 ERDs)
+[22:33:11.817][I][feature_bit:509]:   [SET] Zoneline / Stratos EEV (mask 0x00000020, 7 ERDs)
+[22:33:11.817][I][feature_bit:509]:   [SET] Zoneline / Stratos MUA (mask 0x00000040, 7 ERDs)
+[22:33:11.819][I][feature_bit:509]:   [SET] Zoneline / Stratos Dehum (mask 0x00000100, 2 ERDs)
+[22:33:11.819][I][feature_bit:509]:   [SET] Zoneline / Stratos OD Sensors (mask 0x00000200, 2 ERDs)
+[22:33:11.819][I][feature_bit:509]:   [SET] Zoneline / Stratos ID Outlet Sensor (mask 0x00000400, 1 ERDs)
+[22:33:11.820][I][feature_bit:509]:   [SET] Zoneline / Stratos EEV Sensors (mask 0x00000800, 2 ERDs)
+[22:33:11.856][I][feature_bit:509]:   [SET] Zoneline / Stratos OD Coil Liquid Sensor (mask 0x00001000, 1 ERDs)
+[22:33:11.856][I][feature_bit:509]:   [SET] Zoneline / Stratos Humidity Sensor (mask 0x00002000, 2 ERDs)
+[22:33:11.856][I][feature_bit:509]:   [SET] Zoneline / Stratos Base Aux Modes (mask 0x00004000, 16 ERDs)
+[22:33:11.856][I][feature_bit:501]: Appliance feature ERD 0x0094: type 0x0202, version 1, features 0x0000386F
+[22:33:11.865][I][feature_bit:509]:   [SET] HVAC / Base Functionality (mask 0x00000001, 7 ERDs)
+[22:33:11.865][I][feature_bit:509]:   [SET] HVAC / Heat Mode Supported (mask 0x00000002, 6 ERDs)
+[22:33:11.865][I][feature_bit:509]:   [SET] HVAC / Cool Mode Supported (mask 0x00000004, 6 ERDs)
+[22:33:11.865][I][feature_bit:509]:   [SET] HVAC / Fan Mode Supported (mask 0x00000008, 3 ERDs)
+[22:33:11.905][I][feature_bit:509]:   [SET] HVAC / Heating Setpoint Maximum Limit Configurable (mask 0x00000020, 2 ERDs)
+[22:33:11.905][I][feature_bit:509]:   [SET] HVAC / Cooling Setpoint Minimum Limit Configurable (mask 0x00000040, 2 ERDs)
+[22:33:11.905][I][feature_bit:501]: Appliance feature ERD 0x0095: type 0x0302, version 1, features 0x00001000
+[22:33:11.905][I][feature_bit:509]:   [SET] Resource Management / Electrical Energy Usage v2 (mask 0x00001000, 4 ERDs)
+[22:33:12.142][I][feature_bit:542]: Feature bit parsing complete: 108 valid ERDs
+[22:33:12.146][I][geappliances_bridge:358]: Startup: Bridge init phase
+[22:33:12.161][I][geappliances_bridge:366]: Device ID ready and MQTT connected, initializing MQTT bridge
+[22:33:12.163][I][geappliances_bridge:182]: Initializing MQTT bridge
+[22:33:12.166][I][geappliances_bridge:262]: Using auto (starting with subscription) mode with polling interval: 10000 ms
+[22:33:12.281][I][geappliances_bridge:391]: Subscription activity detected - subscription mode is working
+[22:33:22.592][W][component:522]: geappliances_bridge took a long time for an operation (398 ms), max is 30 ms
+[22:33:23.345][D][erd_state_table:059]: ErdStateTable new 0x0001: size=32 flag=1
+[22:33:23.352][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:23.838][D][erd_state_table:059]: ErdStateTable new 0x0002: size=32 flag=1
+[22:33:23.841][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:24.332][D][erd_state_table:059]: ErdStateTable new 0x0007: size=1 flag=1
+[22:33:24.339][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:24.824][D][erd_state_table:059]: ErdStateTable new 0x0008: size=1 flag=1
+[22:33:24.829][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:25.317][D][erd_state_table:059]: ErdStateTable new 0x0030: size=1 flag=1
+[22:33:26.291][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:26.291][D][erd_state_table:059]: ErdStateTable new 0x0035: size=4 flag=1
+[22:33:26.291][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:26.291][D][erd_state_table:059]: ErdStateTable new 0x0092: size=8 flag=1
+[22:33:26.295][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:26.778][D][erd_state_table:059]: ErdStateTable new 0x0093: size=8 flag=1
+[22:33:27.282][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:27.282][D][erd_state_table:059]: ErdStateTable new 0x0094: size=8 flag=1
+[22:33:27.288][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:27.785][D][erd_state_table:059]: ErdStateTable new 0x0095: size=8 flag=1
+[22:33:27.789][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:33.129][W][component:522]: geappliances_bridge took a long time for an operation (904 ms), max is 30 ms
+[22:33:37.809][D][erd_state_table:059]: ErdStateTable new 0x0700: size=4 flag=1
+[22:33:37.848][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:39.316][D][erd_state_table:059]: ErdStateTable new 0x0701: size=2 flag=1
+[22:33:39.321][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:40.919][D][erd_state_table:059]: ErdStateTable new 0x0702: size=4 flag=1
+[22:33:40.928][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:43.076][I][safe_mode:142]: Boot seems successful; resetting boot loop counter
+[22:33:43.509][D][erd_state_table:059]: ErdStateTable new 0x0703: size=4 flag=1
+[22:33:43.512][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:44.224][S][sensor]: 'Uptime Sensor' >> 61 s
+[22:33:44.965][S][sensor]: 'Heap Free' >> 104204 B
+[22:33:44.965][S][sensor]: 'Loop Time' >> 908 ms
+[22:33:44.965][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:33:44.965][S][sensor]: 'Heap Max Block' >> 77824 B
+[22:33:44.965][S][sensor]: 'Heap Min Free' >> 53924 B
+[22:33:44.965][S][sensor]: 'Heap Fragmentation' >> 26.1 %
+[22:33:45.550][D][erd_state_table:059]: ErdStateTable new 0x7010: size=2 flag=1
+[22:33:46.811][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:47.083][D][preferences:148]: Writing 1 items: 0 cached, 1 written, 0 failed
+[22:33:47.765][D][erd_state_table:059]: ErdStateTable new 0x7100: size=2 flag=1
+[22:33:47.770][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:50.145][D][erd_state_table:059]: ErdStateTable new 0x7101: size=2 flag=1
+[22:33:50.193][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:53.333][D][erd_state_table:059]: ErdStateTable new 0x7102: size=2 flag=1
+[22:33:53.336][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:56.051][D][erd_state_table:059]: ErdStateTable new 0x7103: size=2 flag=1
+[22:33:56.055][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:33:58.789][D][erd_state_table:059]: ErdStateTable new 0x7104: size=2 flag=1
+[22:33:58.791][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:34:01.683][D][erd_state_table:059]: ErdStateTable new 0x7106: size=2 flag=1
+[22:34:02.810][I][mqtt_fsm:120]: drain: published 1 ERDs
+[22:34:44.223][S][sensor]: 'Uptime Sensor' >> 121 s
+[22:34:44.969][S][sensor]: 'Heap Free' >> 108172 B
+[22:34:44.970][S][sensor]: 'Loop Time' >> 814 ms
+[22:34:44.970][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:34:44.970][S][sensor]: 'Heap Max Block' >> 81920 B
+[22:34:44.970][S][sensor]: 'Heap Min Free' >> 53924 B
+[22:34:44.970][S][sensor]: 'Heap Fragmentation' >> 21.8 %
+[22:35:04.752][D][api:223]: Accept 192.168.1.183
+[22:35:04.807][D][api.connection:2458]: aioesphomeapi (192.168.1.183): connected
+[22:35:04.856][D][api.connection:2458]: aioesphomeapi (192.168.1.183): disconnected
+[22:35:44.222][S][sensor]: 'Uptime Sensor' >> 181 s
+[22:35:44.967][S][sensor]: 'Heap Free' >> 107908 B
+[22:35:44.968][S][sensor]: 'Loop Time' >> 803 ms
+[22:35:44.968][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:35:44.968][S][sensor]: 'Heap Max Block' >> 81920 B
+[22:35:44.968][S][sensor]: 'Heap Min Free' >> 53924 B
+[22:35:44.968][S][sensor]: 'Heap Fragmentation' >> 21.8 %
+[22:36:44.229][S][sensor]: 'Uptime Sensor' >> 241 s
+[22:36:44.959][S][sensor]: 'Heap Free' >> 107620 B
+[22:36:44.959][S][sensor]: 'Loop Time' >> 791 ms
+[22:36:44.959][S][sensor]: 'CPU Frequency' >> 160000000 Hz
+[22:36:44.959][S][sensor]: 'Heap Max Block' >> 81920 B
+[22:36:44.959][S][sensor]: 'Heap Min Free' >> 53924 B
+[22:36:44.959][S][sensor]: 'Heap Fragmentation' >> 21.4 %
+[22:37:08.363][D][api:223]: Accept 192.168.1.183
+[22:37:08.420][D][api.connection:2458]: aioesphomeapi (192.168.1.183): connected
+[22:37:08.459][D][api.connection:2458]: aioesphomeapi (192.168.1.183): disconnected

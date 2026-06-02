@@ -207,6 +207,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       cfg.polling_erds = this->feature_bit_manager_.get_valid_erds_vec();
       this->appliance_fsm_->set_config(cfg);
       this->appliance_fsm_->set_timer_group(&this->timer_group_);
+      this->appliance_fsm_->loop();
     }
   } else if (this->mode_ == BRIDGE_MODE_POLL) {
     mode_name = "polling";
@@ -221,6 +222,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       cfg.polling_erds = this->feature_bit_manager_.get_valid_erds_vec();
       this->appliance_fsm_->set_config(cfg);
       this->appliance_fsm_->set_timer_group(&this->timer_group_);
+      this->appliance_fsm_->loop();
     }
   } else if (this->mode_ == BRIDGE_MODE_SUBSCRIBE) {
     mode_name = "subscription";
@@ -238,6 +240,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       cfg.polling_erds = {};
       this->appliance_fsm_->set_config(cfg);
       this->appliance_fsm_->set_timer_group(&this->timer_group_);
+      this->appliance_fsm_->loop();
     }
   } else if (this->mode_ == BRIDGE_MODE_AUTO) {
     mode_name = "auto (starting with subscription)";
@@ -256,6 +259,12 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       cfg.polling_erds = this->feature_bit_manager_.get_valid_erds_vec();
       this->appliance_fsm_->set_config(cfg);
       this->appliance_fsm_->set_timer_group(&this->timer_group_);
+      // Trigger the transition to RUNNING immediately so the SubscriptionHandler
+      // starts subscribing before the first appliance subscription publications
+      // arrive. Without this, the HSM stays in IDLE until the next loop() call,
+      // which can be seconds later — causing the initial burst of subscription
+      // publications to be missed entirely.
+      this->appliance_fsm_->loop();
     }
   }
 
