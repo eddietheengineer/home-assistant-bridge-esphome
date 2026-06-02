@@ -6,7 +6,7 @@ namespace esphome {
 namespace geappliances_bridge {
 
 std::string build_erd_topic(const std::string& device_id, tiny_erd_t erd) {
-  char buf[64];
+  char buf[128];
   snprintf(buf, sizeof(buf), "geappliances/%s/erd/0x%04x/value", device_id.c_str(), erd);
   return std::string(buf);
 }
