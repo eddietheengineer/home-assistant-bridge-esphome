@@ -101,49 +101,52 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
  protected:
   // ── IBridgeServices implementation (called exclusively by the startup HSM) ──
-  void run_autodiscovery() override;
-  bool is_autodiscovery_complete() const override;
-  uint8_t get_discovered_host_address() const override;
-  bool is_discovered_gea2_protocol() const override;
+  void run_autodiscovery() override { autodiscovery_manager_.start(); }
+  bool is_autodiscovery_complete() const override { return autodiscovery_manager_.get_state() == AUTODISCOVERY_COMPLETE; }
+  uint8_t get_discovered_host_address() const override { return autodiscovery_manager_.get_host_address(); }
+  bool is_discovered_gea2_protocol() const override { return autodiscovery_manager_.is_gea2_protocol(); }
 
-  void init_device_id_reading() override;
-  bool is_device_id_complete() const override;
-  const std::string& get_device_id_string() const override;
+  void init_device_id_reading() override {
+    if (device_identity_manager_.get_state() != DEVICE_ID_STATE_COMPLETE) {
+      device_identity_manager_.init(configured_device_id_, autodiscovery_manager_.get_active_erd_client(), autodiscovery_manager_.get_host_address());
+    }
+  }
+  bool is_device_id_complete() const override { return device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE; }
+  const std::string& get_device_id_string() const override { return device_identity_manager_.get_device_id(); }
 
-  bool is_mqtt_client_initialized() const override;
-  void initialize_mqtt_client() override;
+  bool is_mqtt_client_initialized() const override { return mqtt_client_adapter_initialized_; }
+  void initialize_mqtt_client() override { initialize_mqtt_client_(); }
 
-  void start_feature_bit_reading() override;
-  bool is_feature_bits_complete() const override;
+  void start_feature_bit_reading() override { start_feature_bit_reading_(); }
+  bool is_feature_bits_complete() const override { return feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE; }
 
-  void record_startup_delay_start() override;
-  bool is_startup_delay_elapsed() const override;
+  void record_startup_delay_start() override { startup_delay_start_ms_ = millis(); }
+  bool is_startup_delay_elapsed() const override { return millis() - startup_delay_start_ms_ >= AUTODISCOVERY_STARTUP_DELAY_MS; }
 
-  bool is_bridge_initialized() const override;
-  void initialize_mqtt_bridge() override;
+  bool is_bridge_initialized() const override { return mqtt_bridge_initialized_; }
+  void initialize_mqtt_bridge() override { initialize_mqtt_bridge_(); }
 
-  BridgeMode get_mode() const override;
-  bool is_subscription_mode_active() const override;
+  BridgeMode get_mode() const override { return mode_; }
+  bool is_subscription_mode_active() const override { return subscription_mode_active_; }
 
-  void check_subscription_activity() override;
-  void maybe_start_custom_erd_polling() override;
-  void log_poll_state_transitions() override;
-  void run_ha_discovery() override;
-  void run_all_managers() override;
-
-  GlobalStateRegistry* get_global_registry() override;
+  void check_subscription_activity() override { check_subscription_activity_(); }
+  void maybe_start_custom_erd_polling() override { maybe_start_custom_erd_polling_(); }
+  void log_poll_state_transitions() override { log_poll_state_transitions_(); }
+  void run_ha_discovery() override {
+    bool is_poll_mode = !((mode_ == BRIDGE_MODE_SUBSCRIBE) || (mode_ == BRIDGE_MODE_AUTO && subscription_mode_active_));
+    bool polling_list_complete = true;
+    if (is_poll_mode && appliance_fsm_ != nullptr) {
+      PollingHandler* ph = appliance_fsm_->get_polling_handler();
+      if (ph != nullptr) polling_list_complete = ph->has_completed_first_cycle();
+    }
+    ha_discovery_manager_.run(is_poll_mode, polling_list_complete, subscription_activity_detected_, mqtt::global_mqtt_client);
+  }
+  void run_all_managers() override { }
+  GlobalStateRegistry* get_global_registry() override { return global_registry_.get(); }
 
   // ── Internal bridge methods (event callbacks and per-phase helpers) ─────────
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
-  void initialize_mqtt_client_();
-  void initialize_mqtt_bridge_();
-  void start_custom_erd_polling_();
-  void maybe_start_custom_erd_polling_();
-  void configure_polling_optional_lists_();
-  void check_subscription_activity_();
   void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
-  void log_poll_state_transitions_(); // Debug: log polling HSM state changes
-  void start_feature_bit_reading_();
   void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 
