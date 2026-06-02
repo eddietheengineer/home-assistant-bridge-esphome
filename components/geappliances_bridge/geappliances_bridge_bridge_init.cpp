@@ -263,15 +263,20 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
   (void)mode_name; // Suppress -Wunused-but-set-variable (ESP_LOGI may not reference it in all builds)
 
   // Defer HA device discovery until ERD registration has settled.
+  // Use the valid ERDs from feature bit parsing as the authoritative list.
+  // In the new FSM architecture, erd_registry_.registered_erds() is empty at
+  // this point because the SubscriptionHandler/PollingHandler write to
+  // ErdStateTable rather than calling mqtt_client_register_erd().
+  const std::set<tiny_erd_t>& valid_erds = this->feature_bit_manager_.get_valid_erds();
   if (this->generate_device_config_) {
     this->ha_discovery_manager_.init(
         this->ha_discovery_base_url_,
         this->device_identity_manager_.get_device_id(),
         this->device_identity_manager_.get_model_number(),
         this->device_identity_manager_.get_serial_number(),
-        this->erd_registry_.registered_erds(),
+        valid_erds,
         true);
-    this->ha_discovery_manager_.set_registered_erds(this->erd_registry_.registered_erds());
+    this->ha_discovery_manager_.set_registered_erds(valid_erds);
     this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
     ESP_LOGI(TAG, "HA discovery deferred: will publish after ERD discovery completes "
                   "(polling mode) or %u s quiet window (subscription mode)",
