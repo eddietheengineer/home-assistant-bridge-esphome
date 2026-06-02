@@ -34,6 +34,16 @@ size_t ErdStateTable::find_index_(tiny_erd_t erd_id) const
 
 void ErdStateTable::update_erd_value(tiny_erd_t erd_id, const uint8_t* value, uint8_t size)
 {
+  update_erd_value_internal_(erd_id, value, size, false);
+}
+
+void ErdStateTable::update_erd_value_from_subscription(tiny_erd_t erd_id, const uint8_t* value, uint8_t size)
+{
+  update_erd_value_internal_(erd_id, value, size, true);
+}
+
+void ErdStateTable::update_erd_value_internal_(tiny_erd_t erd_id, const uint8_t* value, uint8_t size, bool from_subscription)
+{
   // Guard against null value pointer — malformed appliance data could crash the bridge.
   if (value == nullptr) {
     return;
@@ -53,7 +63,11 @@ void ErdStateTable::update_erd_value(tiny_erd_t erd_id, const uint8_t* value, ui
                    (std::memcmp(entry->value, value, size) != 0);
     std::memcpy(entry->value, value, size);
     entry->value_size = size;
-    if (changed) {
+    // For subscription publications, ALWAYS set publish_flag because the
+    // appliance only sends subscription publications when the value has
+    // actually changed - we trust the appliance's notification.
+    // For polling reads, set publish_flag only if the value actually changed.
+    if (from_subscription || changed) {
       entry->publish_flag = true;
       tiny_event_publish(&erd_changed_, &erd_id);
     }

@@ -401,10 +401,11 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
     // Store the ERD data in ErdStateTable as a fallback when the
     // SubscriptionHandler hasn't started yet (e.g., during the feature bit
     // reading phase when the initial burst of subscription publications
-    // arrives). The ErdStateTable sets publish_flag so the MqttSideStateMachine
-    // will drain it to MQTT.
+    // arrives). Use update_erd_value_from_subscription() to always set
+    // publish_flag because the appliance only sends subscription publications
+    // when the value has actually changed.
     if (this->erd_state_table_ != nullptr) {
-      this->erd_state_table_->update_erd_value(
+      this->erd_state_table_->update_erd_value_from_subscription(
           args->subscription_publication_received.erd,
           reinterpret_cast<const uint8_t*>(args->subscription_publication_received.data),
           args->subscription_publication_received.data_size);

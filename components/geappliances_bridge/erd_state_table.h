@@ -60,6 +60,13 @@ class ErdStateTable {
   /// Used by: SubscriptionHandler, PollingHandler (only_publish_on_change=true)
   void update_erd_value(tiny_erd_t erd_id, const uint8_t* value, uint8_t size);
 
+  /// Store value from a subscription publication. ALWAYS sets publish_flag=true
+  /// because the appliance only sends subscription publications when the value
+  /// has actually changed - we trust the appliance's notification.
+  /// Fires on_erd_changed event.
+  /// Used by: SubscriptionHandler, bridge's handle_erd_client_activity_() fallback
+  void update_erd_value_from_subscription(tiny_erd_t erd_id, const uint8_t* value, uint8_t size);
+
   /// Unconditionally set publish_flag=true without changing the stored value.
   /// Used by: PollingHandler when only_publish_on_change=false (call after update_erd_value)
   void set_publish_flag(tiny_erd_t erd_id);
@@ -96,6 +103,11 @@ class ErdStateTable {
  private:
   // Find entry index by binary search. Returns entries_.size() if not found.
   size_t find_index_(tiny_erd_t erd_id) const;
+
+  // Internal implementation shared by update_erd_value() and
+  // update_erd_value_from_subscription(). 'from_subscription' controls
+  // whether publish_flag is set unconditionally (true) or only on change (false).
+  void update_erd_value_internal_(tiny_erd_t erd_id, const uint8_t* value, uint8_t size, bool from_subscription);
 
   // Sorted vector of entries, kept in erd_id order for binary search.
   // Max ~300 entries × ~36 bytes each = ~10.8 KB total.

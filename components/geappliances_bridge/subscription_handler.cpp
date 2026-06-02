@@ -159,8 +159,10 @@ tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const
       // Track known ERDs
       self->known_erds_.insert(erd);
 
-      // Write to state table — sets publish_flag only if value changed
-      self->state_table_->update_erd_value(
+      // Write to state table — use update_erd_value_from_subscription() to
+      // always set publish_flag because the appliance only sends subscription
+      // publications when the value has actually changed.
+      self->state_table_->update_erd_value_from_subscription(
         erd,
         reinterpret_cast<const uint8_t*>(args->subscription_publication_received.data),
         args->subscription_publication_received.data_size);
