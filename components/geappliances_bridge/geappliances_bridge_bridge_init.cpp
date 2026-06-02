@@ -118,55 +118,11 @@ void GeappliancesBridge::initialize_mqtt_client_()
 
   this->mqtt_client_adapter_initialized_ = true;
   ESP_LOGI(TAG, "MQTT client adapter initialized; feature bit ERDs will be published as they are read");
-
-  // ── Construct new FSM-based modules ────────────────────────────────────────
-  // All modules are constructed now that the adapter is initialized.
-
-  // Global state registry
-  global_registry_ = std::make_unique<GlobalStateRegistry>();
-  global_registry_->set_device_id(this->device_identity_manager_.get_device_id());
-  global_registry_->set_appliance_address(this->autodiscovery_manager_.get_host_address());
-  global_registry_->set_gea_protocol_type(this->gea2_protocol_active_ ? 2 : 3);
-
-  // Shared state structures
-  erd_state_table_ = std::make_unique<ErdStateTable>();
-  write_queue_ = std::make_unique<WriteQueue>();
-
-  // Use the active ERD client (may be GEA2 or GEA3 depending on autodiscovery).
-  // For manual device_id configs where autodiscovery was skipped, fall back to
-  // the GEA3 client.
-  i_tiny_gea3_erd_client_t* active_client = this->autodiscovery_manager_.get_active_erd_client();
-  if (active_client == nullptr) {
-    active_client = &this->erd_client_.interface;
-  }
-
-  // Construct mode-appropriate handlers
-  if (mode_ == BRIDGE_MODE_SUBSCRIBE || mode_ == BRIDGE_MODE_AUTO) {
-    subscription_handler_ = std::make_unique<SubscriptionHandler>(
-      active_client, erd_state_table_.get(), &this->timer_group_);
-  }
-  if (mode_ == BRIDGE_MODE_POLL || mode_ == BRIDGE_MODE_AUTO) {
-    polling_handler_ = std::make_unique<PollingHandler>(
-      active_client, erd_state_table_.get(),
-      this->polling_interval_ms_, this->polling_only_publish_on_change_);
-  }
-  write_handler_ = std::make_unique<WriteHandler>(active_client, write_queue_.get());
-
-  // Appliance-side FSM (takes ownership of the handlers via set_handlers)
-  appliance_fsm_ = std::make_unique<ApplianceSideStateMachine>(
-    erd_state_table_.get(), global_registry_.get(), write_queue_.get(),
-    active_client);
-  appliance_fsm_->set_handlers(subscription_handler_.get(),
-                               polling_handler_.get(),
-                               write_handler_.get());
-
-  // Write router (requires adapter to be initialized)
-  write_router_ = std::make_unique<WriteRouter>(&this->mqtt_client_adapter_.interface, write_queue_.get());
-
-  // MQTT-side FSM
-  mqtt_fsm_ = std::make_unique<MqttSideStateMachine>(
-    erd_state_table_.get(), global_registry_.get(),
-    &this->mqtt_client_adapter_, write_router_.get());
+  // NOTE: FSM-based modules (ErdStateTable, handlers, state machines) are
+  // constructed in initialize_mqtt_bridge_(), NOT here. This defers the large
+  // heap allocation (~141KB for ErdStateTable alone) until after device ID
+  // reading and feature bit reading complete, preventing heap exhaustion on
+  // ESP32-C3 devices with limited RAM during the critical startup phases.
 }
 
 // ---------------------------------------------------------------------------
@@ -180,6 +136,47 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
   }
 
   ESP_LOGI(TAG, "Initializing MQTT bridge");
+
+  // ── Construct FSM-based modules here (deferred from mqtt_client_init) ──────
+  // This defers the large heap allocation (~141KB for ErdStateTable alone)
+  // until after device ID reading and feature bit reading complete, preventing
+  // heap exhaustion on ESP32-C3 devices with limited RAM.
+  global_registry_ = std::make_unique<GlobalStateRegistry>();
+  global_registry_->set_device_id(this->device_identity_manager_.get_device_id());
+  global_registry_->set_appliance_address(this->autodiscovery_manager_.get_host_address());
+  global_registry_->set_gea_protocol_type(this->gea2_protocol_active_ ? 2 : 3);
+
+  erd_state_table_ = std::make_unique<ErdStateTable>();
+  write_queue_ = std::make_unique<WriteQueue>();
+
+  i_tiny_gea3_erd_client_t* active_client = this->autodiscovery_manager_.get_active_erd_client();
+  if (active_client == nullptr) {
+    active_client = &this->erd_client_.interface;
+  }
+
+  if (mode_ == BRIDGE_MODE_SUBSCRIBE || mode_ == BRIDGE_MODE_AUTO) {
+    subscription_handler_ = std::make_unique<SubscriptionHandler>(
+      active_client, erd_state_table_.get(), &this->timer_group_);
+  }
+  if (mode_ == BRIDGE_MODE_POLL || mode_ == BRIDGE_MODE_AUTO) {
+    polling_handler_ = std::make_unique<PollingHandler>(
+      active_client, erd_state_table_.get(),
+      this->polling_interval_ms_, this->polling_only_publish_on_change_);
+  }
+  write_handler_ = std::make_unique<WriteHandler>(active_client, write_queue_.get());
+
+  appliance_fsm_ = std::make_unique<ApplianceSideStateMachine>(
+    erd_state_table_.get(), global_registry_.get(), write_queue_.get(),
+    active_client);
+  appliance_fsm_->set_handlers(subscription_handler_.get(),
+                               polling_handler_.get(),
+                               write_handler_.get());
+
+  write_router_ = std::make_unique<WriteRouter>(&this->mqtt_client_adapter_.interface, write_queue_.get());
+
+  mqtt_fsm_ = std::make_unique<MqttSideStateMachine>(
+    erd_state_table_.get(), global_registry_.get(),
+    &this->mqtt_client_adapter_, write_router_.get());
 
   // Apply the valid-ERD filter when appliance API parsing is enabled and
   // produced results. An empty set is ignored by the registry so all ERDs
