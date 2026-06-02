@@ -116,14 +116,10 @@ void MqttSideStateMachine::drain_flagged_erds_() {
     std::string payload = format_erd_payload(erd_id, value, size, erd_registry_);
     esphome_mqtt_client_adapter_publish(adapter_, topic, payload, true);
     state_table_->clear_publish_flag(erd_id);
-    // Debug log: ERD number and raw data bytes in hex
-    char data_hex[65];  // 32 bytes * 2 hex chars + null
-    data_hex[0] = '\0';
-    for (uint8_t i = 0; i < size && i < 32; i++) {
-      sprintf(data_hex + (i * 2), "%02X", value[i]);
-    }
-    ESP_LOGD(TAG, "drain: published 0x%04X Data: %s", erd_id, data_hex);
     flushed++;
+  }
+  if (flushed > 0) {
+    ESP_LOGI(TAG, "drain: published %u ERDs", flushed);
   }
 }
 
