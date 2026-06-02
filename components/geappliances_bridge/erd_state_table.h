@@ -9,7 +9,7 @@
 // Responsibilities:
 //   - Store ERD values in fixed-size inline buffers (no per-ERD heap allocation)
 //   - Track publish_flag per ERD (change tracking + reconnect recovery)
-//   - Provide O(1) lookup via index table into flat entry array
+//   - Provide O(log n) lookup via sorted vector + binary search
 //   - Fire on_erd_changed event when value differs from stored
 //
 // NOT responsible for:
@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <vector>
 
@@ -93,13 +94,12 @@ class ErdStateTable {
   i_tiny_event_t* on_erd_changed();
 
  private:
-  // Flat array of entries, allocated at boot. ERDs stored in insertion order.
-  ErdEntry entries_[MAX_ERD_ENTRIES];
-  size_t   entry_count_;
+  // Find entry index by binary search. Returns entries_.size() if not found.
+  size_t find_index_(tiny_erd_t erd_id) const;
 
-  // Index table for O(1) lookup. Index by ERD ID (16-bit = 0x0000..0xFFFF).
-  // Stores entry index (uint16_t). 0xFFFF means not present.
-  uint16_t index_table_[65536];
+  // Sorted vector of entries, kept in erd_id order for binary search.
+  // Max ~300 entries × ~36 bytes each = ~10.8 KB total.
+  std::vector<ErdEntry> entries_;
 
   tiny_event_t erd_changed_;
 };

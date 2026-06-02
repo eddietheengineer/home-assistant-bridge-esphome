@@ -8,12 +8,28 @@ namespace esphome {
 namespace geappliances_bridge {
 
 ErdStateTable::ErdStateTable()
-    : entry_count_(0)
 {
-  for (size_t i = 0; i < 65536; i++) {
-    index_table_[i] = 0xFFFF;
-  }
   tiny_event_init(&erd_changed_);
+}
+
+size_t ErdStateTable::find_index_(tiny_erd_t erd_id) const
+{
+  // Binary search on the sorted entries_ vector.
+  size_t lo = 0;
+  size_t hi = entries_.size();
+  while (lo < hi) {
+    size_t mid = lo + (hi - lo) / 2;
+    if (entries_[mid].erd_id < erd_id) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  // lo is the insertion point. Check if the ERD actually exists there.
+  if (lo < entries_.size() && entries_[lo].erd_id == erd_id) {
+    return lo;
+  }
+  return entries_.size();  // not found
 }
 
 void ErdStateTable::update_erd_value(tiny_erd_t erd_id, const uint8_t* value, uint8_t size)
@@ -28,9 +44,9 @@ void ErdStateTable::update_erd_value(tiny_erd_t erd_id, const uint8_t* value, ui
     size = MAX_ERD_VALUE_SIZE;
   }
 
-  uint16_t idx = index_table_[erd_id];
+  size_t idx = find_index_(erd_id);
 
-  if (idx != 0xFFFF) {
+  if (idx < entries_.size()) {
     // ERD already exists — update in place
     ErdEntry* entry = &entries_[idx];
     bool changed = (entry->value_size != size) ||
@@ -43,27 +59,26 @@ void ErdStateTable::update_erd_value(tiny_erd_t erd_id, const uint8_t* value, ui
     }
     ESP_LOGD(TAG, "ErdStateTable update 0x%04X: size=%u flag=%d", erd_id, entry->value_size, entry->publish_flag);
   } else {
-    // New ERD — add to flat array
-    if (entry_count_ >= MAX_ERD_ENTRIES) {
+    // New ERD — insert in sorted order
+    if (entries_.size() >= MAX_ERD_ENTRIES) {
       return;  // table full, silently drop
     }
-    size_t new_idx = entry_count_;
-    ErdEntry* entry = &entries_[new_idx];
-    entry->erd_id = erd_id;
-    std::memcpy(entry->value, value, size);
-    entry->value_size = size;
-    entry->publish_flag = true;
-    index_table_[erd_id] = static_cast<uint16_t>(new_idx);
-    entry_count_++;
+    ErdEntry entry;
+    entry.erd_id = erd_id;
+    std::memcpy(entry.value, value, size);
+    entry.value_size = size;
+    entry.publish_flag = true;
+    // Insert at idx to maintain sorted order
+    entries_.insert(entries_.begin() + static_cast<long>(idx), entry);
     tiny_event_publish(&erd_changed_, &erd_id);
-    ESP_LOGD(TAG, "ErdStateTable new 0x%04X: size=%u flag=%d", erd_id, entry->value_size, entry->publish_flag);
+    ESP_LOGD(TAG, "ErdStateTable new 0x%04X: size=%u flag=%d", erd_id, entry.value_size, entry.publish_flag);
   }
 }
 
 void ErdStateTable::set_publish_flag(tiny_erd_t erd_id)
 {
-  uint16_t idx = index_table_[erd_id];
-  if (idx != 0xFFFF) {
+  size_t idx = find_index_(erd_id);
+  if (idx < entries_.size()) {
     entries_[idx].publish_flag = true;
   }
 }
@@ -71,9 +86,9 @@ void ErdStateTable::set_publish_flag(tiny_erd_t erd_id)
 std::vector<tiny_erd_t> ErdStateTable::get_flagged_erds() const
 {
   std::vector<tiny_erd_t> result;
-  for (size_t i = 0; i < entry_count_; i++) {
-    if (entries_[i].publish_flag) {
-      result.push_back(entries_[i].erd_id);
+  for (const auto& entry : entries_) {
+    if (entry.publish_flag) {
+      result.push_back(entry.erd_id);
     }
   }
   return result;
@@ -81,8 +96,8 @@ std::vector<tiny_erd_t> ErdStateTable::get_flagged_erds() const
 
 const uint8_t* ErdStateTable::get_erd_value(tiny_erd_t erd_id, uint8_t& size_out) const
 {
-  uint16_t idx = index_table_[erd_id];
-  if (idx != 0xFFFF) {
+  size_t idx = find_index_(erd_id);
+  if (idx < entries_.size()) {
     size_out = entries_[idx].value_size;
     return entries_[idx].value;
   }
@@ -92,16 +107,16 @@ const uint8_t* ErdStateTable::get_erd_value(tiny_erd_t erd_id, uint8_t& size_out
 
 void ErdStateTable::clear_publish_flag(tiny_erd_t erd_id)
 {
-  uint16_t idx = index_table_[erd_id];
-  if (idx != 0xFFFF) {
+  size_t idx = find_index_(erd_id);
+  if (idx < entries_.size()) {
     entries_[idx].publish_flag = false;
   }
 }
 
 bool ErdStateTable::has_flag(tiny_erd_t erd_id) const
 {
-  uint16_t idx = index_table_[erd_id];
-  if (idx != 0xFFFF) {
+  size_t idx = find_index_(erd_id);
+  if (idx < entries_.size()) {
     return entries_[idx].publish_flag;
   }
   return false;
