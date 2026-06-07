@@ -72,6 +72,9 @@ class SubscriptionHandler {
   // Get the set of ERDs seen so far.
   const std::set<tiny_erd_t>& get_known_erds() const { return known_erds_; }
 
+  // Returns true if the handler is actively running (started but not stopped).
+  bool is_running() const;
+
  private:
   // HSM states (friend functions so they can access private members)
   friend tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);

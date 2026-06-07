@@ -207,5 +207,15 @@ void ApplianceSideStateMachine::stop_handlers()
   }
 }
 
+void ApplianceSideStateMachine::transition_to_error_for_test()
+{
+  transition_to(ApplianceSideState::ERROR);
+}
+
+void ApplianceSideStateMachine::on_error_retry_timer_for_test()
+{
+  on_error_retry_timer(this);
+}
+
 }  // namespace geappliances_bridge
 }  // namespace esphome

@@ -96,6 +96,10 @@ class ApplianceSideStateMachine {
   /// Returns the write handler for external access.
   WriteHandler* get_write_handler();
 
+  // Test hooks — not part of the public API
+  void transition_to_error_for_test();
+  void on_error_retry_timer_for_test();
+
  private:
   void on_appliance_address_changed(void* context, const void* args);
   void on_error_retry_timer(void* context);

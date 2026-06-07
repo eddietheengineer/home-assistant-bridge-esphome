@@ -10,6 +10,8 @@ namespace geappliances_bridge {
 // container_of pointer arithmetic on non-standard-layout types.
 static SubscriptionHandler* s_active_handler = nullptr;
 
+bool SubscriptionHandler::is_running() const { return s_active_handler == this; }
+
 // HSM state descriptors
 extern "C" {
 #include "tiny_utils.h"

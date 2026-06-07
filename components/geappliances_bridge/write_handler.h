@@ -61,6 +61,9 @@ class WriteHandler {
   /// Returns the current appliance address for writes.
   uint8_t get_appliance_address() const;
 
+  /// Returns true if the handler has a valid appliance address set.
+  bool is_running() const { return appliance_address_ != 0; }
+
   /// Set the appliance address for writes.
   void set_appliance_address(uint8_t addr);
 
