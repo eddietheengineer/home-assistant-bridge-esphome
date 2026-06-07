@@ -149,6 +149,14 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
   void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   bool should_route_to_feature_bits_(tiny_erd_t erd);
+  void initialize_mqtt_client_();
+  void start_feature_bit_reading_();
+  void initialize_mqtt_bridge_();
+  void check_subscription_activity_();
+  void maybe_start_custom_erd_polling_();
+  void log_poll_state_transitions_();
+  void configure_polling_optional_lists_();
+  void start_custom_erd_polling_();
 
   // Startup HSM — replaces the manual switch-based phase progression.
   // The HSM drives the linear startup sequence:

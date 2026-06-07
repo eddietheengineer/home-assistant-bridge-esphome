@@ -112,7 +112,7 @@ void MqttSideStateMachine::drain_flagged_erds_() {
     }
     std::string topic = build_erd_topic(registry_->get_device_id(), erd_id);
     std::string payload = format_erd_payload(value, size);
-    ESP_LOGD(TAG, \"publish: topic=%s, payload=%s\", topic.c_str(), payload.c_str());
+    ESP_LOGD(TAG, "publish: topic=%s, payload=%s", topic.c_str(), payload.c_str());
     esphome_mqtt_client_adapter_publish(adapter_, topic, payload, true);
     state_table_->clear_publish_flag(erd_id);
     flushed++;
