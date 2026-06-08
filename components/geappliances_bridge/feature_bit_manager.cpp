@@ -75,6 +75,15 @@ void FeatureBitManager::start()
   this->queue_erd_read_();
 }
 
+void FeatureBitManager::cleanup()
+{
+  if (this->erd_client_ != nullptr) {
+    tiny_event_unsubscribe(
+      tiny_gea3_erd_client_on_activity(this->erd_client_),
+      &this->erd_activity_subscription_);
+  }
+  tiny_timer_stop(this->timer_group_, &this->parse_timer_);
+}
 const std::set<tiny_erd_t>& FeatureBitManager::get_valid_erds() const
 {
   return this->valid_erds_;

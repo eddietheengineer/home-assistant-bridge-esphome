@@ -312,29 +312,29 @@ def generate_appliance_api_feature_lists_header(appliance_api_data: Dict) -> str
         all_common_features.extend(ver_data.get('features', []))
 
     # Generate ERD arrays for each common feature
+    # Only include features that have ERDs — skip features with no ERDs to
+    # reduce compile-time overhead and flash usage.
+    common_feature_map = {}  # array_name -> (mask_val, name, erds)
     for feature in all_common_features:
         sanitized = sanitize_name_for_cpp(feature['name'])
         erds = collect_all_erds_for_common_feature(feature)
         array_name = f"common_feature_{sanitized}_erds"
-        if erds:
-            lines.append(f"static const tiny_erd_t {array_name}[] = {{")
-            for erd_id in erds:
-                lines.append(f"  0x{erd_id:04x},")
-            lines.append("};")
-        else:
-            lines.append(f"static const tiny_erd_t* {array_name} __attribute__((unused)) = nullptr;")
+        if not erds:
+            continue
+        mask_val = int(feature['mask'], 16)
+        common_feature_map[array_name] = (mask_val, feature['name'], erds)
+
+    for array_name, (mask_val, name, erds) in common_feature_map.items():
+        lines.append(f"static const tiny_erd_t {array_name}[] = {{")
+        for erd_id in erds:
+            lines.append(f"  0x{erd_id:04x},")
+        lines.append("};")
         lines.append("")
 
     # Generate master common feature descriptor array
     lines.append("static const common_feature_descriptor_t common_feature_descriptors[] = {")
-    for feature in all_common_features:
-        sanitized = sanitize_name_for_cpp(feature['name'])
-        array_name = f"common_feature_{sanitized}_erds"
-        mask_val = int(feature['mask'], 16)
-        erds = collect_all_erds_for_common_feature(feature)
-        count = len(erds)
-        null_ptr = "nullptr" if count == 0 else array_name
-        lines.append(f"  {{0x{mask_val:08x}, \"{feature['name']}\", {null_ptr}, {count}}},")
+    for array_name, (mask_val, name, erds) in common_feature_map.items():
+        lines.append(f"  {{0x{mask_val:08x}, \"{name}\", {array_name}, {len(erds)}}},")
     lines.append("};")
     lines.append("static const uint16_t common_feature_descriptor_count =")
     lines.append("  sizeof(common_feature_descriptors) / sizeof(common_feature_descriptors[0]);")
@@ -401,37 +401,34 @@ def generate_appliance_api_feature_lists_header(appliance_api_data: Dict) -> str
     array_names = make_array_names(valid_feature_apis)
 
     # Generate one ERD array per feature per version per appliance API.
-    for key, api in valid_feature_apis:
-        for ver, ver_data in api.get('versions', {}).items():
-            for i, feature in enumerate(ver_data.get('features', [])):
-                array_name = array_names[(key, ver, i)]
-                erds = collect_erds_for_feature(feature)
-                if erds:
-                    lines.append(f"static const tiny_erd_t {array_name}[] = {{")
-                    for erd_id in erds:
-                        lines.append(f"  0x{erd_id:04x},")
-                    lines.append("};")
-                else:
-                    lines.append(f"static const tiny_erd_t* {array_name} __attribute__((unused)) = nullptr;")
-                lines.append("")
-
-    # Generate master descriptor array: one row per feature per version.
-    lines.append("static const appliance_feature_api_descriptor_t appliance_feature_api_descriptors[] = {")
-    total_descriptors = 0
+    # Only include features that have ERDs — skip features with no ERDs to
+    # reduce compile-time overhead and flash usage.
+    appliance_feature_map = {}  # array_name -> (ft, ver, mask_val, label, erds)
     for key, api in valid_feature_apis:
         ft = api['featureType']
         for ver, ver_data in api.get('versions', {}).items():
             for i, feature in enumerate(ver_data.get('features', [])):
                 array_name = array_names[(key, ver, i)]
-                mask_val = int(feature['mask'], 16)
                 erds = collect_erds_for_feature(feature)
-                count = len(erds)
-                null_ptr = "nullptr" if count == 0 else array_name
+                if not erds:
+                    continue
+                mask_val = int(feature['mask'], 16)
                 label = f"{api['name']} / {feature['name']}"
-                lines.append(
-                    f"  {{0x{ft:04x}, {ver}, 0x{mask_val:08x}, \"{label}\", {null_ptr}, {count}}},"
-                )
-                total_descriptors += 1
+                appliance_feature_map[array_name] = (ft, ver, mask_val, label, erds)
+
+    for array_name, (ft, ver, mask_val, label, erds) in appliance_feature_map.items():
+        lines.append(f"static const tiny_erd_t {array_name}[] = {{")
+        for erd_id in erds:
+            lines.append(f"  0x{erd_id:04x},")
+        lines.append("};")
+        lines.append("")
+
+    # Generate master descriptor array: one row per feature per version.
+    lines.append("static const appliance_feature_api_descriptor_t appliance_feature_api_descriptors[] = {")
+    for array_name, (ft, ver, mask_val, label, erds) in appliance_feature_map.items():
+        lines.append(
+            f"  {{0x{ft:04x}, {ver}, 0x{mask_val:08x}, \"{label}\", {array_name}, {len(erds)}}},"
+        )
     lines.append("};")
     lines.append("static const uint16_t appliance_feature_api_descriptor_count =")
     lines.append("  sizeof(appliance_feature_api_descriptors) / sizeof(appliance_feature_api_descriptors[0]);")

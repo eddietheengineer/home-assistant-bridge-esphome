@@ -84,6 +84,21 @@ void AutodiscoveryManager::start()
   this->run();
 }
 
+void AutodiscoveryManager::cleanup()
+{
+  tiny_timer_stop(this->timer_group_, &this->broadcast_window_timer_);
+  if (this->has_gea3_uart_ && this->gea3_erd_client_ != nullptr) {
+    tiny_event_unsubscribe(
+      tiny_gea3_erd_client_on_activity(this->gea3_erd_client_),
+      &this->gea3_activity_subscription_);
+  }
+  if (this->has_gea2_uart_ && this->gea2_adapter_client_ != nullptr) {
+    tiny_event_unsubscribe(
+      tiny_gea3_erd_client_on_activity(this->gea2_adapter_client_),
+      &this->gea2_activity_subscription_);
+  }
+}
+
 // =============================================================================
 // Timer callback (static, invoked by tiny_timer_group on broadcast window expiry)
 // =============================================================================

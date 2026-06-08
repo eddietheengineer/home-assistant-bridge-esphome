@@ -99,6 +99,9 @@ class FeatureBitManager {
   /// Start the feature-bit reading sequence.  Idempotent if already past the first state.
   void start();
 
+  /// Unsubscribe from events and stop timers.  Called during bridge teardown.
+  void cleanup();
+
   const std::set<tiny_erd_t>& get_valid_erds() const;
   const std::vector<tiny_erd_t>& get_valid_erds_vec() const;
 

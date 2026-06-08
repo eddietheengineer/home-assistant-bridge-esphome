@@ -215,7 +215,6 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
 static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
-  auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
 
   switch (signal) {
     case signal_timer_expired:
@@ -224,7 +223,8 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
       }
       break;
 
-    case signal_read_completed:
+    case signal_read_completed: {
+      auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
       disarm_timer(self);
       add_erd_to_polling_list(self, args->read_completed.erd);
       mqtt_client_update_erd(
@@ -236,8 +236,10 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
         tiny_hsm_transition(hsm, self->next_discovery_state);
       }
       break;
+    }
 
-    case signal_read_failed:
+    case signal_read_failed: {
+      auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
       disarm_timer(self);
       // If the appliance explicitly rejects the ERD (not_supported), mark it
       // in erd_set so the state_polling entry dedup loop does not add it.
@@ -250,6 +252,7 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
         tiny_hsm_transition(hsm, self->next_discovery_state);
       }
       break;
+    }
 
     default:
       return tiny_hsm_result_signal_deferred;
@@ -313,7 +316,6 @@ static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
 static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
-  auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
 
   switch (signal) {
     case tiny_hsm_signal_entry:
@@ -358,7 +360,8 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
       }
     } break;
 
-    case signal_read_completed:
+    case signal_read_completed: {
+      auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
       // Ignore reads for ERDs other than the appliance type ERD (0x0008); they
       // are from concurrent activity on the shared bus and must not trigger a
       // premature transition out of identification with erd_host_address still
@@ -381,7 +384,7 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
         tiny_hsm_transition(hsm, state_add_common_erds);
       }
       break;
-
+    }
     case tiny_hsm_signal_exit:
       disarm_timer(self);
       break;
@@ -494,7 +497,6 @@ static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_sign
 static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
-  auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
 
   switch (signal) {
     case tiny_hsm_signal_entry:
@@ -566,6 +568,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
     case signal_read_completed: {
       disarm_timer(self);
       reset_lost_appliance_timer(self);
+      auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
       tiny_erd_t      erd       = args->read_completed.erd;
       const uint8_t*  erd_data  = reinterpret_cast<const uint8_t*>(args->read_completed.data);
       uint8_t         data_size = args->read_completed.data_size;
@@ -691,8 +694,11 @@ static void mqtt_bridge_polling_init_impl(
   self->custom_erd_list_count  = 0;
   self->erd_polling_list       = nullptr;
   self->polling_list_count     = 0;
-  self->polling_list_capacity  = 0;
   self->restart_pending        = false;
+  self->polling_timer_armed    = false;
+  memset(&self->polling_timer, 0, sizeof(self->polling_timer));
+  memset(&self->appliance_lost_timer, 0, sizeof(self->appliance_lost_timer));
+  memset(&self->timer, 0, sizeof(self->timer));
   self->erd_set   = reinterpret_cast<void*>(new set<tiny_erd_t>());
   self->erd_cache = reinterpret_cast<void*>(new map<tiny_erd_t, vector<uint8_t>>());
   self->pending_registration_set = reinterpret_cast<void*>(new set<tiny_erd_t>());

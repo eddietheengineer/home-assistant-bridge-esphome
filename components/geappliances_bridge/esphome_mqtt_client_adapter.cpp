@@ -199,6 +199,7 @@ extern "C" void esphome_mqtt_client_adapter_init(
   self->erd_registry = nullptr;
   self->wildcard_subscribed   = false;
   self->mqtt_connected_at_ms  = 0;
+  self->destroyed             = false;
 
   tiny_event_init(&self->on_write_request_event);
   tiny_event_init(&self->on_mqtt_disconnect_event);
@@ -248,6 +249,7 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
       mqtt_client->subscribe(
         wildcard_topic,
         [self](const std::string& topic, const std::string& payload) {
+          if (self->destroyed) return;
           // Parse the ERD number from the topic.
           // Topic format: geappliances/{device_id}/erd/0xXXXX/write
           size_t write_pos = topic.rfind("/write");
@@ -277,29 +279,32 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
             return;
           }
 
-          std::vector<uint8_t> data;
-          data.reserve(payload.length() / 2);
-          for (size_t i = 0; i < payload.length(); i += 2) {
-            char byte_str[3] = {payload[i], payload[i + 1], '\0'};
-            if (!std::isxdigit(static_cast<unsigned char>(payload[i])) ||
-                !std::isxdigit(static_cast<unsigned char>(payload[i + 1]))) {
-              ESP_LOGW(TAG, "Invalid hex characters in payload for ERD 0x%04X at position %zu", erd, i);
-              return;
-            }
-            data.push_back(static_cast<uint8_t>(strtol(byte_str, nullptr, 16)));
+          // Allocate data on the heap so the pointer remains valid after
+          // the lambda scope ends.  The event callback (in mqtt_bridge or
+          // mqtt_bridge_polling) copies the data immediately via
+          // tiny_gea3_erd_client_write(), which takes a const void* and
+          // reads size bytes synchronously before returning.  The heap
+          // allocation is freed right after the publish call returns.
+          uint8_t* data_buf = new uint8_t[payload.length() / 2];
+          size_t data_len = payload.length() / 2;
+          for (size_t i = 0; i < data_len; i++) {
+            char byte_str[3] = {payload[i * 2], payload[i * 2 + 1], '\0'};
+            data_buf[i] = static_cast<uint8_t>(strtol(byte_str, nullptr, 16));
           }
 
-          if (data.empty() || data.size() > 255) {
-            ESP_LOGW(TAG, "Invalid data size for ERD 0x%04X: %zu bytes", erd, data.size());
+          if (data_len == 0 || data_len > 255) {
+            ESP_LOGW(TAG, "Invalid data size for ERD 0x%04X: %zu bytes", erd, data_len);
+            delete[] data_buf;
             return;
           }
 
           mqtt_client_on_write_request_args_t args = {
             .erd  = erd,
-            .size = static_cast<uint8_t>(data.size()),
-            .value = data.data()
+            .size = static_cast<uint8_t>(data_len),
+            .value = data_buf
           };
           tiny_event_publish(&self->on_write_request_event, &args);
+          delete[] data_buf;
         },
         0  // QoS 0
       );
@@ -344,6 +349,9 @@ extern "C" void esphome_mqtt_client_adapter_notify_connected(
 extern "C" void esphome_mqtt_client_adapter_destroy(
   esphome_mqtt_client_adapter_t* self)
 {
+  // Mark as destroyed first so any in-flight MQTT callbacks bail out
+  // before accessing freed members.
+  self->destroyed = true;
   if (self->device_id != nullptr) {
     delete self->device_id;
     self->device_id = nullptr;

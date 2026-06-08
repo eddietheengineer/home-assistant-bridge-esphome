@@ -189,24 +189,12 @@ static const tiny_erd_t appliance_api_water_heater_v1_mixing_valve_erds[] = {
   0x4105,
 };
 
-static const tiny_erd_t* appliance_api_water_heater_v1_tall_tank_erds __attribute__((unused)) = nullptr;
-
-static const tiny_erd_t* appliance_api_water_heater_v1_wifi_erds __attribute__((unused)) = nullptr;
-
 static const tiny_erd_t appliance_api_water_heater_v1_heat_pump_erds[] = {
   0x4061,
   0x4062,
   0x4063,
   0x4064,
 };
-
-static const tiny_erd_t* appliance_api_water_heater_v1_concurrent_loads_erds __attribute__((unused)) = nullptr;
-
-static const tiny_erd_t* appliance_api_water_heater_v1_variable_speed_fan_erds __attribute__((unused)) = nullptr;
-
-static const tiny_erd_t* appliance_api_water_heater_v1_variable_speed_compressor_erds __attribute__((unused)) = nullptr;
-
-static const tiny_erd_t* appliance_api_water_heater_v1_120v_operation_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_water_heater_v1_estimation_erds[] = {
   0x40cb,
@@ -218,10 +206,6 @@ static const tiny_erd_t appliance_api_water_heater_v1_estimation_erds[] = {
 static const tiny_erd_t appliance_api_water_heater_v1_cost_of_power_erds[] = {
   0x4125,
 };
-
-static const tiny_erd_t* appliance_api_water_heater_v1_gas_erds __attribute__((unused)) = nullptr;
-
-static const tiny_erd_t* appliance_api_water_heater_v1_blower_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_water_heater_v1_dad_mode_erds[] = {
   0x411d,
@@ -240,8 +224,6 @@ static const tiny_erd_t appliance_api_water_heater_v1_water_heater_active_erds[]
   0x4225,
   0x4226,
 };
-
-static const tiny_erd_t* appliance_api_water_heater_v1_canadian_model_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_water_heater_v1_anode_percentage_remaining_erds[] = {
   0x40c2,
@@ -720,8 +702,6 @@ static const tiny_erd_t appliance_api_clothes_washer_v1_time_saver_erds[] = {
   0x2054,
   0x2055,
 };
-
-static const tiny_erd_t* appliance_api_clothes_washer_v1_deprecated_m00000800_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_clothes_washer_v1_prewash_erds[] = {
   0x205a,
@@ -2186,10 +2166,6 @@ static const tiny_erd_t appliance_api_cooking_v2_remote_bluetooth_device_managem
   0x6204,
 };
 
-static const tiny_erd_t* appliance_api_cooking_v2_stui_presence_erds __attribute__((unused)) = nullptr;
-
-static const tiny_erd_t* appliance_api_cooking_v2_sentry_erds __attribute__((unused)) = nullptr;
-
 static const tiny_erd_t appliance_api_cooking_v2_estimated_remaining_cook_minutes_erds[] = {
   0x5790,
   0x5791,
@@ -2263,12 +2239,6 @@ static const tiny_erd_t appliance_api_cooking_v2_flex_cook_timer_erds[] = {
   0x521d,
   0x521e,
 };
-
-static const tiny_erd_t* appliance_api_cooking_v2_microphone_supported_erds __attribute__((unused)) = nullptr;
-
-static const tiny_erd_t* appliance_api_cooking_v2_enhanced_speaker_supported_erds __attribute__((unused)) = nullptr;
-
-static const tiny_erd_t* appliance_api_cooking_v3_ui_misconfiguration_detection_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_cooking_v3_enhanced_sabbath_manual_mode_erds[] = {
   0x502e,
@@ -2450,8 +2420,6 @@ static const tiny_erd_t appliance_api_split_ac_v1_multimode_conflict_reporting_e
   0x7859,
 };
 
-static const tiny_erd_t* appliance_api_home_water_softener_v1_foundation_erds __attribute__((unused)) = nullptr;
-
 static const tiny_erd_t appliance_api_home_water_softener_v1_water_valve_erds[] = {
   0x1167,
 };
@@ -2493,8 +2461,6 @@ static const tiny_erd_t appliance_api_home_water_softener_v1_water_softener_aler
   0x8004,
   0x8007,
 };
-
-static const tiny_erd_t* appliance_api_home_water_filter_v1_foundation_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_home_water_filter_v1_water_valve_erds[] = {
   0x115e,
@@ -4179,12 +4145,6 @@ static const tiny_erd_t appliance_api_stand_mixer_v2_foundation_erds[] = {
   0x9317,
 };
 
-static const tiny_erd_t* appliance_api_stand_mixer_v2_precision_speed_erds __attribute__((unused)) = nullptr;
-
-static const tiny_erd_t* appliance_api_stand_mixer_v2_active_stir_erds __attribute__((unused)) = nullptr;
-
-static const tiny_erd_t* appliance_api_stand_mixer_v2_auto_sense_additional_parameters_erds __attribute__((unused)) = nullptr;
-
 static const tiny_erd_t appliance_api_smoker_v1_foundation_erds[] = {
   0x9400,
   0x9401,
@@ -4341,8 +4301,6 @@ static const tiny_erd_t appliance_api_smoker_v1_elapsed_warming_time_erds[] = {
 static const tiny_erd_t appliance_api_smoker_v1_preheat_progress_erds[] = {
   0x9439,
 };
-
-static const tiny_erd_t* appliance_api_air_handler_vrf_v1_foundation_erds __attribute__((unused)) = nullptr;
 
 static const tiny_erd_t appliance_api_fabric_care_cabinet_or_closet_v1_foundation_erds[] = {
   0x2000,
@@ -5563,22 +5521,13 @@ static const appliance_feature_api_descriptor_t appliance_feature_api_descriptor
   {0x0000, 1, 0x00000001, "Water Heater / Foundation", appliance_api_water_heater_v1_foundation_erds, 23},
   {0x0000, 1, 0x00000002, "Water Heater / Anode Depletion", appliance_api_water_heater_v1_anode_depletion_erds, 3},
   {0x0000, 1, 0x00000004, "Water Heater / Mixing Valve", appliance_api_water_heater_v1_mixing_valve_erds, 12},
-  {0x0000, 1, 0x00000008, "Water Heater / Tall Tank", nullptr, 0},
-  {0x0000, 1, 0x00000010, "Water Heater / WiFi", nullptr, 0},
   {0x0000, 1, 0x00000020, "Water Heater / Heat Pump", appliance_api_water_heater_v1_heat_pump_erds, 4},
-  {0x0000, 1, 0x00000040, "Water Heater / Concurrent loads", nullptr, 0},
-  {0x0000, 1, 0x00000080, "Water Heater / Variable speed fan", nullptr, 0},
-  {0x0000, 1, 0x00000100, "Water Heater / Variable speed compressor", nullptr, 0},
-  {0x0000, 1, 0x00000200, "Water Heater / 120v operation", nullptr, 0},
   {0x0000, 1, 0x00000400, "Water Heater / Estimation", appliance_api_water_heater_v1_estimation_erds, 4},
   {0x0000, 1, 0x00000800, "Water Heater / Cost of power", appliance_api_water_heater_v1_cost_of_power_erds, 1},
-  {0x0000, 1, 0x00001000, "Water Heater / Gas", nullptr, 0},
-  {0x0000, 1, 0x00002000, "Water Heater / Blower", nullptr, 0},
   {0x0000, 1, 0x00004000, "Water Heater / Dad Mode", appliance_api_water_heater_v1_dad_mode_erds, 1},
   {0x0000, 1, 0x00008000, "Water Heater / Service request", appliance_api_water_heater_v1_service_request_erds, 1},
   {0x0000, 1, 0x00010000, "Water Heater / Water Heater Boost Mode", appliance_api_water_heater_v1_water_heater_boost_mode_erds, 2},
   {0x0000, 1, 0x00020000, "Water Heater / Water Heater Active", appliance_api_water_heater_v1_water_heater_active_erds, 2},
-  {0x0000, 1, 0x00040000, "Water Heater / Canadian model", nullptr, 0},
   {0x0000, 1, 0x00080000, "Water Heater / Anode Percentage remaining", appliance_api_water_heater_v1_anode_percentage_remaining_erds, 1},
   {0x0000, 1, 0x00100000, "Water Heater / Shutoff valve accessory", appliance_api_water_heater_v1_shutoff_valve_accessory_erds, 4},
   {0x0000, 1, 0x00200000, "Water Heater / Heating Diagnostics", appliance_api_water_heater_v1_heating_diagnostics_erds, 6},
@@ -5649,7 +5598,6 @@ static const appliance_feature_api_descriptor_t appliance_feature_api_descriptor
   {0x0002, 1, 0x00000100, "Clothes Washer / One Step Wash and Dry", appliance_api_clothes_washer_v1_one_step_wash_and_dry_erds, 2},
   {0x0002, 1, 0x00000200, "Clothes Washer / Smart Dispense", appliance_api_clothes_washer_v1_smart_dispense_erds, 12},
   {0x0002, 1, 0x00000400, "Clothes Washer / Time Saver", appliance_api_clothes_washer_v1_time_saver_erds, 2},
-  {0x0002, 1, 0x00000800, "Clothes Washer / Deprecated", nullptr, 0},
   {0x0002, 1, 0x00001000, "Clothes Washer / Prewash", appliance_api_clothes_washer_v1_prewash_erds, 2},
   {0x0002, 1, 0x00002000, "Clothes Washer / Power Care", appliance_api_clothes_washer_v1_power_care_erds, 2},
   {0x0002, 1, 0x00004000, "Clothes Washer / Washer Link v2", appliance_api_clothes_washer_v1_washer_link_v2_erds, 1},
@@ -5867,8 +5815,6 @@ static const appliance_feature_api_descriptor_t appliance_feature_api_descriptor
   {0x0007, 2, 0x00002000, "Cooking / Cooktop Multi Burner Closed Loop Cooking", appliance_api_cooking_v2_cooktop_multi_burner_closed_loop_cooking_erds, 43},
   {0x0007, 2, 0x00004000, "Cooking / Customer Feedback", appliance_api_cooking_v2_customer_feedback_erds, 2},
   {0x0007, 2, 0x00008000, "Cooking / Remote Bluetooth Device Management", appliance_api_cooking_v2_remote_bluetooth_device_management_erds, 6},
-  {0x0007, 2, 0x00010000, "Cooking / Stui Presence", nullptr, 0},
-  {0x0007, 2, 0x00020000, "Cooking / Sentry", nullptr, 0},
   {0x0007, 2, 0x00040000, "Cooking / Estimated Remaining Cook Minutes", appliance_api_cooking_v2_estimated_remaining_cook_minutes_erds, 2},
   {0x0007, 2, 0x00080000, "Cooking / AI Cook Mode Session ID", appliance_api_cooking_v2_ai_cook_mode_session_id_erds, 2},
   {0x0007, 2, 0x00100000, "Cooking / Articulating Display", appliance_api_cooking_v2_articulating_display_erds, 4},
@@ -5881,9 +5827,6 @@ static const appliance_feature_api_descriptor_t appliance_feature_api_descriptor
   {0x0007, 2, 0x08000000, "Cooking / Cook Cam AI Assistant", appliance_api_cooking_v2_cook_cam_ai_assistant_erds, 2},
   {0x0007, 2, 0x10000000, "Cooking / Cooktop v2 Notifications", appliance_api_cooking_v2_cooktop_v2_notifications_erds, 2},
   {0x0007, 2, 0x20000000, "Cooking / Flex Cook Timer", appliance_api_cooking_v2_flex_cook_timer_erds, 10},
-  {0x0007, 2, 0x40000000, "Cooking / Microphone Supported", nullptr, 0},
-  {0x0007, 2, 0x80000000, "Cooking / Enhanced Speaker Supported", nullptr, 0},
-  {0x0007, 3, 0x00000001, "Cooking / UI misconfiguration detection", nullptr, 0},
   {0x0007, 3, 0x00000002, "Cooking / Enhanced Sabbath Manual Mode", appliance_api_cooking_v3_enhanced_sabbath_manual_mode_erds, 5},
   {0x0007, 3, 0x00000004, "Cooking / Upper Local Available Cook Modes", appliance_api_cooking_v3_upper_local_available_cook_modes_erds, 1},
   {0x0007, 3, 0x00000008, "Cooking / Lower Local Available Cook Modes", appliance_api_cooking_v3_lower_local_available_cook_modes_erds, 1},
@@ -5913,7 +5856,6 @@ static const appliance_feature_api_descriptor_t appliance_feature_api_descriptor
   {0x000e, 1, 0x00004000, "Split AC / Refrigerant Leak Sensor Support", appliance_api_split_ac_v1_refrigerant_leak_sensor_support_erds, 7},
   {0x000e, 1, 0x00008000, "Split AC / Notification Support", appliance_api_split_ac_v1_notification_support_erds, 2},
   {0x000e, 1, 0x00010000, "Split AC / MultiMode Conflict Reporting", appliance_api_split_ac_v1_multimode_conflict_reporting_erds, 1},
-  {0x000f, 1, 0x00000001, "Home Water Softener / Foundation", nullptr, 0},
   {0x000f, 1, 0x00000002, "Home Water Softener / Water Valve", appliance_api_home_water_softener_v1_water_valve_erds, 1},
   {0x000f, 1, 0x00000004, "Home Water Softener / Manual Override", appliance_api_home_water_softener_v1_manual_override_erds, 1},
   {0x000f, 1, 0x00000008, "Home Water Softener / Continuous Flow Time Limits", appliance_api_home_water_softener_v1_continuous_flow_time_limits_erds, 1},
@@ -5922,7 +5864,6 @@ static const appliance_feature_api_descriptor_t appliance_feature_api_descriptor
   {0x000f, 1, 0x00000040, "Home Water Softener / Water Auto shutoff", appliance_api_home_water_softener_v1_water_auto_shutoff_erds, 5},
   {0x000f, 1, 0x00000080, "Home Water Softener / Salt Information", appliance_api_home_water_softener_v1_salt_information_erds, 1},
   {0x000f, 1, 0x00000100, "Home Water Softener / Water Softener Alerts Legacy", appliance_api_home_water_softener_v1_water_softener_alerts_legacy_erds, 4},
-  {0x0010, 1, 0x00000001, "Home Water Filter / Foundation", nullptr, 0},
   {0x0010, 1, 0x00000002, "Home Water Filter / Water Valve", appliance_api_home_water_filter_v1_water_valve_erds, 3},
   {0x0010, 1, 0x00000004, "Home Water Filter / Manual Override", appliance_api_home_water_filter_v1_manual_override_erds, 1},
   {0x0010, 1, 0x00000008, "Home Water Filter / Filter Expiration Limits", appliance_api_home_water_filter_v1_filter_expiration_limits_erds, 1},
@@ -6194,9 +6135,6 @@ static const appliance_feature_api_descriptor_t appliance_feature_api_descriptor
   {0x0026, 1, 0x00000200, "Stand Mixer / Display Brightness", appliance_api_stand_mixer_v1_display_brightness_erds, 2},
   {0x0026, 1, 0x00000400, "Stand Mixer / Sound Settings", appliance_api_stand_mixer_v1_sound_settings_erds, 1},
   {0x0026, 2, 0x00000001, "Stand Mixer / Foundation", appliance_api_stand_mixer_v2_foundation_erds, 7},
-  {0x0026, 2, 0x00000002, "Stand Mixer / Precision Speed", nullptr, 0},
-  {0x0026, 2, 0x00000004, "Stand Mixer / Active Stir", nullptr, 0},
-  {0x0026, 2, 0x00000008, "Stand Mixer / Auto Sense Additional Parameters", nullptr, 0},
   {0x002b, 1, 0x00000001, "Smoker / Foundation", appliance_api_smoker_v1_foundation_erds, 5},
   {0x002b, 1, 0x00000002, "Smoker / Smoke", appliance_api_smoker_v1_smoke_erds, 3},
   {0x002b, 1, 0x00000004, "Smoker / Pause Smoke", appliance_api_smoker_v1_pause_smoke_erds, 2},
@@ -6227,7 +6165,6 @@ static const appliance_feature_api_descriptor_t appliance_feature_api_descriptor
   {0x002b, 1, 0x08000000, "Smoker / Sound Settings", appliance_api_smoker_v1_sound_settings_erds, 1},
   {0x002b, 1, 0x10000000, "Smoker / Elapsed Warming Time", appliance_api_smoker_v1_elapsed_warming_time_erds, 1},
   {0x002b, 1, 0x20000000, "Smoker / Preheat Progress", appliance_api_smoker_v1_preheat_progress_erds, 1},
-  {0x002c, 1, 0x00000001, "Air Handler VRF / Foundation", nullptr, 0},
   {0x002d, 1, 0x00000001, "Fabric Care Cabinet or Closet / Foundation", appliance_api_fabric_care_cabinet_or_closet_v1_foundation_erds, 9},
   {0x002d, 1, 0x00000002, "Fabric Care Cabinet or Closet / Remote Start and Stop", appliance_api_fabric_care_cabinet_or_closet_v1_remote_start_and_stop_erds, 3},
   {0x002d, 1, 0x00000004, "Fabric Care Cabinet or Closet / Remote Cycle Selection", appliance_api_fabric_care_cabinet_or_closet_v1_remote_cycle_selection_erds, 2},

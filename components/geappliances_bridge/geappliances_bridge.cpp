@@ -576,6 +576,25 @@ bool GeappliancesBridge::teardown() {
   if (this->mqtt_client_adapter_initialized_) {
     esphome_mqtt_client_adapter_destroy(&this->mqtt_client_adapter_);
   }
+
+  // Unsubscribe bridge-level event subscriptions to prevent callbacks
+  // firing into a destroyed object during teardown or re-initialization.
+  if (this->uart_ != nullptr) {
+    tiny_event_unsubscribe(
+      tiny_gea3_erd_client_on_activity(&this->erd_client_.interface),
+      &this->erd_client_activity_subscription_);
+  }
+  if (this->gea2_uart_ != nullptr) {
+    tiny_event_unsubscribe(
+      tiny_gea3_erd_client_on_activity(&this->gea2_erd_client_adapter_.interface),
+      &this->gea2_activity_subscription_);
+    gea2_erd_client_adapter_destroy(&this->gea2_erd_client_adapter_);
+  }
+
+  // Clean up self-driving managers.
+  this->feature_bit_manager_.cleanup();
+  this->autodiscovery_manager_.cleanup();
+
   Component::teardown();
   return true;
 }

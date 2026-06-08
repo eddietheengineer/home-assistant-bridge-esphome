@@ -79,3 +79,13 @@ extern "C" void gea2_erd_client_adapter_init(
   tiny_event_subscription_init(&self->gea2_sub, self, on_gea2_activity);
   tiny_event_subscribe(tiny_gea2_erd_client_on_activity(gea2_client), &self->gea2_sub);
 }
+
+extern "C" void gea2_erd_client_adapter_destroy(
+  gea2_erd_client_adapter_t* self)
+{
+  if (self->gea2_client != nullptr) {
+    tiny_event_unsubscribe(
+      tiny_gea2_erd_client_on_activity(self->gea2_client),
+      &self->gea2_sub);
+  }
+}

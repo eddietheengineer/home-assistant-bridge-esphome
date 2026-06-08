@@ -63,6 +63,10 @@ typedef struct {
   // notify_disconnected()).  Used to gate the pending-update flush so the IDF
   // MQTT task has time to process the broker's reconnect backlog.
   uint32_t mqtt_connected_at_ms;
+  // Set to true in destroy() so the MQTT subscribe lambda can bail out
+  // if it fires after the adapter is torn down (ESPHome does not expose
+  // an unsubscribe API for topic callbacks).
+  bool destroyed;
 } esphome_mqtt_client_adapter_t;
 
 #ifdef __cplusplus
