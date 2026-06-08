@@ -584,7 +584,9 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       } else {
         // Current batch complete but cycle not done — advance to next batch.
         self->erd_index = self->polling_batch_end;
-        self->cycle_completed_count = 0;
+        // Do NOT reset cycle_completed_count here; it is a cumulative
+        // count from the start of the cycle and is compared against
+        // polling_batch_end / polling_list_count (absolute positions).
       }
       self->cycle_start_ms = esphome::millis();
       start_next_polling_batch(self);
@@ -640,7 +642,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       } else if (self->cycle_completed_count >= self->polling_batch_end) {
         // Current batch complete but more ERDs remain — start next batch.
         self->erd_index = self->polling_batch_end;
-        self->cycle_completed_count = 0;
+        // Do NOT reset cycle_completed_count; it is cumulative across the cycle.
         start_next_polling_batch(self);
       }
       break;
@@ -656,7 +658,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       } else if (self->cycle_completed_count >= self->polling_batch_end) {
         // Current batch complete but more ERDs remain — start next batch.
         self->erd_index = self->polling_batch_end;
-        self->cycle_completed_count = 0;
+        // Do NOT reset cycle_completed_count; it is cumulative across the cycle.
         start_next_polling_batch(self);
       }
       break;
