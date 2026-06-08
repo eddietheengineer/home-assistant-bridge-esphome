@@ -141,9 +141,6 @@ typedef struct {
   // cycle is allowed to finish, then the cycle-completion handler restarts
   // immediately instead of waiting for another timer interval.
   bool restart_pending;
-  // Exclusive upper bound of the current batch in erd_polling_list.
-  // When cycle_completed_count reaches this value, the next batch starts.
-  uint16_t polling_batch_end;
 } mqtt_bridge_polling_t;
 
 /*!
