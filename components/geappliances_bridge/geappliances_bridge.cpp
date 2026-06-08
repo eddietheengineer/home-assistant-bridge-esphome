@@ -3,6 +3,7 @@
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 #include "esphome_time_source.h"
+#include "geappliances_bridge_startup_hsm.h"
 
 #ifdef USE_ESP32
 #include "esp_system.h"
@@ -13,6 +14,31 @@ namespace esphome {
 namespace geappliances_bridge {
 
 static const char* const TAG __attribute__((unused)) = "geappliances_bridge";
+
+static const char* bridge_mode_to_string(BridgeMode mode, bool sub_active)
+{
+  switch (mode) {
+    case BRIDGE_MODE_POLL: return "Polling";
+    case BRIDGE_MODE_SUBSCRIBE: return "Subscription";
+    case BRIDGE_MODE_AUTO: return sub_active ? "Auto (Subscription)" : "Auto (Polling - fallback)";
+    default: return "Unknown";
+  }
+}
+
+static const char* startup_state_to_string(tiny_hsm_state_t state)
+{
+  if (state == startup_state_protocol_stack) return "Protocol Stack";
+  if (state == startup_state_startup_delay) return "Startup Delay";
+  if (state == startup_state_autodiscovery) return "Autodiscovery";
+  if (state == startup_state_device_id) return "Device ID";
+  if (state == startup_state_mqtt_client_init) return "MQTT Client Init";
+  if (state == startup_state_feature_bits) return "Feature Bits";
+  if (state == startup_state_bridge_init) return "Bridge Init";
+  if (state == startup_state_subscription_watch) return "Subscription Watch";
+  if (state == startup_state_ha_discovery) return "HA Discovery";
+  if (state == startup_state_running) return "Running";
+  return "Unknown";
+}
 
 static const tiny_gea3_erd_client_configuration_t client_configuration = {
   .request_timeout = 250,
@@ -509,32 +535,7 @@ void GeappliancesBridge::dump_config() {
     ESP_LOGCONFIG(TAG, "  Active Protocol: %s", this->autodiscovery_manager_.is_gea2_protocol() ? "GEA2" : "GEA3");
   }
 
-  // Display bridge mode
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-but-set-variable"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-#endif
-  const char* mode_str = "Unknown";
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-  if (this->mode_ == BRIDGE_MODE_POLL) {
-    mode_str = "Polling";
-  } else if (this->mode_ == BRIDGE_MODE_SUBSCRIBE) {
-    mode_str = "Subscription";
-  } else if (this->mode_ == BRIDGE_MODE_AUTO) {
-    if (this->subscription_mode_active_) {
-      mode_str = "Auto (Subscription)";
-    } else {
-      mode_str = "Auto (Polling - fallback)";
-    }
-  }
-  ESP_LOGCONFIG(TAG, "  Mode: %s", mode_str);
+  { const char* mode_str __attribute__((unused)) = bridge_mode_to_string(this->mode_, this->subscription_mode_active_); ESP_LOGCONFIG(TAG, "  Mode: %s", mode_str); }
   
   if (this->mode_ == BRIDGE_MODE_POLL || !this->subscription_mode_active_) {
     ESP_LOGCONFIG(TAG, "  Polling Interval: %u ms", this->polling_interval_ms_);
@@ -548,31 +549,7 @@ void GeappliancesBridge::dump_config() {
     ESP_LOGCONFIG(TAG, "  Custom ERDs: %zu configured", this->custom_erds_vec_.size());
   }
 
-  // Display current startup state for debugging
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-but-set-variable"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-#endif
-  const char* phase_str = "Unknown";
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-  if (this->startup_hsm_.current == startup_state_protocol_stack)       phase_str = "Protocol Stack";
-  else if (this->startup_hsm_.current == startup_state_startup_delay)   phase_str = "Startup Delay";
-  else if (this->startup_hsm_.current == startup_state_autodiscovery)    phase_str = "Autodiscovery";
-  else if (this->startup_hsm_.current == startup_state_device_id)        phase_str = "Device ID";
-  else if (this->startup_hsm_.current == startup_state_mqtt_client_init) phase_str = "MQTT Client Init";
-  else if (this->startup_hsm_.current == startup_state_feature_bits)     phase_str = "Feature Bits";
-  else if (this->startup_hsm_.current == startup_state_bridge_init)      phase_str = "Bridge Init";
-  else if (this->startup_hsm_.current == startup_state_subscription_watch) phase_str = "Subscription Watch";
-  else if (this->startup_hsm_.current == startup_state_ha_discovery)     phase_str = "HA Discovery";
-  else if (this->startup_hsm_.current == startup_state_running)          phase_str = "Running";
-  ESP_LOGCONFIG(TAG, "  Startup State: %s", phase_str);
+  { const char* phase_str __attribute__((unused)) = startup_state_to_string(this->startup_hsm_.current); ESP_LOGCONFIG(TAG, "  Startup State: %s", phase_str); }
 }
 
 float GeappliancesBridge::get_setup_priority() const {
@@ -733,12 +710,6 @@ void GeappliancesBridge::run_ha_discovery()
       mqtt_bridge_polling_.polling_list_complete,
       subscription_activity_detected_,
       mqtt::global_mqtt_client);
-}
-
-void GeappliancesBridge::run_all_managers()
-{
-  // FeatureBitManager is self-driving (owns its own timers and event subscriptions).
-  // No polling needed from the bridge loop.
 }
 
 }  // namespace geappliances_bridge

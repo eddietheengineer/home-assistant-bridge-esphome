@@ -120,7 +120,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void maybe_start_custom_erd_polling() override;
   void log_poll_state_transitions() override;
   void run_ha_discovery() override;
-  void run_all_managers() override;
 
   // ── Internal bridge methods (event callbacks and per-phase helpers) ─────────
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);

@@ -92,7 +92,6 @@ class MockBridgeServices : public IBridgeServices {
   void maybe_start_custom_erd_polling() override {}
   void log_poll_state_transitions() override {}
   void run_ha_discovery() override {}
-  void run_all_managers() override {}
 };
 
 // =============================================================================

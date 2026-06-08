@@ -461,7 +461,6 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
       break;
 
     case signal_run_loop:
-      svc->run_all_managers();
 
       if (svc->get_mode() == BRIDGE_MODE_AUTO && svc->is_subscription_mode_active()) {
         svc->check_subscription_activity();

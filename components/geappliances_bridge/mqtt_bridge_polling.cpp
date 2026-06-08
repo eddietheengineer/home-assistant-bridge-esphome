@@ -42,6 +42,7 @@ static tiny_hsm_result_t state_add_appliance_api_feature_erds(tiny_hsm_t* hsm, t
 static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+static void send_next_poll_read_request(mqtt_bridge_polling_t* self);
 
 // ============================================================================
 // Polling bridge — private helpers
@@ -68,6 +69,31 @@ static void reset_lost_appliance_timer(mqtt_bridge_polling_t* self)
     self->timer_group, &self->appliance_lost_timer, appliance_lost_timeout, self, +[](void* context) {
       tiny_hsm_send_signal(&reinterpret_cast<mqtt_bridge_polling_t*>(context)->hsm, signal_appliance_lost, nullptr);
     });
+}
+
+// Restart the polling cycle: reset index/counters and fire read requests.
+static void restart_polling_cycle(mqtt_bridge_polling_t* self)
+{
+  self->erd_index = 0;
+  self->cycle_completed_count = 0;
+  self->cycle_start_ms = esphome::millis();
+  arm_polling_timer(self, self->polling_interval_ms);
+  while (self->erd_index < self->polling_list_count) {
+    send_next_poll_read_request(self);
+  }
+}
+
+// Record cycle completion and restart if needed (restart pending or timer not armed).
+static void complete_polling_cycle(mqtt_bridge_polling_t* self)
+{
+  self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
+  self->cycle_count++;
+  if (self->restart_pending) {
+    self->restart_pending = false;
+    restart_polling_cycle(self);
+  } else if (!self->polling_timer_armed) {
+    restart_polling_cycle(self);
+  }
 }
 
 // Growth increment for dynamic polling list reallocation.
@@ -232,6 +258,25 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
   return tiny_hsm_result_signal_consumed;
 }
 
+// Shared entry handler for all discovery-list states.
+// Sets up the ERD list, resets index, and fires the first read request.
+static void enter_discovery_list_state(mqtt_bridge_polling_t* self, const char* name,
+    tiny_hsm_result_t (*next_state)(tiny_hsm_t*, tiny_hsm_signal_t, const void*),
+    const uint16_t* erd_list, uint16_t erd_list_count)
+{
+  self->current_state_name      = name;
+  self->next_discovery_state    = next_state;
+  self->appliance_erd_list      = erd_list;
+  self->appliance_erd_list_count = erd_list_count;
+  self->erd_index               = 0;
+  self->request_id++;
+  bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id,
+    self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+  if (queued) {
+    arm_timer(self, retry_delay);
+  }
+}
+
 // ============================================================================
 // Polling bridge — state handlers
 // ============================================================================
@@ -347,17 +392,11 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
 
   return tiny_hsm_result_signal_consumed;
 }
-
 static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
 
   if (signal == tiny_hsm_signal_entry) {
-    self->current_state_name      = "add_common_erds";
-    self->next_discovery_state    = state_add_energy_erds;
-    self->appliance_erd_list       = commonErds;
-    self->appliance_erd_list_count = commonErdCount;
-    self->erd_index                = 0;
     // Reset the polling list and the erd_set that deduplicates it. This is
     // the correct place to clear erd_set: it only runs in the full-discovery
     // path (appliance first seen, or appliance_lost re-discovery), NOT on every
@@ -366,12 +405,8 @@ static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     // the heap over time.
     erd_set(self).clear();
     pending_registration_set(self).clear();
-    self->polling_list_count       = 0;
-    self->request_id++;
-    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    if (queued) {
-      arm_timer(self, retry_delay);
-    }
+    self->polling_list_count = 0;
+    enter_discovery_list_state(self, "add_common_erds", state_add_energy_erds, commonErds, commonErdCount);
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -383,16 +418,7 @@ static tiny_hsm_result_t state_add_energy_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
   mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
 
   if (signal == tiny_hsm_signal_entry) {
-    self->current_state_name      = "add_energy_erds";
-    self->next_discovery_state    = state_add_appliance_api_feature_erds;
-    self->appliance_erd_list       = energyErds;
-    self->appliance_erd_list_count = energyErdCount;
-    self->erd_index                = 0;
-    self->request_id++;
-    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    if (queued) {
-      arm_timer(self, retry_delay);
-    }
+    enter_discovery_list_state(self, "add_energy_erds", state_add_appliance_api_feature_erds, energyErds, energyErdCount);
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -404,29 +430,20 @@ static tiny_hsm_result_t state_add_appliance_api_feature_erds(tiny_hsm_t* hsm, t
   mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
 
   if (signal == tiny_hsm_signal_entry) {
-    self->current_state_name = "add_appliance_api_feature_erds";
     // When reached via the api_parsed_list path (from state_identify_appliance),
     // probe each ERD in api_parsed_list before polling to filter out ERDs the
     // appliance does not actually support.  Clear the polling list and erd_set
     // here so that re-entry after appliance_lost starts fresh.
     // When reached via the full discovery chain (from state_add_energy_erds),
     // continue to appliance-specific ERDs as before.
+    tiny_hsm_state_t next = state_add_appliance_erds;
     if (self->api_parsed_list != nullptr) {
       erd_set(self).clear();
       pending_registration_set(self).clear();
       self->polling_list_count = 0;
-      self->next_discovery_state = state_probe_api_parsed_erds;
-    } else {
-      self->next_discovery_state = state_add_appliance_erds;
+      next = state_probe_api_parsed_erds;
     }
-    self->appliance_erd_list       = applianceApiFeatureErds;
-    self->appliance_erd_list_count = applianceApiFeatureErdCount;
-    self->erd_index                = 0;
-    self->request_id++;
-    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    if (queued) {
-      arm_timer(self, retry_delay);
-    }
+    enter_discovery_list_state(self, "add_appliance_api_feature_erds", next, applianceApiFeatureErds, applianceApiFeatureErdCount);
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -438,16 +455,7 @@ static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_s
   mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
 
   if (signal == tiny_hsm_signal_entry) {
-    self->current_state_name      = "probe_api_parsed_erds";
-    self->next_discovery_state    = state_polling;
-    self->appliance_erd_list       = self->api_parsed_list;
-    self->appliance_erd_list_count = self->api_parsed_list_count;
-    self->erd_index                = 0;
-    self->request_id++;
-    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    if (queued) {
-      arm_timer(self, retry_delay);
-    }
+    enter_discovery_list_state(self, "probe_api_parsed_erds", state_polling, self->api_parsed_list, self->api_parsed_list_count);
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -475,16 +483,8 @@ static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_sign
     if (self->appliance_type >= maximumApplianceType) {
       self->appliance_type = 0;
     }
-    self->current_state_name      = "add_appliance_erds";
-    self->next_discovery_state    = state_polling;
-    self->appliance_erd_list       = applianceTypeToErdGroupTranslation[self->appliance_type].erdList;
-    self->appliance_erd_list_count = applianceTypeToErdGroupTranslation[self->appliance_type].erdCount;
-    self->erd_index                = 0;
-    self->request_id++;
-    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    if (queued) {
-      arm_timer(self, retry_delay);
-    }
+    const applianceTypeToErdListAndCount_t* group = &applianceTypeToErdGroupTranslation[self->appliance_type];
+    enter_discovery_list_state(self, "add_appliance_erds", state_polling, group->erdList, group->erdCount);
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -601,28 +601,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       }
       self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
-        self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
-        self->cycle_count++;
-        if (self->restart_pending) {
-          // Timer fired while this cycle was in progress; start next cycle now.
-          self->restart_pending = false;
-          self->erd_index = 0;
-          self->cycle_completed_count = 0;
-          self->cycle_start_ms = esphome::millis();
-          arm_polling_timer(self, self->polling_interval_ms);
-          while (self->erd_index < self->polling_list_count) {
-            send_next_poll_read_request(self);
-          }
-        } else if (!self->polling_timer_armed) {
-          /* Cycle finished and no timer pending — start next cycle immediately. */
-          self->erd_index = 0;
-          self->cycle_completed_count = 0;
-          self->cycle_start_ms = esphome::millis();
-          while (self->erd_index < self->polling_list_count) {
-            send_next_poll_read_request(self);
-          }
-        }
-        // else: timer still armed — wait for it to fire and restart.
+        complete_polling_cycle(self);
       }
       break;
     }
@@ -632,26 +611,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       reset_lost_appliance_timer(self);
       self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
-        self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
-        self->cycle_count++;
-        if (self->restart_pending) {
-          self->restart_pending = false;
-          self->erd_index = 0;
-          self->cycle_completed_count = 0;
-          self->cycle_start_ms = esphome::millis();
-          arm_polling_timer(self, self->polling_interval_ms);
-          while (self->erd_index < self->polling_list_count) {
-            send_next_poll_read_request(self);
-          }
-        } else if (!self->polling_timer_armed) {
-          self->erd_index = 0;
-          self->cycle_completed_count = 0;
-          self->cycle_start_ms = esphome::millis();
-          while (self->erd_index < self->polling_list_count) {
-            send_next_poll_read_request(self);
-          }
-        }
-        // else: timer still armed — wait for it to fire and restart.
+        complete_polling_cycle(self);
       }
       break;
 
