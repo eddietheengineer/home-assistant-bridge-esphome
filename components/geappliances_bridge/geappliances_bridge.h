@@ -129,7 +129,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void maybe_start_custom_erd_polling_();
   void configure_polling_optional_lists_();
   void check_subscription_activity_();
+  void update_mqtt_connection_fsm_();
   void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
+  void drive_startup_hsm_();
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
   void start_feature_bit_reading_();
   void on_ha_discovery_erd_seen_(tiny_erd_t erd);

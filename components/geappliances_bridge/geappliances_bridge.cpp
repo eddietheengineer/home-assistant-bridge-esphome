@@ -204,8 +204,8 @@ void GeappliancesBridge::setup() {
   ESP_LOGCONFIG(TAG, "GE Appliances Bridge setup complete");
 }
 
-void GeappliancesBridge::loop() {
-  // ── MQTT Connection FSM ────────────────────────────────────────────────────
+void GeappliancesBridge::update_mqtt_connection_fsm_()
+{
   // A 4-state FSM drives the MQTT (re)connection sequence so that each loop()
   // call performs at most one MQTT operation, keeping the main loop
   // non-blocking.
@@ -218,85 +218,77 @@ void GeappliancesBridge::loop() {
   // only on genuine connection loss.  Calling it on reconnect caused full GEA2
   // re-identification inside the GEA2 tight loop, leading to heap corruption
   // (see iteration_log.md).
-  // ─────────────────────────────────────────────────────────────────────────
-  {
-    auto mqtt_client = mqtt::global_mqtt_client;
-    if (mqtt_client != nullptr) {
-      bool is_connected = mqtt_client->is_connected();
-      if (!is_connected) {
-        // Any state → DISCONNECTED on genuine loss of connection.
-        if (this->mqtt_connection_state_ != MqttConnectionState::DISCONNECTED) {
-          this->mqtt_connection_state_ = MqttConnectionState::DISCONNECTED;
-          if (this->mqtt_client_adapter_initialized_) {
-            esphome_mqtt_client_adapter_notify_disconnected(&this->mqtt_client_adapter_);
-          }
-        }
-      } else {
-        switch (this->mqtt_connection_state_) {
-          case MqttConnectionState::DISCONNECTED:
-            // Connect edge: log and signal the startup HSM, then advance to
-            // SUBSCRIBING.  The HSM signal may unblock the feature_bits or
-            // bridge_init phases.
-            ESP_LOGI(TAG, "MQTT connected");
-            tiny_hsm_send_signal(&this->startup_hsm_, signal_mqtt_connected, nullptr);
-            this->mqtt_connection_state_ = MqttConnectionState::SUBSCRIBING;
-            break;
+  auto mqtt_client = mqtt::global_mqtt_client;
+  if (mqtt_client == nullptr) return;
 
-          case MqttConnectionState::SUBSCRIBING:
-            // Wait for adapter initialization, then register the single wildcard
-            // write topic.  Stay in SUBSCRIBING until the adapter is ready so
-            // the subscribe is not skipped when MQTT connects before adapter init.
-            if (this->mqtt_client_adapter_initialized_) {
-              esphome_mqtt_client_adapter_subscribe_write_topic(&this->mqtt_client_adapter_);
-              this->mqtt_connection_state_ = MqttConnectionState::FLUSHING;
-            }
-            break;
-
-          case MqttConnectionState::FLUSHING:
-            // Drain pending ERD updates a few at a time.  Transition to
-            // RUNNING once the queue is empty.
-            if (this->mqtt_client_adapter_initialized_) {
-              if (esphome_mqtt_client_adapter_drain_pending_updates(
-                      &this->mqtt_client_adapter_) == 0) {
-                this->mqtt_connection_state_ = MqttConnectionState::RUNNING;
-              }
-            } else {
-              this->mqtt_connection_state_ = MqttConnectionState::RUNNING;
-            }
-            break;
-
-          case MqttConnectionState::RUNNING:
-            // Steady-state: drain any newly queued ERD updates.
-            if (this->mqtt_client_adapter_initialized_) {
-              esphome_mqtt_client_adapter_drain_pending_updates(&this->mqtt_client_adapter_);
-            }
-            break;
-        }
+  bool is_connected = mqtt_client->is_connected();
+  if (!is_connected) {
+    // Any state → DISCONNECTED on genuine loss of connection.
+    if (this->mqtt_connection_state_ != MqttConnectionState::DISCONNECTED) {
+      this->mqtt_connection_state_ = MqttConnectionState::DISCONNECTED;
+      if (this->mqtt_client_adapter_initialized_) {
+        esphome_mqtt_client_adapter_notify_disconnected(&this->mqtt_client_adapter_);
       }
     }
+    return;
   }
 
-  // ── Startup HSM ────────────────────────────────────────────────────────
-  // The bridge progresses through a linear sequence of startup phases via
-  // a tiny_hsm-based state machine.  Each state handles its own entry/exit
-  // logic and waits for signals from managers before transitioning.
-  //
-  // Phase dependency chain:
-  //   PROTOCOL → AUTODISCOVERY → DEVICE_ID → MQTT_CLIENT → FEATURE_BITS
-  //           → BRIDGE_INIT → SUBSCRIPTION_WATCH → HA_DISCOVERY → HEAP
-  //           → RUNNING (steady-state)
-  // ────────────────────────────────────────────────────────────────────────
+  switch (this->mqtt_connection_state_) {
+    case MqttConnectionState::DISCONNECTED:
+      // Connect edge: log and signal the startup HSM, then advance to
+      // SUBSCRIBING.  The HSM signal may unblock the feature_bits or
+      // bridge_init phases.
+      ESP_LOGI(TAG, "MQTT connected");
+      tiny_hsm_send_signal(&this->startup_hsm_, signal_mqtt_connected, nullptr);
+      this->mqtt_connection_state_ = MqttConnectionState::SUBSCRIBING;
+      break;
 
-  // Drive the GEA2/GEA3 protocol stack on every loop iteration so that
-  // UART bytes are processed and ERD read responses are delivered to the
-  // active manager (autodiscovery, device ID, feature bits, polling bridge).
+    case MqttConnectionState::SUBSCRIBING:
+      // Wait for adapter initialization, then register the single wildcard
+      // write topic.  Stay in SUBSCRIBING until the adapter is ready so
+      // the subscribe is not skipped when MQTT connects before adapter init.
+      if (this->mqtt_client_adapter_initialized_) {
+        esphome_mqtt_client_adapter_subscribe_write_topic(&this->mqtt_client_adapter_);
+        this->mqtt_connection_state_ = MqttConnectionState::FLUSHING;
+      }
+      break;
+
+    case MqttConnectionState::FLUSHING:
+      // Drain pending ERD updates a few at a time.  Transition to
+      // RUNNING once the queue is empty.
+      if (this->mqtt_client_adapter_initialized_) {
+        if (esphome_mqtt_client_adapter_drain_pending_updates(
+                &this->mqtt_client_adapter_) == 0) {
+          this->mqtt_connection_state_ = MqttConnectionState::RUNNING;
+        }
+      } else {
+        this->mqtt_connection_state_ = MqttConnectionState::RUNNING;
+      }
+      break;
+
+    case MqttConnectionState::RUNNING:
+      // Steady-state: drain any newly queued ERD updates.
+      if (this->mqtt_client_adapter_initialized_) {
+        esphome_mqtt_client_adapter_drain_pending_updates(&this->mqtt_client_adapter_);
+      }
+      break;
+  }
+}
+
+void GeappliancesBridge::loop() {
+  this->update_mqtt_connection_fsm_();
   this->run_protocol_stack_();
 #ifdef USE_ESP32
-  // Feed the task watchdog after the protocol stack — the GEA2 tight loop
-  // can run for 200 ms wall-clock time, exceeding the default TWDT timeout.
   esp_task_wdt_reset();
 #endif
+  this->drive_startup_hsm_();
+#ifdef USE_ESP32
+  esp_task_wdt_reset();
+#endif
+}
 
+void GeappliancesBridge::drive_startup_hsm_()
+{
   // Initialize the startup HSM on the first loop() call.
   if (this->startup_hsm_.current == nullptr) {
     // Set the back-pointer so HSM state functions can invoke bridge
@@ -314,12 +306,6 @@ void GeappliancesBridge::loop() {
   if (hsm_elapsed >= 1000) {
     ESP_LOGW(TAG, "Long HSM run_loop: %ums", hsm_elapsed);
   }
-#ifdef USE_ESP32
-  // Feed the task watchdog after the HSM run_loop signal — in steady-state
-  // this drains pending MQTT updates (each acquiring the IDF MQTT mutex)
-  // and can block for hundreds of milliseconds.
-  esp_task_wdt_reset();
-#endif
 }
 
 // ---------------------------------------------------------------------------
