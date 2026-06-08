@@ -43,6 +43,7 @@ static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_s
 static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static void send_next_poll_read_request(mqtt_bridge_polling_t* self);
+static void start_next_polling_batch(mqtt_bridge_polling_t* self);
 
 // ============================================================================
 // Polling bridge — private helpers
@@ -71,16 +72,14 @@ static void reset_lost_appliance_timer(mqtt_bridge_polling_t* self)
     });
 }
 
-// Restart the polling cycle: reset index/counters and fire read requests.
+// Restart the polling cycle: reset index/counters and start the first batch.
 static void restart_polling_cycle(mqtt_bridge_polling_t* self)
 {
   self->erd_index = 0;
   self->cycle_completed_count = 0;
   self->cycle_start_ms = esphome::millis();
   arm_polling_timer(self, self->polling_interval_ms);
-  while (self->erd_index < self->polling_list_count) {
-    send_next_poll_read_request(self);
-  }
+  start_next_polling_batch(self);
 }
 
 // Record cycle completion and restart if needed (restart pending or timer not armed).
@@ -99,6 +98,9 @@ static void complete_polling_cycle(mqtt_bridge_polling_t* self)
 // Growth increment for dynamic polling list reallocation.
 // Large enough to amortize allocation cost, small enough to avoid wasting heap.
 static const uint16_t POLLING_LIST_GROWTH_INCREMENT = 32;
+// Number of ERDs to read in each polling batch during steady-state.
+// Limits in-flight reads to avoid overwhelming the GEA2/GEA3 queue.
+static const uint16_t POLLING_BATCH_SIZE = 5;
 
 // Allocate or grow the polling list to at least the requested capacity.
 // If the list is already large enough, this is a no-op.
@@ -123,6 +125,21 @@ static void ensure_polling_list_capacity(mqtt_bridge_polling_t* self, uint16_t n
   }
   self->erd_polling_list = new_list;
   self->polling_list_capacity = new_capacity;
+}
+
+// Start a batch of up to POLLING_BATCH_SIZE read requests from the current
+// erd_index position.  Sets polling_batch_end to mark the batch boundary.
+static void start_next_polling_batch(mqtt_bridge_polling_t* self)
+{
+  uint16_t batch_end = self->erd_index + POLLING_BATCH_SIZE;
+  if (batch_end > self->polling_list_count) {
+    batch_end = self->polling_list_count;
+  }
+  self->polling_batch_end = batch_end;
+
+  while (self->erd_index < batch_end) {
+    send_next_poll_read_request(self);
+  }
 }
 
 static set<tiny_erd_t>& pending_registration_set(mqtt_bridge_polling_t* self)
@@ -154,6 +171,11 @@ static void add_erd_to_polling_list(mqtt_bridge_polling_t* self, tiny_erd_t erd)
     ensure_polling_list_capacity(self, self->polling_list_count + 1);
     self->erd_polling_list[self->polling_list_count] = erd;
     self->polling_list_count++;
+    // If added mid-batch, expand the batch boundary so the new ERD is
+    // included in the current batch rather than being skipped.
+    if (self->polling_list_count > self->polling_batch_end) {
+      self->polling_batch_end = self->polling_list_count;
+    }
   }
 }
 
@@ -539,29 +561,38 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
     case signal_polling_timer_expired: {
       // Timer fired: mark as no longer armed.
       self->polling_timer_armed = false;
-      if (self->erd_index >= self->polling_list_count && self->cycle_completed_count < self->polling_list_count) {
-        // Reads are in flight (erd_index reached the end of the list) but
-        // not all responses have arrived yet.  Per Phase 3 spec, let the
-        // current cycle finish naturally before restarting.  If erd_index
-        // is 0 the cycle has not started; the timer correctly starts it below.
-        // Mark restart as pending so the cycle-completion handler kicks off
-        // the next cycle as soon as the last ERD responds.
+      // Disarm the per-read retry timer so that tiny_timer_ticks_until_next_ready
+      // returns the polling timer's remaining ticks rather than the retry timer's
+      // shorter interval.  The retry timer is re-armed by send_next_poll_read_request
+      // for each new read below.
+      disarm_timer(self);
+      if (self->erd_index >= self->polling_batch_end && self->cycle_completed_count < self->polling_batch_end) {
+        // Current batch reads are in flight but not all responses have
+        // arrived yet.  Let the batch finish naturally before advancing.
+        // If erd_index is 0 the cycle has not started; the timer correctly
+        // starts it below.  Mark restart as pending so the batch/cycle
+        // completion handler kicks off the next batch or cycle immediately.
         self->restart_pending = true;
         break;
       }
-      // Cycle was already complete when the timer fired — start next cycle now.
-      self->erd_index = 0;
-      self->cycle_completed_count = 0;
+      // Batch or cycle was already complete when the timer fired —
+      // advance to the next batch or start a new cycle.
+      if (self->cycle_completed_count >= self->polling_list_count) {
+        // Full cycle complete — restart from scratch.
+        self->erd_index = 0;
+        self->cycle_completed_count = 0;
+      } else {
+        // Current batch complete but cycle not done — advance to next batch.
+        self->erd_index = self->polling_batch_end;
+        self->cycle_completed_count = 0;
+      }
       self->cycle_start_ms = esphome::millis();
-      uint32_t cycle_start = esphome::millis();
-      while (self->erd_index < self->polling_list_count) {
-        send_next_poll_read_request(self);
-      }
-      uint32_t elapsed = esphome::millis() - cycle_start;
-      if (elapsed >= 1000) {
-        ESP_LOGW(TAG, "Long cycle start: %ums for %u ERDs", elapsed, self->polling_list_count);
-      }
+      start_next_polling_batch(self);
       arm_polling_timer(self, self->polling_interval_ms);
+      // Disarm the retry timer after arming the polling timer so that
+      // tiny_timer_ticks_until_next_ready returns the polling timer's
+      // remaining ticks, not the retry timer's shorter interval.
+      disarm_timer(self);
       break;
     }
 
@@ -604,7 +635,13 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       }
       self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
+        // Full cycle complete.
         complete_polling_cycle(self);
+      } else if (self->cycle_completed_count >= self->polling_batch_end) {
+        // Current batch complete but more ERDs remain — start next batch.
+        self->erd_index = self->polling_batch_end;
+        self->cycle_completed_count = 0;
+        start_next_polling_batch(self);
       }
       break;
     }
@@ -614,7 +651,13 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       reset_lost_appliance_timer(self);
       self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
+        // Full cycle complete.
         complete_polling_cycle(self);
+      } else if (self->cycle_completed_count >= self->polling_batch_end) {
+        // Current batch complete but more ERDs remain — start next batch.
+        self->erd_index = self->polling_batch_end;
+        self->cycle_completed_count = 0;
+        start_next_polling_batch(self);
       }
       break;
 
@@ -695,6 +738,7 @@ static void mqtt_bridge_polling_init_impl(
   self->erd_polling_list       = nullptr;
   self->polling_list_count     = 0;
   self->restart_pending        = false;
+  self->polling_batch_end      = 0;
   self->polling_timer_armed    = false;
   memset(&self->polling_timer, 0, sizeof(self->polling_timer));
   memset(&self->appliance_lost_timer, 0, sizeof(self->appliance_lost_timer));

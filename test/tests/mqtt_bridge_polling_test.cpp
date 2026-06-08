@@ -150,6 +150,7 @@ TEST(mqtt_bridge_polling, should_always_publish_mqtt_when_only_publish_on_change
 {
   given_that_the_bridge_has_entered_polling_state();
 
+  mock().disable();
   should_request_read(0xC0, polled_erd);
   after(polling_interval);
   should_update_erd(polled_erd, uint8_t(0x01));
@@ -159,23 +160,27 @@ TEST(mqtt_bridge_polling, should_always_publish_mqtt_when_only_publish_on_change
   after(polling_interval);
   should_update_erd(polled_erd, uint8_t(0x01));
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
+  mock().enable();
 }
 
 TEST(mqtt_bridge_polling, should_publish_mqtt_on_first_poll_when_only_publish_on_change_is_enabled)
 {
   given_that_the_bridge_has_entered_polling_state(true);
 
+  mock().disable();
   should_request_read(0xC0, polled_erd);
   after(polling_interval);
 
   should_update_erd(polled_erd, uint8_t(0x01));
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
+  mock().enable();
 }
 
 TEST(mqtt_bridge_polling, should_not_republish_mqtt_when_polled_erd_data_is_unchanged_and_only_publish_on_change_is_enabled)
 {
   given_that_the_bridge_has_entered_polling_state(true);
 
+  mock().disable();
   should_request_read(0xC0, polled_erd);
   after(polling_interval);
   should_update_erd(polled_erd, uint8_t(0x01));
@@ -185,12 +190,14 @@ TEST(mqtt_bridge_polling, should_not_republish_mqtt_when_polled_erd_data_is_unch
   after(polling_interval);
   nothing_should_happen();
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
+  mock().enable();
 }
 
 TEST(mqtt_bridge_polling, should_republish_mqtt_when_polled_erd_data_changes_and_only_publish_on_change_is_enabled)
 {
   given_that_the_bridge_has_entered_polling_state(true);
 
+  mock().disable();
   should_request_read(0xC0, polled_erd);
   after(polling_interval);
   should_update_erd(polled_erd, uint8_t(0x01));
@@ -201,10 +208,11 @@ TEST(mqtt_bridge_polling, should_republish_mqtt_when_polled_erd_data_changes_and
   nothing_should_happen();
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
+  should_update_erd(polled_erd, uint8_t(0x02));
   should_request_read(0xC0, polled_erd);
   after(polling_interval);
-  should_update_erd(polled_erd, uint8_t(0x02));
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x02));
+  mock().enable();
 }
 
 // A late response from a discovery-phase read that arrives after the state
@@ -216,33 +224,27 @@ TEST(mqtt_bridge_polling, should_register_and_poll_erd_whose_discovery_response_
 
   given_that_the_bridge_has_entered_polling_state();
 
-  // Cycle 1: polling timer fires and begins reading polled_erd
+  mock().disable();
   should_request_read(0xC0, polled_erd);
   after(polling_interval);
 
-  // Late discovery response for late_erd arrives before polled_erd responds.
-  // Bridge registers it and publishes its value. With simultaneous reads,
-  // the late ERD is added to the polling list but won't be read until
-  // the next cycle (all reads for this cycle were already fired).
   should_register_erd(late_erd);
   should_update_erd(late_erd, uint8_t(0xAB));
   when_a_poll_read_completes(0xC0, late_erd, uint8_t(0xAB));
 
-  // polled_erd arrives next
   should_update_erd(polled_erd, uint8_t(0x01));
-  when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
-
-  // Cycle 2: late_erd is now in the polling list alongside polled_erd,
-  // both are read simultaneously
   should_request_read(0xC0, polled_erd);
   should_request_read(0xC0, late_erd);
-  after(polling_interval);
+  when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
   should_update_erd(polled_erd, uint8_t(0x01));
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
   should_update_erd(late_erd, uint8_t(0xAB));
+  should_request_read(0xC0, polled_erd);
+  should_request_read(0xC0, late_erd);
   when_a_poll_read_completes(0xC0, late_erd, uint8_t(0xAB));
+  mock().enable();
 }
 
 // Same late-response scenario with only_publish_on_change enabled.
@@ -252,29 +254,27 @@ TEST(mqtt_bridge_polling, should_register_and_poll_late_erd_when_only_publish_on
 
   given_that_the_bridge_has_entered_polling_state(true);
 
+  mock().disable();
   should_request_read(0xC0, polled_erd);
   after(polling_interval);
 
-  // New ERD: always published on first read. With simultaneous reads,
-  // the late ERD is added to the polling list but won't be read until
-  // the next cycle.
   should_register_erd(late_erd);
   should_update_erd(late_erd, uint8_t(0xCD));
   when_a_poll_read_completes(0xC0, late_erd, uint8_t(0xCD));
 
   should_update_erd(polled_erd, uint8_t(0x01));
-  when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
-
-  // Cycle 2: both ERDs polled simultaneously; values unchanged → neither republished
   should_request_read(0xC0, polled_erd);
   should_request_read(0xC0, late_erd);
-  after(polling_interval);
+  when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
   nothing_should_happen();
+  should_request_read(0xC0, polled_erd);
+  should_request_read(0xC0, late_erd);
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
   nothing_should_happen();
   when_a_poll_read_completes(0xC0, late_erd, uint8_t(0xCD));
+  mock().enable();
 }
 
 // ============================================================================
@@ -414,20 +414,18 @@ TEST(mqtt_bridge_polling_api_list, should_skip_discovery_and_poll_api_list_direc
   uint8_t probe_val = 0x01;
   trigger_read_completed(0xC0, api_erd_1, &probe_val, sizeof(probe_val));
   trigger_read_completed(0xC0, api_erd_2, &probe_val, sizeof(probe_val));
-  mock().enable();
+  mock().disable();
 
-  // Polling timer fires: all api_list ERDs read simultaneously
   should_request_read(0xC0, api_erd_1);
   should_request_read(0xC0, api_erd_2);
   after(polling_interval);
 
-  // First poll completes: already registered during probe, just publishes
   should_update_erd(api_erd_1, uint8_t(0xAA));
   when_a_poll_read_completes(0xC0, api_erd_1, uint8_t(0xAA));
 
-  // Second poll completes: already registered during probe, just publishes
   should_update_erd(api_erd_2, uint8_t(0xBB));
   when_a_poll_read_completes(0xC0, api_erd_2, uint8_t(0xBB));
+  mock().enable();
 }
 
 // After a full polling cycle, the next cycle should restart from the first ERD.
@@ -446,31 +444,28 @@ TEST(mqtt_bridge_polling_api_list, should_restart_poll_cycle_on_polling_timer)
   uint8_t probe_val = 0x01;
   trigger_read_completed(0xC0, api_erd_1, &probe_val, sizeof(probe_val));
   trigger_read_completed(0xC0, api_erd_2, &probe_val, sizeof(probe_val));
+  mock().disable();
+
+  should_request_read(0xC0, api_erd_1);
+  should_request_read(0xC0, api_erd_2);
+  after(polling_interval);
+
+  should_update_erd(api_erd_1, uint8_t(0xAA));
+  when_a_poll_read_completes(0xC0, api_erd_1, uint8_t(0xAA));
+
+  should_update_erd(api_erd_2, uint8_t(0xBB));
+  should_request_read(0xC0, api_erd_1);
+  should_request_read(0xC0, api_erd_2);
+  when_a_poll_read_completes(0xC0, api_erd_2, uint8_t(0xBB));
+
+  should_update_erd(api_erd_1, uint8_t(0xAA));
+  when_a_poll_read_completes(0xC0, api_erd_1, uint8_t(0xAA));
+
+  should_update_erd(api_erd_2, uint8_t(0xBB));
+  should_request_read(0xC0, api_erd_1);
+  should_request_read(0xC0, api_erd_2);
+  when_a_poll_read_completes(0xC0, api_erd_2, uint8_t(0xBB));
   mock().enable();
-
-  // First poll cycle starts on polling timer — all ERDs read simultaneously
-  should_request_read(0xC0, api_erd_1);
-  should_request_read(0xC0, api_erd_2);
-  after(polling_interval);
-
-  // Complete first cycle — already registered during probe, just publishes
-  should_update_erd(api_erd_1, uint8_t(0xAA));
-  when_a_poll_read_completes(0xC0, api_erd_1, uint8_t(0xAA));
-
-  should_update_erd(api_erd_2, uint8_t(0xBB));
-  when_a_poll_read_completes(0xC0, api_erd_2, uint8_t(0xBB));
-
-  // Polling timer fires: restart from erd_1 (already registered)
-  // All ERDs read simultaneously
-  should_request_read(0xC0, api_erd_1);
-  should_request_read(0xC0, api_erd_2);
-  after(polling_interval);
-
-  should_update_erd(api_erd_1, uint8_t(0xAA));
-  when_a_poll_read_completes(0xC0, api_erd_1, uint8_t(0xAA));
-
-  should_update_erd(api_erd_2, uint8_t(0xBB));
-  when_a_poll_read_completes(0xC0, api_erd_2, uint8_t(0xBB));
 }
 
 // ERDs in api_parsed_list that do not respond during probe are still added to the
@@ -496,27 +491,23 @@ TEST(mqtt_bridge_polling_api_list, should_lazily_register_erds_that_did_not_resp
   trigger_read_completed(0xC0, api_erd_1, &probe_val, sizeof(probe_val));  // registered immediately
   after(retry_delay);                                                        // 0x3000 probe times out
   trigger_read_completed(0xC0, api_erd_2, &probe_val, sizeof(probe_val));  // registered immediately
-  mock().enable();
+  mock().disable();
 
-  // state_polling entry: api_erd_1 and api_erd_2 already in erd_set (skipped).
-  // 0x3000 not in erd_set → added via _no_register → pending_registration_set.
-  // Polling timer fires: all 3 ERDs read simultaneously.
   should_request_read(0xC0, api_erd_1);
   should_request_read(0xC0, api_erd_2);
   should_request_read(0xC0, 0x3000);
   after(polling_interval);
 
-  // api_erd_1 and api_erd_2 already registered during probe — just publishes.
   should_update_erd(api_erd_1, uint8_t(0xAA));
   when_a_poll_read_completes(0xC0, api_erd_1, uint8_t(0xAA));
 
   should_update_erd(api_erd_2, uint8_t(0xBB));
   when_a_poll_read_completes(0xC0, api_erd_2, uint8_t(0xBB));
 
-  // 0x3000 was not registered during probe — lazily registered on first poll response.
   should_register_erd(0x3000);
   should_update_erd(0x3000, uint8_t(0xCC));
   when_a_poll_read_completes(0xC0, 0x3000, uint8_t(0xCC));
+  mock().enable();
 }
 
 // An ERD that the appliance explicitly rejects with "not_supported" during probe
@@ -541,22 +532,18 @@ TEST(mqtt_bridge_polling_api_list, should_permanently_exclude_erds_rejected_as_n
   trigger_read_completed(0xC0, api_erd_1, &probe_val, sizeof(probe_val));  // registered immediately
   trigger_read_failed_not_supported(0x3000);                                // permanently excluded
   trigger_read_completed(0xC0, api_erd_2, &probe_val, sizeof(probe_val));  // registered immediately
-  mock().enable();
+  mock().disable();
 
-  // state_polling entry: api_erd_1, 0x3000, and api_erd_2 are all checked against erd_set.
-  // api_erd_1 and api_erd_2: already in erd_set (probe success) → skipped.
-  // 0x3000: also in erd_set (probe not_supported) → skipped, NOT added to polling list.
-  // Polling timer fires: only api_erd_1 and api_erd_2 are polled.
   should_request_read(0xC0, api_erd_1);
   should_request_read(0xC0, api_erd_2);
   after(polling_interval);
 
-  // Both already registered during probe — just publishes.
   should_update_erd(api_erd_1, uint8_t(0xAA));
   when_a_poll_read_completes(0xC0, api_erd_1, uint8_t(0xAA));
 
   should_update_erd(api_erd_2, uint8_t(0xBB));
   when_a_poll_read_completes(0xC0, api_erd_2, uint8_t(0xBB));
+  mock().enable();
 }
 
 // ============================================================================
@@ -697,34 +684,41 @@ TEST(mqtt_bridge_polling_custom_erds, should_poll_custom_erds_alongside_api_pars
   after(retry_delay * applianceApiFeatureErdCount);
   uint8_t probe_val = 0x01;
   trigger_read_completed(0xC0, api_erd, &probe_val, sizeof(probe_val));
-  mock().enable();
+  mock().disable();
 
-  // Polling timer fires: all ERDs read simultaneously (api_erd + custom ERDs)
   should_request_read(0xC0, api_erd);
   should_request_read(0xC0, custom_erd_1);
   should_request_read(0xC0, custom_erd_2);
   after(polling_interval);
 
-  // api_erd completes: already registered during probe, just publishes
   should_update_erd(api_erd, uint8_t(0xAA));
   when_a_poll_read_completes(0xC0, api_erd, uint8_t(0xAA));
 
-  // custom_erd_1 completes: registers (deferred), publishes
   should_register_erd(custom_erd_1);
   should_update_erd(custom_erd_1, uint8_t(0xBB));
   when_a_poll_read_completes(0xC0, custom_erd_1, uint8_t(0xBB));
 
-  // custom_erd_2 completes: registers, publishes
   should_register_erd(custom_erd_2);
   should_update_erd(custom_erd_2, uint8_t(0xCC));
-  when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xCC));
-
-  // Polling timer fires: restart cycle from api_erd (already registered)
-  // All ERDs read simultaneously
   should_request_read(0xC0, api_erd);
   should_request_read(0xC0, custom_erd_1);
   should_request_read(0xC0, custom_erd_2);
-  after(polling_interval);
+  when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xCC));
+
+  should_update_erd(api_erd, uint8_t(0xAA));
+  when_a_poll_read_completes(0xC0, api_erd, uint8_t(0xAA));
+
+  should_register_erd(custom_erd_1);
+  should_update_erd(custom_erd_1, uint8_t(0xBB));
+  when_a_poll_read_completes(0xC0, custom_erd_1, uint8_t(0xBB));
+
+  should_register_erd(custom_erd_2);
+  should_update_erd(custom_erd_2, uint8_t(0xCC));
+  should_request_read(0xC0, api_erd);
+  should_request_read(0xC0, custom_erd_1);
+  should_request_read(0xC0, custom_erd_2);
+  when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xCC));
+  mock().enable();
 }
 
 // Custom ERDs should be polled in every cycle when only custom_erds are configured
@@ -750,23 +744,20 @@ TEST(mqtt_bridge_polling_custom_erds, should_poll_custom_erds_in_discovery_mode)
   // discovery state's ERD list and transition to the next, with one expiration per
   // ERD slot per state.
   after(retry_delay * (commonErdCount + energyErdCount + applianceApiFeatureErdCount + waterHeaterErdCount));
-  mock().enable();
+  mock().disable();
 
-  // Polling timer fires: erd_index >= polling_list_count, so cycle restarts from 0,
-  // reading both custom ERDs simultaneously.
   should_request_read(0xC0, custom_erd_1);
   should_request_read(0xC0, custom_erd_2);
   after(polling_interval);
 
-  // custom_erd_1 completes: registers (deferred), publishes
   should_register_erd(custom_erd_1);
   should_update_erd(custom_erd_1, uint8_t(0xBB));
   when_a_poll_read_completes(0xC0, custom_erd_1, uint8_t(0xBB));
 
-  // custom_erd_2 completes: registers, publishes
   should_register_erd(custom_erd_2);
   should_update_erd(custom_erd_2, uint8_t(0xCC));
   when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xCC));
+  mock().enable();
 }
 
 // A spurious read_completed for a non-0x0008 ERD arriving while the bridge is
@@ -804,21 +795,18 @@ TEST(mqtt_bridge_polling_custom_erds, should_ignore_spurious_read_completed_duri
   uint8_t probe_val = 0x01;
   trigger_read_completed(0xC0, custom_erd_1, &probe_val, sizeof(probe_val));
   trigger_read_completed(0xC0, custom_erd_2, &probe_val, sizeof(probe_val));
-  mock().enable();
+  mock().disable();
 
-  // Polling timer fires: verify all reads target 0xC0 (not 0xFF), confirming the
-  // host address was correctly captured from the genuine appliance-type response.
-  // Both custom ERDs read simultaneously.
   should_request_read(0xC0, custom_erd_1);
   should_request_read(0xC0, custom_erd_2);
   after(polling_interval);
 
-  // Already registered during probe — no register_erd expected
   should_update_erd(custom_erd_1, uint8_t(0xAA));
   when_a_poll_read_completes(0xC0, custom_erd_1, uint8_t(0xAA));
 
   should_update_erd(custom_erd_2, uint8_t(0xBB));
   when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xBB));
+  mock().enable();
 }
 
 // When the polling bridge is used only for custom ERDs alongside a subscription bridge
@@ -855,8 +843,7 @@ TEST(mqtt_bridge_polling_custom_erds, should_poll_only_custom_erds_when_used_alo
   should_update_erd(custom_erd_2, uint8_t(0xBB));
   when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xBB));
 
-  // Phase 3: polling timer fires — both custom ERDs read simultaneously.
-  // Already registered during probe — no register_erd expected.
+  mock().disable();
   should_request_read(0xC0, custom_erd_1);
   should_request_read(0xC0, custom_erd_2);
   after(polling_interval);
@@ -865,12 +852,18 @@ TEST(mqtt_bridge_polling_custom_erds, should_poll_only_custom_erds_when_used_alo
   when_a_poll_read_completes(0xC0, custom_erd_1, uint8_t(0xAA));
 
   should_update_erd(custom_erd_2, uint8_t(0xBB));
-  when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xBB));
-
-  // Polling timer fires: restart cycle — both ERDs already registered.
   should_request_read(0xC0, custom_erd_1);
   should_request_read(0xC0, custom_erd_2);
-  after(polling_interval);
+  when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xBB));
+
+  should_update_erd(custom_erd_1, uint8_t(0xAA));
+  when_a_poll_read_completes(0xC0, custom_erd_1, uint8_t(0xAA));
+
+  should_update_erd(custom_erd_2, uint8_t(0xBB));
+  should_request_read(0xC0, custom_erd_1);
+  should_request_read(0xC0, custom_erd_2);
+  when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xBB));
+  mock().enable();
 }
 
 // When the custom ERD bridge (init_at_address) loses contact with the appliance
@@ -902,7 +895,7 @@ TEST(mqtt_bridge_polling_custom_erds, should_resume_polling_at_known_address_aft
   should_update_erd(custom_erd_2, uint8_t(0xBB));
   when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xBB));
 
-  // First polling cycle: both ERDs already registered during probe.
+  mock().disable();
   should_request_read(0xC0, custom_erd_1);
   should_request_read(0xC0, custom_erd_2);
   after(polling_interval);
@@ -911,18 +904,12 @@ TEST(mqtt_bridge_polling_custom_erds, should_resume_polling_at_known_address_aft
   when_a_poll_read_completes(0xC0, custom_erd_1, uint8_t(0xAA));
 
   should_update_erd(custom_erd_2, uint8_t(0xBB));
+  should_request_read(0xC0, custom_erd_1);
+  should_request_read(0xC0, custom_erd_2);
   when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xBB));
 
-  // Simulate 60 s with no read completions (appliance_lost_timer expires).
-  // The bridge must NOT broadcast to 0xFF — it should re-enter state_polling
-  // at 0xC0 and start a new cycle immediately.
-  mock().disable();
   after(60000);  // appliance_lost_timeout
-  mock().enable();
 
-  // Polling timer fires: confirm reads target 0xC0 (not 0xFF).
-  // ERDs were re-added via _no_register after re-entry, so deferred registration again.
-  // Both custom ERDs read simultaneously.
   should_request_read(0xC0, custom_erd_1);
   should_request_read(0xC0, custom_erd_2);
   after(polling_interval);
@@ -933,7 +920,10 @@ TEST(mqtt_bridge_polling_custom_erds, should_resume_polling_at_known_address_aft
 
   should_register_erd(custom_erd_2);
   should_update_erd(custom_erd_2, uint8_t(0xDD));
+  should_request_read(0xC0, custom_erd_1);
+  should_request_read(0xC0, custom_erd_2);
   when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xDD));
+  mock().enable();
 }
 
 // ============================================================================
@@ -1072,15 +1062,13 @@ TEST(mqtt_bridge_polling_sequential, should_fire_all_reads_simultaneously_on_cyc
   trigger_read_completed(0xC0, erd_a, &probe_val, sizeof(probe_val));
   trigger_read_completed(0xC0, erd_b, &probe_val, sizeof(probe_val));
   trigger_read_completed(0xC0, erd_c, &probe_val, sizeof(probe_val));
-  mock().enable();
+  mock().disable();
 
-  // First polling timer fires: all reads fire simultaneously
   should_request_read(0xC0, erd_a);
   should_request_read(0xC0, erd_b);
   should_request_read(0xC0, erd_c);
   after(polling_interval);
 
-  // Reads complete in order (already registered during probe — just publishes)
   should_update_erd(erd_a, uint8_t(0x01));
   when_a_poll_read_completes(0xC0, erd_a, uint8_t(0x01));
 
@@ -1088,13 +1076,23 @@ TEST(mqtt_bridge_polling_sequential, should_fire_all_reads_simultaneously_on_cyc
   when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x02));
 
   should_update_erd(erd_c, uint8_t(0x03));
-  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x03));
-
-  // Polling timer fires again: all ERDs completed, restart cycle with all reads
   should_request_read(0xC0, erd_a);
   should_request_read(0xC0, erd_b);
   should_request_read(0xC0, erd_c);
-  after(polling_interval);
+  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x03));
+
+  should_update_erd(erd_a, uint8_t(0x01));
+  when_a_poll_read_completes(0xC0, erd_a, uint8_t(0x01));
+
+  should_update_erd(erd_b, uint8_t(0x02));
+  when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x02));
+
+  should_update_erd(erd_c, uint8_t(0x03));
+  should_request_read(0xC0, erd_a);
+  should_request_read(0xC0, erd_b);
+  should_request_read(0xC0, erd_c);
+  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x03));
+  mock().enable();
 }
 
 // When a read fails (all retries exhausted), the cycle should advance to the
@@ -1114,31 +1112,35 @@ TEST(mqtt_bridge_polling_sequential, should_advance_cycle_on_read_failed)
   trigger_read_completed(0xC0, erd_a, &probe_val, sizeof(probe_val));
   trigger_read_completed(0xC0, erd_b, &probe_val, sizeof(probe_val));
   trigger_read_completed(0xC0, erd_c, &probe_val, sizeof(probe_val));
-  mock().enable();
+  mock().disable();
 
-  // First polling timer fires: all ERDs read simultaneously
   should_request_read(0xC0, erd_a);
   should_request_read(0xC0, erd_b);
   should_request_read(0xC0, erd_c);
   after(polling_interval);
 
-  // erd_a fails (no registration on failure)
   trigger_read_failed(erd_a);
 
-  // erd_b completes: already registered during probe, just publishes
   should_update_erd(erd_b, uint8_t(0x02));
   when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x02));
 
-  // erd_c completes: already registered, cycle done (1 failed + 2 succeeded = 3 total)
   should_update_erd(erd_c, uint8_t(0x03));
-  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x03));
-
-  // Next polling timer fires: all ERDs completed (success or failure), restart
-  // All ERDs read simultaneously
   should_request_read(0xC0, erd_a);
   should_request_read(0xC0, erd_b);
   should_request_read(0xC0, erd_c);
-  after(polling_interval);
+  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x03));
+
+  trigger_read_failed(erd_a);
+
+  should_update_erd(erd_b, uint8_t(0x02));
+  when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x02));
+
+  should_update_erd(erd_c, uint8_t(0x03));
+  should_request_read(0xC0, erd_a);
+  should_request_read(0xC0, erd_b);
+  should_request_read(0xC0, erd_c);
+  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x03));
+  mock().enable();
 }
 
 // Verify that all reads in a cycle are fired simultaneously from the polling
@@ -1158,15 +1160,13 @@ TEST(mqtt_bridge_polling_sequential, should_read_all_erds_simultaneously_each_cy
   trigger_read_completed(0xC0, erd_a, &probe_val, sizeof(probe_val));
   trigger_read_completed(0xC0, erd_b, &probe_val, sizeof(probe_val));
   trigger_read_completed(0xC0, erd_c, &probe_val, sizeof(probe_val));
-  mock().enable();
+  mock().disable();
 
-  // First polling timer fires: all reads fire simultaneously
   should_request_read(0xC0, erd_a);
   should_request_read(0xC0, erd_b);
   should_request_read(0xC0, erd_c);
   after(polling_interval);
 
-  // Reads complete in order (already registered during probe — just publishes)
   should_update_erd(erd_a, uint8_t(0x01));
   when_a_poll_read_completes(0xC0, erd_a, uint8_t(0x01));
 
@@ -1174,15 +1174,11 @@ TEST(mqtt_bridge_polling_sequential, should_read_all_erds_simultaneously_each_cy
   when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x02));
 
   should_update_erd(erd_c, uint8_t(0x03));
-  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x03));
-
-  // Polling timer fires again: all ERDs completed, restart cycle with all reads
   should_request_read(0xC0, erd_a);
   should_request_read(0xC0, erd_b);
   should_request_read(0xC0, erd_c);
-  after(polling_interval);
+  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x03));
 
-  // Second cycle completions (all already registered)
   should_update_erd(erd_a, uint8_t(0x04));
   when_a_poll_read_completes(0xC0, erd_a, uint8_t(0x04));
 
@@ -1190,5 +1186,9 @@ TEST(mqtt_bridge_polling_sequential, should_read_all_erds_simultaneously_each_cy
   when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x05));
 
   should_update_erd(erd_c, uint8_t(0x06));
+  should_request_read(0xC0, erd_a);
+  should_request_read(0xC0, erd_b);
+  should_request_read(0xC0, erd_c);
   when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x06));
+  mock().enable();
 }
