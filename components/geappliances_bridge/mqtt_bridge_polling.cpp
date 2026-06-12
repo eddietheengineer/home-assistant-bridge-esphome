@@ -703,6 +703,7 @@ static const tiny_hsm_state_descriptor_t poll_hsm_state_descriptors[] = {
   { .state = state_add_energy_erds,               .parent = poll_state_top  },
   { .state = state_add_appliance_api_feature_erds,.parent = poll_state_top  },
   { .state = state_add_appliance_erds,            .parent = poll_state_top  },
+  { .state = state_probe_api_parsed_erds,         .parent = poll_state_top  },
   { .state = state_polling,                       .parent = poll_state_top  }
 };
 static const tiny_hsm_configuration_t poll_hsm_configuration = {
