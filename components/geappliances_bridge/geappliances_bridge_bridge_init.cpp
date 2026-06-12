@@ -234,7 +234,8 @@ void GeappliancesBridge::configure_polling_optional_lists_()
   // Set the API-parsed list before any events fire. state_identify_appliance
   // only checks api_parsed_list in signal_read_completed, so setting it here
   // (synchronously, before any events) is safe.
-  if (this->appliance_api_parsing_ && this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE &&\
+  if (this->appliance_api_parsing_ &&
+      this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE &&
       !this->feature_bit_manager_.get_valid_erds_vec().empty()) {
     this->mqtt_bridge_polling_.api_parsed_list       = this->feature_bit_manager_.get_valid_erds_vec().data();
     this->mqtt_bridge_polling_.api_parsed_list_count =
