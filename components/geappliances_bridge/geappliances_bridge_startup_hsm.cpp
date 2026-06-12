@@ -25,7 +25,6 @@ extern "C" {
 namespace esphome {
 namespace geappliances_bridge {
 
-static const char* const TAG __attribute__((unused)) = "geappliances_bridge";
 
 // Back-pointer to the bridge services, set during HSM init.
 // This allows HSM state functions to invoke bridge operations through a

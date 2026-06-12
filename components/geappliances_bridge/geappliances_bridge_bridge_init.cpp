@@ -34,7 +34,6 @@
 namespace esphome {
 namespace geappliances_bridge {
 
-static const char* const TAG __attribute__((unused)) = "geappliances_bridge";
 
 // ---------------------------------------------------------------------------
 // Startup: kick off feature-bit reading sequence
