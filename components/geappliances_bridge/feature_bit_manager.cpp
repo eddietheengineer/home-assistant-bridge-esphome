@@ -145,6 +145,10 @@ void FeatureBitManager::handle_read_completed_(tiny_erd_t erd, const void* data,
   }
 
   uint8_t copy_size = (size <= 8u) ? size : 8u;
+  if (copy_size < size) {
+    ESP_LOGW(TAG, "Feature bit ERD 0x%04X: data truncated from %u to %u bytes",
+             erd, size, copy_size);
+  }
 
   // Store the ERD data and advance to the next state
   if      (erd == ERD_APPLIANCE_TYPE)        {

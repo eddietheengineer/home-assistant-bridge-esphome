@@ -185,10 +185,37 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
   }
 }
 
+// Send remaining poll read requests with a time budget to avoid blocking
+// the ESPHome main loop for too long.  With large ERD lists (100+),
+// sending all reads synchronously can take hundreds of milliseconds.
+// This helper processes in batches, yielding after POLL_YIELD_MS so the
+// framework can service other tasks.  The caller checks
+// erd_index < polling_list_count after return and calls again if needed.
+static constexpr uint32_t POLL_YIELD_MS = 50;
+
+static void send_poll_read_requests_bounded(mqtt_bridge_polling_t* self, uint32_t budget_ms)
+{
+  uint32_t start = esphome::millis();
+  uint16_t count = 0;
+  while (self->erd_index < self->polling_list_count) {
+    send_next_poll_read_request(self);
+    count++;
+    // Check time budget every 10 ERDs to minimize overhead on small lists.
+    if (count % 10 == 0 && (esphome::millis() - start) >= budget_ms) {
+      break;
+    }
+  }
+}
+
 // Shared entry handler for all discovery states (common, energy, appliance API, appliance).
 static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
+  // signal_timer_expired is sent with null data; guard only the signals that
+  // carry activity arguments.
+  if (data == nullptr && signal != signal_timer_expired) {
+    return tiny_hsm_result_signal_deferred;
+  }
   auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
 
   switch (signal) {
@@ -552,9 +579,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       self->cycle_completed_count = 0;
       self->cycle_start_ms = esphome::millis();
       uint32_t cycle_start = esphome::millis();
-      while (self->erd_index < self->polling_list_count) {
-        send_next_poll_read_request(self);
-      }
+      send_poll_read_requests_bounded(self, POLL_YIELD_MS);
       uint32_t elapsed = esphome::millis() - cycle_start;
       if (elapsed >= 1000) {
         ESP_LOGW(TAG, "Long cycle start: %ums for %u ERDs", elapsed, self->polling_list_count);
@@ -610,17 +635,13 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
           self->cycle_completed_count = 0;
           self->cycle_start_ms = esphome::millis();
           arm_polling_timer(self, self->polling_interval_ms);
-          while (self->erd_index < self->polling_list_count) {
-            send_next_poll_read_request(self);
-          }
+          send_poll_read_requests_bounded(self, POLL_YIELD_MS);
         } else if (!self->polling_timer_armed) {
           /* Cycle finished and no timer pending — start next cycle immediately. */
           self->erd_index = 0;
           self->cycle_completed_count = 0;
           self->cycle_start_ms = esphome::millis();
-          while (self->erd_index < self->polling_list_count) {
-            send_next_poll_read_request(self);
-          }
+          send_poll_read_requests_bounded(self, POLL_YIELD_MS);
         }
         // else: timer still armed — wait for it to fire and restart.
       }
@@ -640,16 +661,12 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
           self->cycle_completed_count = 0;
           self->cycle_start_ms = esphome::millis();
           arm_polling_timer(self, self->polling_interval_ms);
-          while (self->erd_index < self->polling_list_count) {
-            send_next_poll_read_request(self);
-          }
+          send_poll_read_requests_bounded(self, POLL_YIELD_MS);
         } else if (!self->polling_timer_armed) {
           self->erd_index = 0;
           self->cycle_completed_count = 0;
           self->cycle_start_ms = esphome::millis();
-          while (self->erd_index < self->polling_list_count) {
-            send_next_poll_read_request(self);
-          }
+          send_poll_read_requests_bounded(self, POLL_YIELD_MS);
         }
         // else: timer still armed — wait for it to fire and restart.
       }
@@ -831,9 +848,9 @@ void mqtt_bridge_polling_destroy(mqtt_bridge_polling_t* self)
   self->erd_cache = nullptr;
   self->pending_registration_set = nullptr;
 
-  // Free the dynamically allocated polling list.
-  delete[] self->erd_polling_list;
-  self->erd_polling_list = nullptr;
+  if (self->erd_polling_list != nullptr) {
+    delete[] self->erd_polling_list;
+  }
   self->polling_list_count = 0;
   self->polling_list_capacity = 0;
 }

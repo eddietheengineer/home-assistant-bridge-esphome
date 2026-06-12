@@ -179,7 +179,7 @@ def load_appliance_types() -> dict[int, str]:
         _LOGGER.info("Fetching ERD definitions from GitHub: %s", url)
         
         try:
-            with urllib.request.urlopen(url, timeout=10) as response:
+            with urllib.request.urlopen(url, timeout=5) as response:
                 data = json.loads(response.read().decode('utf-8'))
             _LOGGER.info("Successfully fetched appliance types from GitHub (fallback)")
         except urllib.error.HTTPError as e:
@@ -316,9 +316,10 @@ async def to_code(config: dict[str, Any]) -> None:
     # Add library dependencies
     cg.add_library("https://github.com/ryanplusplus/tiny", None)
     cg.add_library("https://github.com/geappliances/tiny-gea-api#develop", None)
-    # Add public-appliance-api-documentation as a library dependency
-    # This allows users to control the version by updating the library reference
     cg.add_library("https://github.com/joshualongenecker/public-appliance-api-documentation", None)
+    # NOTE: Library versions are pinned to git refs above. The `None` version
+    # parameter tells ESPHome to use the commit at the URL's ref (main/develop).
+    # To pin to a specific commit, append @<sha> to the URL.
     
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)

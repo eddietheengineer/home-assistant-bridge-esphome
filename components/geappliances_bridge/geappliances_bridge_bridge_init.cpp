@@ -134,7 +134,8 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
   // Apply the valid-ERD filter when appliance API parsing is enabled and
   // produced results. An empty set is ignored by the registry so all ERDs
   // continue to be published in that case.
-  if (this->appliance_api_parsing_ && this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE &&\
+  if (this->appliance_api_parsing_ &&
+      this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE &&
       !this->feature_bit_manager_.get_valid_erds().empty()) {
     this->erd_registry_.set_valid_erds(this->feature_bit_manager_.get_valid_erds());
     ESP_LOGI(TAG, "Appliance API parsing enabled: publishing filtered to %zu valid ERDs",
