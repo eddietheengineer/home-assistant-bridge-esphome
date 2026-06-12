@@ -143,20 +143,8 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
 
   // Select operating mode.
   bool        use_polling = false;
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-but-set-variable"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-#endif
-  const char* mode_name   = "unknown";
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
+  const char* mode_name = "unknown";
   if (this->autodiscovery_manager_.is_gea2_protocol()) {
     use_polling = true;
     mode_name   = "polling (GEA2 - subscriptions not supported)";
@@ -173,6 +161,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     this->subscription_activity_detected_ = false;
     this->subscription_start_time_       = millis();
   }
+  (void)mode_name;
 
   ESP_LOGI(TAG, "Using %s mode with polling interval: %u ms", mode_name, this->polling_interval_ms_);
 
