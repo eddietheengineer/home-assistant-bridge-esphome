@@ -403,18 +403,36 @@ extern "C" size_t esphome_mqtt_client_adapter_drain_pending_updates(
   }
 
 #ifdef USE_ESP_IDF
-  // Enqueue pending updates to the async publish task instead of calling
-  // publish_now() synchronously.  Each update is enqueued and immediately
-  // removed from the pending map — the async task handles the actual publish.
-  size_t flushed = 0;
-  while (!self->pending_updates->empty() && flushed < MAX_FLUSH_PER_CALL) {
-    auto it = self->pending_updates->begin();
-    enqueue_publish(self, it->second.topic, it->second.payload, true);  // retain
-    self->pending_updates->erase(it);
-    flushed++;
+  // Enqueue pending updates to the async publish task.  Only erase from
+  // the pending map after a successful enqueue — if the async queue is
+  // full or allocation fails, the item stays in pending_updates for the
+  // next drain attempt.
+  if (self->publish_queue_ != nullptr) {
+    size_t flushed = 0;
+    while (!self->pending_updates->empty() && flushed < MAX_FLUSH_PER_CALL) {
+      auto it = self->pending_updates->begin();
+      MqttPublishRequest* req = new (std::nothrow) MqttPublishRequest{it->second.topic, it->second.payload, true};
+      if (req == nullptr) {
+        ESP_LOGW(TAG, "Failed to allocate publish request, stopping drain");
+        break;
+      }
+      if (xQueueSend(self->publish_queue_, &req, 0) != pdTRUE) {
+        ESP_LOGW(TAG, "MQTT publish queue full, stopping drain");
+        delete req;
+        break;
+      }
+      self->pending_updates->erase(it);
+      flushed++;
+    }
+    if (flushed > 0 && self->pending_updates->empty()) {
+      ESP_LOGV(TAG, "Flushed all pending ERD updates");
+    }
+    return self->pending_updates->size();
   }
-#else
-  // Non-ESP-IDF: synchronous publish as before.
+  // Queue not available (init failure) — fall through to synchronous path.
+#endif
+
+  // Synchronous publish path (non-ESP-IDF or ESP-IDF fallback).
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client == nullptr || !mqtt_client->is_connected()) {
     return self->pending_updates->size();
@@ -426,7 +444,6 @@ extern "C" size_t esphome_mqtt_client_adapter_drain_pending_updates(
     self->pending_updates->erase(it);
     flushed++;
   }
-#endif
 
   if (flushed > 0 && self->pending_updates->empty()) {
     ESP_LOGV(TAG, "Flushed all pending ERD updates");
