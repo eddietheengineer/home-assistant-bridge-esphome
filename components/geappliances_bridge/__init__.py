@@ -317,10 +317,10 @@ async def to_code(config: dict[str, Any]) -> None:
     cg.add_library("https://github.com/ryanplusplus/tiny", None)
     cg.add_library("https://github.com/geappliances/tiny-gea-api#develop", None)
     cg.add_library("https://github.com/joshualongenecker/public-appliance-api-documentation", None)
-    # NOTE: Library versions are NOT pinned — the URL refs above point to
-    # branch names (main/develop) that move over time. Builds may change as
-    # branches advance. To pin to a specific commit, append @<sha> to the URL.
-    # Example: https://github.com/ryanplusplus/tiny@abc1234
+    # NOTE: Library versions are NOT pinned — Git URLs may reference moving branches
+    # (e.g. "#develop") or the repo default branch. Builds may change over time.
+    # To pin to a specific commit, append #<sha> to the URL (PlatformIO git ref).
+    # Example: https://github.com/ryanplusplus/tiny#abc1234
     
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
