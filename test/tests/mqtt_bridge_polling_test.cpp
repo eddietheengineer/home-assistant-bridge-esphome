@@ -1162,3 +1162,142 @@ TEST(mqtt_bridge_polling_sequential, should_read_all_erds_simultaneously_each_cy
   should_update_erd(erd_c, uint8_t(0x06));
   when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x06));
 }
+
+
+// ============================================================================
+// Requirement 2.3: Failed reads must not block cycle completion
+// ============================================================================
+
+// A single failed read in a cycle must not stall the cycle indefinitely.
+// The cycle completes when all ERDs have responded (success or failure),
+// and the next cycle begins when the polling timer fires again.
+TEST(mqtt_bridge_polling_sequential, failed_read_does_not_block_cycle_completion)
+{
+  // Init; probe phase: all 3 api ERDs respond
+  should_request_read(0xFF, 0x0008);
+  when_the_bridge_is_initialized();
+
+  mock().disable();
+  uint8_t appliance_type = 0x03;
+  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
+  for (size_t i = 0; i < applianceApiFeatureErdCount; i++) {
+    trigger_read_failed_not_supported(applianceApiFeatureErds[i]);
+  }
+  uint8_t probe_val = 0x01;
+  trigger_read_completed(0xC0, erd_a, &probe_val, sizeof(probe_val));
+  trigger_read_completed(0xC0, erd_b, &probe_val, sizeof(probe_val));
+  trigger_read_completed(0xC0, erd_c, &probe_val, sizeof(probe_val));
+  mock().enable();
+
+  // First polling cycle starts
+  should_request_read(0xC0, erd_a);
+  should_request_read(0xC0, erd_b);
+  should_request_read(0xC0, erd_c);
+  after(polling_interval);
+
+  // erd_a succeeds, erd_b fails, erd_c succeeds — cycle still completes
+  should_update_erd(erd_a, uint8_t(0x01));
+  when_a_poll_read_completes(0xC0, erd_a, uint8_t(0x01));
+
+  trigger_read_failed(erd_b);
+
+  should_update_erd(erd_c, uint8_t(0x03));
+  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x03));
+
+  // Next cycle starts when polling timer fires again
+  should_request_read(0xC0, erd_a);
+  should_request_read(0xC0, erd_b);
+  should_request_read(0xC0, erd_c);
+  after(polling_interval);
+}
+
+// All ERDs failing in a cycle must still allow the cycle to complete and
+// the next cycle to begin — no infinite stall.
+TEST(mqtt_bridge_polling_sequential, all_failed_reads_still_complete_cycle)
+{
+  // Init; probe phase: all 3 api ERDs respond
+  should_request_read(0xFF, 0x0008);
+  when_the_bridge_is_initialized();
+
+  mock().disable();
+  uint8_t appliance_type = 0x03;
+  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
+  for (size_t i = 0; i < applianceApiFeatureErdCount; i++) {
+    trigger_read_failed_not_supported(applianceApiFeatureErds[i]);
+  }
+  uint8_t probe_val = 0x01;
+  trigger_read_completed(0xC0, erd_a, &probe_val, sizeof(probe_val));
+  trigger_read_completed(0xC0, erd_b, &probe_val, sizeof(probe_val));
+  trigger_read_completed(0xC0, erd_c, &probe_val, sizeof(probe_val));
+  mock().enable();
+
+  // First polling cycle starts
+  should_request_read(0xC0, erd_a);
+  should_request_read(0xC0, erd_b);
+  should_request_read(0xC0, erd_c);
+  after(polling_interval);
+
+  // All three reads fail — cycle must still complete
+  trigger_read_failed(erd_a);
+  trigger_read_failed(erd_b);
+  trigger_read_failed(erd_c);
+
+  // Next cycle starts when polling timer fires again
+  should_request_read(0xC0, erd_a);
+  should_request_read(0xC0, erd_b);
+  should_request_read(0xC0, erd_c);
+  after(polling_interval);
+}
+
+// A mix of failures and successes across multiple cycles must not accumulate
+// cycle_completed_count errors that cause premature or missed cycle restarts.
+TEST(mqtt_bridge_polling_sequential, mixed_failures_across_multiple_cycles)
+{
+  // Init; probe phase: all 3 api ERDs respond
+  should_request_read(0xFF, 0x0008);
+  when_the_bridge_is_initialized();
+
+  mock().disable();
+  uint8_t appliance_type = 0x03;
+  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
+  for (size_t i = 0; i < applianceApiFeatureErdCount; i++) {
+    trigger_read_failed_not_supported(applianceApiFeatureErds[i]);
+  }
+  uint8_t probe_val = 0x01;
+  trigger_read_completed(0xC0, erd_a, &probe_val, sizeof(probe_val));
+  trigger_read_completed(0xC0, erd_b, &probe_val, sizeof(probe_val));
+  trigger_read_completed(0xC0, erd_c, &probe_val, sizeof(probe_val));
+  mock().enable();
+
+  // --- Cycle 1: timer fires, all reads sent ---
+  should_request_read(0xC0, erd_a);
+  should_request_read(0xC0, erd_b);
+  should_request_read(0xC0, erd_c);
+  after(polling_interval);
+
+  // Cycle 1: erd_a fails, erd_b succeeds, erd_c fails
+  trigger_read_failed(erd_a);
+  should_update_erd(erd_b, uint8_t(0x02));
+  when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x02));
+  trigger_read_failed(erd_c);
+
+  // Cycle 2 starts when polling timer fires again
+  should_request_read(0xC0, erd_a);
+  should_request_read(0xC0, erd_b);
+  should_request_read(0xC0, erd_c);
+  after(polling_interval);
+
+  // Cycle 2: all succeed
+  should_update_erd(erd_a, uint8_t(0x10));
+  when_a_poll_read_completes(0xC0, erd_a, uint8_t(0x10));
+  should_update_erd(erd_b, uint8_t(0x20));
+  when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x20));
+  should_update_erd(erd_c, uint8_t(0x30));
+  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x30));
+
+  // Cycle 3 starts when polling timer fires again
+  should_request_read(0xC0, erd_a);
+  should_request_read(0xC0, erd_b);
+  should_request_read(0xC0, erd_c);
+  after(polling_interval);
+}

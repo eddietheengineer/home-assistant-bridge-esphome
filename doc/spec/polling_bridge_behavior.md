@@ -68,7 +68,11 @@ The next polling cycle MUST NOT begin until BOTH conditions are met:
 
 A failed read (timeout, not supported, or queue full) counts as a "completed" response for cycle-tracking purposes.
 
-### Requirement 2.3: Restart Pending
+### Requirement 2.3: Failed Reads Must Not Block Cycle Completion
+
+Failed ERD reads during steady-state polling MUST NOT block the polling cycle from completing. When any ERD read fails, the cycle completion counter MUST be incremented so the cycle can finish once all ERDs have responded (success or failure). The polling loop MUST never stall indefinitely waiting for a response that will never arrive.
+
+### Requirement 2.4: Restart Pending
 
 If the polling timer fires while a cycle is still in progress (reads outstanding but not all responses received), the cycle continues to completion. The next cycle starts immediately after the last ERD responds, without waiting for another timer expiration.
 
@@ -86,10 +90,15 @@ If the polling timer fires while a cycle is still in progress (reads outstanding
 - Starting a new polling cycle before all ERDs have responded.
 - Starting a new polling cycle before the polling timer has expired (unless `restart_pending` is set).
 - Using retry timers for individual ERD reads in steady-state polling.
+- Allowing failed reads to stall the cycle indefinitely.
 
 ### Verification
 
-Tests must verify that all ERDs are read simultaneously at cycle start and that cycle completion requires both full response coverage and timer expiration.
+Tests must verify that:
+- All ERDs are read simultaneously at cycle start and that cycle completion requires both full response coverage and timer expiration.
+- Failed reads (timeout, not supported) increment the cycle completion counter and allow the cycle to finish.
+- Cycles with mixed success and failure outcomes complete normally and subsequent cycles begin when the polling timer fires.
+- Cycles where all reads fail still complete and do not require the appliance_lost_timeout to recover.
 
 ---
 
