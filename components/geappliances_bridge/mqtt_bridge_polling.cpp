@@ -646,6 +646,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
 
     case signal_read_failed:
       reset_lost_appliance_timer(self);
+      self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
         self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
         self->cycle_count++;
