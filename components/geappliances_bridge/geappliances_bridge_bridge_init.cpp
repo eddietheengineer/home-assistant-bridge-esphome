@@ -190,6 +190,11 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       this->autodiscovery_manager_.get_host_address());
     this->subscription_bridge_initialized_ = true;
 
+    // Subscription bridge has no discovery phase — signal the startup HSM
+    // immediately so it can transition to subscription_watch.
+    this->ha_discovery_manager_.set_registered_erds(this->erd_registry_.registered_erds());
+    tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
+
     if (!this->custom_erds_vec_.empty()) {
       this->custom_erd_subscription_seen_erds_.clear();
       this->custom_erd_subscription_last_activity_ = millis();
