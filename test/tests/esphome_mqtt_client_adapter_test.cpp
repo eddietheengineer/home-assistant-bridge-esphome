@@ -168,6 +168,39 @@ TEST(esphome_mqtt_client_adapter, update_erd_publishes_hex_when_connected)
   CHECK(mock_client.published_payloads.back() == "0102AB");
   CHECK_TRUE(mock_client.published_retain.back());
 }
+// MQTT Data Publishing Spec 1: Hexadecimal ERD Data Format
+// Verify that all published payloads are valid uppercase hex strings
+// containing only characters 0-9 and A-F.
+TEST(esphome_mqtt_client_adapter, update_erd_hex_payload_is_valid_uppercase_hex)
+{
+  MockMqttClient local_mock;
+  esphome::mqtt::global_mqtt_client = &local_mock;
+
+  esphome_mqtt_client_adapter_t local_adapter;
+  esphome_mqtt_client_adapter_init(&local_adapter, "test_device");
+
+  local_mock.connected = true;
+
+  // Test various byte patterns: zero bytes, high bytes, mixed, and multi-byte
+  uint8_t data[] = {0x00, 0x0F, 0xA0, 0xFF, 0xAB, 0xCD, 0x12, 0x34};
+  local_adapter.interface.api->update_erd(&local_adapter.interface, 0x0001, data, sizeof(data));
+
+  esphome_mqtt_client_adapter_notify_connected(&local_adapter);
+
+  CHECK_EQUAL(1u, local_mock.published_topics.size());
+  // Expected hex: 000FA0FFABCD1234 (uppercase, no spaces, no prefix)
+  CHECK(local_mock.published_payloads.back() == "000FA0FFABCD1234");
+
+  // Verify every character is a valid uppercase hex digit
+  const std::string& payload = local_mock.published_payloads.back();
+  for (char c : payload) {
+    bool valid = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F');
+    CHECK_TRUE(valid);
+  }
+
+  esphome_mqtt_client_adapter_destroy(&local_adapter);
+  esphome::mqtt::global_mqtt_client = nullptr;
+}
 
 
 /* ------------------------------------------------------------------ */

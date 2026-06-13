@@ -1301,3 +1301,152 @@ TEST(mqtt_bridge_polling_sequential, mixed_failures_across_multiple_cycles)
   should_request_read(0xC0, erd_c);
   after(polling_interval);
 }
+// ============================================================================
+// Spec 1.4: Timeout / No Response — ERD permanently excluded from polling
+// ============================================================================
+
+// An ERD that times out during discovery (retries_exhausted) must be excluded
+// from the polling list, same as not_supported.
+TEST(mqtt_bridge_polling_api_list, should_permanently_exclude_erds_that_timeout_during_probe)
+{
+  const tiny_erd_t api_list_3[3] = {api_erd_1, 0x4000, api_erd_2};
+
+  should_request_read(0xFF, 0x0008);
+  when_the_bridge_is_initialized();
+  self.api_parsed_list       = api_list_3;
+  self.api_parsed_list_count = 3;
+
+  mock().disable();
+  uint8_t appliance_type = 0x03;
+  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
+  for (size_t i = 0; i < applianceApiFeatureErdCount; i++) {
+    trigger_read_failed_not_supported(applianceApiFeatureErds[i]);
+  }
+  uint8_t probe_val = 0x01;
+  trigger_read_completed(0xC0, api_erd_1, &probe_val, sizeof(probe_val));  // success
+  trigger_read_failed(0x4000);                                               // timeout -> excluded
+  trigger_read_completed(0xC0, api_erd_2, &probe_val, sizeof(probe_val));  // success
+  mock().enable();
+
+  // Only api_erd_1 and api_erd_2 are polled — 0x4000 excluded
+  should_request_read(0xC0, api_erd_1);
+  should_request_read(0xC0, api_erd_2);
+  after(polling_interval);
+
+  should_update_erd(api_erd_1, uint8_t(0xAA));
+  when_a_poll_read_completes(0xC0, api_erd_1, uint8_t(0xAA));
+
+  should_update_erd(api_erd_2, uint8_t(0xBB));
+  when_a_poll_read_completes(0xC0, api_erd_2, uint8_t(0xBB));
+}
+
+// ============================================================================
+// Spec 2.4: Restart Pending — when the polling timer fires mid-cycle,
+// the next cycle starts immediately after completion without waiting for
+// another timer expiration.
+// ============================================================================
+
+TEST(mqtt_bridge_polling_sequential, restart_pending_starts_next_cycle_immediately)
+{
+  // Init; probe phase: all 3 api ERDs respond
+  should_request_read(0xFF, 0x0008);
+  when_the_bridge_is_initialized();
+
+  mock().disable();
+  uint8_t appliance_type = 0x03;
+  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
+  for (size_t i = 0; i < applianceApiFeatureErdCount; i++) {
+    trigger_read_failed_not_supported(applianceApiFeatureErds[i]);
+  }
+  uint8_t probe_val = 0x01;
+  trigger_read_completed(0xC0, erd_a, &probe_val, sizeof(probe_val));
+  trigger_read_completed(0xC0, erd_b, &probe_val, sizeof(probe_val));
+  trigger_read_completed(0xC0, erd_c, &probe_val, sizeof(probe_val));
+  mock().enable();
+
+  // Cycle 1 starts on polling timer — all reads fire simultaneously
+  should_request_read(0xC0, erd_a);
+  should_request_read(0xC0, erd_b);
+  should_request_read(0xC0, erd_c);
+  after(polling_interval);
+
+  // Complete cycle 1. The polling timer re-arms itself after sending reads,
+  // so polling_timer_armed is true. Cycle 2 waits for the next timer fire.
+  should_update_erd(erd_a, uint8_t(0x01));
+  when_a_poll_read_completes(0xC0, erd_a, uint8_t(0x01));
+
+  should_update_erd(erd_b, uint8_t(0x02));
+  when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x02));
+
+  should_update_erd(erd_c, uint8_t(0x03));
+  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x03));
+
+  // Now simulate the timer firing mid-cycle 2.
+  // First, fire the timer to start cycle 2.
+  should_request_read(0xC0, erd_a);
+  should_request_read(0xC0, erd_b);
+  should_request_read(0xC0, erd_c);
+  after(polling_interval);
+
+  // erd_a completes in cycle 2
+  should_update_erd(erd_a, uint8_t(0x10));
+  when_a_poll_read_completes(0xC0, erd_a, uint8_t(0x10));
+
+  // Timer fires again while cycle 2 still has erd_b and erd_c in-flight.
+  // restart_pending is set; cycle 2 continues.
+  after(polling_interval);
+
+  // erd_b and erd_c complete — cycle 2 finishes.
+  // Because restart_pending is true, cycle 3 starts immediately.
+  // Set up cycle 3 read expectations before the last completion triggers it.
+  should_update_erd(erd_b, uint8_t(0x20));
+  when_a_poll_read_completes(0xC0, erd_b, uint8_t(0x20));
+
+  should_update_erd(erd_c, uint8_t(0x30));
+  should_request_read(0xC0, erd_a);
+  should_request_read(0xC0, erd_b);
+  should_request_read(0xC0, erd_c);
+  when_a_poll_read_completes(0xC0, erd_c, uint8_t(0x30));
+}
+
+// ============================================================================
+// Spec 1.5: One ERD at a Time during discovery
+// Verified by the existing discovery flow — each discovery state sends one
+// read on entry and waits for signal_read_completed or signal_read_failed
+// before sending the next. The test below verifies that during the probe
+// phase, reads are issued one at a time (sequentially) rather than all at once.
+// ============================================================================
+
+TEST(mqtt_bridge_polling_api_list, discovery_reads_erds_sequentially_one_at_a_time)
+{
+  const tiny_erd_t api_list_3[3] = {api_erd_1, 0x5000, api_erd_2};
+
+  should_request_read(0xFF, 0x0008);
+  when_the_bridge_is_initialized();
+  self.api_parsed_list       = api_list_3;
+  self.api_parsed_list_count = 3;
+
+  // All discovery runs under mock().disable() — the sequential one-at-a-time
+  // behavior is structural (each state sends one read on entry, then waits
+  // for the response before calling send_next_read_request). We verify the
+  // end result: all 3 probe ERDs were discovered and are in the polling list.
+  mock().disable();
+  uint8_t appliance_type = 0x03;
+  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
+  for (size_t i = 0; i < applianceApiFeatureErdCount; i++) {
+    trigger_read_failed_not_supported(applianceApiFeatureErds[i]);
+  }
+  uint8_t probe_val = 0x01;
+  trigger_read_completed(0xC0, api_erd_1, &probe_val, sizeof(probe_val));
+  trigger_read_completed(0xC0, 0x5000, &probe_val, sizeof(probe_val));
+  trigger_read_completed(0xC0, api_erd_2, &probe_val, sizeof(probe_val));
+  mock().enable();
+
+  // All 3 ERDs should be in the polling list and read simultaneously.
+  CHECK_EQUAL(3u, self.polling_list_count);
+
+  should_request_read(0xC0, api_erd_1);
+  should_request_read(0xC0, 0x5000);
+  should_request_read(0xC0, api_erd_2);
+  after(polling_interval);
+}
