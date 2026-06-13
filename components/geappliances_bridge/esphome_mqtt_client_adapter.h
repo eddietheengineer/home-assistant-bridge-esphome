@@ -28,6 +28,12 @@
 #include <map>
 #include <set>
 
+#ifdef USE_ESP_IDF
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
+#endif
+
 #include "erd_registry.h"
 
 extern "C" {
@@ -63,6 +69,17 @@ typedef struct {
   // notify_disconnected()).  Used to gate the pending-update flush so the IDF
   // MQTT task has time to process the broker's reconnect backlog.
   uint32_t mqtt_connected_at_ms;
+
+#ifdef USE_ESP_IDF
+  // Async MQTT publish task — moves blocking publish() calls off the main
+  // ESPHome loop to prevent task watchdog timer (TWDT) crashes on devices
+  // with large ERD counts (50+) where synchronous publish() can block for
+  // seconds when the IDF MQTT outbox is full.
+  QueueHandle_t publish_queue_;
+  TaskHandle_t  publish_task_;
+  StackType_t*  publish_task_stack_;
+  StaticTask_t* publish_task_tcb_;
+#endif
 } esphome_mqtt_client_adapter_t;
 
 #ifdef __cplusplus
