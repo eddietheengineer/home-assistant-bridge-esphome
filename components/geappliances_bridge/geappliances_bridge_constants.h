@@ -20,7 +20,7 @@ extern "C" {
 // Logging tag — shared across all bridge translation units
 // ---------------------------------------------------------------------------
 
-static const char* const TAG __attribute__((unused)) = "geappliances_bridge";
+[[maybe_unused]] static constexpr const char* TAG = "geappliances_bridge";
 
 // ---------------------------------------------------------------------------
 // Well-known GEA ERD identifiers
