@@ -248,19 +248,7 @@ void FeatureBitManager::handle_read_completed_(tiny_erd_t erd, const void* data,
 void FeatureBitManager::queue_erd_read_()
 {
   tiny_erd_t feature_erd = 0;
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-but-set-variable"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-#endif
-  const char* feature_name = nullptr;
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
+  [[maybe_unused]] const char* feature_name = nullptr;
 
   switch (this->state_) {
     case FEATURE_BIT_STATE_READING_0008: feature_erd = ERD_APPLIANCE_TYPE;        feature_name = "appliance type (0x0008)";              break;
@@ -450,22 +438,10 @@ void FeatureBitManager::parse_next_step_()
   }
 
   // Static tables for appliance ERDs (indexed 0-9).
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-variable"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#endif
-  static const char* const erd_names[10] = {
+  [[maybe_unused]] static const char* const erd_names[10] = {
     "0x0093", "0x0094", "0x0095", "0x0096", "0x0097",
     "0x0109", "0x010A", "0x010B", "0x010C", "0x010D"
   };
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
   // Process one appliance ERD per tick to avoid blocking the timer for too long.
   if (this->parse_erd_idx_ < 10) {

@@ -317,9 +317,10 @@ async def to_code(config: dict[str, Any]) -> None:
     cg.add_library("https://github.com/ryanplusplus/tiny", None)
     cg.add_library("https://github.com/geappliances/tiny-gea-api#develop", None)
     cg.add_library("https://github.com/joshualongenecker/public-appliance-api-documentation", None)
-    # NOTE: Library versions are pinned to git refs above. The `None` version
-    # parameter tells ESPHome to use the commit at the URL's ref (main/develop).
-    # To pin to a specific commit, append @<sha> to the URL.
+    # NOTE: Library versions are NOT pinned — the URL refs above point to
+    # branch names (main/develop) that move over time. Builds may change as
+    # branches advance. To pin to a specific commit, append @<sha> to the URL.
+    # Example: https://github.com/ryanplusplus/tiny@abc1234
     
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)

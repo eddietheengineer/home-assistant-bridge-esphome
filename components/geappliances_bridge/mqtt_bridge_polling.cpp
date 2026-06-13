@@ -189,9 +189,19 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
 // the ESPHome main loop for too long.  With large ERD lists (100+),
 // sending all reads synchronously can take hundreds of milliseconds.
 // This helper processes in batches, yielding after POLL_YIELD_MS so the
-// framework can service other tasks.  The caller checks
-// erd_index < polling_list_count after return and calls again if needed.
-static constexpr uint32_t POLL_YIELD_MS = 50;
+// framework can service other tasks.
+//
+// POLL_YIELD_MS — per-batch time budget in milliseconds.  Values below 20 ms
+// risk excessive context-switch overhead; values above 100 ms may cause
+// noticeable blocking for other ESPHome components.  Tune based on appliance
+// ERD count and hardware platform.
+//
+// The caller wraps this in a while loop:
+//     while (self->erd_index < self->polling_list_count) {
+//       send_poll_read_requests_bounded(self, POLL_YIELD_MS);
+//     }
+// so that all ERDs are queued before proceeding.
+static constexpr uint32_t POLL_YIELD_MS = 50;  // tuning: per-batch time budget
 
 static void send_poll_read_requests_bounded(mqtt_bridge_polling_t* self, uint32_t budget_ms)
 {
@@ -579,7 +589,9 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       self->cycle_completed_count = 0;
       self->cycle_start_ms = esphome::millis();
       uint32_t cycle_start = esphome::millis();
-      send_poll_read_requests_bounded(self, POLL_YIELD_MS);
+      while (self->erd_index < self->polling_list_count) {
+        send_poll_read_requests_bounded(self, POLL_YIELD_MS);
+      }
       uint32_t elapsed = esphome::millis() - cycle_start;
       if (elapsed >= 1000) {
         ESP_LOGW(TAG, "Long cycle start: %ums for %u ERDs", elapsed, self->polling_list_count);
@@ -635,13 +647,17 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
           self->cycle_completed_count = 0;
           self->cycle_start_ms = esphome::millis();
           arm_polling_timer(self, self->polling_interval_ms);
-          send_poll_read_requests_bounded(self, POLL_YIELD_MS);
+          while (self->erd_index < self->polling_list_count) {
+            send_poll_read_requests_bounded(self, POLL_YIELD_MS);
+          }
         } else if (!self->polling_timer_armed) {
           /* Cycle finished and no timer pending — start next cycle immediately. */
           self->erd_index = 0;
           self->cycle_completed_count = 0;
           self->cycle_start_ms = esphome::millis();
-          send_poll_read_requests_bounded(self, POLL_YIELD_MS);
+          while (self->erd_index < self->polling_list_count) {
+            send_poll_read_requests_bounded(self, POLL_YIELD_MS);
+          }
         }
         // else: timer still armed — wait for it to fire and restart.
       }
@@ -661,12 +677,16 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
           self->cycle_completed_count = 0;
           self->cycle_start_ms = esphome::millis();
           arm_polling_timer(self, self->polling_interval_ms);
-          send_poll_read_requests_bounded(self, POLL_YIELD_MS);
+          while (self->erd_index < self->polling_list_count) {
+            send_poll_read_requests_bounded(self, POLL_YIELD_MS);
+          }
         } else if (!self->polling_timer_armed) {
           self->erd_index = 0;
           self->cycle_completed_count = 0;
           self->cycle_start_ms = esphome::millis();
-          send_poll_read_requests_bounded(self, POLL_YIELD_MS);
+          while (self->erd_index < self->polling_list_count) {
+            send_poll_read_requests_bounded(self, POLL_YIELD_MS);
+          }
         }
         // else: timer still armed — wait for it to fire and restart.
       }
@@ -851,6 +871,7 @@ void mqtt_bridge_polling_destroy(mqtt_bridge_polling_t* self)
 
   if (self->erd_polling_list != nullptr) {
     delete[] self->erd_polling_list;
+    self->erd_polling_list = nullptr;
   }
   self->polling_list_count = 0;
   self->polling_list_capacity = 0;
