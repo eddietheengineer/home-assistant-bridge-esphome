@@ -28,6 +28,7 @@
 #include "geappliances_bridge.h"
 #include "appliance_api_feature_lists.h"
 #include "geappliances_bridge_constants.h"
+#include "geappliances_bridge_startup_hsm.h"
 #include "esphome/core/log.h"
 
 namespace esphome {
@@ -170,6 +171,14 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       &this->mqtt_client_adapter_.interface,
       this->polling_interval_ms_,
       this->polling_only_publish_on_change_);
+    // Wire the discovery-complete callback so the startup HSM waits for
+    // ERD discovery to finish before transitioning to steady-state.
+    this->mqtt_bridge_polling_.on_discovery_complete = +[](void* ctx) {
+      auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
+      bridge->ha_discovery_manager_.set_registered_erds(bridge->erd_registry_.registered_erds());
+      tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
+    };
+    this->mqtt_bridge_polling_.on_discovery_complete_context = this;
     this->polling_bridge_initialized_ = true;
     this->configure_polling_optional_lists_();
   } else {
@@ -199,9 +208,8 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
         this->device_identity_manager_.get_device_id(),
         this->device_identity_manager_.get_model_number(),
         this->device_identity_manager_.get_serial_number(),
-        this->erd_registry_.registered_erds(),
+        {},
         true);
-    this->ha_discovery_manager_.set_registered_erds(this->erd_registry_.registered_erds());
     this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
     ESP_LOGI(TAG, "HA discovery deferred: will publish after ERD discovery completes "
                   "(polling mode) or %u s quiet window (subscription mode)",

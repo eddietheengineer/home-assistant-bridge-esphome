@@ -15,7 +15,7 @@ namespace geappliances_bridge {
 
 static const tiny_gea3_erd_client_configuration_t client_configuration = {
   .request_timeout = 250,
-  .request_retries = 10
+  .request_retries = 1
 };
 
 // GEA2 ERD client: one attempt per bridge-level retry cycle.
@@ -34,7 +34,7 @@ static const tiny_gea3_erd_client_configuration_t client_configuration = {
 // next attempt.
 static const tiny_gea2_erd_client_configuration_t gea2_client_configuration = {
   .request_timeout = 250,
-  .request_retries = 0
+  .request_retries = 1
 };
 
 // Tick-counter time source for the GEA2 interface's internal timer group.

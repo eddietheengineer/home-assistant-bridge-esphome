@@ -140,11 +140,6 @@ static bool send_next_read_request(mqtt_bridge_polling_t* self)
   if (more_erds_to_try) {
     self->request_id++;
     tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    // Always arm the retry timer so signal_timer_expired can advance erd_index
-    // even if the read was not queued (GEA2 queue momentarily full).  Without
-    // this, the discovery state machine stalls permanently after the failed
-    // read and only recovers after the 60 s appliance_lost timeout.
-    arm_timer(self, retry_delay);
   }
   return more_erds_to_try;
 }
@@ -157,9 +152,7 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
     bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->erd_polling_list[self->erd_index]);
     uint32_t elapsed = esphome::millis() - t0;
     self->erd_index++;
-    if (queued) {
-      arm_timer(self, retry_delay);
-    } else {
+    if (!queued) {
       /* Queue full — the read was silently dropped. Count it as completed
        * (failed) so the cycle can advance. The ERD will be retried on the
        * next cycle. */
@@ -167,13 +160,6 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
       if (self->cycle_completed_count >= self->polling_list_count) {
         self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
         self->cycle_count++;
-        /* Cycle finished and polling timer is not armed — schedule the next
-         * cycle via the polling timer instead of recursing into
-         * send_next_poll_read_request().  Recursion here caused a stack
-         * overflow when the entire GEA2 queue was full: every ERD in the
-         * polling list triggered another recursive call, exhausting the stack.
-         * signal_polling_timer_expired resets erd_index / cycle_completed_count
-         * and starts the next cycle safely from the main-loop context. */
         if (!self->polling_timer_armed) {
           arm_polling_timer(self, self->polling_interval_ms);
         }
@@ -219,26 +205,18 @@ static void send_poll_read_requests_bounded(mqtt_bridge_polling_t* self, uint32_
   }
 }
 
-// Shared entry handler for all discovery states (common, energy, appliance API, appliance).
+// Shared handler for all discovery states (common, energy, appliance API, appliance).
+// Each ERD read waits for a definitive GEA-client response before the next is sent.
 static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
-  // signal_timer_expired is sent with null data; guard only the signals that
-  // carry activity arguments.
-  if (data == nullptr && signal != signal_timer_expired) {
+  if (data == nullptr) {
     return tiny_hsm_result_signal_deferred;
   }
   auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
 
   switch (signal) {
-    case signal_timer_expired:
-      if (!send_next_read_request(self)) {
-        tiny_hsm_transition(hsm, self->next_discovery_state);
-      }
-      break;
-
     case signal_read_completed:
-      disarm_timer(self);
       add_erd_to_polling_list(self, args->read_completed.erd);
       mqtt_client_update_erd(
         self->mqtt_client,
@@ -251,14 +229,9 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
       break;
 
     case signal_read_failed:
-      disarm_timer(self);
-      // If the appliance explicitly rejects the ERD (not_supported), mark it
-      // in erd_set so the state_polling entry dedup loop does not add it.
-      // retries_exhausted means the GEA3 client timed out — the ERD may still
-      // be in the queue and could respond later; do NOT exclude it here.
-      if (args->read_failed.reason == tiny_gea3_erd_client_read_failure_reason_not_supported) {
-        erd_set(self).insert(args->read_failed.erd);
-      }
+      // Both not_supported and retries_exhausted are definitive — the GEA client
+      // has finished its work.  Exclude the ERD from the polling list permanently.
+      erd_set(self).insert(args->read_failed.erd);
       if (!send_next_read_request(self)) {
         tiny_hsm_transition(hsm, self->next_discovery_state);
       }
@@ -270,11 +243,6 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
 
   return tiny_hsm_result_signal_consumed;
 }
-
-// ============================================================================
-// Polling bridge — state handlers
-// ============================================================================
-
 static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
@@ -342,15 +310,10 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
         tiny_hsm_transition(hsm, next);
         break;
       }
-      __attribute__((fallthrough));
-
-    case signal_timer_expired: {
+      // Broadcast read for appliance type ERD (0x0008).
       self->request_id++;
-      bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, 0x0008);
-      if (queued) {
-        arm_timer(self, retry_delay);
-      }
-    } break;
+      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, 0x0008);
+      break;
 
     case signal_read_completed:
       // Ignore reads for ERDs other than the appliance type ERD (0x0008); they
@@ -360,7 +323,6 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
       if (args->read_completed.erd != 0x0008) {
         break;
       }
-      disarm_timer(self);
       reset_lost_appliance_timer(self);
       if (args->read_completed.data_size >= 1) {
         self->erd_host_address = args->address;
@@ -376,8 +338,15 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
       }
       break;
 
+    case signal_read_failed:
+      // Broadcast read for 0x0008 timed out — retry.
+      if (args->read_failed.erd == 0x0008) {
+        self->request_id++;
+        tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, 0x0008);
+      }
+      break;
+
     case tiny_hsm_signal_exit:
-      disarm_timer(self);
       break;
 
     default:
@@ -407,10 +376,7 @@ static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     pending_registration_set(self).clear();
     self->polling_list_count       = 0;
     self->request_id++;
-    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    if (queued) {
-      arm_timer(self, retry_delay);
-    }
+    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -428,10 +394,7 @@ static tiny_hsm_result_t state_add_energy_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     self->appliance_erd_list_count = energyErdCount;
     self->erd_index                = 0;
     self->request_id++;
-    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    if (queued) {
-      arm_timer(self, retry_delay);
-    }
+    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -462,10 +425,7 @@ static tiny_hsm_result_t state_add_appliance_api_feature_erds(tiny_hsm_t* hsm, t
     self->appliance_erd_list_count = applianceApiFeatureErdCount;
     self->erd_index                = 0;
     self->request_id++;
-    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    if (queued) {
-      arm_timer(self, retry_delay);
-    }
+    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -484,10 +444,7 @@ static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_s
     self->erd_index                = 0;
     self->request_id++;
     if (self->appliance_erd_list_count > 0) {
-      bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-      if (queued) {
-        arm_timer(self, retry_delay);
-      }
+      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
     } else {
       // No ERDs to probe; transition directly to polling.
       tiny_hsm_transition(hsm, self->next_discovery_state);
@@ -500,14 +457,12 @@ static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_s
   // permanently excludes the ERD from the Phase 3 polling list.
   if (signal == signal_read_failed) {
     auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
-    disarm_timer(self);
     erd_set(self).insert(args->read_failed.erd);
     if (!send_next_read_request(self)) {
       tiny_hsm_transition(hsm, self->next_discovery_state);
     }
     return tiny_hsm_result_signal_consumed;
   }
-
   return handle_discovery_list_signals(hsm, signal, data);
 }
 
@@ -525,10 +480,7 @@ static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_sign
     self->appliance_erd_list_count = applianceTypeToErdGroupTranslation[self->appliance_type].erdCount;
     self->erd_index                = 0;
     self->request_id++;
-    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    if (queued) {
-      arm_timer(self, retry_delay);
-    }
+    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -567,16 +519,12 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       arm_polling_timer(self, self->polling_interval_ms);
       self->polling_list_complete = true;
       self->current_state_name    = "polling";
+      // Notify startup HSM that discovery is complete.
+      if (self->on_discovery_complete != nullptr) {
+        self->on_discovery_complete(self->on_discovery_complete_context);
+      }
       break;
 
-    case signal_timer_expired:
-      // Retry timer fired — a read is still in-flight after retry_delay.
-      // Do NOT resend; the ERD client handles retries internally (10 × 250ms).
-      // The retry timer is armed in send_next_poll_read_request() as a safety
-      // net and is disarmed in signal_read_completed / signal_read_failed.
-      // If we reach here, the read is still pending — just re-arm the timer.
-      arm_timer(self, retry_delay);
-      break;
 
     case signal_polling_timer_expired: {
       // Timer fired: mark as no longer armed.
@@ -610,7 +558,6 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
     }
 
     case signal_read_completed: {
-      disarm_timer(self);
       reset_lost_appliance_timer(self);
       tiny_erd_t      erd       = args->read_completed.erd;
       const uint8_t*  erd_data  = reinterpret_cast<const uint8_t*>(args->read_completed.data);
@@ -676,9 +623,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
     }
 
     case signal_read_failed:
-      disarm_timer(self);
       reset_lost_appliance_timer(self);
-      self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
         self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
         self->cycle_count++;
@@ -715,7 +660,6 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       break;
 
     case tiny_hsm_signal_exit:
-      disarm_timer(self);
       break;
 
     default:
@@ -787,6 +731,8 @@ static void mqtt_bridge_polling_init_impl(
   self->erd_set   = reinterpret_cast<void*>(new set<tiny_erd_t>());
   self->erd_cache = reinterpret_cast<void*>(new map<tiny_erd_t, vector<uint8_t>>());
   self->pending_registration_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
+  self->on_discovery_complete        = nullptr;
+  self->on_discovery_complete_context = nullptr;
 
   tiny_event_subscription_init(
     &self->erd_client_activity_subscription, self, +[](void* context, const void* _args) {

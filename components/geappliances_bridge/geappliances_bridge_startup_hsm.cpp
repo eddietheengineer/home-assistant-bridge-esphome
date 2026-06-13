@@ -337,7 +337,8 @@ tiny_hsm_result_t startup_state_bridge_init(tiny_hsm_t* hsm, tiny_hsm_signal_t s
           mqtt::global_mqtt_client->is_connected()) {
         ESP_LOGI(TAG, "Device ID ready and MQTT connected, initializing MQTT bridge");
         svc->initialize_mqtt_bridge();
-        tiny_hsm_transition(hsm, startup_state_subscription_watch);
+        // Do NOT transition here — wait for signal_bridge_ready from the
+        // polling bridge when ERD discovery is complete.
       }
       break;
 
@@ -345,7 +346,7 @@ tiny_hsm_result_t startup_state_bridge_init(tiny_hsm_t* hsm, tiny_hsm_signal_t s
       if (!svc->is_bridge_initialized() && svc->is_autodiscovery_complete()) {
         ESP_LOGI(TAG, "MQTT connected, initializing MQTT bridge");
         svc->initialize_mqtt_bridge();
-        tiny_hsm_transition(hsm, startup_state_subscription_watch);
+        // Do NOT transition here — wait for signal_bridge_ready.
       }
       break;
 

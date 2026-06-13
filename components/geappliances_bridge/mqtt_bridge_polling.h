@@ -141,6 +141,12 @@ typedef struct {
   // cycle is allowed to finish, then the cycle-completion handler restarts
   // immediately instead of waiting for another timer interval.
   bool restart_pending;
+  // Called once when the HSM enters state_polling (discovery complete).
+  // The callback may send a signal to the startup HSM to transition to the
+  // next phase.  Set after mqtt_bridge_polling_init() and before the HSM
+  // processes its first signal.  NULL means no callback.
+  void (*on_discovery_complete)(void* context);
+  void* on_discovery_complete_context;
 } mqtt_bridge_polling_t;
 
 /*!
