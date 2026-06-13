@@ -15,25 +15,16 @@ namespace geappliances_bridge {
 
 static const tiny_gea3_erd_client_configuration_t client_configuration = {
   .request_timeout = 250,
-  .request_retries = 1
+  .request_retries = 0
 };
 
-// GEA2 ERD client: initial request + 1 retry per bridge-level retry cycle.
-// request_retries = 1 means the ERD client sends the initial request and
-// one retry if no response arrives within request_timeout ms.  This gives
-// two attempts per bridge-level retry cycle while still limiting the number
-// of queued copies.  Multiple queued copies can cause half-duplex collisions:
-// the GEA2 interface starts sending a retry at the same time the appliance's
-// response to the previous request arrives on the bus; the response bytes are
-// treated as unexpected reflections in state_send, handle_send_failure() fires,
-// and state_collision_cooldown silently discards the response — so no ACK is
-// ever sent.  Bridge-level retries (try_read_erd_with_retry_) are spaced
-// ~500 ms apart (200 ms tight loop + 50 ms ESPHome gap + processing), giving
-// appliances with slow first-access NVRAM lookups time to cache the value
-// before the next attempt.
+// GEA2 ERD client: no internal retries.  Bridge-level retries
+// (try_read_erd_with_retry_) handle all retry logic with ~500 ms spacing
+// between attempts, giving appliances time to service slow first-access
+// NVRAM lookups.
 static const tiny_gea2_erd_client_configuration_t gea2_client_configuration = {
   .request_timeout = 250,
-  .request_retries = 1
+  .request_retries = 0
 };
 
 // Tick-counter time source for the GEA2 interface's internal timer group.
