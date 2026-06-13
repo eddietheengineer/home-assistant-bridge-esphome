@@ -407,7 +407,7 @@ extern "C" size_t esphome_mqtt_client_adapter_drain_pending_updates(
   // the pending map after a successful enqueue — if the async queue is
   // full or allocation fails, the item stays in pending_updates for the
   // next drain attempt.
-  if (self->publish_queue_ != nullptr && self->publish_task_ != nullptr) {
+  if (self->publish_queue_ != nullptr) {
     size_t flushed = 0;
     while (!self->pending_updates->empty() && flushed < MAX_FLUSH_PER_CALL) {
       auto it = self->pending_updates->begin();
