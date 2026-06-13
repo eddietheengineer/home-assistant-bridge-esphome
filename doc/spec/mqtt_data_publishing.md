@@ -16,14 +16,14 @@ All ERD data published to MQTT topics under `geappliances/<deviceId>/erd/0x<ERD>
 
 ### Implementation
 
-The MQTT client adapter (`esphome_mqtt_client_adapter.cpp`) must convert all ERD values to lowercase hex strings before publishing. The `update_erd()` function is the single point of conversion.
+The MQTT client adapter (`esphome_mqtt_client_adapter.cpp`) must convert all ERD values to uppercase hex strings before publishing. The `update_erd()` function is the single point of conversion.
 
 ### Example
 
 | ERD | Raw Bytes | Published Payload |
 |-----|-----------|-------------------|
-| 0x0001 (Model Number) | `4A 45 53 39 35 30 30 53 53 53 00 00` | `4a4553393530305353530000` |
-| 0x0002 (Serial Number) | `41 56 56 4C 32 34 44 4D 58 58 41 4B 31 00` | `4156564c3234444d5858414b3100` |
+| 0x0001 (Model Number) | `4A 45 53 39 35 30 30 53 53 53 00 00` | `4A4553393530305353530000` |
+| 0x0002 (Serial Number) | `41 56 56 4C 32 34 44 4D 58 58 41 4B 31 00` | `4156564C3234444D5858414B3100` |
 
 ### Prohibited
 
@@ -33,4 +33,4 @@ The MQTT client adapter (`esphome_mqtt_client_adapter.cpp`) must convert all ERD
 
 ### Verification
 
-Tests must verify that published payloads are valid hex strings (only characters `0-9a-f`).
+Tests must verify that published payloads are valid hex strings (only characters `0-9A-F`).

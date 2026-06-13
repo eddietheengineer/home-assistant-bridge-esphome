@@ -100,7 +100,7 @@ static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value
   payload.reserve(size * 2);
   for (uint8_t i = 0; i < size; i++) {
     char hex[3];
-    snprintf(hex, sizeof(hex), "%02x", bytes[i]);
+    snprintf(hex, sizeof(hex), "%02X", bytes[i]);
     payload += hex;
   }
   

@@ -165,7 +165,7 @@ TEST(esphome_mqtt_client_adapter, update_erd_publishes_hex_when_connected)
 
   CHECK_EQUAL(1u, mock_client.published_topics.size());
   CHECK(mock_client.published_topics.back() == "geappliances/test_device/erd/0x0092/value");
-  CHECK(mock_client.published_payloads.back() == "0102ab");
+  CHECK(mock_client.published_payloads.back() == "0102AB");
   CHECK_TRUE(mock_client.published_retain.back());
 }
 
@@ -413,7 +413,7 @@ TEST(esphome_mqtt_client_adapter, update_erd_overwrites_pending_for_same_erd)
   local_mock.connected = true;
   esphome_mqtt_client_adapter_notify_connected(&local_adapter);
   CHECK_EQUAL(1u, local_mock.published_topics.size());
-  CHECK(local_mock.published_payloads.back() == "ff");
+  CHECK(local_mock.published_payloads.back() == "FF");
 
   esphome_mqtt_client_adapter_destroy(&local_adapter);
   esphome::mqtt::global_mqtt_client = nullptr;
