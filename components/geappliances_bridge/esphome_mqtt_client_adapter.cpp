@@ -91,6 +91,10 @@ static void mqtt_publish_task_(void* param)
     }
     delete req;
   }
+  // Signal destroy() that the task is exiting before self-deleting.
+  if (self->publish_task_exit_ != nullptr) {
+    xSemaphoreGive(self->publish_task_exit_);
+  }
   vTaskDelete(nullptr);  // static task self-deletes
 }
 
@@ -264,6 +268,7 @@ extern "C" void esphome_mqtt_client_adapter_init(
   self->publish_task_     = nullptr;
   self->publish_task_stack_ = nullptr;
   self->publish_task_tcb_   = nullptr;
+  self->publish_task_exit_  = xSemaphoreCreateBinary();
   if (self->publish_queue_ != nullptr) {
     self->publish_task_stack_ = (StackType_t*)heap_caps_malloc(
       MQTT_PUBLISH_STACK_SIZE * sizeof(StackType_t), MALLOC_CAP_INTERNAL);
@@ -463,20 +468,26 @@ extern "C" void esphome_mqtt_client_adapter_destroy(
 {
 #ifdef USE_ESP_IDF
   if (self->publish_task_ != nullptr) {
-    // Drain remaining queued requests (free heap memory)
+    // Drain remaining queued requests (free heap memory).
     MqttPublishRequest* req = nullptr;
     while (xQueueReceive(self->publish_queue_, &req, 0) == pdTRUE) {
       delete req;
     }
-    // Send sentinel so the task exits and self-deletes
+    // Send sentinel so the task exits and self-deletes.
     MqttPublishRequest* sentinel = nullptr;
     xQueueSend(self->publish_queue_, &sentinel, portMAX_DELAY);
-    vTaskDelay(pdMS_TO_TICKS(200));  // wait for task to self-delete
+    // Wait for the task to signal it is about to self-delete.  This is
+    // synchronous — no fixed delay, no race between destroy and the task
+    // accessing freed memory.
+    if (self->publish_task_exit_ != nullptr) {
+      xSemaphoreTake(self->publish_task_exit_, pdMS_TO_TICKS(1000));
+    }
     self->publish_task_ = nullptr;
   }
   if (self->publish_queue_) { vQueueDelete(self->publish_queue_); self->publish_queue_ = nullptr; }
   if (self->publish_task_stack_) { heap_caps_free(self->publish_task_stack_); self->publish_task_stack_ = nullptr; }
   if (self->publish_task_tcb_)   { heap_caps_free(self->publish_task_tcb_);   self->publish_task_tcb_   = nullptr; }
+  if (self->publish_task_exit_)  { vSemaphoreDelete(self->publish_task_exit_); self->publish_task_exit_ = nullptr; }
 #endif
 
   if (self->device_id != nullptr) {
