@@ -140,43 +140,9 @@ static bool send_next_read_request(mqtt_bridge_polling_t* self)
   bool more_erds_to_try = (self->erd_index < self->appliance_erd_list_count);
   if (more_erds_to_try) {
     self->request_id++;
-    if (!tiny_gea3_erd_client_read(self->erd_client, &self->request_id,
-          self->erd_host_address, self->appliance_erd_list[self->erd_index])) {
-      // GEA queue full — the read was silently dropped. Treat it as a
-      // failed read (exclude from polling) and advance to the next ERD
-      // so the discovery state machine doesn't stall.
-      ESP_LOGW(TAG, "GEA queue full during discovery, skipping ERD 0x%04X",
-               self->appliance_erd_list[self->erd_index]);
-      erd_set(self).insert(self->appliance_erd_list[self->erd_index]);
-      return send_next_read_request(self);
-    }
+    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
   }
   return more_erds_to_try;
-}
-
-// Send the first read request for a discovery state's ERD list.
-// If the GEA queue is full, skip all ERDs in the list (mark them as
-// excluded) and transition directly to the next discovery state.
-// Returns true if the read was sent successfully, false if the state
-// machine was transitioned.
-static bool send_first_discovery_read(mqtt_bridge_polling_t* self, tiny_hsm_t* hsm)
-{
-  if (self->appliance_erd_list_count == 0) {
-    tiny_hsm_transition(hsm, self->next_discovery_state);
-    return false;
-  }
-  self->request_id++;
-  if (!tiny_gea3_erd_client_read(self->erd_client, &self->request_id,
-        self->erd_host_address, self->appliance_erd_list[self->erd_index])) {
-    // GEA queue full — skip all ERDs in this list and move on.
-    ESP_LOGW(TAG, "GEA queue full during discovery, skipping ERD list");
-    for (uint16_t i = 0; i < self->appliance_erd_list_count; i++) {
-      erd_set(self).insert(self->appliance_erd_list[i]);
-    }
-    tiny_hsm_transition(hsm, self->next_discovery_state);
-    return false;
-  }
-  return true;
 }
 
 static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
@@ -410,7 +376,8 @@ static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     erd_set(self).clear();
     pending_registration_set(self).clear();
     self->polling_list_count       = 0;
-    send_first_discovery_read(self, hsm);
+    self->request_id++;
+    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -427,7 +394,8 @@ static tiny_hsm_result_t state_add_energy_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     self->appliance_erd_list       = energyErds;
     self->appliance_erd_list_count = energyErdCount;
     self->erd_index                = 0;
-    send_first_discovery_read(self, hsm);
+    self->request_id++;
+    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -457,7 +425,8 @@ static tiny_hsm_result_t state_add_appliance_api_feature_erds(tiny_hsm_t* hsm, t
     self->appliance_erd_list       = applianceApiFeatureErds;
     self->appliance_erd_list_count = applianceApiFeatureErdCount;
     self->erd_index                = 0;
-    send_first_discovery_read(self, hsm);
+    self->request_id++;
+    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -477,7 +446,13 @@ static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_s
     self->appliance_erd_list       = self->api_parsed_list;
     self->appliance_erd_list_count = self->api_parsed_list_count;
     self->erd_index                = 0;
-    send_first_discovery_read(self, hsm);
+    self->request_id++;
+    if (self->appliance_erd_list_count > 0) {
+      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    } else {
+      // No ERDs to probe; transition directly to polling.
+      tiny_hsm_transition(hsm, self->next_discovery_state);
+    }
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -505,7 +480,12 @@ static tiny_hsm_result_t state_add_custom_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     self->appliance_erd_list       = self->custom_erd_list;
     self->appliance_erd_list_count = self->custom_erd_list_count;
     self->erd_index                = 0;
-    send_first_discovery_read(self, hsm);
+    self->request_id++;
+    if (self->appliance_erd_list_count > 0) {
+      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    } else {
+      tiny_hsm_transition(hsm, self->next_discovery_state);
+    }
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -528,7 +508,8 @@ static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_sign
     self->appliance_erd_list       = applianceTypeToErdGroupTranslation[self->appliance_type].erdList;
     self->appliance_erd_list_count = applianceTypeToErdGroupTranslation[self->appliance_type].erdCount;
     self->erd_index                = 0;
-    send_first_discovery_read(self, hsm);
+    self->request_id++;
+    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
     return tiny_hsm_result_signal_consumed;
   }
 

@@ -79,7 +79,6 @@ typedef struct {
   TaskHandle_t  publish_task_;
   StackType_t*  publish_task_stack_;
   StaticTask_t* publish_task_tcb_;
-  SemaphoreHandle_t publish_task_exit_;  /* binary semaphore: given by task before vTaskDelete */
 #endif
 } esphome_mqtt_client_adapter_t;
 
