@@ -1,6 +1,7 @@
 // =============================================================================
 // MODULE GOAL
 // =============================================================================
+// Goal: Be the single authoritative source for which ERDs are valid
 //       and which are registered at runtime.
 //
 // Responsibilities:
