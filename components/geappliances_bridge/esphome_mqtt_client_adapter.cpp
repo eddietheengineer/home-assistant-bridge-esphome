@@ -94,32 +94,14 @@ static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value
 
   const uint8_t* bytes = reinterpret_cast<const uint8_t*>(value);
 
-  // String-type ERDs: publish the raw bytes as a null-terminated ASCII string
-  // instead of a hex string so Home Assistant displays human-readable text.
-  bool is_string = (self->erd_registry != nullptr && self->erd_registry->is_string_type(erd));
-
+  // Convert binary data to hex string for all ERDs.
+  // String conversion is handled at the HA discovery level, not here.
   std::string payload;
-  if (is_string) {
-    // Reserve only up to the first null byte (or full size if no null found)
-    uint8_t str_len = 0;
-    while (str_len < size && bytes[str_len] != 0) str_len++;
-    payload.reserve(str_len);
-    for (uint8_t i = 0; i < str_len; i++) {
-      if (isprint(bytes[i])) {
-        payload += static_cast<char>(bytes[i]);
-      } else {
-        ESP_LOGD(TAG, "ERD 0x%04X: skipping non-printable byte 0x%02X at offset %u",
-                 erd, bytes[i], i);
-      }
-    }
-  } else {
-    // Convert binary data to hex string
-    payload.reserve(size * 2);
-    for (uint8_t i = 0; i < size; i++) {
-      char hex[3];
-      snprintf(hex, sizeof(hex), "%02x", bytes[i]);
-      payload += hex;
-    }
+  payload.reserve(size * 2);
+  for (uint8_t i = 0; i < size; i++) {
+    char hex[3];
+    snprintf(hex, sizeof(hex), "%02x", bytes[i]);
+    payload += hex;
   }
   
   // Always queue the update in the pending map rather than publishing

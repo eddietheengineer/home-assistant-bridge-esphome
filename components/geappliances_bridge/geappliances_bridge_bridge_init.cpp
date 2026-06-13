@@ -104,13 +104,10 @@ void GeappliancesBridge::initialize_mqtt_client_()
   esphome_mqtt_client_adapter_init(&this->mqtt_client_adapter_,
                                    this->device_identity_manager_.get_device_id().c_str());
 
-  // Wire up the ERD registry: clears any stale registrations and populates
-  // string-type ERDs from the generated config so the adapter publishes
-  // ASCII text instead of hex for those ERDs.  All three responsibilities
-  // (valid-ERD filtering, string-type detection, registered-ERD tracking)
-  // are owned by the registry and accessed through a single pointer.
+  // Wire up the ERD registry: clears any stale registrations and sets up
+  // the MQTT adapter with a single pointer for valid-ERD filtering and
+  // registered-ERD tracking.
   this->erd_registry_.clear_registered_erds();
-  this->erd_registry_.init_string_erds(ha_string_erd_ids, ha_string_erd_count);
   esphome_mqtt_client_adapter_set_erd_registry(
     &this->mqtt_client_adapter_, &this->erd_registry_);
 

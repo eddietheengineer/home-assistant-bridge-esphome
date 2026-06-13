@@ -169,23 +169,6 @@ TEST(esphome_mqtt_client_adapter, update_erd_publishes_hex_when_connected)
   CHECK_TRUE(mock_client.published_retain.back());
 }
 
-TEST(esphome_mqtt_client_adapter, update_erd_publishes_string_when_in_filter)
-{
-  std::set<tiny_erd_t> strings{0x0001};
-  erd_registry.set_string_erds(strings);
-  init_adapter_with_registry();
-  mock_client.connected = true;
-
-  uint8_t data[] = "Hello";
-  adapter.interface.api->update_erd(&adapter.interface, 0x0001, data, 5);
-
-  // update_erd always queues; notify_connected drains the queue and publishes
-  esphome_mqtt_client_adapter_notify_connected(&adapter);
-
-  CHECK_EQUAL(1u, mock_client.published_topics.size());
-  CHECK(mock_client.published_topics.back() == "geappliances/test_device/erd/0x0001/value");
-  CHECK(mock_client.published_payloads.back() == "Hello");
-}
 
 /* ------------------------------------------------------------------ */
 /* update_erd - filter & validation                                     */
