@@ -94,6 +94,7 @@ class HaDiscoveryManager {
   void on_erd_seen(tiny_erd_t erd);
 
   void run(bool is_poll_mode,
+           bool polling_bridge_initialized,
            bool polling_list_complete,
            bool subscription_activity_detected,
            mqtt::MQTTClientComponent* mqtt_client);

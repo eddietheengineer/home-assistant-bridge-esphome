@@ -42,6 +42,7 @@ static tiny_hsm_result_t state_add_energy_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
 static tiny_hsm_result_t state_add_appliance_api_feature_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+static tiny_hsm_result_t state_add_custom_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
 // ============================================================================
@@ -438,7 +439,10 @@ static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_s
 
   if (signal == tiny_hsm_signal_entry) {
     self->current_state_name      = "probe_api_parsed_erds";
-    self->next_discovery_state    = state_polling;
+    // If custom ERDs are configured, discover them after api_parsed_list probe.
+    self->next_discovery_state    = (self->custom_erd_list != nullptr && self->custom_erd_list_count > 0)
+      ? state_add_custom_erds
+      : state_polling;
     self->appliance_erd_list       = self->api_parsed_list;
     self->appliance_erd_list_count = self->api_parsed_list_count;
     self->erd_index                = 0;
@@ -466,6 +470,28 @@ static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_s
   return handle_discovery_list_signals(hsm, signal, data);
 }
 
+static tiny_hsm_result_t state_add_custom_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
+{
+  mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
+
+  if (signal == tiny_hsm_signal_entry) {
+    self->current_state_name      = "add_custom_erds";
+    self->next_discovery_state    = state_polling;
+    self->appliance_erd_list       = self->custom_erd_list;
+    self->appliance_erd_list_count = self->custom_erd_list_count;
+    self->erd_index                = 0;
+    self->request_id++;
+    if (self->appliance_erd_list_count > 0) {
+      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    } else {
+      tiny_hsm_transition(hsm, self->next_discovery_state);
+    }
+    return tiny_hsm_result_signal_consumed;
+  }
+
+  return handle_discovery_list_signals(hsm, signal, data);
+}
+
 static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
@@ -475,7 +501,10 @@ static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_sign
       self->appliance_type = 0;
     }
     self->current_state_name      = "add_appliance_erds";
-    self->next_discovery_state    = state_polling;
+    // If custom ERDs are configured, discover them after appliance ERDs.
+    self->next_discovery_state    = (self->custom_erd_list != nullptr && self->custom_erd_list_count > 0)
+      ? state_add_custom_erds
+      : state_polling;
     self->appliance_erd_list       = applianceTypeToErdGroupTranslation[self->appliance_type].erdList;
     self->appliance_erd_list_count = applianceTypeToErdGroupTranslation[self->appliance_type].erdCount;
     self->erd_index                = 0;
@@ -504,13 +533,6 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       if (self->api_parsed_list != nullptr) {
         for (uint16_t i = 0; i < self->api_parsed_list_count; i++) {
           add_erd_to_polling_list_no_register(self, self->api_parsed_list[i]);
-        }
-      }
-      // Add user-configured custom ERDs to the polling list without
-      // registering them yet — same reasoning as above.
-      if (self->custom_erd_list != nullptr) {
-        for (uint16_t i = 0; i < self->custom_erd_list_count; i++) {
-          add_erd_to_polling_list_no_register(self, self->custom_erd_list[i]);
         }
       }
       self->erd_index = 0;

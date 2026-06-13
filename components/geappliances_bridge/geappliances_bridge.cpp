@@ -707,6 +707,7 @@ void GeappliancesBridge::run_ha_discovery()
   ha_discovery_manager_.run(
       !((mode_ == BRIDGE_MODE_SUBSCRIBE) ||
         (mode_ == BRIDGE_MODE_AUTO && subscription_mode_active_)),
+      polling_bridge_initialized_,
       mqtt_bridge_polling_.polling_list_complete,
       subscription_activity_detected_,
       mqtt::global_mqtt_client);

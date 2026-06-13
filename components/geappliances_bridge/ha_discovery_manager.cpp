@@ -123,6 +123,7 @@ void HaDiscoveryManager::cleanup()
 }
 
 void HaDiscoveryManager::run(bool is_poll_mode,
+                             bool polling_bridge_initialized,
                              bool polling_list_complete,
                              bool subscription_activity_detected,
                              mqtt::MQTTClientComponent* mqtt_client)
@@ -132,17 +133,24 @@ void HaDiscoveryManager::run(bool is_poll_mode,
     if (is_poll_mode) {
       ready = polling_list_complete;
     } else {
-      // Subscription mode: ready once the quiet window elapses after the
-      // last new ERD was seen. Do NOT gate on polling_list_complete — the
-      // polling bridge is not running in subscription mode.
+      // Subscription mode (or auto mode with subscription active):
+      // ready once the quiet window elapses after the last new ERD was seen.
+      bool quiet = false;
       if (subscription_activity_detected) {
         if (millis() - this->last_activity_ >= HA_DISCOVERY_QUIET_MS) {
-          ready = true;
+          quiet = true;
         }
       }
       // Safety cap: start discovery after 30 s even if activity never
       // settles, so HA discovery is never permanently blocked.
       if (millis() - this->start_time_ >= HA_DISCOVERY_MAX_WAIT_MS) {
+        quiet = true;
+      }
+      // In auto mode, if the polling bridge is also active, gate on
+      // polling discovery completion as well (spec 3.3).
+      if (quiet && polling_bridge_initialized) {
+        ready = polling_list_complete;
+      } else if (quiet) {
         ready = true;
       }
     }

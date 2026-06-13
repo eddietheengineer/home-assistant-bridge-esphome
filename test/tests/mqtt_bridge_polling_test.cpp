@@ -699,6 +699,9 @@ TEST(mqtt_bridge_polling_custom_erds, should_poll_custom_erds_alongside_api_pars
   }
   uint8_t probe_val = 0x01;
   trigger_read_completed(0xC0, api_erd, &probe_val, sizeof(probe_val));
+  // Custom ERDs discovered through state_add_custom_erds
+  trigger_read_completed(0xC0, custom_erd_1, &probe_val, sizeof(probe_val));
+  trigger_read_completed(0xC0, custom_erd_2, &probe_val, sizeof(probe_val));
   mock().enable();
 
   // Polling timer fires: all ERDs read simultaneously (api_erd + custom ERDs)
@@ -706,22 +709,20 @@ TEST(mqtt_bridge_polling_custom_erds, should_poll_custom_erds_alongside_api_pars
   should_request_read(0xC0, custom_erd_1);
   should_request_read(0xC0, custom_erd_2);
   after(polling_interval);
-
   // api_erd completes: already registered during probe, just publishes
   should_update_erd(api_erd, uint8_t(0xAA));
   when_a_poll_read_completes(0xC0, api_erd, uint8_t(0xAA));
 
-  // custom_erd_1 completes: registers (deferred), publishes
-  should_register_erd(custom_erd_1);
+  // custom_erd_1 completes: already registered during discovery, just publishes
   should_update_erd(custom_erd_1, uint8_t(0xBB));
   when_a_poll_read_completes(0xC0, custom_erd_1, uint8_t(0xBB));
 
-  // custom_erd_2 completes: registers, publishes
-  should_register_erd(custom_erd_2);
+  // custom_erd_2 completes: already registered during discovery, just publishes
   should_update_erd(custom_erd_2, uint8_t(0xCC));
   when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xCC));
 
-  // Polling timer fires: restart cycle from api_erd (already registered)
+  // Polling timer fires: restart cycle
+
   // All ERDs read simultaneously
   should_request_read(0xC0, api_erd);
   should_request_read(0xC0, custom_erd_1);
@@ -741,26 +742,26 @@ TEST(mqtt_bridge_polling_custom_erds, should_poll_custom_erds_in_discovery_mode)
   uint8_t appliance_type = 0x00;
   trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
 
-  // Fail all discovery ERDs to transition through discovery states to polling.
+  // Fail all discovery ERDs to transition through discovery states.
   for (size_t i = 0; i < commonErdCount; i++) trigger_read_failed(commonErds[i]);
   for (size_t i = 0; i < energyErdCount; i++) trigger_read_failed(energyErds[i]);
   for (size_t i = 0; i < applianceApiFeatureErdCount; i++) trigger_read_failed(applianceApiFeatureErds[i]);
   for (size_t i = 0; i < waterHeaterErdCount; i++) trigger_read_failed(waterHeaterErds[i]);
+  // Custom ERDs discovered through state_add_custom_erds — both respond successfully
+  uint8_t probe_val = 0x01;
+  trigger_read_completed(0xC0, custom_erd_1, &probe_val, sizeof(probe_val));
+  trigger_read_completed(0xC0, custom_erd_2, &probe_val, sizeof(probe_val));
   mock().enable();
 
-  // Polling timer fires: erd_index >= polling_list_count, so cycle restarts from 0,
-  // reading both custom ERDs simultaneously.
+  // Polling timer fires: both custom ERDs read simultaneously
   should_request_read(0xC0, custom_erd_1);
   should_request_read(0xC0, custom_erd_2);
   after(polling_interval);
 
-  // custom_erd_1 completes: registers (deferred), publishes
-  should_register_erd(custom_erd_1);
+  // Both already registered during discovery — just publishes
   should_update_erd(custom_erd_1, uint8_t(0xBB));
   when_a_poll_read_completes(0xC0, custom_erd_1, uint8_t(0xBB));
 
-  // custom_erd_2 completes: registers, publishes
-  should_register_erd(custom_erd_2);
   should_update_erd(custom_erd_2, uint8_t(0xCC));
   when_a_poll_read_completes(0xC0, custom_erd_2, uint8_t(0xCC));
 }
