@@ -23,4 +23,8 @@ inline void delay(uint32_t ms) {
   (void)ms;
 }
 
+namespace esphome {
+using ::delay;
+}  // namespace esphome
+
 #endif  // esphome_core_hal_h
