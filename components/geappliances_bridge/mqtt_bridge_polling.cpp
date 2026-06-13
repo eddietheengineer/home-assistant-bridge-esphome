@@ -483,9 +483,14 @@ static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_s
     self->appliance_erd_list_count = self->api_parsed_list_count;
     self->erd_index                = 0;
     self->request_id++;
-    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    if (queued) {
-      arm_timer(self, retry_delay);
+    if (self->appliance_erd_list_count > 0) {
+      bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+      if (queued) {
+        arm_timer(self, retry_delay);
+      }
+    } else {
+      // No ERDs to probe; transition directly to polling.
+      tiny_hsm_transition(hsm, self->next_discovery_state);
     }
     return tiny_hsm_result_signal_consumed;
   }
@@ -649,16 +654,17 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
           self->restart_pending = false;
           self->erd_index = 0;
           self->cycle_completed_count = 0;
-          while (self->erd_index < self->polling_list_count) {
-            delay(0);
-            delay(0);
-          }
-        } else if (!self->polling_timer_armed) {
-          /* Cycle finished and no timer pending — start next cycle immediately. */
+          self->cycle_start_ms = esphome::millis();
+          arm_polling_timer(self, self->polling_interval_ms);
           while (self->erd_index < self->polling_list_count) {
             send_poll_read_requests_bounded(self, POLL_YIELD_MS);
             delay(0);
           }
+        } else if (!self->polling_timer_armed) {
+          /* Cycle finished and no timer pending — start next cycle immediately. */
+          self->erd_index = 0;
+          self->cycle_completed_count = 0;
+          self->cycle_start_ms = esphome::millis();
           while (self->erd_index < self->polling_list_count) {
             send_poll_read_requests_bounded(self, POLL_YIELD_MS);
             delay(0);
@@ -678,18 +684,20 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         self->cycle_count++;
         if (self->restart_pending) {
           self->restart_pending = false;
-          while (self->erd_index < self->polling_list_count) {
-            delay(0);
-            delay(0);
-          }
+          self->erd_index = 0;
+          self->cycle_completed_count = 0;
+          self->cycle_start_ms = esphome::millis();
           arm_polling_timer(self, self->polling_interval_ms);
           while (self->erd_index < self->polling_list_count) {
-            delay(0);
+            send_poll_read_requests_bounded(self, POLL_YIELD_MS);
             delay(0);
           }
+        } else if (!self->polling_timer_armed) {
+          self->erd_index = 0;
           self->cycle_completed_count = 0;
+          self->cycle_start_ms = esphome::millis();
           while (self->erd_index < self->polling_list_count) {
-            delay(0);
+            send_poll_read_requests_bounded(self, POLL_YIELD_MS);
             delay(0);
           }
         }

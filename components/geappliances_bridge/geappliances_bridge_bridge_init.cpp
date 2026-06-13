@@ -26,7 +26,6 @@
  */
 
 #include "geappliances_bridge.h"
-#include "ha_discovery_config.h"
 #include "appliance_api_feature_lists.h"
 #include "geappliances_bridge_constants.h"
 #include "esphome/core/log.h"
