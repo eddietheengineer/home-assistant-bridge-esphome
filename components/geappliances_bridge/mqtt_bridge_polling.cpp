@@ -208,10 +208,18 @@ static void send_poll_read_requests_bounded(mqtt_bridge_polling_t* self, uint32_
 
 // Shared handler for all discovery states (common, energy, appliance API, appliance).
 // Each ERD read waits for a definitive GEA-client response before the next is sent.
+//
+// Contract: callers MUST handle tiny_hsm_signal_entry before delegating here.
+// This handler only processes signal_read_completed and signal_read_failed, both
+// of which carry non-null data from the GEA client activity callback.  Any signal
+// with null data (entry, exit, etc.) is deferred — if a caller forgets to handle
+// entry, the signal silently defers rather than causing undefined behavior.
 static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
   if (data == nullptr) {
+    // Signal with no payload (entry, exit, or unknown).  Callers are
+    // responsible for handling entry before reaching this point.
     return tiny_hsm_result_signal_deferred;
   }
   auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
