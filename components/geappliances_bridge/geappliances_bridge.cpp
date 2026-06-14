@@ -15,7 +15,7 @@ namespace geappliances_bridge {
 
 static const tiny_gea3_erd_client_configuration_t client_configuration = {
   .request_timeout = 250,
-  .request_retries = 0
+  .request_retries = 10
 };
 
 // GEA2 ERD client: no internal retries.  Bridge-level retries
