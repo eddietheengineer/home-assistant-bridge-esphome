@@ -11,14 +11,14 @@ from typing import Any
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import esp32, mqtt, uart
+from esphome.components import uart
 from esphome.const import CONF_ID
 from esphome.core import CORE
 
 _LOGGER = logging.getLogger(__name__)
 
 CODEOWNERS = ["@joshualongenecker"]
-DEPENDENCIES = ["uart", "mqtt"]
+DEPENDENCIES = ["uart"]
 AUTO_LOAD = []
 
 # UART configuration keys
@@ -32,18 +32,6 @@ CONF_MODE = "mode"
 CONF_POLLING_INTERVAL = "polling_interval"
 CONF_POLLING_ONLY_PUBLISH_ON_CHANGE = "polling_onlypublish_onchange"
 CONF_APPLIANCE_API_PARSING = "appliance_api_parsing"
-CONF_CUSTOM_ERDS = "custom_erds"
-CONF_GENERATE_DEVICE_CONFIG = "generate_device_config"
-CONF_HA_DISCOVERY_BASE_URL = "ha_discovery_base_url"
-
-
-
-# Default base URL for the per-category JSONL files used by runtime HA discovery.
-# Uses HEAD to always resolve against the repository's default branch.
-HA_DISCOVERY_DEFAULT_BASE_URL = (
-    "https://raw.githubusercontent.com/joshualongenecker/"
-    "home-assistant-bridge-esphome/HEAD/ha_discovery"
-)
 
 # Bridge mode options (polling vs subscriptions)
 MODE_POLL = "poll"
@@ -296,12 +284,9 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_POLLING_INTERVAL, default=10000): cv.positive_int,
         cv.Optional(CONF_POLLING_ONLY_PUBLISH_ON_CHANGE, default=True): cv.boolean,
         cv.Optional(CONF_APPLIANCE_API_PARSING, default=True): cv.boolean,
-        cv.Optional(CONF_GENERATE_DEVICE_CONFIG, default=False): cv.boolean,
         cv.Optional(CONF_CUSTOM_ERDS, default=[]): cv.ensure_list(
             cv.int_range(min=0, max=0xFFFF)
         ),
-        cv.Optional(CONF_HA_DISCOVERY_BASE_URL,
-                    default=HA_DISCOVERY_DEFAULT_BASE_URL): cv.string,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
@@ -325,11 +310,9 @@ async def to_code(config: dict[str, Any]) -> None:
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    # The HA-discovery HTTPS fetch uses esp_http_client, which ESPHome excludes
-    # from all builds by default.  Re-enable it here for ESP32 targets so that
-    # esp_http_client.h (and its transitive dependencies like esp_crt_bundle.h)
-    # are on the include path — the same technique used by ESPHome's built-in
-    # http_request component.
+    # esp_http_client was needed for HA-discovery HTTPS fetch; no longer required
+    # without MQTT.  The include is kept for backward compatibility with existing
+    # YAML configs that may reference it, but is a no-op now.
     if CORE.is_esp32:
         esp32.include_builtin_idf_component("esp_http_client")
 
@@ -355,10 +338,6 @@ async def to_code(config: dict[str, Any]) -> None:
     cg.add(var.set_polling_interval(config[CONF_POLLING_INTERVAL]))
     cg.add(var.set_polling_only_publish_on_change(config[CONF_POLLING_ONLY_PUBLISH_ON_CHANGE]))
     cg.add(var.set_appliance_api_parsing(config[CONF_APPLIANCE_API_PARSING]))
-    cg.add(var.set_generate_device_config(config[CONF_GENERATE_DEVICE_CONFIG]))
-
-    # Set the base URL for runtime HA-discovery JSONL download
-    cg.add(var.set_ha_discovery_base_url(config[CONF_HA_DISCOVERY_BASE_URL]))
 
     # Register any user-configured custom ERDs
     for erd in config[CONF_CUSTOM_ERDS]:

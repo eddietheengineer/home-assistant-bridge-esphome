@@ -257,6 +257,8 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
         args->read_completed.erd,
         args->read_completed.data,
         args->read_completed.data_size);
+      ESP_LOGD(TAG, "Polling discovery read: ERD 0x%04X (polling list: %u)",
+               args->read_completed.erd, self->polling_list_count);
       if (!send_next_read_request(self)) {
         tiny_hsm_transition(hsm, self->next_discovery_state);
       }
@@ -662,6 +664,9 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       if (should_publish) {
         mqtt_client_update_erd(self->mqtt_client, erd, erd_data, data_size);
       }
+      ESP_LOGD(TAG, "Polling read: ERD 0x%04X %s (cycle %u/%u)",
+               erd, should_publish ? "published" : "unchanged",
+               self->cycle_completed_count, self->polling_list_count);
       self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
         on_polling_cycle_complete(self, self->restart_pending || !self->polling_timer_armed);

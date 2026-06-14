@@ -221,79 +221,47 @@ TEST(startup_hsm, device_id_phase_signal_complete_transitions_to_mqtt_client_ini
 // Feature bits phase — feature bits complete, MQTT not yet connected
 // =============================================================================
 
-TEST(startup_hsm, feature_bits_complete_waits_for_mqtt_connection)
+TEST(startup_hsm, feature_bits_complete_transitions_to_bridge_init)
 {
-  // Entry: no timeout logic (manager is self-driving).
   tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_feature_bits);
 
-  // global_mqtt_client is null -> MQTT not connected -> no transition yet.
-  // is_feature_bits_complete returns true but MQTT not connected.
+  // Feature bits complete -> transition immediately (no MQTT gate).
   mock()
     .expectOneCall("is_feature_bits_complete")
     .onObject(&svc)
     .andReturnValue(true);
-  // mqtt::global_mqtt_client == nullptr -> no transition
 
   tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
 
-  // Still in feature_bits - MQTT hasn't connected yet.
-  CHECK(hsm.current == startup_state_feature_bits);
+  CHECK(hsm.current == startup_state_bridge_init);
   mock().checkExpectations();
 }
 
 // =============================================================================
-// Feature bits phase — feature bits complete then MQTT connects
+// Feature bits phase — signal_feature_bits_complete transitions immediately
 // =============================================================================
 
-TEST(startup_hsm, feature_bits_complete_then_mqtt_connected_signal_transitions_to_bridge_init)
+TEST(startup_hsm, feature_bits_complete_signal_transitions_to_bridge_init)
 {
   tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_feature_bits);
 
-  // Step 1: run_loop - feature bits done but MQTT not connected.
-  mock()
-    .expectOneCall("is_feature_bits_complete")
-    .onObject(&svc)
-    .andReturnValue(true);
+  // signal_feature_bits_complete -> transition immediately.
+  tiny_hsm_send_signal(&hsm, signal_feature_bits_complete, nullptr);
 
-  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
-  CHECK(hsm.current == startup_state_feature_bits);
+  CHECK(hsm.current == startup_state_bridge_init);
+}
 
-  // Step 2: MQTT connects - signal_mqtt_connected causes the state to check
-  // is_feature_bits_complete() and transition to bridge_init.
-  mock()
-    .expectOneCall("is_feature_bits_complete")
-    .onObject(&svc)
-    .andReturnValue(true);
+// =============================================================================
+// Feature bits phase - signal_mqtt_connected is a no-op (deferred)
+// =============================================================================
 
+TEST(startup_hsm, mqtt_connected_signal_deferred_in_feature_bits)
+{
+  tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_feature_bits);
+
+  // signal_mqtt_connected is not handled by feature_bits state anymore.
   tiny_hsm_send_signal(&hsm, signal_mqtt_connected, nullptr);
 
-  CHECK(hsm.current == startup_state_bridge_init);
-  mock().checkExpectations();
-}
-
-// =============================================================================
-// Feature bits phase - happy path (complete + MQTT connected in same run_loop)
-// =============================================================================
-
-TEST(startup_hsm, feature_bits_complete_with_mqtt_connected_transitions_to_bridge_init)
-{
-  tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_feature_bits);
-
-  // Set up a connected MQTT client
-  esphome::mqtt::global_mqtt_client = &mqtt_client;
-
-  // run_loop: feature bits complete, MQTT connected -> transition.
-  mock()
-    .expectOneCall("is_feature_bits_complete")
-    .onObject(&svc)
-    .andReturnValue(true);
-  mock()
-    .expectOneCall("is_connected")
-    .onObject(&mqtt_client)
-    .andReturnValue(true);
-
-  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
-
-  CHECK(hsm.current == startup_state_bridge_init);
-  mock().checkExpectations();
+  // Still in feature_bits — signal was deferred.
+  CHECK(hsm.current == startup_state_feature_bits);
 }
