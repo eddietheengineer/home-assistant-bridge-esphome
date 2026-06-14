@@ -509,8 +509,12 @@ static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_sign
     self->appliance_erd_list_count = applianceTypeToErdGroupTranslation[self->appliance_type].erdCount;
     self->erd_index                = 0;
     self->request_id++;
-    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    return tiny_hsm_result_signal_consumed;
+    if (self->appliance_erd_list_count > 0) {
+      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    } else {
+      // No appliance-specific ERDs to discover; transition directly.
+      tiny_hsm_transition(hsm, self->next_discovery_state);
+    }
   }
 
   return handle_discovery_list_signals(hsm, signal, data);
