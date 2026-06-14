@@ -440,6 +440,8 @@ TEST(mqtt_bridge_polling_api_list, should_skip_discovery_and_poll_api_list_direc
   uint8_t probe_val = 0x01;
   trigger_read_completed(0xC0, api_erd_1, &probe_val, sizeof(probe_val));
   trigger_read_completed(0xC0, api_erd_2, &probe_val, sizeof(probe_val));
+  mock().enable();
+
   // Polling timer fires: all api_list ERDs read simultaneously
   should_request_read(0xC0, api_erd_1);
   should_request_read(0xC0, api_erd_2);

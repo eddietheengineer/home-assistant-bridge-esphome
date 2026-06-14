@@ -192,7 +192,6 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
 
     // Subscription bridge has no discovery phase — signal the startup HSM
     // immediately so it can transition to subscription_watch.
-    this->ha_discovery_manager_.set_registered_erds(this->erd_registry_.registered_erds());
     tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
 
     if (!this->custom_erds_vec_.empty()) {
@@ -213,7 +212,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
         this->device_identity_manager_.get_device_id(),
         this->device_identity_manager_.get_model_number(),
         this->device_identity_manager_.get_serial_number(),
-        {},
+        this->erd_registry_.registered_erds(),
         true);
     this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
     ESP_LOGI(TAG, "HA discovery deferred: will publish after ERD discovery completes "
