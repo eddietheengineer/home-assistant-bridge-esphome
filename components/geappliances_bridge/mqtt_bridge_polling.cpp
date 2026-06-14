@@ -44,6 +44,8 @@ static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_s
 static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_add_custom_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+static void send_poll_read_requests_bounded(mqtt_bridge_polling_t* self, uint32_t budget_ms);
+static constexpr uint32_t POLL_YIELD_MS = 50;  // tuning: per-batch time budget
 
 // ============================================================================
 // Polling bridge — private helpers
@@ -133,6 +135,34 @@ static void add_erd_to_polling_list(mqtt_bridge_polling_t* self, tiny_erd_t erd)
   }
 }
 
+// Called when all ERDs in the current polling cycle have responded.
+// Records cycle metrics and decides whether to start the next cycle
+// immediately or wait for the polling timer.  When 'immediate' is true,
+// the next cycle starts right away (used when restart_pending is set or
+// the timer has already expired).  When 'immediate' is false, only arms
+// the timer if it isn't already armed (used from send_next_poll_read_request
+// where restart_pending is never set).
+static void on_polling_cycle_complete(mqtt_bridge_polling_t* self, bool immediate)
+{
+  self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
+  self->cycle_count++;
+
+  if (immediate) {
+    self->restart_pending = false;
+    self->erd_index = 0;
+    self->cycle_completed_count = 0;
+    self->cycle_start_ms = esphome::millis();
+    arm_polling_timer(self, self->polling_interval_ms);
+    while (self->erd_index < self->polling_list_count) {
+      send_poll_read_requests_bounded(self, POLL_YIELD_MS);
+      esphome::delay(0);
+    }
+  } else if (!self->polling_timer_armed) {
+    arm_polling_timer(self, self->polling_interval_ms);
+  }
+  // else: timer still armed — wait for it to fire and restart.
+}
+
 static bool send_next_read_request(mqtt_bridge_polling_t* self)
 {
   reset_lost_appliance_timer(self);
@@ -159,11 +189,7 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
        * next cycle. */
       self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
-        self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
-        self->cycle_count++;
-        if (!self->polling_timer_armed) {
-          arm_polling_timer(self, self->polling_interval_ms);
-        }
+        on_polling_cycle_complete(self, false);
       }
     }
     if (elapsed >= 500) {
@@ -190,7 +216,6 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
 //       esphome::delay(0); // yield to main loop
 //     }
 // so that all ERDs are queued before proceeding.
-static constexpr uint32_t POLL_YIELD_MS = 50;  // tuning: per-batch time budget
 
 static void send_poll_read_requests_bounded(mqtt_bridge_polling_t* self, uint32_t budget_ms)
 {
@@ -638,30 +663,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       }
       self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
-        self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
-        self->cycle_count++;
-        if (self->restart_pending) {
-          // Timer fired while this cycle was in progress; start next cycle now.
-          self->restart_pending = false;
-          self->erd_index = 0;
-          self->cycle_completed_count = 0;
-          self->cycle_start_ms = esphome::millis();
-          arm_polling_timer(self, self->polling_interval_ms);
-          while (self->erd_index < self->polling_list_count) {
-            send_poll_read_requests_bounded(self, POLL_YIELD_MS);
-            esphome::delay(0);
-          }
-        } else if (!self->polling_timer_armed) {
-          /* Cycle finished and no timer pending — start next cycle immediately. */
-          self->erd_index = 0;
-          self->cycle_completed_count = 0;
-          self->cycle_start_ms = esphome::millis();
-          while (self->erd_index < self->polling_list_count) {
-            send_poll_read_requests_bounded(self, POLL_YIELD_MS);
-            esphome::delay(0);
-          }
-        }
-        // else: timer still armed — wait for it to fire and restart.
+        on_polling_cycle_complete(self, self->restart_pending || !self->polling_timer_armed);
       }
       break;
     }
@@ -670,28 +672,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       reset_lost_appliance_timer(self);
       self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
-        self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
-        self->cycle_count++;
-        if (self->restart_pending) {
-          self->restart_pending = false;
-          self->erd_index = 0;
-          self->cycle_completed_count = 0;
-          self->cycle_start_ms = esphome::millis();
-          arm_polling_timer(self, self->polling_interval_ms);
-          while (self->erd_index < self->polling_list_count) {
-            send_poll_read_requests_bounded(self, POLL_YIELD_MS);
-            esphome::delay(0);
-          }
-        } else if (!self->polling_timer_armed) {
-          self->erd_index = 0;
-          self->cycle_completed_count = 0;
-          self->cycle_start_ms = esphome::millis();
-          while (self->erd_index < self->polling_list_count) {
-            send_poll_read_requests_bounded(self, POLL_YIELD_MS);
-            esphome::delay(0);
-          }
-        }
-        // else: timer still armed — wait for it to fire and restart.
+        on_polling_cycle_complete(self, self->restart_pending || !self->polling_timer_armed);
       }
       break;
 
