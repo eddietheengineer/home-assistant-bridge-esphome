@@ -66,24 +66,47 @@ Boot #2 (11:22:42–11:25:15) is the only run that completed the full startup se
 
 At boot attempt 10, safe mode activates and skips custom component setup. The device connects to WiFi and remains stable. This confirms the crash is in the bridge component code path, not in core ESPHome or WiFi/MQTT infrastructure.
 
-## Root Cause Hypothesis
+## Root Cause (Confirmed)
 
-The `loopTask` watchdog (default 3s on ESP32-C6) is being starved because the main event loop is blocked by synchronous operations during startup. The most likely culprits:
+The MQTT connection FSM in `loop()` runs **before** the first `esp_task_wdt_reset()` call.
+During startup, three blocking operations execute without feeding the watchdog:
 
-1. **Blocking MQTT operations** — The consistent `mqtt took a long time` warnings (~104ms per operation) suggest the MQTT client is doing synchronous network I/O on the main loop. Accumulated across multiple subscribe/publish calls during startup, this can exceed the 3s watchdog window.
+1. `subscribe_write_topic()` — acquires the IDF MQTT mutex, sends a SUBSCRIBE packet to the broker
+2. `drain_pending_updates()` (FLUSHING state) — publishes up to 5 pending ERD messages synchronously, each acquiring the IDF MQTT mutex (~100 ms per publish)
+3. `drain_pending_updates()` (RUNNING state) — same blocking pattern in steady-state
 
-2. **Blocking UART operations** — The GEA3 UART adapter performs synchronous reads during autodiscovery and feature bit enumeration. If the appliance board is slow to respond or unresponsive, the UART read can block indefinitely.
+When the pending update queue is large (startup: 50+ ERDs to flush), the FLUSHING state
+blocks for multiple loop iterations. Each iteration drains 5 messages at ~100 ms each
+(~500 ms per iteration). The TWDT timeout (default 3 s on ESP32-C6) fires before the
+first `esp_task_wdt_reset()` at the end of `run_protocol_stack_()`.
 
-3. **Combined effect** — MQTT + UART operations happening in the same loop iteration can push total blocking time past the watchdog threshold.
+The crash timing converges to ~5 s after MQTT connect because: the TWDT is fed once
+during the connect transition (DISCONNECTED → SUBSCRIBING), then the SUBSCRIBING and
+FLUSHING states block for >3 s before reaching the next feed point.
 
-## Recommendations
+Boot #2 reached steady state because MQTT connected before feature bit reading started,
+so the pending queue was small. It still crashed later (153 s uptime) during polling,
+confirming the RUNNING state also needed protection.
 
-1. **Increase the task watchdog timeout** — Add `esphome: on_boot: priority: -100` with `esp_task_wdt_config` to give more headroom during startup, or configure the watchdog timeout in the platformio/ESPhome config.
+## Fix Applied
 
-2. **Make UART reads non-blocking** — Ensure all GEA3 UART operations use timeouts and yield control back to the event loop between reads.
+Added `esp_task_wdt_reset()` calls gated by `#ifdef USE_ESP32` before each blocking
+MQTT operation in the SUBSCRIBING, FLUSHING, and RUNNING FSM states
+(`geappliances_bridge.cpp`, `loop()` method). This ensures the task watchdog is fed
+before the main loop enters any potentially blocking MQTT path.
 
-3. **Yield in MQTT-heavy startup paths** — Break up batches of MQTT subscribe/publish calls with `yield()` or `delay(0)` calls to feed the watchdog.
+## Remaining Questions
 
-4. **Add `App.feed_wdt()` at strategic points** — In long-running startup sequences (feature bit enumeration, ERD registration), explicitly feed the watchdog between operations.
+1. **Steady-state crash** — Boot #2 crashed at 153 s uptime during normal polling.
+   The fix adds TWDT feeds in the RUNNING state, but the root cause of that specific
+   crash (possibly `aioesphomeapi` disconnect triggering a long reconnection sequence)
+   may need separate investigation.
 
-5. **Investigate the steady-state crash** — The one run that reached polling mode also crashed (153s uptime), suggesting the blocking issue persists in the polling loop, not just during startup.
+2. **MQTT publish latency** — The consistent ~104 ms per MQTT operation is high.
+   Investigating whether the broker, network path, or IDF MQTT client configuration
+   can reduce this latency would improve startup time and reduce watchdog pressure.
+
+3. **ERD client read timeouts** — The GEA3 ERD client uses 250 ms timeout × 10 retries
+   = 2.5 s per ERD read on failure. During discovery phases, a non-responsive appliance
+   could block the protocol stack for extended periods. The GEA2 tight loop already has
+   TWDT feeds, but the GEA3 single-pass path does not feed the watchdog between ERD reads.
