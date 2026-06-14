@@ -210,6 +210,11 @@ void GeappliancesBridge::loop() {
             // write topic.  Stay in SUBSCRIBING until the adapter is ready so
             // the subscribe is not skipped when MQTT connects before adapter init.
             if (this->mqtt_client_adapter_initialized_) {
+#ifdef USE_ESP32
+              // Feed the watchdog before subscribe() which acquires the IDF
+              // MQTT mutex and can block for hundreds of milliseconds.
+              esp_task_wdt_reset();
+#endif
               esphome_mqtt_client_adapter_subscribe_write_topic(&this->mqtt_client_adapter_);
               this->mqtt_connection_state_ = MqttConnectionState::FLUSHING;
             }
@@ -219,6 +224,12 @@ void GeappliancesBridge::loop() {
             // Drain pending ERD updates a few at a time.  Transition to
             // RUNNING once the queue is empty.
             if (this->mqtt_client_adapter_initialized_) {
+#ifdef USE_ESP32
+              // Feed the watchdog before drain_pending_updates() which
+              // publishes up to 5 messages synchronously, each acquiring
+              // the IDF MQTT mutex (~100 ms per publish).
+              esp_task_wdt_reset();
+#endif
               if (esphome_mqtt_client_adapter_drain_pending_updates(
                       &this->mqtt_client_adapter_) == 0) {
                 this->mqtt_connection_state_ = MqttConnectionState::RUNNING;
@@ -231,9 +242,13 @@ void GeappliancesBridge::loop() {
           case MqttConnectionState::RUNNING:
             // Steady-state: drain any newly queued ERD updates.
             if (this->mqtt_client_adapter_initialized_) {
+#ifdef USE_ESP32
+              esp_task_wdt_reset();
+#endif
               esphome_mqtt_client_adapter_drain_pending_updates(&this->mqtt_client_adapter_);
             }
             break;
+
         }
       }
     }
