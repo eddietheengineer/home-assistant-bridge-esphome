@@ -548,6 +548,7 @@ static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_sign
       // No appliance-specific ERDs to discover; transition directly.
       tiny_hsm_transition(hsm, self->next_discovery_state);
     }
+    return tiny_hsm_result_signal_consumed;
   }
 
   return handle_discovery_list_signals(hsm, signal, data);
