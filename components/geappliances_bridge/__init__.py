@@ -311,11 +311,6 @@ async def to_code(config: dict[str, Any]) -> None:
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    # esp_http_client was needed for HA-discovery HTTPS fetch; no longer required
-    # without MQTT.  The include is kept for backward compatibility with existing
-    # YAML configs that may reference it, but is a no-op now.
-    if CORE.is_esp32:
-        esp32.include_builtin_idf_component("esp_http_client")
 
     # Get optional GEA3 UART component reference
     if CONF_GEA3_UART_ID in config:
