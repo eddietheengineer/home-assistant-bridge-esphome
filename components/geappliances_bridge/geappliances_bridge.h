@@ -183,9 +183,11 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // (see doc/geappliances_bridge.md section 13 for detailed explanation)
   static constexpr uint32_t GEA2_LOOP_DURATION_MS = 200;
 
-  // GEA3 tight-loop duration: covers the full TX→RX cycle at 230400 baud
-  // (see doc/geappliances_bridge.md section 13 for detailed explanation)
-  static constexpr uint32_t GEA3_LOOP_DURATION_MS = 10;
+  // GEA3 tight-loop duration: kept short to avoid starving other components
+  // on single-core ESP32 variants (C6, S2).  At 230400 baud, a full
+  // GEA3 response packet is ~50 bytes (~2ms of UART time), so 3ms is
+  // sufficient to process any bytes that have arrived since the last loop.
+  static constexpr uint32_t GEA3_LOOP_DURATION_MS = 3;
 
   bool gea2_protocol_active_{false}; // fallback for manual device_id when autodiscovery is skipped
 
