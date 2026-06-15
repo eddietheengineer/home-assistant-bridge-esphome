@@ -383,10 +383,16 @@ void GeappliancesBridge::run_protocol_stack_()
     }
     // GEA3 path: run a tight loop at 1ms intervals to ensure UART bytes
     // at 230400 baud are processed without missing messages.  The tight
-    // loop runs whenever GEA3 UART is configured and GEA2 is not active.
-    // This covers all phases: startup (autodiscovery, device_id, feature_bits),
-    // bridge initialization, and steady-state polling/subscription.
-    if (this->uart_ != nullptr) {
+    // loop runs only after the HSM has progressed past STARTUP_DELAY — i.e.,
+    // when there is actual GEA3 communication happening (autodiscovery,
+    // device_id, feature_bits, bridge_init, polling, subscription).
+    // During PROTOCOL_STACK and STARTUP_DELAY the device is not yet active,
+    // so we fall back to single-pass to avoid starving ESPHome components
+    // (e.g., the MQTT client connection logic).
+    bool gea3_past_startup_delay = this->startup_hsm_.current != nullptr &&
+      this->startup_hsm_.current != startup_state_protocol_stack &&
+      this->startup_hsm_.current != startup_state_startup_delay;
+    if (this->uart_ != nullptr && gea3_past_startup_delay) {
       uint32_t gea3_loop_start_ms = millis();
       static constexpr uint32_t GEA3_LOOP_HARD_CAP_MS = GEA3_LOOP_DURATION_MS * 2;
       while (millis() - gea3_loop_start_ms < GEA3_LOOP_DURATION_MS) {
@@ -405,7 +411,7 @@ void GeappliancesBridge::run_protocol_stack_()
         tiny_gea3_interface_run(&this->gea3_interface_);
       }
     } else {
-      // No GEA3 UART configured (GEA2-only or neither).  Single-pass to
+      // No GEA3 UART configured or still in early startup.  Single-pass to
       // keep timers advancing for autodiscovery or other background work.
       tiny_timer_group_run(&this->timer_group_);
       if (this->gea2_uart_ != nullptr) {
