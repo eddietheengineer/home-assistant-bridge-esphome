@@ -383,6 +383,7 @@ void GeappliancesBridge::run_protocol_stack_()
       }
       tiny_gea2_interface_run(&this->gea2_interface_);
     }
+  } else {
     // GEA3 path: run a tight loop at 1ms intervals to ensure UART bytes
     // at 230400 baud are processed without missing messages.  Runs
     // continuously whenever GEA3 UART is configured and GEA2 is not active.
