@@ -32,7 +32,6 @@ CONF_MODE = "mode"
 CONF_POLLING_INTERVAL = "polling_interval"
 CONF_POLLING_ONLY_PUBLISH_ON_CHANGE = "polling_onlypublish_onchange"
 CONF_APPLIANCE_API_PARSING = "appliance_api_parsing"
-CONF_CUSTOM_ERDS = "custom_erds"
 
 # Bridge mode options (polling vs subscriptions)
 MODE_POLL = "poll"
