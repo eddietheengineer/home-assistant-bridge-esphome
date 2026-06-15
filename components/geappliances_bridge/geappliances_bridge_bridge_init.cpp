@@ -84,11 +84,11 @@ void GeappliancesBridge::start_feature_bit_reading_()
 
 void GeappliancesBridge::initialize_mqtt_client_()
 {
-  if (this->adapter_initialized_) {
+  if (this->mqtt_client_adapter_initialized_) {
     return;
   }
 
-  ESP_LOGI(TAG, "Initializing no-op MQTT adapter with device ID: %s",
+  ESP_LOGI(TAG, "Initializing MQTT client adapter with device ID: %s",
            this->device_identity_manager_.get_device_id().c_str());
 
   // For manual device_id configs where autodiscovery is skipped (gea2_uart only,
@@ -100,11 +100,19 @@ void GeappliancesBridge::initialize_mqtt_client_()
     }
   }
 
-  no_op_mqtt_adapter_init(&this->no_op_adapter_);
+  // Bind the adapter to the device ID.
+  esphome_mqtt_client_adapter_init(&this->mqtt_client_adapter_,
+                                   this->device_identity_manager_.get_device_id().c_str());
 
+  // Wire up the ERD registry: clears any stale registrations and sets up
+  // the MQTT adapter with a single pointer for valid-ERD filtering and
+  // registered-ERD tracking.
   this->erd_registry_.clear_registered_erds();
-  this->adapter_initialized_ = true;
-  ESP_LOGI(TAG, "No-op MQTT adapter initialized; ERD operations will be logged");
+  esphome_mqtt_client_adapter_set_erd_registry(
+    &this->mqtt_client_adapter_, &this->erd_registry_);
+
+  this->mqtt_client_adapter_initialized_ = true;
+  ESP_LOGI(TAG, "MQTT client adapter initialized; feature bit ERDs will be published as they are read");
 }
 
 // ---------------------------------------------------------------------------
@@ -113,11 +121,11 @@ void GeappliancesBridge::initialize_mqtt_client_()
 
 void GeappliancesBridge::initialize_mqtt_bridge_()
 {
-  if (!this->adapter_initialized_ || this->bridge_initialized_) {
+  if (!this->mqtt_client_adapter_initialized_ || this->mqtt_bridge_initialized_) {
     return;
   }
 
-  ESP_LOGI(TAG, "Initializing bridge");
+  ESP_LOGI(TAG, "Initializing MQTT bridge");
 
   // Apply the valid-ERD filter when appliance API parsing is enabled and
   // produced results. An empty set is ignored by the registry so all ERDs
@@ -131,7 +139,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
   }
 
   // Select operating mode.
-  bool use_polling = false;
+  bool        use_polling = false;
 
   const char* mode_name = "unknown";
   if (this->autodiscovery_manager_.is_gea2_protocol()) {
@@ -160,13 +168,14 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       &this->mqtt_bridge_polling_,
       &this->timer_group_,
       this->autodiscovery_manager_.get_active_erd_client(),
-      &this->no_op_adapter_.interface,
+      &this->mqtt_client_adapter_.interface,
       this->polling_interval_ms_,
       this->polling_only_publish_on_change_);
     // Wire the discovery-complete callback so the startup HSM waits for
     // ERD discovery to finish before transitioning to steady-state.
     this->mqtt_bridge_polling_.on_discovery_complete = +[](void* ctx) {
       auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
+      bridge->ha_discovery_manager_.set_registered_erds(bridge->erd_registry_.registered_erds());
       tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
     };
     this->mqtt_bridge_polling_.on_discovery_complete_context = this;
@@ -177,7 +186,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       &this->mqtt_bridge_,
       &this->timer_group_,
       this->autodiscovery_manager_.get_active_erd_client(),
-      &this->no_op_adapter_.interface,
+      &this->mqtt_client_adapter_.interface,
       this->autodiscovery_manager_.get_host_address());
     this->subscription_bridge_initialized_ = true;
 
@@ -193,8 +202,23 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     }
   }
 
-  this->bridge_initialized_ = true;
-  ESP_LOGI(TAG, "Bridge initialized successfully");
+  this->mqtt_bridge_initialized_ = true;
+  ESP_LOGI(TAG, "MQTT bridge initialized successfully");
+
+  // Defer HA device discovery until ERD registration has settled.
+  if (this->generate_device_config_) {
+    this->ha_discovery_manager_.init(
+        this->ha_discovery_base_url_,
+        this->device_identity_manager_.get_device_id(),
+        this->device_identity_manager_.get_model_number(),
+        this->device_identity_manager_.get_serial_number(),
+        this->erd_registry_.registered_erds(),
+        true);
+    this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
+    ESP_LOGI(TAG, "HA discovery deferred: will publish after ERD discovery completes "
+                  "(polling mode) or %u s quiet window (subscription mode)",
+             HA_DISCOVERY_QUIET_MS / 1000);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +278,7 @@ void GeappliancesBridge::start_custom_erd_polling_()
     &this->mqtt_bridge_polling_,
     &this->timer_group_,
     this->autodiscovery_manager_.get_active_erd_client(),
-    &this->no_op_adapter_.interface,
+    &this->mqtt_client_adapter_.interface,
     this->polling_interval_ms_,
     this->polling_only_publish_on_change_,
     this->autodiscovery_manager_.get_host_address(),
@@ -267,7 +291,7 @@ void GeappliancesBridge::start_custom_erd_polling_()
 void GeappliancesBridge::maybe_start_custom_erd_polling_()
 {
   if (this->custom_erds_vec_.empty() ||
-      !this->bridge_initialized_ ||
+      !this->mqtt_bridge_initialized_ ||
       this->custom_erd_polling_started_) {
     return;
   }
@@ -327,7 +351,7 @@ void GeappliancesBridge::check_subscription_activity_()
     &this->mqtt_bridge_polling_,
     &this->timer_group_,
     this->autodiscovery_manager_.get_active_erd_client(),
-    &this->no_op_adapter_.interface,
+    &this->mqtt_client_adapter_.interface,
     this->polling_interval_ms_,
     this->polling_only_publish_on_change_);
   this->polling_bridge_initialized_ = true;

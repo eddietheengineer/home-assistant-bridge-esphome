@@ -92,8 +92,9 @@ class IBridgeServices {
   virtual void maybe_start_custom_erd_polling() = 0;
   /// Log any pending polling-bridge state-name transitions.
   virtual void log_poll_state_transitions() = 0;
-  /// No-op: HA discovery is not available without MQTT.
+  /// Run one tick of the HA discovery manager.
   virtual void run_ha_discovery() = 0;
+  /// Run one tick of all managers (autodiscovery, device-ID, feature bits).
   virtual void run_all_managers() = 0;
 };
 

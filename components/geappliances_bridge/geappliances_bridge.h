@@ -29,6 +29,7 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/uart/uart.h"
+#include "esphome/components/mqtt/mqtt_client.h"
 #include <string>
 #include <set>
 #include <vector>
@@ -50,10 +51,11 @@ extern "C" {
 #include "bridge_mode.h"
 #include "i_bridge_services.h"
 #include "erd_registry.h"
-#include "no_op_mqtt_adapter.h"
+#include "esphome_mqtt_client_adapter.h"
 #include "device_identity_manager.h"
 #include "feature_bit_manager.h"
 #include "autodiscovery_manager.h"
+#include "ha_discovery_manager.h"
 #include "geappliances_bridge_startup_hsm.h"
 
 // Forward declaration of the generated function
@@ -83,7 +85,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_polling_interval(uint32_t polling_interval) { this->polling_interval_ms_ = polling_interval; }
   void set_polling_only_publish_on_change(bool only_publish_on_change) { this->polling_only_publish_on_change_ = only_publish_on_change; }
   void set_appliance_api_parsing(bool appliance_api_parsing) { this->appliance_api_parsing_ = appliance_api_parsing; }
+  void set_generate_device_config(bool generate_device_config) { this->generate_device_config_ = generate_device_config; }
   void add_custom_erd(uint16_t erd) { this->custom_erds_vec_.push_back(static_cast<tiny_erd_t>(erd)); }
+  void set_ha_discovery_base_url(const std::string& url) { this->ha_discovery_base_url_ = url; }
 
 
 
@@ -144,12 +148,21 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   std::string configured_device_id_;
   uint8_t client_address_{0xE4};
 
-  bool adapter_initialized_{false};
-  bool bridge_initialized_{false};
+  // States for the non-blocking MQTT (re)connection FSM in loop().
+  enum class MqttConnectionState : uint8_t {
+    DISCONNECTED,  // No MQTT connection (or not yet seen)
+    SUBSCRIBING,   // Connected; waiting for adapter init to subscribe wildcard
+    FLUSHING,      // Subscribed; draining pending ERD update queue
+    RUNNING,       // Steady-state: queue empty, draining new updates each loop
+  };
+  MqttConnectionState mqtt_connection_state_{MqttConnectionState::DISCONNECTED};
+  bool mqtt_client_adapter_initialized_{false};
+  bool mqtt_bridge_initialized_{false};
   BridgeMode mode_{BRIDGE_MODE_AUTO};
   uint32_t polling_interval_ms_{10000};
   bool polling_only_publish_on_change_{false};
   bool appliance_api_parsing_{true};
+  bool generate_device_config_{false};
   // User-configured custom ERDs to poll in addition to the standard list.
   // Populated by add_custom_erd() calls generated from the YAML custom_erds option.
   std::vector<tiny_erd_t> custom_erds_vec_;
@@ -162,6 +175,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   std::set<tiny_erd_t> custom_erd_subscription_seen_erds_;
   bool custom_erd_polling_started_{false};  // Guard to prevent re-initialization
   static constexpr uint32_t SUBSCRIPTION_TIMEOUT_MS = 10000; // 10 seconds
+
   // Startup phase delay tracking
   uint32_t startup_delay_start_ms_{0};
 
@@ -184,19 +198,33 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // Feature bit reading state machine (runs after autodiscovery, before device ID gen)
   // The FeatureBitManager owns the valid ERD list and ready flag; use its getters directly.
 
+  // HA device discovery state is managed by HaDiscoveryManager; the bridge
+  // delegates to it rather than maintaining redundant copies.
   const char* last_logged_poll_state_{nullptr};
   // ERD registry: single owner of valid-ERD filter, string-type set,
   // and runtime registered-ERD tracking.
   ErdRegistry erd_registry_;
 
+  // Base URL for the per-category JSONL files.
+  // Can be overridden in YAML via ha_discovery_base_url.
+  // Uses HEAD to always resolve against the repository's default branch.
+  std::string ha_discovery_base_url_{
+    "https://raw.githubusercontent.com/joshualongenecker/"
+    "home-assistant-bridge-esphome/HEAD/ha_discovery"
+  };
+
   // Autodiscovery manager (extracted from god class)
   AutodiscoveryManager autodiscovery_manager_;
+
+  // HA discovery manager (extracted from god class)
+  HaDiscoveryManager ha_discovery_manager_;
 
   tiny_timer_group_t timer_group_;
 
   // GEA3 components
   esphome_uart_adapter_t uart_adapter_;
-  no_op_mqtt_adapter_t no_op_adapter_;
+  esphome_mqtt_client_adapter_t mqtt_client_adapter_;
+
   tiny_gea3_interface_t gea3_interface_;
   uint8_t receive_buffer_[255];
   uint8_t send_queue_buffer_[1000];

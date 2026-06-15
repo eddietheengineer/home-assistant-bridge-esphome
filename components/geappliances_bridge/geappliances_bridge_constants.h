@@ -52,10 +52,6 @@ static constexpr uint8_t GEA_BROADCAST_ADDRESS = 0xFF;
 // Autodiscovery startup delay (bridge waits before starting broadcast discovery).
 static constexpr uint32_t AUTODISCOVERY_STARTUP_DELAY_MS = 5000;
 
-// Quiet window for subscription-mode custom ERD polling: wait this long
-// after the last subscription publication before starting custom ERD polling.
-static constexpr uint32_t HA_DISCOVERY_QUIET_MS = 10000;
-
 // Each appliance feature API ERD has the layout [2B type][2B version][4B bitmap]
 static constexpr uint8_t APPLIANCE_FEATURE_ERD_SIZE = 8;
 

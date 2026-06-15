@@ -34,8 +34,7 @@ static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
       auto erd = args->subscription_publication_received.erd;
 
-      bool new_erd = erd_set(self).find(erd) == erd_set(self).end();
-      if(new_erd) {
+      if(erd_set(self).find(erd) == erd_set(self).end()) {
         mqtt_client_register_erd(self->mqtt_client, erd);
         erd_set(self).insert(erd);
       }
@@ -45,9 +44,6 @@ static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         erd,
         args->subscription_publication_received.data,
         args->subscription_publication_received.data_size);
-
-      ESP_LOGD(TAG, "Subscription update: ERD 0x%04X %s (total registered: %zu)",
-               erd, new_erd ? "(new)" : "", erd_set(self).size());
     } break;
 
     case signal_write_requested: {
