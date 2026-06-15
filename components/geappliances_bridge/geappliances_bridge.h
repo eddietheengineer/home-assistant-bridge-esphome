@@ -28,6 +28,7 @@
 #pragma once
 
 #include "esphome/core/component.h"
+#include "esphome/components/sensor/sensor.h"
 #include "esphome/components/uart/uart.h"
 #include <string>
 #include <set>
@@ -85,8 +86,8 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_polling_only_publish_on_change(bool only_publish_on_change) { this->polling_only_publish_on_change_ = only_publish_on_change; }
   void set_appliance_api_parsing(bool appliance_api_parsing) { this->appliance_api_parsing_ = appliance_api_parsing; }
   void set_generate_device_config(bool generate_device_config) { this->generate_device_config_ = generate_device_config; }
-  void add_custom_erd(uint16_t erd) { this->custom_erds_vec_.push_back(static_cast<tiny_erd_t>(erd)); }
   void set_ha_discovery_base_url(const std::string& url) { this->ha_discovery_base_url_ = url; }
+  void set_erd_publish_rate_sensor(sensor::Sensor* sensor) { this->erd_publish_rate_sensor_ = sensor; }
 
 
 
@@ -192,6 +193,12 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // HA device discovery state is managed by HaDiscoveryManager; the bridge
   // delegates to it rather than maintaining redundant copies.
   const char* last_logged_poll_state_{nullptr};
+
+  // ERD publish rate sensor: counts ERD updates per ~60s window and
+  // publishes to Home Assistant.
+  sensor::Sensor* erd_publish_rate_sensor_{nullptr};
+  uint32_t last_erd_publish_rate_publish_{0};
+  static constexpr uint32_t ERD_PUBLISH_RATE_INTERVAL_MS = 60000;
   // ERD registry: single owner of valid-ERD filter, string-type set,
   // and runtime registered-ERD tracking.
   ErdRegistry erd_registry_;

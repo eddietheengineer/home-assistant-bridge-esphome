@@ -250,3 +250,19 @@ TEST(esphome_mqtt_client_adapter, on_mqtt_disconnect_returns_event)
   i_tiny_event_t* evt = adapter.interface.api->on_mqtt_disconnect(&adapter.interface);
   CHECK(evt != nullptr);
 }
+/* ------------------------------------------------------------------ */
+/* ERD publish count                                                    */
+/* ------------------------------------------------------------------ */
+
+TEST(esphome_mqtt_client_adapter, erd_publish_count_increments_and_resets)
+{
+  init_adapter();
+  CHECK_EQUAL(0u, esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(&adapter));
+
+  uint8_t value1 = 0x42;
+  uint8_t value2 = 0x01;
+  adapter.interface.api->update_erd(&adapter.interface, 0x0008, &value1, 1);
+  adapter.interface.api->update_erd(&adapter.interface, 0x0001, &value2, 1);
+  CHECK_EQUAL(2u, esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(&adapter));
+  CHECK_EQUAL(0u, esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(&adapter));
+}

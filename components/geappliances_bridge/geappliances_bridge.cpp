@@ -213,6 +213,17 @@ void GeappliancesBridge::loop() {
   // and can block for hundreds of milliseconds.
   esp_task_wdt_reset();
 #endif
+
+  // Publish ERD publish rate sensor every ~60 seconds.
+  if (this->erd_publish_rate_sensor_ != nullptr) {
+    uint32_t now = esphome::millis();
+    if (now - this->last_erd_publish_rate_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
+      uint32_t count = esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(
+        &this->mqtt_client_adapter_);
+      this->erd_publish_rate_sensor_->publish_state(static_cast<float>(count));
+      this->last_erd_publish_rate_publish_ = now;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
