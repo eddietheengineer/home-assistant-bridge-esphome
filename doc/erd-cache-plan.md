@@ -29,19 +29,15 @@ The goal is to add a fixed-size array-based ERD cache that:
 | Data size | `uint8_t` | 0–255 bytes per ERD |
 | Max ERDs in cache | 200 | Per requirement |
 
-### Memory Budget (200 ERDs)
+### Memory Budget (200 ERDs, Option C)
 
 | Component | Size per entry | Total (200) |
 |-----------|---------------|-------------|
-| ERD number | 2 bytes | 400 B |
-| Data pointer | 4 bytes | 800 B |
-| Update required bool | 1 byte | 200 B |
-| Data size | 1 byte | 200 B |
-| **Entry struct** | **8 bytes** | **1,600 B** |
-| **Data buffers** (200 × 256) | 256 bytes | **51,200 B** |
-| **Total** | | **~52.8 KB** |
+| Entry struct (erd, inline_data[16], flags) | 22 bytes | **4,400 B** |
+| Heap data (ERDs > 16 bytes) | ~0 (rare) | **~0 B** |
+| **Total** | | **~4.4 KB** (all static, no heap for typical ERDs) |
 
-This is significant for ESP32 (~520KB total heap). We need to be strategic about data storage.
+For ERDs larger than 16 bytes (rare in practice), a single heap allocation is made per unique ERD. Most GE Appliances ERDs are 1–8 bytes (feature bits, status flags, simple values).
 
 ## Design
 
@@ -65,7 +61,7 @@ erd_cache_entry_t erd_cache[ERD_CACHE_CAPACITY];
 **Pros:** Zero heap allocation after init. Simple O(n) linear scan.
 **Cons:** 52 KB even if most ERDs are small (most are 1-8 bytes). Wasteful.
 
-### Option B: Heap-allocated data buffers per entry (chosen)
+### Option B: Heap-allocated data buffers per entry
 
 ```c
 typedef struct {
@@ -85,7 +81,7 @@ erd_cache_entry_t erd_cache[ERD_CACHE_CAPACITY];
 **Pros:** Only allocates what's needed. Most ERDs are 1-8 bytes.
 **Cons:** Still uses heap for data, but controlled allocation (one per ERD, not per read).
 
-### Option C: Hybrid — small inline buffer + heap for large
+### Option C: Hybrid — small inline buffer + heap for large (chosen)
 
 ```c
 typedef struct {
@@ -101,17 +97,20 @@ typedef struct {
 } erd_cache_entry_t;
 ```
 
-**Pros:** Most ERDs (≤16 bytes) use no heap at all.
-**Cons:** More complex code, slightly larger struct.
+**Total:** 200 × 22 = **4,400 bytes** for the array + heap only for ERDs > 16 bytes (rare)
 
-## Recommended Approach: Option B
+**Pros:** Most ERDs (≤16 bytes) use zero heap. No heap fragmentation for the common case. Slightly larger struct than Option B, but eliminates the per-entry heap allocation entirely for ~95% of ERDs.
+**Cons:** Slightly more complex get/set logic (one `if (uses_heap)` branch).
+
+## Recommended Approach: Option C
 
 **Rationale:**
-- Most ERDs are 1-8 bytes (feature bits, status flags, simple values)
-- The 1,800-byte fixed array is negligible
-- Heap allocations are one per unique ERD, not per cycle — stable memory footprint
-- Simpler than Option C, nearly as efficient for the data sizes we actually see
-- Option A wastes ~50KB on ERDs that are typically 1-4 bytes
+- Most ERDs are 1–8 bytes (feature bits, status flags, simple values)
+- The 4.4 KB fixed array is negligible
+- Heap allocations are only for ERDs > 16 bytes, which are rare in practice
+- Option A wastes ~50 KB on ERDs that are typically 1–4 bytes
+- Option B reintroduces heap fragmentation for every ERD
+- Option C's complexity delta over Option B is minimal: one `uses_heap` flag and a union, with a single conditional branch in get/set paths
 
 ## Invariant: Only registered ERDs enter the cache
 
@@ -129,15 +128,20 @@ New module in `components/geappliances_bridge/`:
 
 ```c
 // erd_cache.h
+#define ERD_CACHE_INLINE_DATA_SIZE 16
+#define ERD_CACHE_CAPACITY 200
+
 typedef struct {
   tiny_erd_t erd;
-  uint8_t* data;
+  union {
+    uint8_t inline_data[ERD_CACHE_INLINE_DATA_SIZE];
+    uint8_t* heap_data;
+  };
   uint8_t data_size;
+  bool uses_heap;
   bool update_required;
   bool valid;
 } erd_cache_entry_t;
-
-#define ERD_CACHE_CAPACITY 200
 
 typedef struct {
   erd_cache_entry_t entries[ERD_CACHE_CAPACITY];
@@ -149,23 +153,30 @@ void erd_cache_destroy(erd_cache_t* self);
 // Returns pointer to entry, or NULL if not found
 erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd);
 
-// Updates or inserts ERD data. Returns true if data changed (for reads)
-// or always true (for subscriptions).
+// Updates or inserts ERD data.
+// For reads (is_subscription=false): compares new data against cached;
+//   returns true if data changed (or entry was new).
+// For subscriptions (is_subscription=true): always sets update_required=true;
+//   returns true.
 bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool is_subscription);
 
-// Returns the entry with update_required=true, then clears the flag.
-// Caller must provide a way to iterate. Returns NULL when no more entries.
+// Returns the next entry with update_required=true, then clears the flag.
+// Caller provides an iterator (uint16_t) initialized to 0.
+// Returns NULL when no more updated entries remain.
 erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* iterator);
 ```
 
 **API contract:**
 - `erd_cache_init(self)` — zeroes all entries; marks every entry as `valid = false`, `update_required = false`
-- `erd_cache_destroy(self)` — frees each entry's `data` pointer if non-null; zeroes all fields
+- `erd_cache_destroy(self)` — frees each entry's `heap_data` if `uses_heap` is true; zeroes all fields
 - `erd_cache_update(erd, data, size, true)` — subscription: always sets `update_required = true`; inserts new entry or updates existing one; returns `true`
 - `erd_cache_update(erd, data, size, false)` — read: compares new data against cached; only sets `update_required = true` if data differs; returns `true` if data changed (or entry was new)
 - `erd_cache_find(erd)` — returns entry pointer or NULL
+- Data access: callers use `entry->uses_heap ? entry->heap_data : entry->inline_data` and `entry->data_size`
 
 **Note:** `erd_cache_get_next_updated()` is declared for future use (e.g., batch republish after MQTT reconnect). It is **not used** in the initial implementation.
+
+**Capacity overflow:** When all 200 slots are full and a new ERD arrives, the new ERD is rejected (returns `false`). A one-time warning log is emitted the first time overflow occurs. The ERD still gets published via the normal path — it just won't be cached for change detection. This is a safe degradation.
 
 ### 2. Integrate into polling bridge
 
@@ -185,7 +196,7 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
 - Remove `self->erd_cache = nullptr` (no longer a pointer)
 
 **d) `state_polling::entry` (line 564):**
-- Remove `erd_cache(self).clear()` — the cache is not cleared here. Instead, the cache is reset at the start of discovery (see f below) and persists through the polling lifecycle.
+- Remove `erd_cache(self).clear()` — the cache is not cleared here. Instead, the cache is reset at the start of discovery (see h below) and persists through the polling lifecycle.
 
 **e) `state_polling::signal_read_completed` (lines 630-669):**
 - Cache write happens **after** the registration block (lines 636-641). At this point the ERD is confirmed in `erd_set`.
@@ -237,7 +248,7 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
     args->subscription_publication_received.data,
     args->subscription_publication_received.data_size);
   ```
-- Subscriptions always set `update_required = true` and always publish immediately. The cache serves as a record of latest values for potential future use (e.g., republish after MQTT reconnect).
+- Subscriptions always set `update_required = true` and always publish immediately. The cache serves as a record of latest values for potential future use.
 
 **d) `state_subscribing::signal_subscription_host_came_online` (line 72):**
 - Add `erd_cache_init(&self->erd_cache)` right after `erd_set(self).clear()` — matches the existing `erd_set` clear when the host restarts.
@@ -249,25 +260,24 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
 **Current behavior:** Publish immediately on each read/subscription.
 **New behavior:** The cache tracks updates, but we still publish immediately — the cache is used to:
 1. Determine if data actually changed (for polling with `only_publish_on_change`)
-2. Track what needs to be republished after MQTT reconnection
+2. Maintain a record of latest ERD values for future features
 
 **Decision:** The cache replaces the existing `map<tiny_erd_t, vector<uint8_t>>` comparison logic. The publish decision remains immediate — we just use the cache's `update_required` flag instead of doing a fresh memcmp each cycle.
 
 **For polling bridge:** `erd_cache_update(..., false)` returns true if data changed → publish immediately. This is the same behavior as the current `only_publish_on_change` logic, but without the O(n) map lookup + vector allocation per cycle.
 
-**For subscription bridge:** `erd_cache_update(..., true)` always returns true → always publish. The cache serves as a record of latest values for potential future use (e.g., republish after MQTT reconnect).
+**For subscription bridge:** `erd_cache_update(..., true)` always returns true → always publish. The cache serves as a record of latest values for potential future use.
 
 ### 5. Include and build system cleanup
 
 **In `mqtt_bridge_polling.cpp`:**
+- Remove `#include <cstring>` (line 25) — only used by old cache `memcmp`
 - Remove `#include <map>` (line 26) — no longer needed
 - Remove `#include <vector>` (line 28) — no longer needed
+- Add `#include "erd_cache.h"`
 - Update the destroy comment (line 840) to reference `erd_cache` by name instead of `self->erd_cache`
 
 **In `mqtt_bridge.cpp`:**
-- Add `#include "erd_cache.h"`
-
-**In `mqtt_bridge_polling.cpp`:**
 - Add `#include "erd_cache.h"`
 
 **In `Makefile` (line 23+):**
@@ -289,25 +299,51 @@ components/geappliances_bridge/
 
 **`erd_cache_test.cpp`** in `test/tests/`:
 - Test init/destroy
-- Test insert first ERD
+- Test insert first ERD (inline data path, size <= 16)
+- Test insert ERD with data > 16 bytes (heap data path)
 - Test update same ERD with same data (no change)
 - Test update same ERD with different data (change detected)
 - Test update same ERD with different size (change detected)
+- Test update ERD from inline to heap path (size grows past 16)
+- Test update ERD from heap to inline path (size shrinks below 16)
 - Test subscription update (always marks as updated)
-- Test capacity overflow (200+ ERDs — oldest not evicted, new ones rejected or last slot used)
+- Test capacity overflow (200+ ERDs — new ones rejected)
 - Test find non-existent ERD returns NULL
 - Test iteration over updated entries
 - Test destroy frees all heap data
+- Test destroy with only inline data (no heap to free)
 ### 8. Capacity overflow handling
 When all 200 slots are full and a new ERD arrives:
-- **Option:** Reject the new ERD (return false, don't cache it)
-- **Rationale:** 200 is generous for any single appliance. If exceeded, the ERD still gets published via the normal path — it just won't be cached for change detection. This is a safe degradation.
+- Reject the new ERD (return false, don't cache it)
+- Emit a one-time warning log on the first overflow occurrence
+- 200 is generous for any single appliance. If exceeded, the ERD still gets published via the normal path — it just won't be cached for change detection. This is a safe degradation.
 
 ### 9. Memory considerations
-- **Fixed array:** 200 × 9 bytes = 1,800 bytes (stack or static)
-- **Heap data:** 200 × avg 8 bytes = ~1,600 bytes (one allocation per ERD)
-- **Total:** ~3.4 KB vs current map approach which allocates ~48 bytes per entry (map node) + vector overhead (~24 bytes) + data = ~80 bytes per entry for 200 ERDs = ~16 KB of heap fragmentation
-- **Net savings:** ~12.6 KB less heap fragmentation, all in contiguous struct
+- **Fixed array:** 200 × 22 bytes = **4,400 bytes** (stack or static within the bridge struct)
+- **Heap data:** Only ERDs > 16 bytes allocate heap (rare; most are 1-8 bytes)
+- **Total:** ~4.4 KB vs current map approach which allocates ~48 bytes per entry (map node) + vector overhead (~24 bytes) + data = ~80 bytes per entry for 200 ERDs = ~16 KB of heap fragmentation
+- **Net savings:** ~11.6 KB less heap fragmentation, all in contiguous struct with zero heap for typical ERDs
+
+### 10. Code to Remove After This Change
+
+The following code becomes obsolete and must be removed:
+
+**`mqtt_bridge_polling.cpp`:**
+- Lines 54-57: `erd_cache()` helper function — the `void*` cast to `map<tiny_erd_t, vector<uint8_t>>`
+- Line 25: `#include <cstring>` — only used by old cache `memcmp`
+- Line 26: `#include <map>` — no longer needed
+- Line 28: `#include <vector>` — no longer needed
+- Line 564: `erd_cache(self).clear()` in `state_polling::entry`
+- Lines 644-660: The entire `only_publish_on_change` comparison block with `cache.find()`, `memcmp`, and `vector` copy
+- Line 760: `self->erd_cache = reinterpret_cast<void*>(new map<tiny_erd_t, vector<uint8_t>>())`
+- Lines 853, 856: `delete reinterpret_cast<map<tiny_erd_t, vector<uint8_t>>*>(self->erd_cache)` and `self->erd_cache = nullptr`
+- Line 840: Update destroy comment referencing `self->erd_cache` as heap pointer
+
+**`mqtt_bridge_polling.h`:**
+- Line 87: `void* erd_cache;` — replaced with `erd_cache_t erd_cache;`
+
+**`mqtt_bridge.cpp`:**
+- No removals — only additions (new field, init, destroy, cache update)
 
 ## Execution Order
 
