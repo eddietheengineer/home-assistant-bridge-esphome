@@ -35,15 +35,6 @@ external_components:
       path: ../components
     components: [ geappliances_bridge ]
 
-# MQTT configuration for Home Assistant
-mqtt:
-  broker: !secret mqtt_broker
-  username: !secret mqtt_username
-  password: !secret mqtt_password
-  port: 1883
-  discovery: true
-  discovery_prefix: homeassistant
-  clean_session: true
 
 # UART configuration for GEA3 communication
 uart:

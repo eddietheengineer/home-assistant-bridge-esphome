@@ -11,14 +11,14 @@ from typing import Any
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import esp32, mqtt, uart
+from esphome.components import esp32, uart
 from esphome.const import CONF_ID
 from esphome.core import CORE
 
 _LOGGER = logging.getLogger(__name__)
 
 CODEOWNERS = ["@joshualongenecker"]
-DEPENDENCIES = ["uart", "mqtt"]
+DEPENDENCIES = ["uart"]
 AUTO_LOAD = []
 
 # UART configuration keys

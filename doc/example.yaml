@@ -35,14 +35,6 @@ external_components:
   - source: github://joshualongenecker/home-assistant-bridge-esphome
     components: [ geappliances_bridge ]
 
-# MQTT configuration for Home Assistant
-mqtt:
-  broker: !secret mqtt_broker
-  username: !secret mqtt_username
-  password: !secret mqtt_password
-  port: 1883
-  discovery: true
-  discovery_prefix: homeassistant
 
 # UART configuration
 uart:

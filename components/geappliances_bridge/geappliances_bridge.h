@@ -29,7 +29,6 @@
 
 #include "esphome/core/component.h"
 #include "esphome/components/uart/uart.h"
-#include "esphome/components/mqtt/mqtt_client.h"
 #include <string>
 #include <set>
 #include <vector>
@@ -148,14 +147,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   std::string configured_device_id_;
   uint8_t client_address_{0xE4};
 
-  // States for the non-blocking MQTT (re)connection FSM in loop().
-  enum class MqttConnectionState : uint8_t {
-    DISCONNECTED,  // No MQTT connection (or not yet seen)
-    SUBSCRIBING,   // Connected; waiting for adapter init to subscribe wildcard
-    FLUSHING,      // Subscribed; draining pending ERD update queue
-    RUNNING,       // Steady-state: queue empty, draining new updates each loop
-  };
-  MqttConnectionState mqtt_connection_state_{MqttConnectionState::DISCONNECTED};
   bool mqtt_client_adapter_initialized_{false};
   bool mqtt_bridge_initialized_{false};
   BridgeMode mode_{BRIDGE_MODE_AUTO};
