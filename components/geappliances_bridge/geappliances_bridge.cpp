@@ -308,20 +308,36 @@ void GeappliancesBridge::run_protocol_stack_()
       tiny_gea2_interface_run(&this->gea2_interface_);
     }
   } else {
-    // Standard single-pass for GEA3 (or while awaiting autodiscovery).
-    tiny_timer_group_run(&this->timer_group_);
-    // When both UARTs are configured, the inactive adapter's period-0 poll
-    // timer also fires from the shared timer group.  Drain it so it doesn't
-    // steal the next call's slot from the GEA3 adapter's poll timer.
-    // tiny_timer_group_run() services exactly one timer per call; with two
-    // period-0 timers, calling it once leaves the other timer still pending,
-    // which means on the next loop() iteration the GEA2 (inactive) timer
-    // fires instead of the GEA3 one — effectively halving the GEA3 poll rate.
-    if (this->gea2_uart_ != nullptr) {
-      tiny_timer_group_run(&this->timer_group_);
-    }
+    // GEA3 path: run a tight loop at 1ms intervals to ensure UART bytes
+    // at 230400 baud are processed without missing messages.  The tight
+    // loop runs whenever GEA3 UART is configured and GEA2 is not active.
+    // This covers all phases: startup (autodiscovery, device_id, feature_bits),
+    // bridge initialization, and steady-state polling/subscription.
     if (this->uart_ != nullptr) {
-      tiny_gea3_interface_run(&this->gea3_interface_);
+      uint32_t gea3_loop_start_ms = millis();
+      static constexpr uint32_t GEA3_LOOP_HARD_CAP_MS = GEA3_LOOP_DURATION_MS * 2;
+      while (millis() - gea3_loop_start_ms < GEA3_LOOP_DURATION_MS) {
+        if (millis() - gea3_loop_start_ms >= GEA3_LOOP_HARD_CAP_MS) {
+          ESP_LOGW(TAG, "GEA3 tight loop exceeded hard cap (%u ms), breaking",
+                   static_cast<unsigned>(GEA3_LOOP_HARD_CAP_MS));
+          break;
+        }
+#ifdef USE_ESP32
+        esp_task_wdt_reset();
+#endif
+        tiny_timer_group_run(&this->timer_group_);
+        if (this->gea2_uart_ != nullptr) {
+          tiny_timer_group_run(&this->timer_group_);
+        }
+        tiny_gea3_interface_run(&this->gea3_interface_);
+      }
+    } else {
+      // No GEA3 UART configured (GEA2-only or neither).  Single-pass to
+      // keep timers advancing for autodiscovery or other background work.
+      tiny_timer_group_run(&this->timer_group_);
+      if (this->gea2_uart_ != nullptr) {
+        tiny_timer_group_run(&this->timer_group_);
+      }
     }
   }
   uint32_t loop_elapsed = esphome::millis() - loop_start;

@@ -174,6 +174,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // GEA2 tight-loop duration: covers the full TX→RX cycle at 19200 baud
   // (see doc/geappliances_bridge.md section 13 for detailed explanation)
   static constexpr uint32_t GEA2_LOOP_DURATION_MS = 200;
+  static constexpr uint32_t GEA3_LOOP_DURATION_MS = 10;
   bool gea2_protocol_active_{false}; // fallback for manual device_id when autodiscovery is skipped
 
   // Device identity manager (extracted from god class)

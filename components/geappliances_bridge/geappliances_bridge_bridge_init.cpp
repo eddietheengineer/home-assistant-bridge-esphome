@@ -158,6 +158,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     this->subscription_activity_detected_ = false;
     this->subscription_start_time_       = millis();
   }
+
   (void)mode_name;
 
   ESP_LOGI(TAG, "Using %s mode with polling interval: %u ms", mode_name, this->polling_interval_ms_);
