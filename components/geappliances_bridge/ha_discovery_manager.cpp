@@ -6,6 +6,7 @@
 #include "ha_discovery_manager.h"
 #include "esphome_mqtt_client_adapter.h"
 #include "esphome/core/log.h"
+#include "esphome/core/application.h"
 #include <cstring>
 
 #ifdef USE_ESP_IDF
