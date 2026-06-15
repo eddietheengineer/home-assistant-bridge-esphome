@@ -305,7 +305,7 @@ CONFIG_SCHEMA = cv.Schema(
                     default=HA_DISCOVERY_DEFAULT_BASE_URL): cv.string,
         cv.Optional(CONF_ERD_PUBLISH_RATE_SENSOR): cv.Schema({
             cv.Optional("name", default="ERD Publish Rate"): cv.string,
-        }).extend(sensor.sensor_schema()),
+        }).extend(sensor.sensor_schema(state_class="measurement")),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
