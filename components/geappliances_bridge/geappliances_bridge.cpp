@@ -14,7 +14,7 @@ namespace geappliances_bridge {
 
 
 static const tiny_gea3_erd_client_configuration_t client_configuration = {
-  .request_timeout = 250,
+  .request_timeout = 500,
   .request_retries = 10
 };
 
@@ -23,7 +23,7 @@ static const tiny_gea3_erd_client_configuration_t client_configuration = {
 // between attempts, giving appliances time to service slow first-access
 // NVRAM lookups.
 static const tiny_gea2_erd_client_configuration_t gea2_client_configuration = {
-  .request_timeout = 250,
+  .request_timeout = 500,
   .request_retries = 0
 };
 
