@@ -426,3 +426,45 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_multiple_erds)
   CHECK_EQUAL(3u, published);
   CHECK_EQUAL(3u, publisher.total_published);
 }
+
+/* ------------------------------------------------------------------ */
+/* loop - large payload hex encoding (Issue 9 fix)                     */
+/* ------------------------------------------------------------------ */
+
+TEST(erd_cache_mqtt_publisher, loop_publishes_128_byte_payload)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+
+  uint8_t data[128];
+  for (uint8_t i = 0; i < 128; i++) {
+    data[i] = i;
+  }
+  erd_cache_update(&cache, 0x1001, data, sizeof(data), true);
+
+  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 1, 100);
+  CHECK_EQUAL(1u, published);
+  CHECK_EQUAL(1u, publisher.total_published);
+}
+
+TEST(erd_cache_mqtt_publisher, loop_publishes_255_byte_payload)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+
+  uint8_t data[255];
+  for (uint16_t i = 0; i < 255; i++) {
+    data[i] = (uint8_t)(i & 0xFF);
+  }
+  erd_cache_update(&cache, 0x1002, data, sizeof(data), true);
+
+  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 1, 100);
+  CHECK_EQUAL(1u, published);
+  CHECK_EQUAL(1u, publisher.total_published);
+}

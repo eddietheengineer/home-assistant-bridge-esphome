@@ -103,15 +103,16 @@ uint16_t erd_cache_mqtt_publisher_loop(
     char topic[128];
     snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04X/value", self->device_id, entry->erd);
 
-    /* Build hex payload */
-    char hex[256];
-    for (uint8_t i = 0; i < entry->data_size && i < 128; i++) {
+    /* Build hex payload: max data_size is 255 (uint8_t), so hex is 510 chars + null */
+    size_t data_len = entry->data_size;
+    char hex[data_len * 2 + 1];
+    for (size_t i = 0; i < data_len; i++) {
       snprintf(hex + i * 2, 3, "%02X", data[i]);
     }
-    hex[entry->data_size * 2] = '\0';
+    hex[data_len * 2] = '\0';
 
     /* Publish through the interface */
-    mqtt_client_publish_raw(self->mqtt_client, topic, hex, strlen(hex), true);
+    mqtt_client_publish_raw(self->mqtt_client, topic, hex, data_len * 2, true);
 
     self->total_published++;
     published++;
