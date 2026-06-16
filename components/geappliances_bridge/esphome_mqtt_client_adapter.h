@@ -84,7 +84,7 @@ size_t esphome_mqtt_client_adapter_get_pending_update_count(
   const esphome_mqtt_client_adapter_t* self);
 
 /*!
- * Log a publish message via ESP_LOGD.  Used by HA discovery manager.
+ * Publish an MQTT message.  Used by HA discovery manager.
  */
 void esphome_mqtt_client_adapter_publish(
   esphome_mqtt_client_adapter_t* self,
