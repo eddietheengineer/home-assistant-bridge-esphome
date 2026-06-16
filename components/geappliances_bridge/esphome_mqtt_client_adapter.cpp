@@ -48,7 +48,7 @@ static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value
   }
   hex[log_bytes * 2] = '\0';
 
-  ESP_LOGV(TAG, "ERD 0x%04X: %s", erd, hex.c_str());
+  ESP_LOGV(TAG, "ERD 0x%04X: %s", erd, hex);
   self->erd_publish_count_++;
 }
 
@@ -151,9 +151,9 @@ extern "C" void esphome_mqtt_client_adapter_publish(
   const std::string& payload,
   bool retain)
 {
-  self->mqtt_publish_count_++;
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client != nullptr && mqtt_client->is_connected()) {
+    self->mqtt_publish_count_++;
     mqtt_client->publish(topic, payload, 0, retain);
   }
 }
@@ -166,9 +166,9 @@ extern "C" void esphome_mqtt_client_adapter_publish_raw(
   bool retain)
 {
   auto self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(_self);
-  self->mqtt_publish_count_++;
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client != nullptr && mqtt_client->is_connected()) {
+    self->mqtt_publish_count_++;
     mqtt_client->publish(topic, std::string(payload, payload_len), 0, retain);
   }
 }
