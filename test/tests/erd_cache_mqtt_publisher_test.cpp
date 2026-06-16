@@ -56,7 +56,7 @@ TEST(erd_cache_mqtt_publisher, init_sets_cache_pointer)
   CHECK_EQUAL(0u, publisher.publish_index);
   CHECK(publisher.mqtt_connected);
   CHECK_EQUAL(0u, publisher.total_published);
-  CHECK_EQUAL(0u, publisher.dropped_count);
+  CHECK_EQUAL(0u, publisher.missed_loops);
   CHECK(strncmp(publisher.device_id, "my_device", 8) == 0);
 }
 

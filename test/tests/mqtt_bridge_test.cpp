@@ -4,6 +4,7 @@
  */
 
 extern "C" {
+#include "erd_cache.h"
 #include "mqtt_bridge.h"
 }
 

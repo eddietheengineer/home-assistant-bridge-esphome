@@ -81,7 +81,7 @@ uint16_t erd_cache_mqtt_publisher_loop(
   }
 
   if (!self->mqtt_connected) {
-    self->dropped_count++;
+    self->missed_loops++;
     return 0;
   }
   uint32_t start_ms = self->get_time_ms();

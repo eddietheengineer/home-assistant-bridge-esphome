@@ -35,7 +35,7 @@ typedef struct {
   tiny_event_subscription_t mqtt_connect_subscription;
   // Stats
   uint32_t total_published;        // Total ERD publishes since init
-  uint32_t dropped_count;          // Publishes dropped due to MQTT disconnect
+  uint32_t missed_loops;           // Loop iterations skipped while MQTT disconnected
   // Time callback (defaults to esphome::millis; overridable for testing)
   uint32_t (*get_time_ms)(void);
 } erd_cache_mqtt_publisher_t;
@@ -53,9 +53,8 @@ void erd_cache_mqtt_publisher_init(
 void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self);
 
 /*!
- * Publish up to max_publishes ERDs within max_ms time budget.
  * Returns the number of ERDs actually published.
- * No-ops if MQTT is disconnected (increments dropped_count).
+ * No-ops if MQTT is disconnected (increments missed_loops).
  */
 uint16_t erd_cache_mqtt_publisher_loop(
   erd_cache_mqtt_publisher_t* self,
