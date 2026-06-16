@@ -38,14 +38,15 @@ static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value
   }
 
   const uint8_t* bytes = reinterpret_cast<const uint8_t*>(value);
-  std::string hex;
-  hex.reserve(size * 2);
-  for (uint8_t i = 0; i < size; i++) {
-    char buf[3];
-    snprintf(buf, sizeof(buf), "%02X", bytes[i]);
-    hex += buf;
-  }
 
+  /* Build hex string on the stack for verbose logging only.
+   * Cap at 64 bytes (128 hex chars) to avoid huge log lines. */
+  size_t log_bytes = size < 64 ? size : 64;
+  char hex[130];
+  for (size_t i = 0; i < log_bytes; i++) {
+    snprintf(hex + i * 2, 3, "%02X", bytes[i]);
+  }
+  hex[log_bytes * 2] = '\0';
 
   ESP_LOGV(TAG, "ERD 0x%04X: %s", erd, hex.c_str());
   self->erd_publish_count_++;
