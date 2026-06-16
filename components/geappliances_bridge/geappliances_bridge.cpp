@@ -222,24 +222,21 @@ void GeappliancesBridge::loop() {
     erd_cache_mqtt_publisher_loop(&this->erd_cache_publisher_, 20, 4000);
   }
 
-  // Publish ERD publish rate + cache stats sensors every ~60 seconds.
-  if (this->erd_publish_rate_sensor_ != nullptr) {
+  // Publish ERD/MQTT publish rate + cache stats sensors every ~60 seconds.
+  if (this->erd_publish_rate_sensor_ != nullptr || this->mqtt_publish_rate_sensor_ != nullptr) {
     uint32_t now = esphome::millis();
     if (now - this->last_erd_publish_rate_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
-      uint32_t count = esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(
-        &this->mqtt_client_adapter_);
-      this->erd_publish_rate_sensor_->publish_state(static_cast<float>(count));
+      if (this->erd_publish_rate_sensor_ != nullptr) {
+        uint32_t count = esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(
+          &this->mqtt_client_adapter_);
+        this->erd_publish_rate_sensor_->publish_state(static_cast<float>(count));
+      }
+      if (this->mqtt_publish_rate_sensor_ != nullptr) {
+        uint32_t count = esphome_mqtt_client_adapter_get_and_reset_mqtt_publish_count(
+          &this->mqtt_client_adapter_);
+        this->mqtt_publish_rate_sensor_->publish_state(static_cast<float>(count));
+      }
       this->last_erd_publish_rate_publish_ = now;
-    }
-  }
-
-  // Publish MQTT publish rate sensor every ~60 seconds.
-  if (this->mqtt_publish_rate_sensor_ != nullptr) {
-    uint32_t now = esphome::millis();
-    if (now - this->last_erd_publish_rate_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
-      uint32_t count = esphome_mqtt_client_adapter_get_and_reset_mqtt_publish_count(
-        &this->mqtt_client_adapter_);
-      this->mqtt_publish_rate_sensor_->publish_state(static_cast<float>(count));
     }
   }
 
