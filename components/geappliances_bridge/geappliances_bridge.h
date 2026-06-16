@@ -93,6 +93,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; }
   void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; }
   void set_mqtt_publish_rate_sensor(sensor::Sensor* sensor) { this->mqtt_publish_rate_sensor_ = sensor; }
+  void add_custom_erd(tiny_erd_t erd) { this->custom_erds_vec_.push_back(erd); }
 
 
 
