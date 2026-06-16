@@ -1,13 +1,13 @@
 // =============================================================================
 // MODULE GOAL
 // =============================================================================
-// Goal: Implement the i_mqtt_client_t interface for the bridge, providing
-//       debug logging of ERD value updates without requiring an MQTT broker.
+// Goal: Implement the i_mqtt_client_t interface for the bridge, publishing
+//       ERD value updates to MQTT topics via ESPHome's global MQTT client.
 //
 // Responsibilities:
 //   - Implement i_mqtt_client_t for the bridge and polling bridge
-//   - Log ERD updates via ESP_LOGD for debugging and development
-//   - Provide no-op implementations for MQTT-specific operations
+//   - Publish ERD updates to geappliances/{device_id}/erd/0x{ERD}/value topics
+//   - Provide MQTT connect/disconnect events for publisher coordination
 //
 // NOT responsible for:
 //   - Deciding which ERDs to publish (filtering is applied via ErdRegistry)
@@ -17,9 +17,11 @@
 // Dependencies:
 //   - i_mqtt_client.h (interface implemented here)
 //   - ErdRegistry for valid-ERD filtering
+//   - ESPHome MQTT client (esphome::mqtt::global_mqtt_client)
 // =============================================================================
 
 #pragma once
+#include "esphome/components/mqtt/mqtt_client.h"
 
 #include <string>
 

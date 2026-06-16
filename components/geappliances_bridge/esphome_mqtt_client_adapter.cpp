@@ -12,21 +12,6 @@ extern "C" {
 
 static const char *const TAG __attribute__((unused)) = "geappliances_bridge.mqtt";
 
-// ---------------------------------------------------------------------------
-// publish_now: debug log output instead of MQTT publish.
-// ---------------------------------------------------------------------------
-
-static void publish_now(const std::string& topic,
-                        const std::string& payload,
-                        bool retain)
-{
-  // Note: mqtt_publish_count_ is incremented by callers (update_erd, esphome_mqtt_client_adapter_publish)
-  // rather than here, because publish_now is a static function without access to the adapter instance.
-  ESP_LOGD(TAG, "MQTT PUBLISH [retain=%s] topic=%s payload=%s",
-           retain ? "true" : "false", topic.c_str(), payload.c_str());
-  (void)topic; (void)payload; (void)retain;
-}
-
 
 static void register_erd(i_mqtt_client_t* _self, tiny_erd_t erd)
 {
@@ -63,7 +48,16 @@ static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value
 
   ESP_LOGV(TAG, "ERD 0x%04X: %s", erd, hex.c_str());
   self->erd_publish_count_++;
+
+  /* Build topic and publish to MQTT */
+  char topic[128];
+  snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04X/value",
+           self->device_id->c_str(), erd);
   self->mqtt_publish_count_++;
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client != nullptr && mqtt_client->is_connected()) {
+    mqtt_client->publish(topic, hex, 0, true);
+  }
 }
 
 static void update_erd_write_result(
@@ -165,7 +159,10 @@ extern "C" void esphome_mqtt_client_adapter_publish(
   bool retain)
 {
   self->mqtt_publish_count_++;
-  publish_now(topic, payload, retain);
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client != nullptr && mqtt_client->is_connected()) {
+    mqtt_client->publish(topic, payload, 0, retain);
+  }
 }
 
 extern "C" size_t esphome_mqtt_client_adapter_get_pending_update_count(

@@ -7,6 +7,7 @@
 #include "i_mqtt_client.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
+#include "esphome_mqtt_client_adapter.h"
 
 #include <string.h>
 
@@ -95,10 +96,23 @@ uint16_t erd_cache_mqtt_publisher_loop(
     if (esphome::millis() - start_ms >= max_ms) {
       break;
     }
-
     /* Determine data pointer */
     const uint8_t* data = entry->uses_heap ? entry->heap_data : entry->inline_data;
-    mqtt_client_update_erd(self->mqtt_client, entry->erd, data, entry->data_size);
+
+    /* Build topic: geappliances/{device_id}/erd/0x{ERD:04X}/value */
+    char topic[128];
+    snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04X/value", self->device_id, entry->erd);
+
+    /* Build hex payload */
+    char hex[256];
+    for (uint8_t i = 0; i < entry->data_size && i < 128; i++) {
+      snprintf(hex + i * 2, 3, "%02X", data[i]);
+    }
+    hex[entry->data_size * 2] = '\0';
+
+    /* Publish through the adapter */
+    esphome_mqtt_client_adapter_publish(
+      (esphome_mqtt_client_adapter_t*)self->mqtt_client, topic, hex, true);
 
     self->total_published++;
     published++;
