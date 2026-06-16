@@ -46,18 +46,10 @@ static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value
     hex += buf;
   }
 
+
   ESP_LOGV(TAG, "ERD 0x%04X: %s", erd, hex.c_str());
   self->erd_publish_count_++;
-
-  /* Build topic and publish to MQTT */
-  char topic[128];
-  snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04X/value",
-           self->device_id->c_str(), erd);
   self->mqtt_publish_count_++;
-  auto mqtt_client = esphome::mqtt::global_mqtt_client;
-  if (mqtt_client != nullptr && mqtt_client->is_connected()) {
-    mqtt_client->publish(topic, hex, 0, true);
-  }
 }
 
 static void update_erd_write_result(
