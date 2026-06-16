@@ -219,7 +219,7 @@ void GeappliancesBridge::loop() {
 
   // Drain updated ERD cache entries to MQTT each loop iteration.
   if (this->erd_cache_publisher_.cache != nullptr) {
-    erd_cache_mqtt_publisher_loop(&this->erd_cache_publisher_, 20, 4000);
+    erd_cache_mqtt_publisher_loop(&this->erd_cache_publisher_, 20, 100);
   }
 
   // Publish ERD/MQTT publish rate + cache stats sensors every ~60 seconds.

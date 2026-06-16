@@ -25,6 +25,8 @@
 #ifndef i_mqtt_client_h
 #define i_mqtt_client_h
 
+#include <cstddef>
+
 #include "i_tiny_event.h"
 #include "i_tiny_gea3_erd_client.h"
 #include "tiny_erd.h"
@@ -53,6 +55,8 @@ typedef struct i_mqtt_client_api_t {
   i_tiny_event_t* (*on_mqtt_disconnect)(i_mqtt_client_t* self);
 
   i_tiny_event_t* (*on_mqtt_connect)(i_mqtt_client_t* self);
+
+  void (*publish_raw)(i_mqtt_client_t* self, const char* topic, const char* payload, size_t payload_len, bool retain);
 } i_mqtt_client_api_t;
 
 /*!
@@ -101,6 +105,14 @@ static inline i_tiny_event_t* mqtt_client_on_mqtt_disconnect(i_mqtt_client_t* se
 static inline i_tiny_event_t* mqtt_client_on_mqtt_connect(i_mqtt_client_t* self)
 {
   return self->api->on_mqtt_connect(self);
+}
+
+/*!
+ * Publish a raw MQTT message (C-string topic and payload).
+ */
+static inline void mqtt_client_publish_raw(i_mqtt_client_t* self, const char* topic, const char* payload, size_t payload_len, bool retain)
+{
+  self->api->publish_raw(self, topic, payload, payload_len, retain);
 }
 
 #endif

@@ -57,7 +57,8 @@ static const i_mqtt_client_api_t api = {
   update_erd_write_result,
   on_write_request,
   on_mqtt_disconnect,
-  on_mqtt_connect
+  on_mqtt_connect,
+  mqtt_client_double_publish_raw
 };
 
 void mqtt_client_double_init(mqtt_client_double_t* self)
@@ -88,4 +89,20 @@ void mqtt_client_double_trigger_mqtt_connect(
   mqtt_client_double_t* self)
 {
   tiny_event_publish(&self->on_mqtt_connect, nullptr);
+}
+
+void mqtt_client_double_publish_raw(
+  i_mqtt_client_t* _self,
+  const char* topic,
+  const char* payload,
+  size_t payload_len,
+  bool retain)
+{
+  (void)_self;
+  mock()
+    .actualCall("publish_raw")
+    .withParameter("topic", topic)
+    .withParameterOfType("const char*", "payload", payload)
+    .withParameter("payload_len", payload_len)
+    .withParameter("retain", retain);
 }

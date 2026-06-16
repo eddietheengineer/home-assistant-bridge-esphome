@@ -7,8 +7,8 @@
 #include "i_mqtt_client.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
-#include "esphome_mqtt_client_adapter.h"
 
+#include <cstdio>
 #include <string.h>
 
 static const char* const TAG = "erd_cache_mqtt_publisher";
@@ -110,9 +110,8 @@ uint16_t erd_cache_mqtt_publisher_loop(
     }
     hex[entry->data_size * 2] = '\0';
 
-    /* Publish through the adapter */
-    esphome_mqtt_client_adapter_publish(
-      (esphome_mqtt_client_adapter_t*)self->mqtt_client, topic, hex, true);
+    /* Publish through the interface */
+    mqtt_client_publish_raw(self->mqtt_client, topic, hex, strlen(hex), true);
 
     self->total_published++;
     published++;

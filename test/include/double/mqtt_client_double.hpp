@@ -45,4 +45,14 @@ void mqtt_client_double_trigger_mqtt_disconnect(
 void mqtt_client_double_trigger_mqtt_connect(
   mqtt_client_double_t* self);
 
+/*!
+ * Implement the publish_raw vtable slot for the test double.
+ */
+void mqtt_client_double_publish_raw(
+  i_mqtt_client_t* self,
+  const char* topic,
+  const char* payload,
+  size_t payload_len,
+  bool retain);
+
 #endif

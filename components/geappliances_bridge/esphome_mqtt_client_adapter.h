@@ -93,6 +93,17 @@ void esphome_mqtt_client_adapter_publish(
   bool retain);
 
 /*!
+ * Publish raw MQTT message (C-string topic and payload).
+ * Implements the i_mqtt_client_t publish_raw vtable slot.
+ */
+void esphome_mqtt_client_adapter_publish_raw(
+  i_mqtt_client_t* self,
+  const char* topic,
+  const char* payload,
+  size_t payload_len,
+  bool retain);
+
+/*!
  * Get and reset the ERD publish counter.
  * Returns the count of ERD updates since the last call.
  */
