@@ -4,44 +4,14 @@
  */
 
 #include "erd_cache_mqtt_publisher.h"
-#include "esphome_mqtt_client_adapter.h"
+#include "i_mqtt_client.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 
-#include <stdio.h>
 #include <string.h>
 
 static const char* const TAG = "erd_cache_mqtt_publisher";
 
-/* Build the MQTT topic: geappliances/{device_id}/erd/0x{ERD:04X}/value */
-static void build_topic(char* buf, size_t buf_size, const char* device_id, uint16_t erd)
-{
-  snprintf(buf, buf_size, "geappliances/%s/erd/0x%04X/value", device_id, erd);
-}
-
-/* Build the hex payload: uppercase hex bytes, no separator, no prefix. */
-static void build_hex_payload(char* buf, size_t max_out, const uint8_t* data, uint8_t data_size)
-{
-  if (data_size == 0 || max_out == 0) {
-    if (max_out > 0) {
-      buf[0] = '\0';
-    }
-    return;
-  }
-  char* p = buf;
-  size_t out_len = 0;
-  for (uint8_t i = 0; i < data_size; i++) {
-    if (out_len + 2 >= max_out) {
-      break;
-    }
-    char hex[3];
-    snprintf(hex, sizeof(hex), "%02X", data[i]);
-    *p++ = hex[0];
-    *p++ = hex[1];
-    out_len += 2;
-  }
-  *p = '\0';
-}
 
 void erd_cache_mqtt_publisher_init(
   erd_cache_mqtt_publisher_t* self,
@@ -128,22 +98,7 @@ uint16_t erd_cache_mqtt_publisher_loop(
 
     /* Determine data pointer */
     const uint8_t* data = entry->uses_heap ? entry->heap_data : entry->inline_data;
-
-    /* Build topic and payload */
-    char topic[64];
-    build_topic(topic, sizeof(topic), self->device_id, entry->erd);
-
-    char payload[128];
-    build_hex_payload(payload, sizeof(payload), data, entry->data_size);
-
-    /* Publish via the adapter's publish function.
-     * The mqtt_client pointer is the adapter's interface sub-struct;
-     * we recover the containing adapter struct to call the C++ publish. */
-    esphome_mqtt_client_adapter_t* adapter = reinterpret_cast<esphome_mqtt_client_adapter_t*>(
-      reinterpret_cast<char*>(self->mqtt_client) - offsetof(esphome_mqtt_client_adapter_t, interface));
-    std::string topic_str(topic);
-    std::string payload_str(payload);
-    esphome_mqtt_client_adapter_publish(adapter, topic_str, payload_str, true);
+    mqtt_client_update_erd(self->mqtt_client, entry->erd, data, entry->data_size);
 
     self->total_published++;
     published++;

@@ -154,13 +154,6 @@ extern "C" void esphome_mqtt_client_adapter_destroy(
   }
 }
 
-extern "C" size_t esphome_mqtt_client_adapter_get_pending_update_count(
-  const esphome_mqtt_client_adapter_t* self)
-{
-  (void)self;
-  return 0;
-}
-
 extern "C" void esphome_mqtt_client_adapter_publish(
   esphome_mqtt_client_adapter_t* /*self*/,
   const std::string& topic,
@@ -168,6 +161,13 @@ extern "C" void esphome_mqtt_client_adapter_publish(
   bool retain)
 {
   publish_now(topic, payload, retain);
+}
+
+extern "C" size_t esphome_mqtt_client_adapter_get_pending_update_count(
+  const esphome_mqtt_client_adapter_t* self)
+{
+  (void)self;
+  return 0;
 }
 
 extern "C" uint32_t esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(
