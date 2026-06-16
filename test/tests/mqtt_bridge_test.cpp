@@ -21,6 +21,7 @@ TEST_GROUP(mqtt_bridge)
   };
 
   mqtt_bridge_t self;
+  erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -33,11 +34,13 @@ TEST_GROUP(mqtt_bridge)
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
 
   void teardown()
   {
     mqtt_bridge_destroy(&self);
+    erd_cache_destroy(&test_cache);
   }
 
   void when_the_bridge_is_initialized(uint8_t address = 0xC0)
@@ -47,7 +50,8 @@ TEST_GROUP(mqtt_bridge)
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
-      address);
+      address,
+      &test_cache);
   }
 
   void given_that_the_bridge_has_been_initialized()
@@ -407,6 +411,7 @@ TEST_GROUP(mqtt_bridge_dual)
 
   mqtt_bridge_t bridge_a;
   mqtt_bridge_t bridge_b;
+  erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -421,12 +426,14 @@ TEST_GROUP(mqtt_bridge_dual)
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client_a);
     mqtt_client_double_init(&mqtt_client_b);
+    erd_cache_init(&test_cache);
   }
 
   void teardown()
   {
     mqtt_bridge_destroy(&bridge_a);
     mqtt_bridge_destroy(&bridge_b);
+    erd_cache_destroy(&test_cache);
   }
 
   void given_both_bridges_are_initialized()
@@ -437,13 +444,15 @@ TEST_GROUP(mqtt_bridge_dual)
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client_a.interface,
-      address_a);
+      address_a,
+      &test_cache);
     mqtt_bridge_init(
       &bridge_b,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client_b.interface,
-      address_b);
+      address_b,
+      &test_cache);
     mock().enable();
   }
 
@@ -524,13 +533,15 @@ TEST(mqtt_bridge_dual, each_bridge_subscribes_to_its_own_address_at_init)
     &timer_group.timer_group,
     &erd_client.interface,
     &mqtt_client_a.interface,
-    address_a);
+    address_a,
+    &test_cache);
   mqtt_bridge_init(
     &bridge_b,
     &timer_group.timer_group,
     &erd_client.interface,
     &mqtt_client_b.interface,
-    address_b);
+    address_b,
+    &test_cache);
 }
 
 TEST(mqtt_bridge_dual, publications_from_each_appliance_are_routed_to_the_correct_mqtt_client)

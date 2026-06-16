@@ -51,6 +51,8 @@ typedef struct i_mqtt_client_api_t {
   i_tiny_event_t* (*on_write_request)(i_mqtt_client_t* self);
 
   i_tiny_event_t* (*on_mqtt_disconnect)(i_mqtt_client_t* self);
+
+  i_tiny_event_t* (*on_mqtt_connect)(i_mqtt_client_t* self);
 } i_mqtt_client_api_t;
 
 /*!
@@ -91,6 +93,14 @@ static inline i_tiny_event_t* mqtt_client_on_write_request(i_mqtt_client_t* self
 static inline i_tiny_event_t* mqtt_client_on_mqtt_disconnect(i_mqtt_client_t* self)
 {
   return self->api->on_mqtt_disconnect(self);
+}
+
+/*!
+ * Event raised when the client connects to the MQTT broker.
+ */
+static inline i_tiny_event_t* mqtt_client_on_mqtt_connect(i_mqtt_client_t* self)
+{
+  return self->api->on_mqtt_connect(self);
 }
 
 #endif

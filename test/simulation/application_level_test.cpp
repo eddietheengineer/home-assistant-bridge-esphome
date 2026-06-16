@@ -43,6 +43,7 @@ TEST_GROUP(application_level)
   
   mqtt_bridge_t mqtt_bridge;
   mqtt_bridge_polling_t mqtt_bridge_polling;
+  erd_cache_t test_cache;
   
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -57,12 +58,14 @@ TEST_GROUP(application_level)
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
   
   void teardown()
   {
     mqtt_bridge_destroy(&mqtt_bridge);
     mqtt_bridge_polling_destroy(&mqtt_bridge_polling);
+    erd_cache_destroy(&test_cache);
     mock().clear();
   }
   
@@ -76,7 +79,8 @@ TEST_GROUP(application_level)
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
-      appliance_address);
+      appliance_address,
+      &test_cache);
   }
   
   /*!
@@ -90,7 +94,8 @@ TEST_GROUP(application_level)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      false);
+      false,
+      &test_cache);
   }
   
   /*!

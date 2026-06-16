@@ -85,12 +85,19 @@ static i_tiny_event_t* on_mqtt_disconnect(i_mqtt_client_t* _self)
   return &self->on_mqtt_disconnect_event.interface;
 }
 
+static i_tiny_event_t* on_mqtt_connect(i_mqtt_client_t* _self)
+{
+  auto self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(_self);
+  return &self->on_mqtt_connect_event.interface;
+}
+
 static const i_mqtt_client_api_t api = {
   register_erd,
   update_erd,
   update_erd_write_result,
   on_write_request,
-  on_mqtt_disconnect
+  on_mqtt_disconnect,
+  on_mqtt_connect
 };
 
 extern "C" void esphome_mqtt_client_adapter_init(
@@ -104,6 +111,7 @@ extern "C" void esphome_mqtt_client_adapter_init(
 
   tiny_event_init(&self->on_write_request_event);
   tiny_event_init(&self->on_mqtt_disconnect_event);
+  tiny_event_init(&self->on_mqtt_connect_event);
 }
 
 extern "C" void esphome_mqtt_client_adapter_set_erd_registry(
@@ -112,11 +120,10 @@ extern "C" void esphome_mqtt_client_adapter_set_erd_registry(
 {
   self->erd_registry = erd_registry;
 }
-
 extern "C" void esphome_mqtt_client_adapter_notify_disconnected(
   esphome_mqtt_client_adapter_t* self)
 {
-  (void)self;
+  tiny_event_publish(&self->on_mqtt_disconnect_event, nullptr);
 }
 
 extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
@@ -132,11 +139,10 @@ extern "C" size_t esphome_mqtt_client_adapter_drain_pending_updates(
   (void)self;
   return 0;
 }
-
 extern "C" void esphome_mqtt_client_adapter_notify_connected(
   esphome_mqtt_client_adapter_t* self)
 {
-  (void)self;
+  tiny_event_publish(&self->on_mqtt_connect_event, nullptr);
 }
 
 extern "C" void esphome_mqtt_client_adapter_destroy(

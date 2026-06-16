@@ -171,7 +171,8 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       this->autodiscovery_manager_.get_active_erd_client(),
       &this->mqtt_client_adapter_.interface,
       this->polling_interval_ms_,
-      this->polling_only_publish_on_change_);
+      this->polling_only_publish_on_change_,
+      &this->erd_cache_);
     // Wire the discovery-complete callback so the startup HSM waits for
     // ERD discovery to finish before transitioning to steady-state.
     this->mqtt_bridge_polling_.on_discovery_complete = +[](void* ctx) {
@@ -182,13 +183,13 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     this->mqtt_bridge_polling_.on_discovery_complete_context = this;
     this->polling_bridge_initialized_ = true;
     this->configure_polling_optional_lists_();
-  } else {
     mqtt_bridge_init(
       &this->mqtt_bridge_,
       &this->timer_group_,
       this->autodiscovery_manager_.get_active_erd_client(),
       &this->mqtt_client_adapter_.interface,
-      this->autodiscovery_manager_.get_host_address());
+      this->autodiscovery_manager_.get_host_address(),
+      &this->erd_cache_);
     this->subscription_bridge_initialized_ = true;
 
     // Subscription bridge has no discovery phase — signal the startup HSM
@@ -284,7 +285,8 @@ void GeappliancesBridge::start_custom_erd_polling_()
     this->polling_only_publish_on_change_,
     this->autodiscovery_manager_.get_host_address(),
     this->custom_erds_vec_.data(),
-    static_cast<uint16_t>(this->custom_erds_vec_.size()));
+    static_cast<uint16_t>(this->custom_erds_vec_.size()),
+    &this->erd_cache_);
   this->custom_erd_polling_started_ = true;
   this->polling_bridge_initialized_ = true;
 }
@@ -354,7 +356,8 @@ void GeappliancesBridge::check_subscription_activity_()
     this->autodiscovery_manager_.get_active_erd_client(),
     &this->mqtt_client_adapter_.interface,
     this->polling_interval_ms_,
-    this->polling_only_publish_on_change_);
+    this->polling_only_publish_on_change_,
+    &this->erd_cache_);
   this->polling_bridge_initialized_ = true;
   this->configure_polling_optional_lists_();
   this->subscription_mode_active_ = false;

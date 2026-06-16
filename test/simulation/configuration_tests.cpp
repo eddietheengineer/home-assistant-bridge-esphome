@@ -8,6 +8,7 @@
  */
 
 extern "C" {
+#include "erd_cache.h"
 #include "mqtt_bridge.h"
 #include "mqtt_bridge_polling.h"
 }
@@ -65,6 +66,8 @@ TEST_GROUP(configuration_based_tests)
   
   mqtt_bridge_t mqtt_bridge;
   mqtt_bridge_polling_t mqtt_bridge_polling;
+
+  erd_cache_t test_cache;
   
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -77,12 +80,14 @@ TEST_GROUP(configuration_based_tests)
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
   
   void teardown()
   {
     mqtt_bridge_destroy(&mqtt_bridge);
     mqtt_bridge_polling_destroy(&mqtt_bridge_polling);
+    erd_cache_destroy(&test_cache);
     mock().clear();
   }
   
@@ -98,7 +103,8 @@ TEST_GROUP(configuration_based_tests)
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
-      address);
+      address,
+      &test_cache);
   }
   
   /*!
@@ -115,7 +121,8 @@ TEST_GROUP(configuration_based_tests)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      only_publish_on_change);
+      only_publish_on_change,
+      &test_cache);
   }
   
   // Helper methods for simulating appliance behavior
@@ -582,6 +589,8 @@ TEST_GROUP(dual_subscription_config)
   mqtt_client_double_t mqtt_client_a;
   mqtt_client_double_t mqtt_client_b;
 
+  erd_cache_t test_cache;
+
   void setup()
   {
     mock().strictOrder();
@@ -589,12 +598,14 @@ TEST_GROUP(dual_subscription_config)
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client_a);
     mqtt_client_double_init(&mqtt_client_b);
+    erd_cache_init(&test_cache);
   }
 
   void teardown()
   {
     mqtt_bridge_destroy(&bridge_a);
     mqtt_bridge_destroy(&bridge_b);
+    erd_cache_destroy(&test_cache);
     mock().clear();
   }
 
@@ -606,13 +617,15 @@ TEST_GROUP(dual_subscription_config)
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client_a.interface,
-      address_appliance_a);
+      address_appliance_a,
+      &test_cache);
     mqtt_bridge_init(
       &bridge_b,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client_b.interface,
-      address_appliance_b);
+      address_appliance_b,
+      &test_cache);
     mock().enable();
   }
 
@@ -665,7 +678,8 @@ TEST(dual_subscription_config, each_bridge_subscribes_to_its_own_address)
     &timer_group.timer_group,
     &erd_client.interface,
     &mqtt_client_a.interface,
-    address_appliance_a);
+    address_appliance_a,
+    &test_cache);
 
   // Expect bridge B to subscribe to address_appliance_b
   mock()
@@ -673,13 +687,13 @@ TEST(dual_subscription_config, each_bridge_subscribes_to_its_own_address)
     .onObject(&erd_client)
     .withParameter("address", address_appliance_b)
     .andReturnValue(true);
-
   mqtt_bridge_init(
     &bridge_b,
     &timer_group.timer_group,
     &erd_client.interface,
     &mqtt_client_b.interface,
-    address_appliance_b);
+    address_appliance_b,
+    &test_cache);
 
   mock().checkExpectations();
 }
@@ -784,18 +798,22 @@ TEST_GROUP(only_publish_on_change_config)
   tiny_gea3_erd_client_double_t erd_client;
   mqtt_client_double_t mqtt_client;
 
+  erd_cache_t test_cache;
+
   void setup()
   {
     mock().strictOrder();
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
 
   void teardown()
   {
     mock().disable();
     mqtt_bridge_polling_destroy(&bridge);
+    erd_cache_destroy(&test_cache);
     mock().enable();
     mock().clear();
   }
@@ -808,7 +826,8 @@ TEST_GROUP(only_publish_on_change_config)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      true);
+      true,
+      &test_cache);
   }
 
   void configure_always_publish()
@@ -819,7 +838,8 @@ TEST_GROUP(only_publish_on_change_config)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      false);
+      false,
+      &test_cache);
   }
 
   void simulate_read_completed(tiny_erd_t erd, const uint8_t* data, uint8_t size)

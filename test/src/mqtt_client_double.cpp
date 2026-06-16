@@ -45,12 +45,19 @@ static i_tiny_event_t* on_mqtt_disconnect(i_mqtt_client_t* _self)
   return &self->on_mqtt_disconnect.interface;
 }
 
+static i_tiny_event_t* on_mqtt_connect(i_mqtt_client_t* _self)
+{
+  auto self = reinterpret_cast<mqtt_client_double_t*>(_self);
+  return &self->on_mqtt_connect.interface;
+}
+
 static const i_mqtt_client_api_t api = {
   register_erd,
   update_erd,
   update_erd_write_result,
   on_write_request,
-  on_mqtt_disconnect
+  on_mqtt_disconnect,
+  on_mqtt_connect
 };
 
 void mqtt_client_double_init(mqtt_client_double_t* self)
@@ -58,6 +65,7 @@ void mqtt_client_double_init(mqtt_client_double_t* self)
   self->interface.api = &api;
   tiny_event_init(&self->on_write_request);
   tiny_event_init(&self->on_mqtt_disconnect);
+  tiny_event_init(&self->on_mqtt_connect);
 }
 
 void mqtt_client_double_trigger_write_request(
@@ -74,4 +82,10 @@ void mqtt_client_double_trigger_mqtt_disconnect(
   mqtt_client_double_t* self)
 {
   tiny_event_publish(&self->on_mqtt_disconnect, nullptr);
+}
+
+void mqtt_client_double_trigger_mqtt_connect(
+  mqtt_client_double_t* self)
+{
+  tiny_event_publish(&self->on_mqtt_connect, nullptr);
 }

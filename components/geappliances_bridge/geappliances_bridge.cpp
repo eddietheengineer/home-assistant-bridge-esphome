@@ -54,6 +54,8 @@ void GeappliancesBridge::setup() {
   // Initialize timer group
   tiny_timer_group_init(&this->timer_group_, esphome_time_source_init());
 
+  // Initialize the shared ERD cache before any component uses it.
+  erd_cache_init(&this->erd_cache_);
   // Initialize GEA3 components if GEA3 UART is configured
   if (this->uart_ != nullptr) {
     esphome_uart_adapter_init(&this->uart_adapter_, &this->timer_group_, this->uart_);
@@ -215,6 +217,11 @@ void GeappliancesBridge::loop() {
   esp_task_wdt_reset();
 #endif
 
+  // Drain updated ERD cache entries to MQTT each loop iteration.
+  if (this->erd_cache_publisher_.cache != nullptr) {
+    erd_cache_mqtt_publisher_loop(&this->erd_cache_publisher_, 20, 10);
+  }
+
   // Publish ERD publish rate + cache stats sensors every ~60 seconds.
   if (this->erd_publish_rate_sensor_ != nullptr) {
     uint32_t now = esphome::millis();
@@ -230,21 +237,13 @@ void GeappliancesBridge::loop() {
   if (this->erd_cache_entries_sensor_ != nullptr || this->erd_cache_updates_sensor_ != nullptr) {
     uint32_t now = esphome::millis();
     if (now - this->last_erd_cache_stats_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
-      erd_cache_t* cache = nullptr;
-      if (this->polling_bridge_initialized_) {
-        cache = &this->mqtt_bridge_polling_.erd_cache;
-      } else if (this->subscription_bridge_initialized_) {
-        cache = &this->mqtt_bridge_.erd_cache;
+      if (this->erd_cache_entries_sensor_ != nullptr) {
+        this->erd_cache_entries_sensor_->publish_state(
+          static_cast<float>(erd_cache_get_count(&this->erd_cache_)));
       }
-      if (cache) {
-        if (this->erd_cache_entries_sensor_ != nullptr) {
-          this->erd_cache_entries_sensor_->publish_state(
-            static_cast<float>(erd_cache_get_count(cache)));
-        }
-        if (this->erd_cache_updates_sensor_ != nullptr) {
-          this->erd_cache_updates_sensor_->publish_state(
-            static_cast<float>(erd_cache_get_update_rate(cache)));
-        }
+      if (this->erd_cache_updates_sensor_ != nullptr) {
+        this->erd_cache_updates_sensor_->publish_state(
+          static_cast<float>(erd_cache_get_update_rate(&this->erd_cache_)));
       }
       this->last_erd_cache_stats_publish_ = now;
     }
@@ -543,6 +542,14 @@ bool GeappliancesBridge::teardown() {
     mqtt_bridge_polling_destroy(&this->mqtt_bridge_polling_);
   }
 
+  // Destroy the shared ERD cache after bridges are torn down.
+
+  // Destroy the ERD cache publisher before the adapter is destroyed.
+  if (this->erd_cache_publisher_.cache) {
+    erd_cache_mqtt_publisher_destroy(&this->erd_cache_publisher_);
+  }
+  erd_cache_destroy(&this->erd_cache_);
+
   // Free heap-allocated members of the MQTT client adapter to prevent
   // memory leaks (device_id string, pending_updates map, etc.).
   if (this->mqtt_client_adapter_initialized_) {
@@ -688,6 +695,29 @@ void GeappliancesBridge::run_all_managers()
 {
   // FeatureBitManager is self-driving (owns its own timers and event subscriptions).
   // No polling needed from the bridge loop.
+}
+
+// -- ERD cache MQTT publisher ------------------------------------------------
+
+void GeappliancesBridge::initialize_erd_cache_publisher()
+{
+  init_erd_cache_publisher_();
+}
+
+bool GeappliancesBridge::is_erd_cache_publisher_initialized() const
+{
+  return erd_cache_publisher_.cache != nullptr;
+}
+
+void GeappliancesBridge::init_erd_cache_publisher_()
+{
+  if (this->erd_cache_publisher_.cache) return; // already initialized
+  erd_cache_mqtt_publisher_init(
+    &this->erd_cache_publisher_,
+    &this->erd_cache_,
+    &this->mqtt_client_adapter_.interface,
+    this->device_identity_manager_.get_device_id().c_str());
+  ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
 }
 
 }  // namespace geappliances_bridge

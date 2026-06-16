@@ -56,6 +56,7 @@ TEST_GROUP(appliance_simulation_examples)
   
   mqtt_bridge_t mqtt_bridge;
   mqtt_bridge_polling_t mqtt_bridge_polling;
+  erd_cache_t test_cache;
   
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -68,12 +69,14 @@ TEST_GROUP(appliance_simulation_examples)
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
   
   void teardown()
   {
     mqtt_bridge_destroy(&mqtt_bridge);
     mqtt_bridge_polling_destroy(&mqtt_bridge_polling);
+    erd_cache_destroy(&test_cache);
     mock().clear();
   }
   
@@ -84,7 +87,8 @@ TEST_GROUP(appliance_simulation_examples)
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
-      host_address);
+      host_address,
+      &test_cache);
   }
   
   void initialize_mqtt_bridge_polling_mode()
@@ -95,7 +99,8 @@ TEST_GROUP(appliance_simulation_examples)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      false);
+      false,
+      &test_cache);
   }
   
   /*!

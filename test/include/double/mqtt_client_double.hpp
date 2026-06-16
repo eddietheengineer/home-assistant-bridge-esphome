@@ -16,6 +16,7 @@ typedef struct {
 
   tiny_event_t on_write_request;
   tiny_event_t on_mqtt_disconnect;
+  tiny_event_t on_mqtt_connect;
 } mqtt_client_double_t;
 
 /*!
@@ -36,6 +37,12 @@ void mqtt_client_double_trigger_write_request(
  * Trigger publication via the on_mqtt_disconnect event.
  */
 void mqtt_client_double_trigger_mqtt_disconnect(
+  mqtt_client_double_t* self);
+
+/*!
+ * Trigger publication via the on_mqtt_connect event.
+ */
+void mqtt_client_double_trigger_mqtt_connect(
   mqtt_client_double_t* self);
 
 #endif

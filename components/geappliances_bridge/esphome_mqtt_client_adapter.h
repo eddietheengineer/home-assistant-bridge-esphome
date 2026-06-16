@@ -36,6 +36,7 @@ typedef struct {
   std::string* device_id;
   tiny_event_t on_write_request_event;
   tiny_event_t on_mqtt_disconnect_event;
+  tiny_event_t on_mqtt_connect_event;
   // Optional ERD registry: when non-null, provides valid-ERD filtering,
   // string-ERD type detection, and registered-ERD tracking in one place.
   // Set via esphome_mqtt_client_adapter_set_erd_registry().
