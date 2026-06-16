@@ -14,11 +14,6 @@ static bool s_overflow_warned = false;
 
 void erd_cache_init(erd_cache_t* self)
 {
-  (void)memset(self, 0, sizeof(*self));
-}
-
-void erd_cache_destroy(erd_cache_t* self)
-{
   for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
     erd_cache_entry_t* e = &self->entries[i];
     if (e->valid && e->uses_heap) {
@@ -27,6 +22,11 @@ void erd_cache_destroy(erd_cache_t* self)
     }
   }
   (void)memset(self, 0, sizeof(*self));
+}
+
+void erd_cache_destroy(erd_cache_t* self)
+{
+  erd_cache_init(self);
 }
 
 erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd)
