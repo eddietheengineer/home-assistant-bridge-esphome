@@ -59,7 +59,7 @@ static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value
     hex += buf;
   }
 
-  ESP_LOGD(TAG, "ERD 0x%04X: %s", erd, hex.c_str());
+  ESP_LOGV(TAG, "ERD 0x%04X: %s", erd, hex.c_str());
   self->erd_publish_count_++;
 }
 
