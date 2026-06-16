@@ -229,7 +229,7 @@ void GeappliancesBridge::loop() {
   // Publish cache stats sensors every ~60 seconds.
   if (this->erd_cache_entries_sensor_ != nullptr || this->erd_cache_updates_sensor_ != nullptr) {
     uint32_t now = esphome::millis();
-    if (now - this->last_erd_publish_rate_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
+    if (now - this->last_erd_cache_stats_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
       erd_cache_t* cache = nullptr;
       if (this->polling_bridge_initialized_) {
         cache = &this->mqtt_bridge_polling_.erd_cache;
@@ -246,6 +246,7 @@ void GeappliancesBridge::loop() {
             static_cast<float>(erd_cache_get_update_rate(cache)));
         }
       }
+      this->last_erd_cache_stats_publish_ = now;
     }
   }
 }

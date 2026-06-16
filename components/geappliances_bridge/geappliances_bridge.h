@@ -206,6 +206,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // ERD cache stats sensors: published every ~60s alongside publish rate.
   sensor::Sensor* erd_cache_entries_sensor_{nullptr};
   sensor::Sensor* erd_cache_updates_sensor_{nullptr};
+  uint32_t last_erd_cache_stats_publish_{0};
   // ERD registry: single owner of valid-ERD filter, string-type set,
   // and runtime registered-ERD tracking.
   ErdRegistry erd_registry_;
