@@ -183,6 +183,12 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     this->mqtt_bridge_polling_.on_discovery_complete_context = this;
     this->polling_bridge_initialized_ = true;
     this->configure_polling_optional_lists_();
+  }
+
+  // Initialize the subscription bridge for non-polling modes (subscribe, auto).
+  // In polling mode (GEA2 or explicit poll), subscriptions are not used, but
+  // the bridge is still initialized above for custom ERD subscription support.
+  if (!use_polling) {
     mqtt_bridge_init(
       &this->mqtt_bridge_,
       &this->timer_group_,
@@ -195,13 +201,6 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     // Subscription bridge has no discovery phase — signal the startup HSM
     // immediately so it can transition to subscription_watch.
     tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
-
-    if (!this->custom_erds_vec_.empty()) {
-      this->custom_erd_subscription_seen_erds_.clear();
-      this->custom_erd_subscription_last_activity_ = millis();
-      ESP_LOGI(TAG, "Custom ERD polling (%zu ERD(s)) will start after subscription settles",
-               this->custom_erds_vec_.size());
-    }
   }
 
   this->mqtt_bridge_initialized_ = true;
