@@ -42,6 +42,7 @@ typedef struct {
   // Set via esphome_mqtt_client_adapter_set_erd_registry().
   esphome::geappliances_bridge::ErdRegistry* erd_registry;
   uint32_t erd_publish_count_;
+  uint32_t mqtt_publish_count_;
 } esphome_mqtt_client_adapter_t;
 
 #ifdef __cplusplus
@@ -94,6 +95,13 @@ void esphome_mqtt_client_adapter_publish(
  * Returns the count of ERD updates since the last call.
  */
 uint32_t esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(
+  esphome_mqtt_client_adapter_t* self);
+
+/*!
+ * Get and reset the MQTT publish counter.
+ * Returns the count of MQTT publishes since the last call.
+ */
+uint32_t esphome_mqtt_client_adapter_get_and_reset_mqtt_publish_count(
   esphome_mqtt_client_adapter_t* self);
 
 #ifdef __cplusplus

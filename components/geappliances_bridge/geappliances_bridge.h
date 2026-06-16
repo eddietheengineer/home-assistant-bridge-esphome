@@ -92,6 +92,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_erd_publish_rate_sensor(sensor::Sensor* sensor) { this->erd_publish_rate_sensor_ = sensor; }
   void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; }
   void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; }
+  void set_mqtt_publish_rate_sensor(sensor::Sensor* sensor) { this->mqtt_publish_rate_sensor_ = sensor; }
 
 
 
@@ -207,9 +208,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   uint32_t last_erd_publish_rate_publish_{0};
   static constexpr uint32_t ERD_PUBLISH_RATE_INTERVAL_MS = 60000;
 
-  // ERD cache stats sensors: published every ~60s alongside publish rate.
   sensor::Sensor* erd_cache_entries_sensor_{nullptr};
   sensor::Sensor* erd_cache_updates_sensor_{nullptr};
+  sensor::Sensor* mqtt_publish_rate_sensor_{nullptr};
   uint32_t last_erd_cache_stats_publish_{0};
   // ERD registry: single owner of valid-ERD filter, string-type set,
   // and runtime registered-ERD tracking.
