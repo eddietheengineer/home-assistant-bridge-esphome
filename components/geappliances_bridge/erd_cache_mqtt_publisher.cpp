@@ -6,6 +6,7 @@
 #include "erd_cache_mqtt_publisher.h"
 #include "esphome_mqtt_client_adapter.h"
 #include "esphome/core/log.h"
+#include "esphome/core/hal.h"
 
 #include <stdio.h>
 #include <string.h>
