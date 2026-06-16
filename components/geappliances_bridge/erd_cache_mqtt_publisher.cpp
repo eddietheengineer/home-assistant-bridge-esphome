@@ -26,6 +26,7 @@ void erd_cache_mqtt_publisher_init(
   self->device_id = device_id;
   self->publish_index = 0;
   self->mqtt_connected = true;
+  self->get_time_ms = esphome::millis;
 
   /* Subscribe to MQTT disconnect event */
   tiny_event_subscription_init(
@@ -83,8 +84,7 @@ uint16_t erd_cache_mqtt_publisher_loop(
     self->dropped_count++;
     return 0;
   }
-
-  uint32_t start_ms = esphome::millis();
+  uint32_t start_ms = self->get_time_ms();
   uint16_t published = 0;
 
   while (published < max_publishes) {
@@ -93,7 +93,7 @@ uint16_t erd_cache_mqtt_publisher_loop(
       break;
     }
 
-    if (esphome::millis() - start_ms >= max_ms) {
+    if (self->get_time_ms() - start_ms >= max_ms) {
       break;
     }
     /* Determine data pointer */
@@ -131,4 +131,11 @@ void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self)
 {
   self->mqtt_connected = false;
   ESP_LOGW(TAG, "MQTT disconnected — pausing ERD cache publishing");
+}
+
+void erd_cache_mqtt_publisher_set_time_fn(
+  erd_cache_mqtt_publisher_t* self,
+  uint32_t (*get_time_ms)(void))
+{
+  self->get_time_ms = get_time_ms;
 }

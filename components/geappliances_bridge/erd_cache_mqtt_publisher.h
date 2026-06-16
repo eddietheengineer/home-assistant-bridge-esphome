@@ -36,6 +36,8 @@ typedef struct {
   // Stats
   uint32_t total_published;        // Total ERD publishes since init
   uint32_t dropped_count;          // Publishes dropped due to MQTT disconnect
+  // Time callback (defaults to esphome::millis; overridable for testing)
+  uint32_t (*get_time_ms)(void);
 } erd_cache_mqtt_publisher_t;
 
 #ifdef __cplusplus
@@ -69,6 +71,14 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self);
  * Called when MQTT broker disconnects.
  */
 void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self);
+
+/*!
+ * Override the time source (defaults to esphome::millis).
+ * Useful for testing.
+ */
+void erd_cache_mqtt_publisher_set_time_fn(
+  erd_cache_mqtt_publisher_t* self,
+  uint32_t (*get_time_ms)(void));
 
 #ifdef __cplusplus
 }
