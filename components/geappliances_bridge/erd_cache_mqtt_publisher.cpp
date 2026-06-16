@@ -105,7 +105,7 @@ uint16_t erd_cache_mqtt_publisher_loop(
 
     /* Build hex payload: max data_size is 255 (uint8_t), so hex is 510 chars + null */
     size_t data_len = entry->data_size;
-    char hex[data_len * 2 + 1];
+    char hex[512];
     for (size_t i = 0; i < data_len; i++) {
       snprintf(hex + i * 2, 3, "%02X", data[i]);
     }
