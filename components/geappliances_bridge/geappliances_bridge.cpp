@@ -218,8 +218,11 @@ void GeappliancesBridge::loop() {
 #endif
 
   // Drain updated ERD cache entries to MQTT each loop iteration.
+  // Budget: 5 publishes max, 20 ms max — each publish() blocks on the IDF
+  // MQTT mutex, so keep the per-loop cost small to avoid starving the
+  // ESPHome framework (which fires its watchdog at 30 ms).
   if (this->erd_cache_publisher_.cache != nullptr) {
-    erd_cache_mqtt_publisher_loop(&this->erd_cache_publisher_, 20, 100);
+    erd_cache_mqtt_publisher_loop(&this->erd_cache_publisher_, 5, 20);
   }
 
   // Publish ERD/MQTT publish rate + cache stats sensors every ~60 seconds.
