@@ -88,6 +88,8 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_generate_device_config(bool generate_device_config) { this->generate_device_config_ = generate_device_config; }
   void set_ha_discovery_base_url(const std::string& url) { this->ha_discovery_base_url_ = url; }
   void set_erd_publish_rate_sensor(sensor::Sensor* sensor) { this->erd_publish_rate_sensor_ = sensor; }
+  void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; }
+  void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; }
 
 
 
@@ -200,6 +202,10 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   sensor::Sensor* erd_publish_rate_sensor_{nullptr};
   uint32_t last_erd_publish_rate_publish_{0};
   static constexpr uint32_t ERD_PUBLISH_RATE_INTERVAL_MS = 60000;
+
+  // ERD cache stats sensors: published every ~60s alongside publish rate.
+  sensor::Sensor* erd_cache_entries_sensor_{nullptr};
+  sensor::Sensor* erd_cache_updates_sensor_{nullptr};
   // ERD registry: single owner of valid-ERD filter, string-type set,
   // and runtime registered-ERD tracking.
   ErdRegistry erd_registry_;

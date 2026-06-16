@@ -53,6 +53,8 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   }
 
   if (existing) {
+    self->update_count++;
+    self->update_count_window++;
     // Update existing entry
     bool data_changed = (existing->data_size != data_size) ||
                         (memcmp(existing->uses_heap ? existing->heap_data : existing->inline_data,
@@ -105,6 +107,8 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
 
   // Insert new entry
   bool needs_heap = data_size > ERD_CACHE_INLINE_DATA_SIZE;
+  self->update_count++;
+  self->update_count_window++;
   slot->erd = erd;
   slot->data_size = data_size;
   slot->uses_heap = needs_heap;
@@ -133,4 +137,22 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
   }
   *iterator = 0; // Reset iterator for next pass
   return nullptr;
+}
+
+uint16_t erd_cache_get_count(erd_cache_t* self)
+{
+  uint16_t count = 0;
+  for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
+    if (self->entries[i].valid) {
+      count++;
+    }
+  }
+  return count;
+}
+
+uint32_t erd_cache_get_update_rate(erd_cache_t* self)
+{
+  uint32_t count = self->update_count_window;
+  self->update_count_window = 0;
+  return count;
 }

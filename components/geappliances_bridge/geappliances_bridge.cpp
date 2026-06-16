@@ -3,6 +3,7 @@
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 #include "esphome_time_source.h"
+#include "erd_cache.h"
 
 #ifdef USE_ESP32
 #include "esp_system.h"
@@ -214,7 +215,7 @@ void GeappliancesBridge::loop() {
   esp_task_wdt_reset();
 #endif
 
-  // Publish ERD publish rate sensor every ~60 seconds.
+  // Publish ERD publish rate + cache stats sensors every ~60 seconds.
   if (this->erd_publish_rate_sensor_ != nullptr) {
     uint32_t now = esphome::millis();
     if (now - this->last_erd_publish_rate_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
@@ -222,6 +223,29 @@ void GeappliancesBridge::loop() {
         &this->mqtt_client_adapter_);
       this->erd_publish_rate_sensor_->publish_state(static_cast<float>(count));
       this->last_erd_publish_rate_publish_ = now;
+    }
+  }
+
+  // Publish cache stats sensors every ~60 seconds.
+  if (this->erd_cache_entries_sensor_ != nullptr || this->erd_cache_updates_sensor_ != nullptr) {
+    uint32_t now = esphome::millis();
+    if (now - this->last_erd_publish_rate_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
+      erd_cache_t* cache = nullptr;
+      if (this->polling_bridge_initialized_) {
+        cache = &this->mqtt_bridge_polling_.erd_cache;
+      } else if (this->subscription_bridge_initialized_) {
+        cache = &this->mqtt_bridge_.erd_cache;
+      }
+      if (cache) {
+        if (this->erd_cache_entries_sensor_ != nullptr) {
+          this->erd_cache_entries_sensor_->publish_state(
+            static_cast<float>(erd_cache_get_count(cache)));
+        }
+        if (this->erd_cache_updates_sensor_ != nullptr) {
+          this->erd_cache_updates_sensor_->publish_state(
+            static_cast<float>(erd_cache_get_update_rate(cache)));
+        }
+      }
     }
   }
 }

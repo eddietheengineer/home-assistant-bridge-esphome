@@ -36,6 +36,8 @@ CONF_CUSTOM_ERDS = "custom_erds"
 CONF_GENERATE_DEVICE_CONFIG = "generate_device_config"
 CONF_HA_DISCOVERY_BASE_URL = "ha_discovery_base_url"
 CONF_ERD_PUBLISH_RATE_SENSOR = "erd_publish_rate_sensor"
+CONF_ERD_CACHE_ENTRIES_SENSOR = "erd_cache_entries_sensor"
+CONF_ERD_CACHE_UPDATES_SENSOR = "erd_cache_updates_sensor"
 
 
 
@@ -306,6 +308,12 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_ERD_PUBLISH_RATE_SENSOR): cv.Schema({
             cv.Optional("name", default="ERD Publish Rate"): cv.string,
         }).extend(sensor.sensor_schema(state_class="measurement")),
+        cv.Optional(CONF_ERD_CACHE_ENTRIES_SENSOR): cv.Schema({
+            cv.Optional("name", default="ERD Cache Entries"): cv.string,
+        }).extend(sensor.sensor_schema()),
+        cv.Optional(CONF_ERD_CACHE_UPDATES_SENSOR): cv.Schema({
+            cv.Optional("name", default="ERD Cache Updates/60s"): cv.string,
+        }).extend(sensor.sensor_schema(state_class="measurement")),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
@@ -368,6 +376,16 @@ async def to_code(config: dict[str, Any]) -> None:
     if CONF_ERD_PUBLISH_RATE_SENSOR in config:
         sens = await sensor.new_sensor(config[CONF_ERD_PUBLISH_RATE_SENSOR])
         cg.add(var.set_erd_publish_rate_sensor(sens))
+
+    # Optionally create the ERD cache entries sensor
+    if CONF_ERD_CACHE_ENTRIES_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_ERD_CACHE_ENTRIES_SENSOR])
+        cg.add(var.set_erd_cache_entries_sensor(sens))
+
+    # Optionally create the ERD cache updates sensor
+    if CONF_ERD_CACHE_UPDATES_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_ERD_CACHE_UPDATES_SENSOR])
+        cg.add(var.set_erd_cache_updates_sensor(sens))
 
     # Register any user-configured custom ERDs
     for erd in config[CONF_CUSTOM_ERDS]:

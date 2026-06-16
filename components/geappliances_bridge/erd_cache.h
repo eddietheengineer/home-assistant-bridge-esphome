@@ -33,6 +33,8 @@ typedef struct {
 
 typedef struct {
   erd_cache_entry_t entries[ERD_CACHE_CAPACITY];
+  uint32_t update_count;        // total updates since last window reset
+  uint32_t update_count_window; // updates in the last 60s window
 } erd_cache_t;
 
 #ifdef __cplusplus
@@ -59,6 +61,13 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
 // NOTE: Declared for future use (e.g., batch republish after MQTT reconnect).
 //       Not used in the initial implementation.
 erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* iterator);
+
+// Returns the number of valid entries currently in the cache.
+uint16_t erd_cache_get_count(erd_cache_t* self);
+
+// Returns the number of cache updates that occurred in the last 60 seconds,
+// then resets the window counter.
+uint32_t erd_cache_get_update_rate(erd_cache_t* self);
 
 #ifdef __cplusplus
 }
