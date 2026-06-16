@@ -19,18 +19,25 @@ static void build_topic(char* buf, size_t buf_size, const char* device_id, uint1
 }
 
 /* Build the hex payload: uppercase hex bytes, no separator, no prefix. */
-static void build_hex_payload(char* buf, size_t, const uint8_t* data, uint8_t data_size)
+static void build_hex_payload(char* buf, size_t max_out, const uint8_t* data, uint8_t data_size)
 {
-  if (data_size == 0) {
-    buf[0] = '\0';
+  if (data_size == 0 || max_out == 0) {
+    if (max_out > 0) {
+      buf[0] = '\0';
+    }
     return;
   }
   char* p = buf;
+  size_t out_len = 0;
   for (uint8_t i = 0; i < data_size; i++) {
+    if (out_len + 2 >= max_out) {
+      break;
+    }
     char hex[3];
     snprintf(hex, sizeof(hex), "%02X", data[i]);
     *p++ = hex[0];
     *p++ = hex[1];
+    out_len += 2;
   }
   *p = '\0';
 }
@@ -96,11 +103,12 @@ uint16_t erd_cache_mqtt_publisher_loop(
   uint16_t max_publishes,
   uint32_t max_ms)
 {
-  if (!self->cache || !self->mqtt_client) {
+  if (!self->cache || !self->mqtt_client || !self->device_id) {
     return 0;
   }
 
   if (!self->mqtt_connected) {
+    self->dropped_count++;
     return 0;
   }
 
