@@ -21,6 +21,7 @@ SRC_DIRS := \
   test/simulation \
 
 SRC_FILES := \
+  components/geappliances_bridge/erd_cache.cpp \
   components/geappliances_bridge/mqtt_bridge.cpp \
   components/geappliances_bridge/mqtt_bridge_polling.cpp \
   components/geappliances_bridge/gea2_erd_client_adapter.cpp \

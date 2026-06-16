@@ -26,10 +26,10 @@
 #ifndef mqtt_bridge_h
 #define mqtt_bridge_h
 
+#include "erd_cache.h"
 #include "i_mqtt_client.h"
 #include "i_tiny_gea3_erd_client.h"
 #include "tiny_hsm.h"
-#include "tiny_timer.h"
 
 typedef struct {
   tiny_timer_group_t* timer_group;
@@ -40,6 +40,7 @@ typedef struct {
   tiny_event_subscription_t mqtt_disconnect_subscription;
   tiny_event_subscription_t erd_client_activity_subscription;
   void* erd_set;
+  erd_cache_t erd_cache;
   tiny_hsm_t hsm;
   uint8_t erd_host_address;
 } mqtt_bridge_t;

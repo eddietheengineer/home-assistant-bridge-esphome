@@ -9,9 +9,8 @@
  */
 
 #include "mqtt_bridge_common.h"
+#include "erd_cache.h"
 #include "esphome/core/log.h"
-
-#include <set>
 
 using namespace std;
 
@@ -39,13 +38,16 @@ static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         erd_set(self).insert(erd);
       }
 
+      erd_cache_update(&self->erd_cache, erd,
+        reinterpret_cast<const uint8_t*>(args->subscription_publication_received.data),
+        args->subscription_publication_received.data_size,
+        true);  // is_subscription = true
       mqtt_client_update_erd(
         self->mqtt_client,
         erd,
         args->subscription_publication_received.data,
         args->subscription_publication_received.data_size);
     } break;
-
     case signal_write_requested: {
       auto args = reinterpret_cast<const mqtt_client_on_write_request_args_t*>(data);
       tiny_gea3_erd_client_request_id_t request_id;
@@ -70,6 +72,7 @@ static tiny_hsm_result_t state_subscribing(tiny_hsm_t* hsm, tiny_hsm_signal_t si
       // the local tracking set so that all ERDs are re-registered when new
       // subscription publications arrive.
       erd_set(self).clear();
+      erd_cache_init(&self->erd_cache);
       __attribute__((fallthrough));
     case tiny_hsm_signal_entry:
       // Intentionally fall through to the subscribe case below.
@@ -162,6 +165,7 @@ void mqtt_bridge_init(
   self->mqtt_client = mqtt_client;
   self->erd_host_address = address;
   self->erd_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
+  erd_cache_init(&self->erd_cache);
 
   tiny_event_subscription_init(
     &self->erd_client_activity_subscription, self, +[](void* context, const void* _args) {
@@ -232,6 +236,7 @@ void mqtt_bridge_destroy(mqtt_bridge_t* self)
     mqtt_client_on_mqtt_disconnect(self->mqtt_client),
     &self->mqtt_disconnect_subscription);
 
+  erd_cache_destroy(&self->erd_cache);
   delete reinterpret_cast<set<tiny_erd_t>*>(self->erd_set);
   self->erd_set = nullptr;
 }
