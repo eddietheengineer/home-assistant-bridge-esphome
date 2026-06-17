@@ -139,14 +139,15 @@ static void add_erd_to_polling_list(erd_bridge_poll_t* self, tiny_erd_t erd)
 // where restart_pending is never set).
 static void on_polling_cycle_complete(erd_bridge_poll_t* self, bool immediate)
 {
-  self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
+  uint32_t now = esphome::millis();
+  self->last_cycle_time_ms = (uint32_t)(now - self->cycle_start_ms);
   self->cycle_count++;
 
   if (immediate) {
     self->restart_pending = false;
     self->erd_index = 0;
     self->cycle_completed_count = 0;
-    self->cycle_start_ms = esphome::millis();
+    self->cycle_start_ms = now;
     if (send_cycle_reads(self)) {
       arm_polling_timer(self, self->polling_interval_ms);
     } else {
