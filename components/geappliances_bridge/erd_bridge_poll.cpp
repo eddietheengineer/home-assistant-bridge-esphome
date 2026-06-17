@@ -1,6 +1,6 @@
 /*!
  * @file
- * @brief MQTT polling bridge implementation.
+ * @brief ERD polling bridge implementation.
  *
  * The polling bridge discovers the connected appliance by reading ERD 0x0008
  * (appliance type) on the broadcast address, then walks through a chain of

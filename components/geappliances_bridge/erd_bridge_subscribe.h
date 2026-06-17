@@ -48,7 +48,7 @@ typedef struct {
 } erd_bridge_subscribe_t;
 
 /*!
- * Initialize the MQTT bridge.
+ * Initialize the ERD subscription bridge.
  */
 void erd_bridge_subscribe_init(
   erd_bridge_subscribe_t* self,
@@ -59,7 +59,7 @@ void erd_bridge_subscribe_init(
   erd_cache_t* cache);
 
 /*!
- * Destroy the MQTT bridge.
+ * Destroy the ERD subscription bridge.
  */
 void erd_bridge_subscribe_destroy(
   erd_bridge_subscribe_t* self);

@@ -1,6 +1,6 @@
 /*!
  * @file
- * @brief Tests for MQTT polling bridge change detection
+ * @brief Tests for ERD polling bridge change detection
  */
 
 extern "C" {

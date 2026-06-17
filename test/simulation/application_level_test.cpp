@@ -70,7 +70,7 @@ TEST_GROUP(application_level)
   }
   
   /*!
-   * Initialize the MQTT bridge in subscription mode.
+   * Initialize the ERD bridge in subscription mode.
    */
   void initialize_erd_bridge_subscription_mode()
   {
@@ -84,7 +84,7 @@ TEST_GROUP(application_level)
   }
   
   /*!
-   * Initialize the MQTT bridge in polling mode.
+   * Initialize the ERD bridge in polling mode.
    */
   void initialize_erd_bridge_polling_mode()
   {

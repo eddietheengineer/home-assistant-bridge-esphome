@@ -151,7 +151,7 @@ typedef struct {
 } erd_bridge_poll_t;
 
 /*!
- * Initialize the MQTT polling bridge.
+ * Initialize the ERD polling bridge.
  */
 void erd_bridge_poll_init(
   erd_bridge_poll_t* self,
@@ -163,7 +163,7 @@ void erd_bridge_poll_init(
   erd_cache_t* cache);
 
 /*!
- * Initialize the MQTT polling bridge with a pre-known host address.
+ * Initialize the ERD polling bridge with a pre-known host address.
  *
  * Unlike erd_bridge_poll_init(), this variant skips the broadcast
  * identification step (reading ERD 0x0008 from 0xFF) because the appliance
@@ -186,7 +186,7 @@ void erd_bridge_poll_init_at_address(
   erd_cache_t* cache);
 
 /*!
- * Destroy the MQTT polling bridge.
+ * Destroy the ERD polling bridge.
  */
 void erd_bridge_poll_destroy(
   erd_bridge_poll_t* self);

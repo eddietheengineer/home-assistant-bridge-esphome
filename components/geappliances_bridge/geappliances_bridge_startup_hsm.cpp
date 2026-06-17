@@ -309,7 +309,7 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
 }
 
 // ============================================================================
-// Phase 6: Bridge Init — initialize the MQTT bridge (poll or subscribe)
+// Phase 6: Bridge Init — initialize the ERD bridge (poll or subscribe)
 //
 // Waits for MQTT connection, then initializes the appropriate bridge.
 // Transitions to subscription_watch on completion.

@@ -11,7 +11,7 @@
  *
  * Each state handles its own entry/exit logic and waits for signals
  * from the managers (autodiscovery, device identity, feature bits,
- * MQTT bridge) before transitioning to the next phase.
+ * ERD bridge) before transitioning to the next phase.
  *
  * The "running" state is the steady-state where all recurring tasks
  * run every loop() iteration.
@@ -58,7 +58,7 @@ enum {
   signal_device_id_complete,                      // Device ID ready (read or pre-configured)
   signal_mqtt_connected,                          // MQTT broker connection established
   signal_feature_bits_complete,                   // All feature bit ERDs read and parsed
-  signal_bridge_ready,                            // MQTT bridge (poll/subscribe) initialized
+  signal_bridge_ready,                            // ERD bridge (poll/subscribe) initialized
   signal_subscription_fallback,                   // AUTO mode: subscription timed out, fell back to polling
 };
 

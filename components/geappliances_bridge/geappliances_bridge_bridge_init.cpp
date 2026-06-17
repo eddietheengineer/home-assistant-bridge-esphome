@@ -116,7 +116,7 @@ void GeappliancesBridge::initialize_mqtt_client_()
 }
 
 // ---------------------------------------------------------------------------
-// Phase 4: Initialize the MQTT bridge (called once from loop())
+// Phase 6: Initialize the ERD bridge (called once from loop())
 // ---------------------------------------------------------------------------
 
 void GeappliancesBridge::initialize_erd_bridge_()
@@ -125,7 +125,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
     return;
   }
 
-  ESP_LOGI(TAG, "Initializing MQTT bridge");
+  ESP_LOGI(TAG, "Initializing ERD bridge");
 
   // Apply the valid-ERD filter when appliance API parsing is enabled and
   // produced results. An empty set is ignored by the registry so all ERDs
@@ -204,7 +204,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
   }
 
   this->erd_bridge_initialized_ = true;
-  ESP_LOGI(TAG, "MQTT bridge initialized successfully");
+  ESP_LOGI(TAG, "ERD bridge initialized successfully");
 
   // Defer HA device discovery until ERD registration has settled.
   if (this->generate_device_config_) {
