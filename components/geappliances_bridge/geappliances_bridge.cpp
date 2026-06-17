@@ -172,6 +172,17 @@ void GeappliancesBridge::setup() {
 
 void GeappliancesBridge::loop() {
 
+  // Drive the GEA2/GEA3 protocol stack FIRST so that UART bytes are
+  // processed before any MQTT work.  The tight loop must run before
+  // MQTT operations to avoid starving UART processing on single-core
+  // ESP32 variants where a blocking MQTT call can delay response
+  // processing past the appliance's timeout window.
+  this->run_protocol_stack_();
+#ifdef USE_ESP32
+  // Feed the task watchdog after the protocol stack — the GEA2 tight loop
+  // can run for 200 ms wall-clock time, exceeding the default TWDT timeout.
+  esp_task_wdt_reset();
+#endif
 
   // Initialize the startup HSM on the first loop() call.
   if (this->startup_hsm_.current == nullptr) {
