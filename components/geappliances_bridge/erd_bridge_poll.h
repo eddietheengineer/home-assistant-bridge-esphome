@@ -76,7 +76,6 @@ typedef struct {
   tiny_timer_group_t* timer_group;
   i_tiny_gea3_erd_client_t* erd_client;
   i_mqtt_client_t* mqtt_client;
-  tiny_timer_t timer;
   tiny_timer_t appliance_lost_timer;
   tiny_timer_t polling_timer;
   tiny_event_subscription_t mqtt_write_request_subscription;

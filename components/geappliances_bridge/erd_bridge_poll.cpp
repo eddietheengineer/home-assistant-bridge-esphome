@@ -809,7 +809,6 @@ void erd_bridge_poll_destroy(erd_bridge_poll_t* self)
 
   // Stop all active timers so they cannot fire after the bridge is torn down.
   // tiny_timer_stop() is idempotent: safe to call even if a timer is not active.
-  tiny_timer_stop(self->timer_group, &self->timer);
   tiny_timer_stop(self->timer_group, &self->appliance_lost_timer);
   tiny_timer_stop(self->timer_group, &self->polling_timer);
 
