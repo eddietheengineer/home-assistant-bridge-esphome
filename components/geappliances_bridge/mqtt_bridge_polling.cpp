@@ -324,7 +324,7 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
         if (is_reentry) {
           erd_set(self).clear();
           pending_registration_set(self).clear();
-          erd_cache_init(&self->erd_cache);
+          erd_cache_init(self->erd_cache);
           self->polling_list_count = 0;
         }
         tiny_hsm_state_t next;
@@ -401,7 +401,7 @@ static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     // set's tree nodes to be freed and reallocated on each reconnect, fragmenting
     erd_set(self).clear();
     pending_registration_set(self).clear();
-    erd_cache_init(&self->erd_cache);
+    erd_cache_init(self->erd_cache);
     self->polling_list_count       = 0;
     self->request_id++;
     tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
@@ -444,7 +444,7 @@ static tiny_hsm_result_t state_add_appliance_api_feature_erds(tiny_hsm_t* hsm, t
     if (self->api_parsed_list != nullptr) {
       erd_set(self).clear();
       pending_registration_set(self).clear();
-      erd_cache_init(&self->erd_cache);
+      erd_cache_init(self->erd_cache);
       self->polling_list_count = 0;
       self->next_discovery_state = state_probe_api_parsed_erds;
     } else {
@@ -635,7 +635,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       }
 
 
-      bool data_changed = erd_cache_update(&self->erd_cache, erd, erd_data, data_size, false);
+      bool data_changed = erd_cache_update(self->erd_cache, erd, erd_data, data_size, false);
       bool should_publish = self->only_publish_on_change ? data_changed : true;
 
       if (should_publish) {
@@ -712,7 +712,8 @@ static void mqtt_bridge_polling_init_impl(
   bool                      only_publish_on_change,
   uint8_t                   initial_host_address,
   const tiny_erd_t*         api_parsed_list,
-  uint16_t                  api_parsed_list_count)
+  uint16_t                  api_parsed_list_count,
+  erd_cache_t*              cache)
 {
   self->timer_group            = timer_group;
   self->erd_client             = erd_client;
@@ -736,7 +737,7 @@ static void mqtt_bridge_polling_init_impl(
   self->polling_list_capacity  = 0;
   self->restart_pending        = false;
   self->erd_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
-  erd_cache_init(&self->erd_cache);
+  self->erd_cache = cache;
   self->pending_registration_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
   self->on_discovery_complete        = nullptr;
   self->on_discovery_complete_context = nullptr;
@@ -773,11 +774,12 @@ void mqtt_bridge_polling_init(
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t*          mqtt_client,
   uint32_t                  polling_interval_ms,
-  bool                      only_publish_on_change)
+  bool                      only_publish_on_change,
+  erd_cache_t*              cache)
 {
   mqtt_bridge_polling_init_impl(
     self, timer_group, erd_client, mqtt_client, polling_interval_ms, only_publish_on_change,
-    tiny_gea_broadcast_address, nullptr, 0);
+    tiny_gea_broadcast_address, nullptr, 0, cache);
 }
 
 void mqtt_bridge_polling_init_at_address(
@@ -789,11 +791,12 @@ void mqtt_bridge_polling_init_at_address(
   bool                      only_publish_on_change,
   uint8_t                   known_host_address,
   const tiny_erd_t*         api_list,
-  uint16_t                  api_list_count)
+  uint16_t                  api_list_count,
+  erd_cache_t*              cache)
 {
   mqtt_bridge_polling_init_impl(
     self, timer_group, erd_client, mqtt_client, polling_interval_ms, only_publish_on_change,
-    known_host_address, api_list, api_list_count);
+    known_host_address, api_list, api_list_count, cache);
 }
 
 void mqtt_bridge_polling_destroy(mqtt_bridge_polling_t* self)
@@ -829,7 +832,6 @@ void mqtt_bridge_polling_destroy(mqtt_bridge_polling_t* self)
     &self->mqtt_disconnect_subscription);
 
   delete reinterpret_cast<set<tiny_erd_t>*>(self->erd_set);
-  erd_cache_destroy(&self->erd_cache);
   delete reinterpret_cast<set<tiny_erd_t>*>(self->pending_registration_set);
   self->erd_set = nullptr;
   self->pending_registration_set = nullptr;

@@ -31,7 +31,7 @@ typedef struct {
   bool valid;
 } erd_cache_entry_t;
 
-typedef struct {
+typedef struct erd_cache_t {
   erd_cache_entry_t entries[ERD_CACHE_CAPACITY];
   uint32_t update_count;        // total updates since last window reset
   uint32_t update_count_window; // updates in the last 60s window

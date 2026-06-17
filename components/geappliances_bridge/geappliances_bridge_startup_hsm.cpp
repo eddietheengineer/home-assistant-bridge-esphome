@@ -242,6 +242,9 @@ tiny_hsm_result_t startup_state_mqtt_client_init(tiny_hsm_t* hsm, tiny_hsm_signa
       if (!svc->is_mqtt_client_initialized()) {
         svc->initialize_mqtt_client();
       }
+      if (!svc->is_erd_cache_publisher_initialized()) {
+        svc->initialize_erd_cache_publisher();
+      }
       svc->start_feature_bit_reading();
       tiny_hsm_transition(hsm, startup_state_feature_bits);
       break;

@@ -23,6 +23,7 @@ TEST_GROUP(mqtt_bridge_polling)
   };
 
   mqtt_bridge_polling_t self;
+  erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -35,12 +36,14 @@ TEST_GROUP(mqtt_bridge_polling)
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
 
   void teardown()
   {
     mock().disable();
     mqtt_bridge_polling_destroy(&self);
+    erd_cache_destroy(&test_cache);
     mock().enable();
   }
 
@@ -52,7 +55,8 @@ TEST_GROUP(mqtt_bridge_polling)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      only_publish_on_change);
+      only_publish_on_change,
+      &test_cache);
   }
 
   void after(tiny_timer_ticks_t ticks)
@@ -304,6 +308,7 @@ TEST_GROUP(mqtt_bridge_polling_api_list)
   };
 
   mqtt_bridge_polling_t self;
+  erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -317,12 +322,14 @@ TEST_GROUP(mqtt_bridge_polling_api_list)
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
 
   void teardown()
   {
     mock().disable();
     mqtt_bridge_polling_destroy(&self);
+    erd_cache_destroy(&test_cache);
     mock().enable();
   }
 
@@ -334,7 +341,8 @@ TEST_GROUP(mqtt_bridge_polling_api_list)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      false);
+      false,
+      &test_cache);
     // Set the API-parsed list AFTER init (api_parsed_list is always zeroed in init)
     self.api_parsed_list = api_list;
     self.api_parsed_list_count = 2;
@@ -554,6 +562,7 @@ TEST_GROUP(mqtt_bridge_polling_custom_erds)
   };
 
   mqtt_bridge_polling_t self;
+  erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -568,12 +577,14 @@ TEST_GROUP(mqtt_bridge_polling_custom_erds)
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
 
   void teardown()
   {
     mock().disable();
     mqtt_bridge_polling_destroy(&self);
+    erd_cache_destroy(&test_cache);
     mock().enable();
   }
 
@@ -585,7 +596,8 @@ TEST_GROUP(mqtt_bridge_polling_custom_erds)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      false);
+      false,
+      &test_cache);
     self.api_parsed_list = api_list;
     self.api_parsed_list_count = 1;
     self.custom_erd_list = custom_list;
@@ -600,7 +612,8 @@ TEST_GROUP(mqtt_bridge_polling_custom_erds)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      false);
+      false,
+      &test_cache);
     self.custom_erd_list = custom_list;
     self.custom_erd_list_count = 2;
   }
@@ -783,7 +796,8 @@ TEST(mqtt_bridge_polling_custom_erds, should_ignore_spurious_read_completed_duri
     &erd_client.interface,
     &mqtt_client.interface,
     polling_interval,
-    false);
+    false,
+    &test_cache);
   self.api_parsed_list = custom_list;
   self.api_parsed_list_count = 2;
 
@@ -841,7 +855,8 @@ TEST(mqtt_bridge_polling_custom_erds, should_poll_only_custom_erds_when_used_alo
     polling_interval,
     false,
     0xC0,     // pre-known host address — no 0xFF broadcast
-    custom_list, 2);
+    custom_list, 2,
+    &test_cache);
 
   // Phase 2: custom_erd_1 responds — registered and published immediately.
   // Bridge sends read for custom_erd_2.
@@ -891,7 +906,8 @@ TEST(mqtt_bridge_polling_custom_erds, should_resume_polling_at_known_address_aft
     polling_interval,
     false,
     0xC0,
-    custom_list, 2);
+    custom_list, 2,
+    &test_cache);
 
   // Phase 2 probe: both custom ERDs respond and are registered immediately.
   should_register_erd(custom_erd_1);
@@ -953,6 +969,7 @@ TEST_GROUP(mqtt_bridge_polling_sequential)
   };
 
   mqtt_bridge_polling_t self;
+  erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -966,12 +983,14 @@ TEST_GROUP(mqtt_bridge_polling_sequential)
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
 
   void teardown()
   {
     mock().disable();
     mqtt_bridge_polling_destroy(&self);
+    erd_cache_destroy(&test_cache);
     mock().enable();
   }
 
@@ -983,7 +1002,8 @@ TEST_GROUP(mqtt_bridge_polling_sequential)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      false);
+      false,
+      &test_cache);
     self.api_parsed_list = api_list;
     self.api_parsed_list_count = 3;
   }

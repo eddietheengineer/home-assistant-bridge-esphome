@@ -12,19 +12,6 @@ extern "C" {
 
 static const char *const TAG __attribute__((unused)) = "geappliances_bridge.mqtt";
 
-// ---------------------------------------------------------------------------
-// publish_now: debug log output instead of MQTT publish.
-// ---------------------------------------------------------------------------
-
-static void publish_now(const std::string& topic,
-                        const std::string& payload,
-                        bool retain)
-{
-  ESP_LOGD(TAG, "MQTT PUBLISH [retain=%s] topic=%s payload=%s",
-           retain ? "true" : "false", topic.c_str(), payload.c_str());
-  (void)topic; (void)payload; (void)retain;
-}
-
 
 static void register_erd(i_mqtt_client_t* _self, tiny_erd_t erd)
 {
@@ -51,15 +38,17 @@ static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value
   }
 
   const uint8_t* bytes = reinterpret_cast<const uint8_t*>(value);
-  std::string hex;
-  hex.reserve(size * 2);
-  for (uint8_t i = 0; i < size; i++) {
-    char buf[3];
-    snprintf(buf, sizeof(buf), "%02X", bytes[i]);
-    hex += buf;
-  }
 
-  ESP_LOGV(TAG, "ERD 0x%04X: %s", erd, hex.c_str());
+  /* Build hex string on the stack for verbose logging only.
+   * Cap at 64 bytes (128 hex chars) to avoid huge log lines. */
+  size_t log_bytes = size < 64 ? size : 64;
+  char hex[130];
+  for (size_t i = 0; i < log_bytes; i++) {
+    snprintf(hex + i * 2, 3, "%02X", bytes[i]);
+  }
+  hex[log_bytes * 2] = '\0';
+
+  ESP_LOGV(TAG, "ERD 0x%04X: %s", erd, hex);
   self->erd_publish_count_++;
 }
 
@@ -85,12 +74,20 @@ static i_tiny_event_t* on_mqtt_disconnect(i_mqtt_client_t* _self)
   return &self->on_mqtt_disconnect_event.interface;
 }
 
+static i_tiny_event_t* on_mqtt_connect(i_mqtt_client_t* _self)
+{
+  auto self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(_self);
+  return &self->on_mqtt_connect_event.interface;
+}
+
 static const i_mqtt_client_api_t api = {
   register_erd,
   update_erd,
   update_erd_write_result,
   on_write_request,
-  on_mqtt_disconnect
+  on_mqtt_disconnect,
+  on_mqtt_connect,
+  esphome_mqtt_client_adapter_publish_raw
 };
 
 extern "C" void esphome_mqtt_client_adapter_init(
@@ -101,9 +98,11 @@ extern "C" void esphome_mqtt_client_adapter_init(
   self->device_id = new std::string(device_id);
   self->erd_registry = nullptr;
   self->erd_publish_count_ = 0;
+  self->mqtt_publish_count_ = 0;
 
   tiny_event_init(&self->on_write_request_event);
   tiny_event_init(&self->on_mqtt_disconnect_event);
+  tiny_event_init(&self->on_mqtt_connect_event);
 }
 
 extern "C" void esphome_mqtt_client_adapter_set_erd_registry(
@@ -112,11 +111,10 @@ extern "C" void esphome_mqtt_client_adapter_set_erd_registry(
 {
   self->erd_registry = erd_registry;
 }
-
 extern "C" void esphome_mqtt_client_adapter_notify_disconnected(
   esphome_mqtt_client_adapter_t* self)
 {
-  (void)self;
+  tiny_event_publish(&self->on_mqtt_disconnect_event, nullptr);
 }
 
 extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
@@ -132,11 +130,10 @@ extern "C" size_t esphome_mqtt_client_adapter_drain_pending_updates(
   (void)self;
   return 0;
 }
-
 extern "C" void esphome_mqtt_client_adapter_notify_connected(
   esphome_mqtt_client_adapter_t* self)
 {
-  (void)self;
+  tiny_event_publish(&self->on_mqtt_connect_event, nullptr);
 }
 
 extern "C" void esphome_mqtt_client_adapter_destroy(
@@ -148,26 +145,52 @@ extern "C" void esphome_mqtt_client_adapter_destroy(
   }
 }
 
+extern "C" void esphome_mqtt_client_adapter_publish(
+  esphome_mqtt_client_adapter_t* self,
+  const std::string& topic,
+  const std::string& payload,
+  bool retain)
+{
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client != nullptr && mqtt_client->is_connected()) {
+    self->mqtt_publish_count_++;
+    mqtt_client->publish(topic, payload, 0, retain);
+  }
+}
+
+extern "C" void esphome_mqtt_client_adapter_publish_raw(
+  i_mqtt_client_t* _self,
+  const char* topic,
+  const char* payload,
+  size_t payload_len,
+  bool retain)
+{
+  auto self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(_self);
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client != nullptr && mqtt_client->is_connected()) {
+    self->mqtt_publish_count_++;
+    mqtt_client->publish(topic, std::string(payload, payload_len), 0, retain);
+  }
+}
+
 extern "C" size_t esphome_mqtt_client_adapter_get_pending_update_count(
   const esphome_mqtt_client_adapter_t* self)
 {
   (void)self;
   return 0;
 }
-
-extern "C" void esphome_mqtt_client_adapter_publish(
-  esphome_mqtt_client_adapter_t* /*self*/,
-  const std::string& topic,
-  const std::string& payload,
-  bool retain)
-{
-  publish_now(topic, payload, retain);
-}
-
 extern "C" uint32_t esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(
   esphome_mqtt_client_adapter_t* self)
 {
   uint32_t count = self->erd_publish_count_;
   self->erd_publish_count_ = 0;
+  return count;
+}
+
+extern "C" uint32_t esphome_mqtt_client_adapter_get_and_reset_mqtt_publish_count(
+  esphome_mqtt_client_adapter_t* self)
+{
+  uint32_t count = self->mqtt_publish_count_;
+  self->mqtt_publish_count_ = 0;
   return count;
 }

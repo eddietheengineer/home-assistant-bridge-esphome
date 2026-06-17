@@ -26,10 +26,12 @@
 #ifndef mqtt_bridge_h
 #define mqtt_bridge_h
 
-#include "erd_cache.h"
+struct erd_cache_t;
+
 #include "i_mqtt_client.h"
 #include "i_tiny_gea3_erd_client.h"
 #include "tiny_hsm.h"
+#include "tiny_timer.h"
 
 typedef struct {
   tiny_timer_group_t* timer_group;
@@ -40,7 +42,7 @@ typedef struct {
   tiny_event_subscription_t mqtt_disconnect_subscription;
   tiny_event_subscription_t erd_client_activity_subscription;
   void* erd_set;
-  erd_cache_t erd_cache;
+  erd_cache_t* erd_cache;
   tiny_hsm_t hsm;
   uint8_t erd_host_address;
 } mqtt_bridge_t;
@@ -53,7 +55,8 @@ void mqtt_bridge_init(
   tiny_timer_group_t* timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t* mqtt_client,
-  uint8_t address);
+  uint8_t address,
+  erd_cache_t* cache);
 
 /*!
  * Destroy the MQTT bridge.

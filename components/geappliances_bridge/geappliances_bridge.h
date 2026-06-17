@@ -35,6 +35,7 @@
 #include <vector>
 
 extern "C" {
+#include "erd_cache.h"
 #include "mqtt_bridge.h"
 #include "mqtt_bridge_polling.h"
 #include "tiny_gea3_erd_client.h"
@@ -43,6 +44,7 @@ extern "C" {
 #include "tiny_gea2_interface.h"
 #include "tiny_timer.h"
 #include "tiny_hsm.h"
+#include "erd_cache_mqtt_publisher.h"
 }
 
 #include "gea2_erd_client_adapter.h"
@@ -90,6 +92,8 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_erd_publish_rate_sensor(sensor::Sensor* sensor) { this->erd_publish_rate_sensor_ = sensor; }
   void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; }
   void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; }
+  void set_mqtt_publish_rate_sensor(sensor::Sensor* sensor) { this->mqtt_publish_rate_sensor_ = sensor; }
+  void add_custom_erd(tiny_erd_t erd) { this->custom_erds_vec_.push_back(erd); }
 
 
 
@@ -122,8 +126,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void maybe_start_custom_erd_polling() override;
   void log_poll_state_transitions() override;
   void run_ha_discovery() override;
+  void initialize_erd_cache_publisher() override;
+  bool is_erd_cache_publisher_initialized() const override;
   void run_all_managers() override;
-
   // ── Internal bridge methods (event callbacks and per-phase helpers) ─────────
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();
@@ -135,6 +140,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
   void start_feature_bit_reading_();
+  void init_erd_cache_publisher_();
   void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 
@@ -203,13 +209,22 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   uint32_t last_erd_publish_rate_publish_{0};
   static constexpr uint32_t ERD_PUBLISH_RATE_INTERVAL_MS = 60000;
 
-  // ERD cache stats sensors: published every ~60s alongside publish rate.
   sensor::Sensor* erd_cache_entries_sensor_{nullptr};
   sensor::Sensor* erd_cache_updates_sensor_{nullptr};
+  sensor::Sensor* mqtt_publish_rate_sensor_{nullptr};
   uint32_t last_erd_cache_stats_publish_{0};
   // ERD registry: single owner of valid-ERD filter, string-type set,
   // and runtime registered-ERD tracking.
   ErdRegistry erd_registry_;
+
+  // Shared ERD cache — owned by the bridge, used by both bridge HSMs and the
+  // MQTT publisher. Entries are updated by the bridges on read/subscription;
+  // the publisher drains update_required entries to MQTT each loop().
+
+  // ERD cache MQTT publisher: drains update_required entries from the shared
+  // cache and publishes them to MQTT topics each loop().
+  erd_cache_mqtt_publisher_t erd_cache_publisher_;
+  erd_cache_t erd_cache_;
 
   // Base URL for the per-category JSONL files.
   // Can be overridden in YAML via ha_discovery_base_url.
