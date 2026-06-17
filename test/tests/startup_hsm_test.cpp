@@ -81,6 +81,10 @@ class MockBridgeServices : public IBridgeServices {
   void log_poll_state_transitions() override {}
   void run_ha_discovery() override {}
   void run_all_managers() override {}
+
+  // -- ERD cache MQTT publisher -----------------------------------------------
+  void initialize_erd_cache_publisher() override {}
+  bool is_erd_cache_publisher_initialized() const override { return false; }
 };
 
 // =============================================================================

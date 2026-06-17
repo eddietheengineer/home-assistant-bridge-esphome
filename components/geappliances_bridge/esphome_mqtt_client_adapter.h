@@ -1,13 +1,13 @@
 // =============================================================================
 // MODULE GOAL
 // =============================================================================
-// Goal: Implement the i_mqtt_client_t interface for the bridge, providing
-//       debug logging of ERD value updates without requiring an MQTT broker.
+// Goal: Implement the i_mqtt_client_t interface for the bridge, publishing
+//       ERD value updates to MQTT topics via ESPHome's global MQTT client.
 //
 // Responsibilities:
 //   - Implement i_mqtt_client_t for the bridge and polling bridge
-//   - Log ERD updates via ESP_LOGD for debugging and development
-//   - Provide no-op implementations for MQTT-specific operations
+//   - Publish ERD updates to geappliances/{device_id}/erd/0x{ERD}/value topics
+//   - Provide MQTT connect/disconnect events for publisher coordination
 //
 // NOT responsible for:
 //   - Deciding which ERDs to publish (filtering is applied via ErdRegistry)
@@ -17,9 +17,11 @@
 // Dependencies:
 //   - i_mqtt_client.h (interface implemented here)
 //   - ErdRegistry for valid-ERD filtering
+//   - ESPHome MQTT client (esphome::mqtt::global_mqtt_client)
 // =============================================================================
 
 #pragma once
+#include "esphome/components/mqtt/mqtt_client.h"
 
 #include <string>
 
@@ -36,11 +38,13 @@ typedef struct {
   std::string* device_id;
   tiny_event_t on_write_request_event;
   tiny_event_t on_mqtt_disconnect_event;
+  tiny_event_t on_mqtt_connect_event;
   // Optional ERD registry: when non-null, provides valid-ERD filtering,
   // string-ERD type detection, and registered-ERD tracking in one place.
   // Set via esphome_mqtt_client_adapter_set_erd_registry().
   esphome::geappliances_bridge::ErdRegistry* erd_registry;
   uint32_t erd_publish_count_;
+  uint32_t mqtt_publish_count_;
 } esphome_mqtt_client_adapter_t;
 
 #ifdef __cplusplus
@@ -80,7 +84,7 @@ size_t esphome_mqtt_client_adapter_get_pending_update_count(
   const esphome_mqtt_client_adapter_t* self);
 
 /*!
- * Log a publish message via ESP_LOGD.  Used by HA discovery manager.
+ * Publish an MQTT message.  Used by HA discovery manager.
  */
 void esphome_mqtt_client_adapter_publish(
   esphome_mqtt_client_adapter_t* self,
@@ -89,10 +93,28 @@ void esphome_mqtt_client_adapter_publish(
   bool retain);
 
 /*!
+ * Publish raw MQTT message (C-string topic and payload).
+ * Implements the i_mqtt_client_t publish_raw vtable slot.
+ */
+void esphome_mqtt_client_adapter_publish_raw(
+  i_mqtt_client_t* self,
+  const char* topic,
+  const char* payload,
+  size_t payload_len,
+  bool retain);
+
+/*!
  * Get and reset the ERD publish counter.
  * Returns the count of ERD updates since the last call.
  */
 uint32_t esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(
+  esphome_mqtt_client_adapter_t* self);
+
+/*!
+ * Get and reset the MQTT publish counter.
+ * Returns the count of MQTT publishes since the last call.
+ */
+uint32_t esphome_mqtt_client_adapter_get_and_reset_mqtt_publish_count(
   esphome_mqtt_client_adapter_t* self);
 
 #ifdef __cplusplus
