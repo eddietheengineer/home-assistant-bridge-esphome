@@ -15,7 +15,7 @@
 //   - Route write commands from i_mqtt_client_t back to the ERD client
 //
 // NOT responsible for:
-//   - Polling (see mqtt_bridge_polling.h)
+//   - Polling (see erd_bridge_poll.h)
 //   - Deciding which ERDs to publish (filtered upstream by i_mqtt_client)
 //   - Bridge initialization or startup phase management
 //
@@ -23,8 +23,8 @@
 //   - i_mqtt_client.h, i_tiny_gea3_erd_client.h, tiny_hsm.h, tiny_timer.h
 // =============================================================================
 
-#ifndef mqtt_bridge_h
-#define mqtt_bridge_h
+#ifndef erd_bridge_subscribe_h
+#define erd_bridge_subscribe_h
 
 struct erd_cache_t;
 

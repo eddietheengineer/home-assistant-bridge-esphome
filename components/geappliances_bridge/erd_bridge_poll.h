@@ -17,7 +17,7 @@
 //   - Report polling health metrics (cycle count, last cycle time)
 //
 // NOT responsible for:
-//   - Subscription-mode operation (see mqtt_bridge.h)
+//   - Subscription-mode operation (see erd_bridge_subscribe.h)
 //   - Deciding which ERDs are valid (filtered upstream by i_mqtt_client)
 //   - Bridge initialization or startup phase management
 //
@@ -58,8 +58,8 @@
 //   - erd_lists.h (appliance ERD list arrays)
 // =============================================================================
 
-#ifndef mqtt_bridge_polling_h
-#define mqtt_bridge_polling_h
+#ifndef erd_bridge_poll_h
+#define erd_bridge_poll_h
 
 #include "i_mqtt_client.h"
 #include "i_tiny_gea3_erd_client.h"
@@ -108,7 +108,7 @@ typedef struct {
   bool polling_list_complete;
   // Updated at each state entry with a human-readable name of the current HSM
   // state. Initialized to nullptr; callers may watch this for changes to emit
-  // debug log messages without coupling mqtt_bridge.cpp to ESP logging headers.
+  // debug log messages without coupling erd_bridge_subscribe.cpp to ESP logging headers.
   const char* current_state_name;
   // Optional pre-populated polling list from appliance API parsing.
   // When non-NULL, discovery states are skipped and this list is polled directly.

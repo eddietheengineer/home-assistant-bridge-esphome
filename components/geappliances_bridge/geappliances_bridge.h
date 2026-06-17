@@ -36,8 +36,8 @@
 
 extern "C" {
 #include "erd_cache.h"
-#include "mqtt_bridge.h"
-#include "mqtt_bridge_polling.h"
+#include "erd_bridge_subscribe.h"
+#include "erd_bridge_poll.h"
 #include "tiny_gea3_erd_client.h"
 #include "tiny_gea3_interface.h"
 #include "tiny_gea2_erd_client.h"
@@ -257,7 +257,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
    * Increased from 1024 to 2048 to prevent ring-buffer overflow when the
    * polling bridge and subscription bridge share the same ERD client;
    * overflow corrupts adjacent heap metadata causing
-   * prvCheckTasksWaitingTermination crashes (see mqtt_bridge_polling.cpp). */
+   * prvCheckTasksWaitingTermination crashes (see erd_bridge_poll.cpp). */
   uint8_t client_queue_buffer_[8192];
 
   // GEA2 components (only used when gea2_uart_ is set)

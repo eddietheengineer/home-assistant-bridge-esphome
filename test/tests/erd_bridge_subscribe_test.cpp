@@ -5,7 +5,7 @@
 
 extern "C" {
 #include "erd_cache.h"
-#include "mqtt_bridge.h"
+#include "erd_bridge_subscribe.h"
 }
 
 #include "CppUTest/TestHarness.h"

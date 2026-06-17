@@ -17,7 +17,7 @@
  *         → state_polling
  */
 
-#include "mqtt_bridge_common.h"
+#include "erd_bridge_common.h"
 #include "erd_lists.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"

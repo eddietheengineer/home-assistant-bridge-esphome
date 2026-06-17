@@ -9,8 +9,8 @@
 
 extern "C" {
 #include "erd_cache.h"
-#include "mqtt_bridge.h"
-#include "mqtt_bridge_polling.h"
+#include "erd_bridge_subscribe.h"
+#include "erd_bridge_poll.h"
 }
 
 #include "CppUTest/TestHarness.h"

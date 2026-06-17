@@ -4,11 +4,11 @@
  *
  * Manages the GEA3 ERD subscription lifecycle: subscribing, retaining the
  * subscription every 30 s, and publishing received ERD values via MQTT.
- * The polling bridge lives in mqtt_bridge_polling.cpp; shared signals and
- * utility templates are in mqtt_bridge_common.h.
+ * The polling bridge lives in erd_bridge_poll.cpp; shared signals and
+ * utility templates are in erd_bridge_common.h.
  */
 
-#include "mqtt_bridge_common.h"
+#include "erd_bridge_common.h"
 #include "erd_cache.h"
 #include "esphome/core/log.h"
 

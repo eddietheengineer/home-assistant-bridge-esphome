@@ -4,7 +4,7 @@
  */
 
 extern "C" {
-#include "mqtt_bridge_polling.h"
+#include "erd_bridge_poll.h"
 }
 
 #include "erd_lists.h"
