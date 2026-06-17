@@ -56,18 +56,17 @@ void erd_cache_mqtt_publisher_init(
 
 void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self)
 {
-  if (!self->cache) {
+  if (!self->mqtt_client) {
+    memset(self, 0, sizeof(*self));
     return;
   }
 
-  if (self->mqtt_client) {
-    tiny_event_unsubscribe(
-      mqtt_client_on_mqtt_disconnect(self->mqtt_client),
-      &self->mqtt_disconnect_subscription);
-    tiny_event_unsubscribe(
-      mqtt_client_on_mqtt_connect(self->mqtt_client),
-      &self->mqtt_connect_subscription);
-  }
+  tiny_event_unsubscribe(
+    mqtt_client_on_mqtt_disconnect(self->mqtt_client),
+    &self->mqtt_disconnect_subscription);
+  tiny_event_unsubscribe(
+    mqtt_client_on_mqtt_connect(self->mqtt_client),
+    &self->mqtt_connect_subscription);
 
   memset(self, 0, sizeof(*self));
 }
@@ -77,7 +76,7 @@ uint16_t erd_cache_mqtt_publisher_loop(
   uint16_t max_publishes,
   uint32_t max_ms)
 {
-  if (!self->cache || !self->mqtt_client || !self->device_id) {
+  if (!self->cache || !self->mqtt_client || !self->device_id || !self->get_time_ms) {
     return 0;
   }
 

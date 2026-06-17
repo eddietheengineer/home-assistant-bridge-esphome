@@ -104,6 +104,20 @@ TEST(erd_cache_mqtt_publisher, init_handles_null_mqtt_client_gracefully)
   CHECK(publisher.mqtt_connected);
 }
 
+TEST(erd_cache_mqtt_publisher, destroy_after_init_with_null_mqtt_client)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    nullptr,
+    "device");
+
+  /* Destroy should clean up without crash when mqtt_client was null. */
+  erd_cache_mqtt_publisher_destroy(&publisher);
+  CHECK(publisher.cache == nullptr);
+  CHECK(publisher.mqtt_client == nullptr);
+}
+
 /* ------------------------------------------------------------------ */
 /* loop - basic publish                                                 */
 /* ------------------------------------------------------------------ */

@@ -358,6 +358,14 @@ void GeappliancesBridge::check_subscription_activity_()
     this->polling_only_publish_on_change_,
     &this->erd_cache_);
   this->polling_bridge_initialized_ = true;
+  // Wire the discovery-complete callback so HA discovery registration
+  // works correctly after subscription fallback.
+  this->mqtt_bridge_polling_.on_discovery_complete = +[](void* ctx) {
+    auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
+    bridge->ha_discovery_manager_.set_registered_erds(bridge->erd_registry_.registered_erds());
+    tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
+  };
+  this->mqtt_bridge_polling_.on_discovery_complete_context = this;
   this->configure_polling_optional_lists_();
   this->subscription_mode_active_ = false;
 
