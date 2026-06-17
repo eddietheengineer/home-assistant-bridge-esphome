@@ -3,6 +3,7 @@
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 #include "esphome_time_source.h"
+#include "erd_cache.h"
 
 #ifdef USE_ESP32
 #include "esp_system.h"
@@ -53,6 +54,8 @@ void GeappliancesBridge::setup() {
   // Initialize timer group
   tiny_timer_group_init(&this->timer_group_, esphome_time_source_init());
 
+  // Initialize the shared ERD cache before any component uses it.
+  erd_cache_init(&this->erd_cache_);
   // Initialize GEA3 components if GEA3 UART is configured
   if (this->uart_ != nullptr) {
     esphome_uart_adapter_init(&this->uart_adapter_, &this->timer_group_, this->uart_);
@@ -168,114 +171,7 @@ void GeappliancesBridge::setup() {
 }
 
 void GeappliancesBridge::loop() {
-  // ── Startup HSM ────────────────────────────────────────────────────────
-  // The bridge progresses through a linear sequence of startup phases via
-  // a tiny_hsm-based state machine.  Each state handles its own entry/exit
-  // logic and waits for signals from managers before transitioning.
-  //
-  // Phase dependency chain:
-  //   PROTOCOL → AUTODISCOVERY → DEVICE_ID → MQTT_CLIENT → FEATURE_BITS
-  //           → BRIDGE_INIT → SUBSCRIPTION_WATCH → HA_DISCOVERY → HEAP
-  //           → RUNNING (steady-state)
-  // ────────────────────────────────────────────────────────────────────────
 
-  // Drive the GEA2/GEA3 protocol stack FIRST so that UART bytes are
-  // processed before any MQTT work.  The tight loop must run before
-  // MQTT operations to avoid starving UART processing on single-core
-  // ESP32 variants where a blocking MQTT call can delay response
-  // processing past the appliance's timeout window.
-  this->run_protocol_stack_();
-#ifdef USE_ESP32
-  // Feed the task watchdog after the protocol stack — the GEA2 tight loop
-  // can run for 200 ms wall-clock time, exceeding the default TWDT timeout.
-  esp_task_wdt_reset();
-#endif
-
-  // ── MQTT Connection FSM ────────────────────────────────────────────────────
-  // A 4-state FSM drives the MQTT (re)connection sequence so that each loop()
-  // call performs at most one MQTT operation, keeping the main loop
-  // non-blocking.
-  //
-  //   DISCONNECTED ─(is_connected)─▶ SUBSCRIBING ─(adapter_init)─▶ FLUSHING ─(empty)─▶ RUNNING
-  //        ▲                                                              │                  │
-  //        └──────────────────────────────────────────────────────────────┴──(disconnect)───┘
-  //
-  // Note: notify_disconnected() is intentionally NOT called on reconnect —
-  // only on genuine connection loss.  Calling it on reconnect caused full GEA2
-  // re-identification inside the GEA2 tight loop, leading to heap corruption
-  // (see iteration_log.md).
-  // ─────────────────────────────────────────────────────────────────────────
-  {
-    auto mqtt_client = mqtt::global_mqtt_client;
-    if (mqtt_client != nullptr) {
-      bool is_connected = mqtt_client->is_connected();
-      if (!is_connected) {
-        // Any state → DISCONNECTED on genuine loss of connection.
-        if (this->mqtt_connection_state_ != MqttConnectionState::DISCONNECTED) {
-          this->mqtt_connection_state_ = MqttConnectionState::DISCONNECTED;
-          if (this->mqtt_client_adapter_initialized_) {
-            esphome_mqtt_client_adapter_notify_disconnected(&this->mqtt_client_adapter_);
-          }
-        }
-      } else {
-        switch (this->mqtt_connection_state_) {
-          case MqttConnectionState::DISCONNECTED:
-            // Connect edge: log and signal the startup HSM, then advance to
-            // SUBSCRIBING.  The HSM signal may unblock the feature_bits or
-            // bridge_init phases.
-            ESP_LOGI(TAG, "MQTT connected");
-            tiny_hsm_send_signal(&this->startup_hsm_, signal_mqtt_connected, nullptr);
-            this->mqtt_connection_state_ = MqttConnectionState::SUBSCRIBING;
-            break;
-
-          case MqttConnectionState::SUBSCRIBING:
-            // Wait for adapter initialization, then register the single wildcard
-            // write topic.  Stay in SUBSCRIBING until the adapter is ready so
-            // the subscribe is not skipped when MQTT connects before adapter init.
-            if (this->mqtt_client_adapter_initialized_) {
-#ifdef USE_ESP32
-              // Feed the watchdog before subscribe() which acquires the IDF
-              // MQTT mutex and can block for hundreds of milliseconds.
-              esp_task_wdt_reset();
-#endif
-              esphome_mqtt_client_adapter_subscribe_write_topic(&this->mqtt_client_adapter_);
-              this->mqtt_connection_state_ = MqttConnectionState::FLUSHING;
-            }
-            break;
-
-          case MqttConnectionState::FLUSHING:
-            // Drain pending ERD updates a few at a time.  Transition to
-            // RUNNING once the queue is empty.
-            if (this->mqtt_client_adapter_initialized_) {
-#ifdef USE_ESP32
-              // Feed the watchdog before drain_pending_updates() which
-              // publishes up to 5 messages synchronously, each acquiring
-              // the IDF MQTT mutex (~100 ms per publish).
-              esp_task_wdt_reset();
-#endif
-              if (esphome_mqtt_client_adapter_drain_pending_updates(
-                      &this->mqtt_client_adapter_) == 0) {
-                this->mqtt_connection_state_ = MqttConnectionState::RUNNING;
-              }
-            } else {
-              this->mqtt_connection_state_ = MqttConnectionState::RUNNING;
-            }
-            break;
-
-          case MqttConnectionState::RUNNING:
-            // Steady-state: drain any newly queued ERD updates.
-            if (this->mqtt_client_adapter_initialized_) {
-#ifdef USE_ESP32
-              esp_task_wdt_reset();
-#endif
-              esphome_mqtt_client_adapter_drain_pending_updates(&this->mqtt_client_adapter_);
-            }
-            break;
-
-        }
-      }
-    }
-  }
 
   // Initialize the startup HSM on the first loop() call.
   if (this->startup_hsm_.current == nullptr) {
@@ -300,6 +196,48 @@ void GeappliancesBridge::loop() {
   // and can block for hundreds of milliseconds.
   esp_task_wdt_reset();
 #endif
+
+  // Drain updated ERD cache entries to MQTT each loop iteration.
+  // Budget: 5 publishes max, 20 ms max — each publish() blocks on the IDF
+  // MQTT mutex, so keep the per-loop cost small to avoid starving the
+  // ESPHome framework (which fires its watchdog at 30 ms).
+  if (this->erd_cache_publisher_.cache != nullptr) {
+    erd_cache_mqtt_publisher_loop(&this->erd_cache_publisher_, 5, 20);
+  }
+
+  // Publish ERD/MQTT publish rate + cache stats sensors every ~60 seconds.
+  if (this->erd_publish_rate_sensor_ != nullptr || this->mqtt_publish_rate_sensor_ != nullptr) {
+    uint32_t now = esphome::millis();
+    if (now - this->last_erd_publish_rate_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
+      if (this->erd_publish_rate_sensor_ != nullptr) {
+        uint32_t count = esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(
+          &this->mqtt_client_adapter_);
+        this->erd_publish_rate_sensor_->publish_state(static_cast<float>(count));
+      }
+      if (this->mqtt_publish_rate_sensor_ != nullptr) {
+        uint32_t count = esphome_mqtt_client_adapter_get_and_reset_mqtt_publish_count(
+          &this->mqtt_client_adapter_);
+        this->mqtt_publish_rate_sensor_->publish_state(static_cast<float>(count));
+      }
+      this->last_erd_publish_rate_publish_ = now;
+    }
+  }
+
+  // Publish cache stats sensors every ~60 seconds.
+  if (this->erd_cache_entries_sensor_ != nullptr || this->erd_cache_updates_sensor_ != nullptr) {
+    uint32_t now = esphome::millis();
+    if (now - this->last_erd_cache_stats_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
+      if (this->erd_cache_entries_sensor_ != nullptr) {
+        this->erd_cache_entries_sensor_->publish_state(
+          static_cast<float>(erd_cache_get_count(&this->erd_cache_)));
+      }
+      if (this->erd_cache_updates_sensor_ != nullptr) {
+        this->erd_cache_updates_sensor_->publish_state(
+          static_cast<float>(erd_cache_get_update_rate(&this->erd_cache_)));
+      }
+      this->last_erd_cache_stats_publish_ = now;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -385,8 +323,10 @@ void GeappliancesBridge::run_protocol_stack_()
     }
   } else {
     // GEA3 path: run a tight loop at 1ms intervals to ensure UART bytes
-    // at 230400 baud are processed without missing messages.  Runs
-    // continuously whenever GEA3 UART is configured and GEA2 is not active.
+    // at 230400 baud are processed without missing messages.  The tight
+    // loop runs whenever GEA3 UART is configured and GEA2 is not active.
+    // This covers all phases: startup (autodiscovery, device_id, feature_bits),
+    // bridge initialization, and steady-state polling/subscription.
     if (this->uart_ != nullptr) {
       uint32_t gea3_loop_start_ms = millis();
       static constexpr uint32_t GEA3_LOOP_HARD_CAP_MS = GEA3_LOOP_DURATION_MS * 2;
@@ -592,6 +532,14 @@ bool GeappliancesBridge::teardown() {
     mqtt_bridge_polling_destroy(&this->mqtt_bridge_polling_);
   }
 
+  // Destroy the shared ERD cache after bridges are torn down.
+
+  // Destroy the ERD cache publisher before the adapter is destroyed.
+  if (this->erd_cache_publisher_.cache) {
+    erd_cache_mqtt_publisher_destroy(&this->erd_cache_publisher_);
+  }
+  erd_cache_destroy(&this->erd_cache_);
+
   // Free heap-allocated members of the MQTT client adapter to prevent
   // memory leaks (device_id string, pending_updates map, etc.).
   if (this->mqtt_client_adapter_initialized_) {
@@ -730,14 +678,36 @@ void GeappliancesBridge::run_ha_discovery()
         (mode_ == BRIDGE_MODE_AUTO && subscription_mode_active_)),
       polling_bridge_initialized_,
       mqtt_bridge_polling_.polling_list_complete,
-      subscription_activity_detected_,
-      mqtt::global_mqtt_client);
+      subscription_activity_detected_);
 }
 
 void GeappliancesBridge::run_all_managers()
 {
   // FeatureBitManager is self-driving (owns its own timers and event subscriptions).
   // No polling needed from the bridge loop.
+}
+
+// -- ERD cache MQTT publisher ------------------------------------------------
+
+void GeappliancesBridge::initialize_erd_cache_publisher()
+{
+  init_erd_cache_publisher_();
+}
+
+bool GeappliancesBridge::is_erd_cache_publisher_initialized() const
+{
+  return erd_cache_publisher_.cache != nullptr;
+}
+
+void GeappliancesBridge::init_erd_cache_publisher_()
+{
+  if (this->erd_cache_publisher_.cache) return; // already initialized
+  erd_cache_mqtt_publisher_init(
+    &this->erd_cache_publisher_,
+    &this->erd_cache_,
+    &this->mqtt_client_adapter_.interface,
+    this->device_identity_manager_.get_device_id().c_str());
+  ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
 }
 
 }  // namespace geappliances_bridge

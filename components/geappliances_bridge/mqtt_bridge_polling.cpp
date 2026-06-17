@@ -22,10 +22,8 @@
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/application.h"
-#include <cstring>
-#include <map>
+#include "erd_cache.h"
 #include <set>
-#include <vector>
 
 using namespace std;
 
@@ -50,11 +48,6 @@ static constexpr uint32_t POLL_YIELD_MS = 50;  // tuning: per-batch time budget
 // ============================================================================
 // Polling bridge — private helpers
 // ============================================================================
-
-static map<tiny_erd_t, vector<uint8_t>>& erd_cache(mqtt_bridge_polling_t* self)
-{
-  return *reinterpret_cast<map<tiny_erd_t, vector<uint8_t>>*>(self->erd_cache);
-}
 
 static void arm_polling_timer(mqtt_bridge_polling_t* self, tiny_timer_ticks_t ticks)
 {
@@ -331,6 +324,7 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
         if (is_reentry) {
           erd_set(self).clear();
           pending_registration_set(self).clear();
+          erd_cache_init(self->erd_cache);
           self->polling_list_count = 0;
         }
         tiny_hsm_state_t next;
@@ -405,9 +399,9 @@ static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     // path (appliance first seen, or appliance_lost re-discovery), NOT on every
     // transient MQTT reconnect. Clearing in the disconnect handler caused the
     // set's tree nodes to be freed and reallocated on each reconnect, fragmenting
-    // the heap over time.
     erd_set(self).clear();
     pending_registration_set(self).clear();
+    erd_cache_init(self->erd_cache);
     self->polling_list_count       = 0;
     self->request_id++;
     tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
@@ -450,6 +444,7 @@ static tiny_hsm_result_t state_add_appliance_api_feature_erds(tiny_hsm_t* hsm, t
     if (self->api_parsed_list != nullptr) {
       erd_set(self).clear();
       pending_registration_set(self).clear();
+      erd_cache_init(self->erd_cache);
       self->polling_list_count = 0;
       self->next_discovery_state = state_probe_api_parsed_erds;
     } else {
@@ -561,7 +556,6 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
 
   switch (signal) {
     case tiny_hsm_signal_entry:
-      erd_cache(self).clear();
       // api_parsed_list ERDs that were successfully probed in state_probe_api_parsed_erds
       // are already in erd_set and erd_polling_list — the dedup check below silently
       // skips them.  ERDs that did not respond during probe (or that arrived via the
@@ -640,24 +634,9 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         add_erd_to_polling_list(self, erd);
       }
 
-      bool should_publish;
-      if (self->only_publish_on_change) {
-        auto& cache = erd_cache(self);
-        auto  it    = cache.find(erd);
-        bool  data_changed;
-        if (it == cache.end()) {
-          data_changed = true;
-        } else {
-          data_changed = (it->second.size() != data_size) ||
-                         (memcmp(it->second.data(), erd_data, data_size) != 0);
-        }
-        if (data_changed) {
-          cache[erd] = vector<uint8_t>(erd_data, erd_data + data_size);
-        }
-        should_publish = data_changed;
-      } else {
-        should_publish = true;
-      }
+
+      bool data_changed = erd_cache_update(self->erd_cache, erd, erd_data, data_size, false);
+      bool should_publish = self->only_publish_on_change ? data_changed : true;
 
       if (should_publish) {
         mqtt_client_update_erd(self->mqtt_client, erd, erd_data, data_size);
@@ -733,7 +712,8 @@ static void mqtt_bridge_polling_init_impl(
   bool                      only_publish_on_change,
   uint8_t                   initial_host_address,
   const tiny_erd_t*         api_parsed_list,
-  uint16_t                  api_parsed_list_count)
+  uint16_t                  api_parsed_list_count,
+  erd_cache_t*              cache)
 {
   self->timer_group            = timer_group;
   self->erd_client             = erd_client;
@@ -756,8 +736,8 @@ static void mqtt_bridge_polling_init_impl(
   self->polling_list_count     = 0;
   self->polling_list_capacity  = 0;
   self->restart_pending        = false;
-  self->erd_set   = reinterpret_cast<void*>(new set<tiny_erd_t>());
-  self->erd_cache = reinterpret_cast<void*>(new map<tiny_erd_t, vector<uint8_t>>());
+  self->erd_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
+  self->erd_cache = cache;
   self->pending_registration_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
   self->on_discovery_complete        = nullptr;
   self->on_discovery_complete_context = nullptr;
@@ -794,11 +774,12 @@ void mqtt_bridge_polling_init(
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t*          mqtt_client,
   uint32_t                  polling_interval_ms,
-  bool                      only_publish_on_change)
+  bool                      only_publish_on_change,
+  erd_cache_t*              cache)
 {
   mqtt_bridge_polling_init_impl(
     self, timer_group, erd_client, mqtt_client, polling_interval_ms, only_publish_on_change,
-    tiny_gea_broadcast_address, nullptr, 0);
+    tiny_gea_broadcast_address, nullptr, 0, cache);
 }
 
 void mqtt_bridge_polling_init_at_address(
@@ -810,11 +791,12 @@ void mqtt_bridge_polling_init_at_address(
   bool                      only_publish_on_change,
   uint8_t                   known_host_address,
   const tiny_erd_t*         api_list,
-  uint16_t                  api_list_count)
+  uint16_t                  api_list_count,
+  erd_cache_t*              cache)
 {
   mqtt_bridge_polling_init_impl(
     self, timer_group, erd_client, mqtt_client, polling_interval_ms, only_publish_on_change,
-    known_host_address, api_list, api_list_count);
+    known_host_address, api_list, api_list_count, cache);
 }
 
 void mqtt_bridge_polling_destroy(mqtt_bridge_polling_t* self)
@@ -837,7 +819,7 @@ void mqtt_bridge_polling_destroy(mqtt_bridge_polling_t* self)
   // this struct: erd_client_activity_subscription,
   // mqtt_write_request_subscription, and mqtt_disconnect_subscription.  If
   // these remain registered after destroy(), any subsequent event fires the
-  // HSM which dereferences self->erd_set / self->erd_cache (freed below) — a
+  // HSM which dereferences self->erd_set (freed below) — a
   // use-after-free that corrupts the heap.
   tiny_event_unsubscribe(
     tiny_gea3_erd_client_on_activity(self->erd_client),
@@ -850,10 +832,8 @@ void mqtt_bridge_polling_destroy(mqtt_bridge_polling_t* self)
     &self->mqtt_disconnect_subscription);
 
   delete reinterpret_cast<set<tiny_erd_t>*>(self->erd_set);
-  delete reinterpret_cast<map<tiny_erd_t, vector<uint8_t>>*>(self->erd_cache);
   delete reinterpret_cast<set<tiny_erd_t>*>(self->pending_registration_set);
   self->erd_set = nullptr;
-  self->erd_cache = nullptr;
   self->pending_registration_set = nullptr;
 
   if (self->erd_polling_list != nullptr) {

@@ -28,13 +28,14 @@
 #pragma once
 
 #include "esphome/core/component.h"
+#include "esphome/components/sensor/sensor.h"
 #include "esphome/components/uart/uart.h"
-#include "esphome/components/mqtt/mqtt_client.h"
 #include <string>
 #include <set>
 #include <vector>
 
 extern "C" {
+#include "erd_cache.h"
 #include "mqtt_bridge.h"
 #include "mqtt_bridge_polling.h"
 #include "tiny_gea3_erd_client.h"
@@ -43,6 +44,7 @@ extern "C" {
 #include "tiny_gea2_interface.h"
 #include "tiny_timer.h"
 #include "tiny_hsm.h"
+#include "erd_cache_mqtt_publisher.h"
 }
 
 #include "gea2_erd_client_adapter.h"
@@ -86,8 +88,12 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_polling_only_publish_on_change(bool only_publish_on_change) { this->polling_only_publish_on_change_ = only_publish_on_change; }
   void set_appliance_api_parsing(bool appliance_api_parsing) { this->appliance_api_parsing_ = appliance_api_parsing; }
   void set_generate_device_config(bool generate_device_config) { this->generate_device_config_ = generate_device_config; }
-  void add_custom_erd(uint16_t erd) { this->custom_erds_vec_.push_back(static_cast<tiny_erd_t>(erd)); }
   void set_ha_discovery_base_url(const std::string& url) { this->ha_discovery_base_url_ = url; }
+  void set_erd_publish_rate_sensor(sensor::Sensor* sensor) { this->erd_publish_rate_sensor_ = sensor; }
+  void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; }
+  void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; }
+  void set_mqtt_publish_rate_sensor(sensor::Sensor* sensor) { this->mqtt_publish_rate_sensor_ = sensor; }
+  void add_custom_erd(tiny_erd_t erd) { this->custom_erds_vec_.push_back(erd); }
 
 
 
@@ -120,8 +126,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void maybe_start_custom_erd_polling() override;
   void log_poll_state_transitions() override;
   void run_ha_discovery() override;
+  void initialize_erd_cache_publisher() override;
+  bool is_erd_cache_publisher_initialized() const override;
   void run_all_managers() override;
-
   // ── Internal bridge methods (event callbacks and per-phase helpers) ─────────
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();
@@ -133,6 +140,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
   void start_feature_bit_reading_();
+  void init_erd_cache_publisher_();
   void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 
@@ -148,14 +156,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   std::string configured_device_id_;
   uint8_t client_address_{0xE4};
 
-  // States for the non-blocking MQTT (re)connection FSM in loop().
-  enum class MqttConnectionState : uint8_t {
-    DISCONNECTED,  // No MQTT connection (or not yet seen)
-    SUBSCRIBING,   // Connected; waiting for adapter init to subscribe wildcard
-    FLUSHING,      // Subscribed; draining pending ERD update queue
-    RUNNING,       // Steady-state: queue empty, draining new updates each loop
-  };
-  MqttConnectionState mqtt_connection_state_{MqttConnectionState::DISCONNECTED};
   bool mqtt_client_adapter_initialized_{false};
   bool mqtt_bridge_initialized_{false};
   BridgeMode mode_{BRIDGE_MODE_AUTO};
@@ -182,13 +182,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // GEA2 tight-loop duration: covers the full TX→RX cycle at 19200 baud
   // (see doc/geappliances_bridge.md section 13 for detailed explanation)
   static constexpr uint32_t GEA2_LOOP_DURATION_MS = 200;
-
-  // GEA3 tight-loop duration: kept short to avoid starving other components
-  // on single-core ESP32 variants (C6, S2).  At 230400 baud, a full
-  // GEA3 response packet is ~50 bytes (~2ms of UART time), so 3ms is
-  // sufficient to process any bytes that have arrived since the last loop.
-  static constexpr uint32_t GEA3_LOOP_DURATION_MS = 3;
-
+  static constexpr uint32_t GEA3_LOOP_DURATION_MS = 10;
   bool gea2_protocol_active_{false}; // fallback for manual device_id when autodiscovery is skipped
 
   // Device identity manager (extracted from god class)
@@ -208,9 +202,29 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // HA device discovery state is managed by HaDiscoveryManager; the bridge
   // delegates to it rather than maintaining redundant copies.
   const char* last_logged_poll_state_{nullptr};
+
+  // ERD publish rate sensor: counts ERD updates per ~60s window and
+  // publishes to Home Assistant.
+  sensor::Sensor* erd_publish_rate_sensor_{nullptr};
+  uint32_t last_erd_publish_rate_publish_{0};
+  static constexpr uint32_t ERD_PUBLISH_RATE_INTERVAL_MS = 60000;
+
+  sensor::Sensor* erd_cache_entries_sensor_{nullptr};
+  sensor::Sensor* erd_cache_updates_sensor_{nullptr};
+  sensor::Sensor* mqtt_publish_rate_sensor_{nullptr};
+  uint32_t last_erd_cache_stats_publish_{0};
   // ERD registry: single owner of valid-ERD filter, string-type set,
   // and runtime registered-ERD tracking.
   ErdRegistry erd_registry_;
+
+  // Shared ERD cache — owned by the bridge, used by both bridge HSMs and the
+  // MQTT publisher. Entries are updated by the bridges on read/subscription;
+  // the publisher drains update_required entries to MQTT each loop().
+
+  // ERD cache MQTT publisher: drains update_required entries from the shared
+  // cache and publishes them to MQTT topics each loop().
+  erd_cache_mqtt_publisher_t erd_cache_publisher_;
+  erd_cache_t erd_cache_;
 
   // Base URL for the per-category JSONL files.
   // Can be overridden in YAML via ha_discovery_base_url.

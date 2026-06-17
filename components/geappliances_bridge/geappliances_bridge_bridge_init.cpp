@@ -158,6 +158,7 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     this->subscription_activity_detected_ = false;
     this->subscription_start_time_       = millis();
   }
+
   (void)mode_name;
 
   ESP_LOGI(TAG, "Using %s mode with polling interval: %u ms", mode_name, this->polling_interval_ms_);
@@ -170,7 +171,8 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       this->autodiscovery_manager_.get_active_erd_client(),
       &this->mqtt_client_adapter_.interface,
       this->polling_interval_ms_,
-      this->polling_only_publish_on_change_);
+      this->polling_only_publish_on_change_,
+      &this->erd_cache_);
     // Wire the discovery-complete callback so the startup HSM waits for
     // ERD discovery to finish before transitioning to steady-state.
     this->mqtt_bridge_polling_.on_discovery_complete = +[](void* ctx) {
@@ -181,25 +183,24 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     this->mqtt_bridge_polling_.on_discovery_complete_context = this;
     this->polling_bridge_initialized_ = true;
     this->configure_polling_optional_lists_();
-  } else {
+  }
+
+  // Initialize the subscription bridge for non-polling modes (subscribe, auto).
+  // In polling mode (GEA2 or explicit poll), subscriptions are not used, but
+  // the bridge is still initialized above for custom ERD subscription support.
+  if (!use_polling) {
     mqtt_bridge_init(
       &this->mqtt_bridge_,
       &this->timer_group_,
       this->autodiscovery_manager_.get_active_erd_client(),
       &this->mqtt_client_adapter_.interface,
-      this->autodiscovery_manager_.get_host_address());
+      this->autodiscovery_manager_.get_host_address(),
+      &this->erd_cache_);
     this->subscription_bridge_initialized_ = true;
 
     // Subscription bridge has no discovery phase — signal the startup HSM
     // immediately so it can transition to subscription_watch.
     tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
-
-    if (!this->custom_erds_vec_.empty()) {
-      this->custom_erd_subscription_seen_erds_.clear();
-      this->custom_erd_subscription_last_activity_ = millis();
-      ESP_LOGI(TAG, "Custom ERD polling (%zu ERD(s)) will start after subscription settles",
-               this->custom_erds_vec_.size());
-    }
   }
 
   this->mqtt_bridge_initialized_ = true;
@@ -283,7 +284,8 @@ void GeappliancesBridge::start_custom_erd_polling_()
     this->polling_only_publish_on_change_,
     this->autodiscovery_manager_.get_host_address(),
     this->custom_erds_vec_.data(),
-    static_cast<uint16_t>(this->custom_erds_vec_.size()));
+    static_cast<uint16_t>(this->custom_erds_vec_.size()),
+    &this->erd_cache_);
   this->custom_erd_polling_started_ = true;
   this->polling_bridge_initialized_ = true;
 }
@@ -353,7 +355,8 @@ void GeappliancesBridge::check_subscription_activity_()
     this->autodiscovery_manager_.get_active_erd_client(),
     &this->mqtt_client_adapter_.interface,
     this->polling_interval_ms_,
-    this->polling_only_publish_on_change_);
+    this->polling_only_publish_on_change_,
+    &this->erd_cache_);
   this->polling_bridge_initialized_ = true;
   this->configure_polling_optional_lists_();
   this->subscription_mode_active_ = false;

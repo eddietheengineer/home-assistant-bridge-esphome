@@ -6,7 +6,7 @@
 #include "ha_discovery_manager.h"
 #include "esphome_mqtt_client_adapter.h"
 #include "esphome/core/log.h"
-#include "esphome/components/mqtt/mqtt_client.h"
+#include "esphome/core/application.h"
 #include <cstring>
 
 #ifdef USE_ESP_IDF
@@ -125,29 +125,22 @@ void HaDiscoveryManager::cleanup()
 void HaDiscoveryManager::run(bool is_poll_mode,
                              bool polling_bridge_initialized,
                              bool polling_list_complete,
-                             bool subscription_activity_detected,
-                             mqtt::MQTTClientComponent* mqtt_client)
+                             bool subscription_activity_detected)
 {
   if (this->state_ == HA_DISCOVERY_WAITING_FOR_READY) {
     bool ready = false;
     if (is_poll_mode) {
       ready = polling_list_complete;
     } else {
-      // Subscription mode (or auto mode with subscription active):
-      // ready once the quiet window elapses after the last new ERD was seen.
       bool quiet = false;
       if (subscription_activity_detected) {
         if (millis() - this->last_activity_ >= HA_DISCOVERY_QUIET_MS) {
           quiet = true;
         }
       }
-      // Safety cap: start discovery after 30 s even if activity never
-      // settles, so HA discovery is never permanently blocked.
       if (millis() - this->start_time_ >= HA_DISCOVERY_MAX_WAIT_MS) {
         quiet = true;
       }
-      // In auto mode, if the polling bridge is also active, gate on
-      // polling discovery completion as well (spec 3.3).
       if (quiet && polling_bridge_initialized) {
         ready = polling_list_complete;
       } else if (quiet) {
@@ -155,7 +148,7 @@ void HaDiscoveryManager::run(bool is_poll_mode,
       }
     }
     if (ready) {
-      this->publish_ha_discovery_(mqtt_client);
+      this->publish_ha_discovery_();
     }
   }
 
@@ -163,103 +156,20 @@ void HaDiscoveryManager::run(bool is_poll_mode,
     uint32_t now = millis();
     if (now - this->last_publish_ms_ >= HA_ENTITY_PUBLISH_INTERVAL_MS) {
       this->last_publish_ms_ = now;
-      this->publish_next_entity_(mqtt_client);
+      this->publish_next_entity_();
     }
   }
 }
 
-void HaDiscoveryManager::publish_ha_discovery_(mqtt::MQTTClientComponent* mqtt_client)
+void HaDiscoveryManager::publish_ha_discovery_()
 {
-  if (mqtt_client == nullptr || !mqtt_client->is_connected()) {
-    ESP_LOGW(TAG, "MQTT not connected, skipping HA discovery publish");
-    return;
-  }
-
-#ifdef USE_ESP_IDF
-  static constexpr size_t HA_FETCH_MIN_FREE_HEAP = 110 * 1024;
-  static constexpr uint32_t HA_FETCH_STACK_SIZE = 49152;
-
-  size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-  size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-  if (free_heap < HA_FETCH_MIN_FREE_HEAP) {
-    ESP_LOGW(TAG, "HA discovery: insufficient free heap, skipping");
-    this->state_ = HA_DISCOVERY_COMPLETE;
-    return;
-  }
-  if (largest_block < HA_FETCH_STACK_SIZE) {
-    ESP_LOGW(TAG, "HA discovery: heap fragmentation, skipping");
-    this->state_ = HA_DISCOVERY_COMPLETE;
-    return;
-  }
-
-  this->queue_ = xQueueCreate(20, sizeof(HaDiscoveryItem*));
-  if (!this->queue_) {
-    ESP_LOGE(TAG, "HA discovery: failed to create queue");
-    return;
-  }
-
-  this->registered_erds_snapshot_ = this->registered_erds_;
-  this->state_ = HA_DISCOVERY_PUBLISHING;
-
-  this->task_stack_ = static_cast<StackType_t*>(
-    heap_caps_malloc(HA_FETCH_STACK_SIZE * sizeof(StackType_t), MALLOC_CAP_INTERNAL));
-  this->task_tcb_ = static_cast<StaticTask_t*>(
-    heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_INTERNAL));
-  if (!this->task_stack_ || !this->task_tcb_) {
-    ESP_LOGE(TAG, "HA discovery: failed to allocate task stack/TCB");
-    if (this->task_stack_) heap_caps_free(this->task_stack_);
-    if (this->task_tcb_)   heap_caps_free(this->task_tcb_);
-    this->task_stack_ = nullptr;
-    this->task_tcb_   = nullptr;
-    vQueueDelete(this->queue_);
-    this->queue_ = nullptr;
-    this->state_ = HA_DISCOVERY_FAILED;
-    return;
-  }
-  this->task_handle_ = xTaskCreateStatic(
-    ha_fetch_task_fn_, "ha_fetch", HA_FETCH_STACK_SIZE, this, 1,
-    this->task_stack_, this->task_tcb_);
-  if (!this->task_handle_) {
-    ESP_LOGE(TAG, "HA discovery: xTaskCreateStatic failed");
-    heap_caps_free(this->task_stack_); this->task_stack_ = nullptr;
-    heap_caps_free(this->task_tcb_);   this->task_tcb_   = nullptr;
-    vQueueDelete(this->queue_);
-    this->queue_ = nullptr;
-    this->state_ = HA_DISCOVERY_FAILED;
-  }
-#else
-  ESP_LOGW(TAG, "HA discovery requires ESP-IDF framework");
+  ESP_LOGD(TAG, "HA discovery triggered (no MQTT broker — skipping entity publish)");
   this->state_ = HA_DISCOVERY_COMPLETE;
-#endif
 }
 
-void HaDiscoveryManager::publish_next_entity_(mqtt::MQTTClientComponent* mqtt_client)
+void HaDiscoveryManager::publish_next_entity_()
 {
-  (void)mqtt_client;  /* Used only under USE_ESP_IDF. */
-#ifdef USE_ESP_IDF
-  if (!this->queue_) return;
-  if (mqtt_client == nullptr || !mqtt_client->is_connected()) return;
-
-  HaDiscoveryItem* item = nullptr;
-  if (xQueueReceive(this->queue_, &item, 0) == pdTRUE) {
-    if (item == nullptr) {
-      this->state_ = HA_DISCOVERY_COMPLETE;
-      vQueueDelete(this->queue_);
-      this->queue_ = nullptr;
-      this->task_handle_ = nullptr;
-      if (this->task_stack_) { heap_caps_free(this->task_stack_); this->task_stack_ = nullptr; }
-      if (this->task_tcb_)   { heap_caps_free(this->task_tcb_);   this->task_tcb_   = nullptr; }
-    } else {
-      // Use async publish via the adapter if available, otherwise sync fallback
-      if (this->mqtt_adapter_ != nullptr) {
-        esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, item->topic, item->payload, true);
-      } else {
-        mqtt_client->publish(item->topic, item->payload, 0, true);
-      }
-      delete item;
-    }
-  }
-#endif
+  // No MQTT broker — no-op.
 }
 
 std::string HaDiscoveryManager::escape_json_str_(const std::string& s)

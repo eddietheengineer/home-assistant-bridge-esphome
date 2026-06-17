@@ -23,6 +23,7 @@ TEST_GROUP(mqtt_bridge_polling)
   };
 
   mqtt_bridge_polling_t self;
+  erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -35,12 +36,14 @@ TEST_GROUP(mqtt_bridge_polling)
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
 
   void teardown()
   {
     mock().disable();
     mqtt_bridge_polling_destroy(&self);
+    erd_cache_destroy(&test_cache);
     mock().enable();
   }
 
@@ -52,7 +55,8 @@ TEST_GROUP(mqtt_bridge_polling)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      only_publish_on_change);
+      only_publish_on_change,
+      &test_cache);
   }
 
   void after(tiny_timer_ticks_t ticks)
@@ -304,6 +308,7 @@ TEST_GROUP(mqtt_bridge_polling_api_list)
   };
 
   mqtt_bridge_polling_t self;
+  erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -317,12 +322,14 @@ TEST_GROUP(mqtt_bridge_polling_api_list)
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
 
   void teardown()
   {
     mock().disable();
     mqtt_bridge_polling_destroy(&self);
+    erd_cache_destroy(&test_cache);
     mock().enable();
   }
 
@@ -334,7 +341,8 @@ TEST_GROUP(mqtt_bridge_polling_api_list)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      false);
+      false,
+      &test_cache);
     // Set the API-parsed list AFTER init (api_parsed_list is always zeroed in init)
     self.api_parsed_list = api_list;
     self.api_parsed_list_count = 2;
@@ -554,6 +562,7 @@ TEST_GROUP(mqtt_bridge_polling_custom_erds)
   };
 
   mqtt_bridge_polling_t self;
+  erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -568,12 +577,14 @@ TEST_GROUP(mqtt_bridge_polling_custom_erds)
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
 
   void teardown()
   {
     mock().disable();
     mqtt_bridge_polling_destroy(&self);
+    erd_cache_destroy(&test_cache);
     mock().enable();
   }
 
@@ -585,7 +596,8 @@ TEST_GROUP(mqtt_bridge_polling_custom_erds)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      false);
+      false,
+      &test_cache);
     self.api_parsed_list = api_list;
     self.api_parsed_list_count = 1;
     self.custom_erd_list = custom_list;
@@ -600,7 +612,8 @@ TEST_GROUP(mqtt_bridge_polling_custom_erds)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      false);
+      false,
+      &test_cache);
     self.custom_erd_list = custom_list;
     self.custom_erd_list_count = 2;
   }
@@ -783,7 +796,8 @@ TEST(mqtt_bridge_polling_custom_erds, should_ignore_spurious_read_completed_duri
     &erd_client.interface,
     &mqtt_client.interface,
     polling_interval,
-    false);
+    false,
+    &test_cache);
   self.api_parsed_list = custom_list;
   self.api_parsed_list_count = 2;
 
@@ -841,7 +855,8 @@ TEST(mqtt_bridge_polling_custom_erds, should_poll_only_custom_erds_when_used_alo
     polling_interval,
     false,
     0xC0,     // pre-known host address — no 0xFF broadcast
-    custom_list, 2);
+    custom_list, 2,
+    &test_cache);
 
   // Phase 2: custom_erd_1 responds — registered and published immediately.
   // Bridge sends read for custom_erd_2.
@@ -891,7 +906,8 @@ TEST(mqtt_bridge_polling_custom_erds, should_resume_polling_at_known_address_aft
     polling_interval,
     false,
     0xC0,
-    custom_list, 2);
+    custom_list, 2,
+    &test_cache);
 
   // Phase 2 probe: both custom ERDs respond and are registered immediately.
   should_register_erd(custom_erd_1);
@@ -953,6 +969,7 @@ TEST_GROUP(mqtt_bridge_polling_sequential)
   };
 
   mqtt_bridge_polling_t self;
+  erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -966,12 +983,14 @@ TEST_GROUP(mqtt_bridge_polling_sequential)
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
     mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
 
   void teardown()
   {
     mock().disable();
     mqtt_bridge_polling_destroy(&self);
+    erd_cache_destroy(&test_cache);
     mock().enable();
   }
 
@@ -983,7 +1002,8 @@ TEST_GROUP(mqtt_bridge_polling_sequential)
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
-      false);
+      false,
+      &test_cache);
     self.api_parsed_list = api_list;
     self.api_parsed_list_count = 3;
   }
@@ -1451,4 +1471,110 @@ TEST(mqtt_bridge_polling_api_list, discovery_reads_erds_sequentially_one_at_a_ti
   should_request_read(0xC0, 0x5000);
   should_request_read(0xC0, api_erd_2);
   after(polling_interval);
+}
+
+
+extern "C" {
+#include "erd_cache.h"
+}
+
+TEST_GROUP(erd_cache_stats)
+{
+  erd_cache_t cache;
+
+  void setup()
+  {
+    erd_cache_init(&cache);
+  }
+
+  void teardown()
+  {
+    erd_cache_destroy(&cache);
+  }
+};
+
+TEST(erd_cache_stats, empty_cache_has_zero_count)
+{
+  CHECK_EQUAL(0u, erd_cache_get_count(&cache));
+}
+
+TEST(erd_cache_stats, count_increments_on_insert)
+{
+  uint8_t data = 0x01;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
+  CHECK_EQUAL(1u, erd_cache_get_count(&cache));
+}
+
+TEST(erd_cache_stats, count_unchanged_on_update)
+{
+  uint8_t data = 0x01;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
+  data = 0x02;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
+  CHECK_EQUAL(1u, erd_cache_get_count(&cache));
+}
+
+TEST(erd_cache_stats, count_for_multiple_erds)
+{
+  uint8_t data_a = 0x01;
+  uint8_t data_b = 0x02;
+  uint8_t data_c = 0x03;
+  erd_cache_update(&cache, 0x1001, &data_a, sizeof(data_a), false);
+  erd_cache_update(&cache, 0x1002, &data_b, sizeof(data_b), false);
+  erd_cache_update(&cache, 0x1003, &data_c, sizeof(data_c), false);
+  CHECK_EQUAL(3u, erd_cache_get_count(&cache));
+}
+
+TEST(erd_cache_stats, update_rate_returns_zero_when_empty)
+{
+  CHECK_EQUAL(0u, erd_cache_get_update_rate(&cache));
+}
+
+TEST(erd_cache_stats, update_rate_counts_updates)
+{
+  uint8_t data = 0x01;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
+  erd_cache_update(&cache, 0x1002, &data, sizeof(data), false);
+  erd_cache_update(&cache, 0x1003, &data, sizeof(data), false);
+  CHECK_EQUAL(3u, erd_cache_get_update_rate(&cache));
+}
+
+TEST(erd_cache_stats, update_rate_resets_after_read)
+{
+  uint8_t data = 0x01;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
+  erd_cache_update(&cache, 0x1002, &data, sizeof(data), false);
+  CHECK_EQUAL(2u, erd_cache_get_update_rate(&cache));
+  CHECK_EQUAL(0u, erd_cache_get_update_rate(&cache));
+}
+
+TEST(erd_cache_stats, update_rate_counts_reupdates)
+{
+  uint8_t data = 0x01;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
+  data = 0x02;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
+  CHECK_EQUAL(2u, erd_cache_get_update_rate(&cache));
+}
+
+TEST(erd_cache_stats, update_rate_counts_subscription_updates)
+{
+  uint8_t data = 0x01;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data), true);
+  erd_cache_update(&cache, 0x1002, &data, sizeof(data), true);
+  CHECK_EQUAL(2u, erd_cache_get_update_rate(&cache));
+}
+
+TEST(erd_cache_stats, update_rate_not_increased_on_overflow)
+{
+  // Fill the cache
+  uint8_t data = 0x01;
+  for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
+    erd_cache_update(&cache, (tiny_erd_t)(0x1000 + i), &data, sizeof(data), false);
+  }
+  CHECK_EQUAL(ERD_CACHE_CAPACITY, erd_cache_get_update_rate(&cache));
+
+  // Try to insert beyond capacity — should be rejected
+  erd_cache_update(&cache, 0x9999, &data, sizeof(data), false);
+  CHECK_EQUAL(0u, erd_cache_get_update_rate(&cache)); // no increment on overflow
 }

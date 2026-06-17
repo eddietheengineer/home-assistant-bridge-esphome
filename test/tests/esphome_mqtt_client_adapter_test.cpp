@@ -1,15 +1,11 @@
 /*!
  * @file
- * @brief Unit tests for the ESPHome MQTT client adapter.
+ * @brief Unit tests for the ESPHome MQTT client adapter (debug-log mode).
  *
- * Validates initialization, ERD publishing (hex & string), valid ERD filtering,
- * queue behavior when MQTT is disconnected, wildcard subscription, and
- * pending update flushing.
- *
- * NOTE: Tests that invoke the subscribe callback lambda are avoided - the
- * lambda captures a raw pointer to the adapter and invoking it after the
- * adapter is destroyed causes use-after-free. The callback logic is tested
- * through integration tests in the bridge itself.
+ * The adapter no longer publishes to MQTT.  All publish paths are replaced
+ * with ESP_LOGD debug messages.  These tests verify that the adapter
+ * functions without crashing, correctly filters ERDs through the registry,
+ * and that all MQTT-specific entry points are safe no-ops.
  */
 
 #include "CppUTest/TestHarness.h"
@@ -22,64 +18,17 @@
 
 #include "esphome_mqtt_client_adapter.h"
 #include "double/esphome_hal_double.hpp"
-#include "esphome/components/mqtt/mqtt_client.h"
 
 #include <string>
-#include <map>
 #include <set>
-#include <vector>
 
 /* ------------------------------------------------------------------ */
-/* Mock MQTT client that tracks calls                                 */
-/* ------------------------------------------------------------------ */
-
-struct MockMqttClient : public esphome::mqtt::MQTTClientComponent {
-  bool connected;
-  std::vector<std::string> published_topics;
-  std::vector<std::string> published_payloads;
-  std::vector<bool> published_retain;
-  std::vector<std::string> subscribed_topics;
-  std::vector<std::function<void(const std::string&, const std::string&)>> subscribed_callbacks;
-
-  MockMqttClient() : connected(false) {}
-
-  bool is_connected() override { return connected; }
-
-  void publish(const std::string& topic, const std::string& payload,
-               uint8_t /*qos*/, bool retain) override
-  {
-    published_topics.push_back(topic);
-    published_payloads.push_back(payload);
-    published_retain.push_back(retain);
-  }
-
-  void subscribe(const std::string& topic,
-                 std::function<void(const std::string&, const std::string&)> callback,
-                 uint8_t /*qos*/) override
-  {
-    subscribed_topics.push_back(topic);
-    subscribed_callbacks.push_back(callback);
-  }
-
-  void clear()
-  {
-    subscribed_callbacks.clear();
-    published_topics.clear();
-    published_payloads.clear();
-    published_retain.clear();
-    subscribed_topics.clear();
-    connected = false;
-  }
-};
-
-/* ------------------------------------------------------------------ */
-/* Test group - basic tests that do NOT call notify_connected          */
+/* Test group                                                          */
 /* ------------------------------------------------------------------ */
 
 TEST_GROUP(esphome_mqtt_client_adapter)
 {
   esphome_mqtt_client_adapter_t adapter;
-  MockMqttClient mock_client;
   std::string device_id_str;
   esphome::geappliances_bridge::ErdRegistry erd_registry;
 
@@ -87,8 +36,6 @@ TEST_GROUP(esphome_mqtt_client_adapter)
   {
     mock().strictOrder();
     device_id_str = "test_device";
-    esphome::mqtt::global_mqtt_client = &mock_client;
-    mock_client.clear();
     erd_registry = esphome::geappliances_bridge::ErdRegistry();
     esphome_hal_double_set_millis(0);
   }
@@ -96,7 +43,6 @@ TEST_GROUP(esphome_mqtt_client_adapter)
   void teardown()
   {
     esphome_mqtt_client_adapter_destroy(&adapter);
-    esphome::mqtt::global_mqtt_client = nullptr;
     mock().clear();
   }
 
@@ -125,6 +71,7 @@ TEST(esphome_mqtt_client_adapter, init_sets_api_pointer)
 TEST(esphome_mqtt_client_adapter, init_creates_device_id)
 {
   init_adapter();
+  // Calling register_erd should not crash even without registry
   adapter.interface.api->register_erd(&adapter.interface, 0x0008);
 }
 
@@ -149,59 +96,25 @@ TEST(esphome_mqtt_client_adapter, register_erd_without_output_set)
 }
 
 /* ------------------------------------------------------------------ */
-/* update_erd - connected path (hex)                                    */
+/* update_erd - no crash on valid input                                 */
 /* ------------------------------------------------------------------ */
 
-TEST(esphome_mqtt_client_adapter, update_erd_publishes_hex_when_connected)
+TEST(esphome_mqtt_client_adapter, update_erd_does_not_crash)
 {
   init_adapter();
-  mock_client.connected = true;
 
   uint8_t data[] = {0x01, 0x02, 0xAB};
   adapter.interface.api->update_erd(&adapter.interface, 0x0092, data, 3);
-
-  // update_erd always queues; notify_connected drains the queue and publishes
-  esphome_mqtt_client_adapter_notify_connected(&adapter);
-
-  CHECK_EQUAL(1u, mock_client.published_topics.size());
-  CHECK(mock_client.published_topics.back() == "geappliances/test_device/erd/0x0092/value");
-  CHECK(mock_client.published_payloads.back() == "0102AB");
-  CHECK_TRUE(mock_client.published_retain.back());
 }
-// MQTT Data Publishing Spec 1: Hexadecimal ERD Data Format
-// Verify that all published payloads are valid uppercase hex strings
-// containing only characters 0-9 and A-F.
-TEST(esphome_mqtt_client_adapter, update_erd_hex_payload_is_valid_uppercase_hex)
+
+TEST(esphome_mqtt_client_adapter, update_erd_handles_various_byte_patterns)
 {
-  MockMqttClient local_mock;
-  esphome::mqtt::global_mqtt_client = &local_mock;
+  init_adapter();
 
-  esphome_mqtt_client_adapter_t local_adapter;
-  esphome_mqtt_client_adapter_init(&local_adapter, "test_device");
-
-  local_mock.connected = true;
-
-  // Test various byte patterns: zero bytes, high bytes, mixed, and multi-byte
+  // Test various byte patterns: zero bytes, high bytes, mixed
   uint8_t data[] = {0x00, 0x0F, 0xA0, 0xFF, 0xAB, 0xCD, 0x12, 0x34};
-  local_adapter.interface.api->update_erd(&local_adapter.interface, 0x0001, data, sizeof(data));
-
-  esphome_mqtt_client_adapter_notify_connected(&local_adapter);
-
-  CHECK_EQUAL(1u, local_mock.published_topics.size());
-  // Expected hex: 000FA0FFABCD1234 (uppercase, no spaces, no prefix)
-  CHECK(local_mock.published_payloads.back() == "000FA0FFABCD1234");
-
-  // Verify every character is a valid uppercase hex digit
-  const std::string& payload = local_mock.published_payloads.back();
-  for (char c : payload) {
-    bool valid = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F');
-    CHECK_TRUE(valid);
-  }
-
-  esphome_mqtt_client_adapter_destroy(&local_adapter);
-  esphome::mqtt::global_mqtt_client = nullptr;
+  adapter.interface.api->update_erd(&adapter.interface, 0x0001, data, sizeof(data));
 }
-
 
 /* ------------------------------------------------------------------ */
 /* update_erd - filter & validation                                     */
@@ -212,82 +125,45 @@ TEST(esphome_mqtt_client_adapter, update_erd_skips_erd_not_in_valid_filter)
   std::set<tiny_erd_t> valid{0x0092};
   erd_registry.set_valid_erds(valid);
   init_adapter_with_registry();
-  mock_client.connected = true;
 
   uint8_t data[] = {0x01};
   adapter.interface.api->update_erd(&adapter.interface, 0x0093, data, 1);
-
-  CHECK_EQUAL(0u, mock_client.published_topics.size());
+  // Should not crash — ERD is filtered out silently
 }
 
 TEST(esphome_mqtt_client_adapter, update_erd_skips_null_value)
 {
   init_adapter();
-  mock_client.connected = true;
 
   adapter.interface.api->update_erd(&adapter.interface, 0x0092, nullptr, 0);
-  CHECK_EQUAL(0u, mock_client.published_topics.size());
+  // Should not crash — null value is logged and skipped
 }
 
 TEST(esphome_mqtt_client_adapter, update_erd_skips_zero_size)
 {
   init_adapter();
-  mock_client.connected = true;
 
   uint8_t data[] = {0x01};
   adapter.interface.api->update_erd(&adapter.interface, 0x0092, data, 0);
-  CHECK_EQUAL(0u, mock_client.published_topics.size());
-}
-
-/* ------------------------------------------------------------------ */
-/* update_erd - disconnected path (queue)                               */
-/* ------------------------------------------------------------------ */
-
-TEST(esphome_mqtt_client_adapter, update_erd_queues_when_disconnected)
-{
-  init_adapter();
-  mock_client.connected = false;
-
-  uint8_t data[] = {0x01, 0x02};
-  adapter.interface.api->update_erd(&adapter.interface, 0x0092, data, 2);
-
-  CHECK_EQUAL(0u, mock_client.published_topics.size());
+  // Should not crash — zero size is logged and skipped
 }
 
 /* ------------------------------------------------------------------ */
 /* update_erd_write_result                                              */
 /* ------------------------------------------------------------------ */
 
-TEST(esphome_mqtt_client_adapter, update_erd_write_result_publishes_success)
+TEST(esphome_mqtt_client_adapter, update_erd_write_result_success_no_crash)
 {
   init_adapter();
-  mock_client.connected = true;
 
   adapter.interface.api->update_erd_write_result(&adapter.interface, 0x0092, true, 0);
-
-  CHECK_EQUAL(1u, mock_client.published_topics.size());
-  CHECK(mock_client.published_topics.back() == "geappliances/test_device/erd/0x0092/write_result");
-  CHECK(mock_client.published_payloads.back() == "success");
 }
 
-TEST(esphome_mqtt_client_adapter, update_erd_write_result_publishes_failure)
+TEST(esphome_mqtt_client_adapter, update_erd_write_result_failure_no_crash)
 {
   init_adapter();
-  mock_client.connected = true;
 
   adapter.interface.api->update_erd_write_result(&adapter.interface, 0x0092, false, 3);
-
-  CHECK_EQUAL(1u, mock_client.published_topics.size());
-  CHECK(mock_client.published_payloads.back() == "failure (reason: 3)");
-}
-
-TEST(esphome_mqtt_client_adapter, update_erd_write_result_drops_when_disconnected)
-{
-  init_adapter();
-  mock_client.connected = false;
-
-  adapter.interface.api->update_erd_write_result(&adapter.interface, 0x0092, true, 0);
-  CHECK_EQUAL(0u, mock_client.published_topics.size());
 }
 
 /* ------------------------------------------------------------------ */
@@ -303,151 +179,90 @@ TEST(esphome_mqtt_client_adapter, destroy_frees_resources)
 }
 
 /* ------------------------------------------------------------------ */
-/* Tests that call notify_connected (use local mock to control lifetime)*/
-/* The adapter is destroyed BEFORE the local mock goes out of scope,   */
-/* so the lambda in subscribed_callbacks has a dangling pointer.       */
-/* We only verify subscription topics and flush behavior, not callback  */
-/* invocation.                                                         */
+/* notify_connected / notify_disconnected — no-ops                      */
 /* ------------------------------------------------------------------ */
 
-TEST(esphome_mqtt_client_adapter, notify_connected_subscribes_wildcard_once)
+TEST(esphome_mqtt_client_adapter, notify_connected_is_noop)
 {
-  MockMqttClient local_mock;
-  esphome::mqtt::global_mqtt_client = &local_mock;
-  local_mock.connected = true;
-
-  esphome_mqtt_client_adapter_t local_adapter;
-  esphome_mqtt_client_adapter_init(&local_adapter, "test_device");
-
-  esphome_mqtt_client_adapter_notify_connected(&local_adapter);
-  CHECK_EQUAL(1u, local_mock.subscribed_topics.size());
-  CHECK(local_mock.subscribed_topics.back() == "geappliances/test_device/erd/+/write");
-
-  esphome_mqtt_client_adapter_notify_connected(&local_adapter);
-  CHECK_EQUAL(1u, local_mock.subscribed_topics.size());
-
-  esphome_mqtt_client_adapter_destroy(&local_adapter);
-  esphome::mqtt::global_mqtt_client = nullptr;
+  init_adapter();
+  esphome_mqtt_client_adapter_notify_connected(&adapter);
+  // Should not crash
 }
 
-TEST(esphome_mqtt_client_adapter, notify_connected_does_not_subscribe_if_not_connected)
+TEST(esphome_mqtt_client_adapter, notify_disconnected_is_noop)
 {
-  MockMqttClient local_mock;
-  esphome::mqtt::global_mqtt_client = &local_mock;
-  local_mock.connected = false;
-
-  esphome_mqtt_client_adapter_t local_adapter;
-  esphome_mqtt_client_adapter_init(&local_adapter, "test_device");
-
-  esphome_mqtt_client_adapter_notify_connected(&local_adapter);
-  CHECK_EQUAL(0u, local_mock.subscribed_topics.size());
-
-  esphome_mqtt_client_adapter_destroy(&local_adapter);
-  esphome::mqtt::global_mqtt_client = nullptr;
+  init_adapter();
+  esphome_mqtt_client_adapter_notify_disconnected(&adapter);
+  // Should not crash
 }
 
-TEST(esphome_mqtt_client_adapter, notify_connected_flushes_pending_updates)
+TEST(esphome_mqtt_client_adapter, subscribe_write_topic_is_noop)
 {
-  MockMqttClient local_mock;
-  esphome::mqtt::global_mqtt_client = &local_mock;
-
-  esphome_mqtt_client_adapter_t local_adapter;
-  esphome_mqtt_client_adapter_init(&local_adapter, "test_device");
-
-  local_mock.connected = false;
-  uint8_t d1[] = {0x01};
-  uint8_t d2[] = {0x02};
-  local_adapter.interface.api->update_erd(&local_adapter.interface, 0x0092, d1, 1);
-  local_adapter.interface.api->update_erd(&local_adapter.interface, 0x0093, d2, 1);
-
-  local_mock.connected = true;
-  esphome_mqtt_client_adapter_notify_connected(&local_adapter);
-  CHECK_EQUAL(2u, local_mock.published_topics.size());
-
-  esphome_mqtt_client_adapter_destroy(&local_adapter);
-  esphome::mqtt::global_mqtt_client = nullptr;
+  init_adapter();
+  esphome_mqtt_client_adapter_subscribe_write_topic(&adapter);
+  // Should not crash
 }
 
-TEST(esphome_mqtt_client_adapter, notify_connected_flushes_max_per_call)
+TEST(esphome_mqtt_client_adapter, drain_pending_updates_returns_zero)
 {
-  MockMqttClient local_mock;
-  esphome::mqtt::global_mqtt_client = &local_mock;
+  init_adapter();
+  uint8_t d[] = {0x01};
+  adapter.interface.api->update_erd(&adapter.interface, 0x0092, d, 1);
 
-  esphome_mqtt_client_adapter_t local_adapter;
-  esphome_mqtt_client_adapter_init(&local_adapter, "test_device");
-
-  local_mock.connected = false;
-  for (int i = 0; i < 10; i++) {
-    uint8_t d[] = {0x01};
-    local_adapter.interface.api->update_erd(&local_adapter.interface, (tiny_erd_t)(0x0092 + i), d, 1);
-  }
-
-  local_mock.connected = true;
-  esphome_mqtt_client_adapter_notify_connected(&local_adapter);
-  CHECK_EQUAL(5u, local_mock.published_topics.size());
-
-  esphome_mqtt_client_adapter_destroy(&local_adapter);
-  esphome::mqtt::global_mqtt_client = nullptr;
+  size_t remaining = esphome_mqtt_client_adapter_drain_pending_updates(&adapter);
+  CHECK_EQUAL(0u, remaining);
 }
 
-TEST(esphome_mqtt_client_adapter, notify_disconnected_resets_connect_time)
+TEST(esphome_mqtt_client_adapter, get_pending_update_count_returns_zero)
 {
-  MockMqttClient local_mock;
-  esphome::mqtt::global_mqtt_client = &local_mock;
-  local_mock.connected = true;
+  init_adapter();
+  uint8_t d[] = {0x01};
+  adapter.interface.api->update_erd(&adapter.interface, 0x0092, d, 1);
 
-  esphome_mqtt_client_adapter_t local_adapter;
-  esphome_mqtt_client_adapter_init(&local_adapter, "test_device");
-
-  esphome_hal_double_set_millis(1000);
-  esphome_mqtt_client_adapter_notify_connected(&local_adapter);
-  esphome_mqtt_client_adapter_notify_disconnected(&local_adapter);
-
-  esphome_hal_double_set_millis(2000);
-  esphome_mqtt_client_adapter_notify_connected(&local_adapter);
-  CHECK_EQUAL(1u, local_mock.subscribed_topics.size());
-
-  esphome_mqtt_client_adapter_destroy(&local_adapter);
-  esphome::mqtt::global_mqtt_client = nullptr;
+  CHECK_EQUAL(0u, esphome_mqtt_client_adapter_get_pending_update_count(&adapter));
 }
 
-TEST(esphome_mqtt_client_adapter, write_request_callback_registered)
+/* ------------------------------------------------------------------ */
+/* publish helper                                                       */
+/* ------------------------------------------------------------------ */
+
+TEST(esphome_mqtt_client_adapter, publish_helper_does_not_crash)
 {
-  MockMqttClient local_mock;
-  esphome::mqtt::global_mqtt_client = &local_mock;
-  local_mock.connected = true;
-
-  esphome_mqtt_client_adapter_t local_adapter;
-  esphome_mqtt_client_adapter_init(&local_adapter, "test_device");
-  esphome_mqtt_client_adapter_notify_connected(&local_adapter);
-
-  /* Verify callback was registered (do NOT invoke it - dangling pointer) */
-  CHECK_EQUAL(1u, local_mock.subscribed_callbacks.size());
-
-  esphome_mqtt_client_adapter_destroy(&local_adapter);
-  esphome::mqtt::global_mqtt_client = nullptr;
+  init_adapter();
+  esphome_mqtt_client_adapter_publish(&adapter, "test/topic", "test_payload", true);
+  // Should not crash — logs via ESP_LOGD
 }
 
-TEST(esphome_mqtt_client_adapter, update_erd_overwrites_pending_for_same_erd)
+/* ------------------------------------------------------------------ */
+/* on_write_request / on_mqtt_disconnect event accessors                */
+/* ------------------------------------------------------------------ */
+
+TEST(esphome_mqtt_client_adapter, on_write_request_returns_event)
 {
-  MockMqttClient local_mock;
-  esphome::mqtt::global_mqtt_client = &local_mock;
+  init_adapter();
+  i_tiny_event_t* evt = adapter.interface.api->on_write_request(&adapter.interface);
+  CHECK(evt != nullptr);
+}
 
-  esphome_mqtt_client_adapter_t local_adapter;
-  esphome_mqtt_client_adapter_init(&local_adapter, "test_device");
+TEST(esphome_mqtt_client_adapter, on_mqtt_disconnect_returns_event)
+{
+  init_adapter();
+  i_tiny_event_t* evt = adapter.interface.api->on_mqtt_disconnect(&adapter.interface);
+  CHECK(evt != nullptr);
+}
+/* ------------------------------------------------------------------ */
+/* ERD publish count                                                    */
+/* ------------------------------------------------------------------ */
 
-  local_mock.connected = false;
-  uint8_t data1[] = {0x01};
-  local_adapter.interface.api->update_erd(&local_adapter.interface, 0x0092, data1, 1);
+TEST(esphome_mqtt_client_adapter, erd_publish_count_increments_and_resets)
+{
+  init_adapter();
+  CHECK_EQUAL(0u, esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(&adapter));
 
-  uint8_t data2[] = {0xFF};
-  local_adapter.interface.api->update_erd(&local_adapter.interface, 0x0092, data2, 1);
-
-  local_mock.connected = true;
-  esphome_mqtt_client_adapter_notify_connected(&local_adapter);
-  CHECK_EQUAL(1u, local_mock.published_topics.size());
-  CHECK(local_mock.published_payloads.back() == "FF");
-
-  esphome_mqtt_client_adapter_destroy(&local_adapter);
-  esphome::mqtt::global_mqtt_client = nullptr;
+  uint8_t value1 = 0x42;
+  uint8_t value2 = 0x01;
+  adapter.interface.api->update_erd(&adapter.interface, 0x0008, &value1, 1);
+  adapter.interface.api->update_erd(&adapter.interface, 0x0001, &value2, 1);
+  CHECK_EQUAL(2u, esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(&adapter));
+  CHECK_EQUAL(0u, esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(&adapter));
 }

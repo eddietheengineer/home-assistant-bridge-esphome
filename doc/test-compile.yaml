@@ -35,15 +35,6 @@ external_components:
       path: ../components
     components: [ geappliances_bridge ]
 
-# MQTT configuration for Home Assistant
-mqtt:
-  broker: !secret mqtt_broker
-  username: !secret mqtt_username
-  password: !secret mqtt_password
-  port: 1883
-  discovery: true
-  discovery_prefix: homeassistant
-  clean_session: true
 
 # UART configuration for GEA3 communication
 uart:
@@ -69,3 +60,5 @@ geappliances_bridge:
   # polling_interval: 10000     # Default: 10000 ms (10 seconds), used when in polling mode
   # polling_only_publish_on_change: true  # Default: true, only publish if value changed
   # generate_device_config: false  # Default: true. Set to false to disable automatic HA MQTT discovery
+  erd_publish_rate_sensor:
+    name: "ERD Publish Rate"

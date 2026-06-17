@@ -65,6 +65,7 @@
 #include "i_tiny_gea3_erd_client.h"
 #include "tiny_hsm.h"
 #include "tiny_timer.h"
+#include "erd_cache.h"
 #include "erd_lists.h"
 
 typedef struct {
@@ -84,7 +85,7 @@ typedef struct {
   tiny_hsm_t hsm;
   tiny_hsm_state_t next_discovery_state;
   void* erd_set;
-  void* erd_cache;
+  erd_cache_t* erd_cache;
   // Set of ERDs that have been added to the polling list but not yet
   // registered on MQTT (added via add_erd_to_polling_list_no_register).
   // On first successful read, these are registered and removed from this set.
@@ -158,7 +159,8 @@ void mqtt_bridge_polling_init(
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t* mqtt_client,
   uint32_t polling_interval_ms,
-  bool only_publish_on_change);
+  bool only_publish_on_change,
+  erd_cache_t* cache);
 
 /*!
  * Initialize the MQTT polling bridge with a pre-known host address.
@@ -180,7 +182,8 @@ void mqtt_bridge_polling_init_at_address(
   bool only_publish_on_change,
   uint8_t known_host_address,
   const tiny_erd_t* api_list,
-  uint16_t api_list_count);
+  uint16_t api_list_count,
+  erd_cache_t* cache);
 
 /*!
  * Destroy the MQTT polling bridge.
