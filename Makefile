@@ -21,6 +21,7 @@ SRC_DIRS := \
   test/simulation \
 
 SRC_FILES := \
+  components/geappliances_bridge/erd_cache.cpp \
   components/geappliances_bridge/mqtt_bridge.cpp \
   components/geappliances_bridge/mqtt_bridge_polling.cpp \
   components/geappliances_bridge/gea2_erd_client_adapter.cpp \
@@ -28,6 +29,7 @@ SRC_FILES := \
   components/geappliances_bridge/feature_bit_manager.cpp \
   components/geappliances_bridge/autodiscovery_manager.cpp \
   components/geappliances_bridge/esphome_mqtt_client_adapter.cpp \
+  components/geappliances_bridge/erd_cache_mqtt_publisher.cpp \
   components/geappliances_bridge/erd_registry.cpp \
   components/geappliances_bridge/esphome_time_source.cpp \
   components/geappliances_bridge/esphome_uart_adapter.cpp \

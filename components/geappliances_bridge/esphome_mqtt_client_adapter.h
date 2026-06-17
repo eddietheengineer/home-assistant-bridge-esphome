@@ -1,15 +1,13 @@
 // =============================================================================
 // MODULE GOAL
 // =============================================================================
-// Goal: Deliver ERD value updates to the MQTT broker reliably and
-//       asynchronously, with deduplication and reconnect-safe queuing.
+// Goal: Implement the i_mqtt_client_t interface for the bridge, publishing
+//       ERD value updates to MQTT topics via ESPHome's global MQTT client.
 //
 // Responsibilities:
 //   - Implement i_mqtt_client_t for the bridge and polling bridge
-//   - Publish ERD updates asynchronously via a FreeRTOS task queue
-//   - Deduplicate pending updates per ERD to bound memory use
-//   - Re-flush pending updates on MQTT reconnect
-//   - Route wildcard write-command subscriptions back to the ERD client
+//   - Publish ERD updates to geappliances/{device_id}/erd/0x{ERD}/value topics
+//   - Provide MQTT connect/disconnect events for publisher coordination
 //
 // NOT responsible for:
 //   - Deciding which ERDs to publish (filtering is applied via ErdRegistry)
@@ -17,16 +15,15 @@
 //   - HA discovery publishing (HaDiscoveryManager)
 //
 // Dependencies:
-//   - esphome::mqtt::MQTTClientComponent
 //   - i_mqtt_client.h (interface implemented here)
-//   - FreeRTOS task + queue on ESP-IDF builds
+//   - ErdRegistry for valid-ERD filtering
+//   - ESPHome MQTT client (esphome::mqtt::global_mqtt_client)
 // =============================================================================
 
 #pragma once
+#include "esphome/components/mqtt/mqtt_client.h"
 
 #include <string>
-#include <map>
-#include <set>
 
 #include "erd_registry.h"
 
@@ -35,34 +32,19 @@ extern "C" {
 #include "tiny_event.h"
 }
 
-struct PendingErdUpdate {
-  std::string topic;
-  std::string payload;
-};
 
 typedef struct {
   i_mqtt_client_t interface;
   std::string* device_id;
   tiny_event_t on_write_request_event;
   tiny_event_t on_mqtt_disconnect_event;
-  // Keyed by ERD so repeated updates while MQTT is down keep only the latest
-  // value per ERD. This prevents the queue from filling with duplicates during
-  // a polling reconnect cycle and bounds its size to the number of distinct ERDs.
-  std::map<tiny_erd_t, PendingErdUpdate>* pending_updates;
+  tiny_event_t on_mqtt_connect_event;
   // Optional ERD registry: when non-null, provides valid-ERD filtering,
   // string-ERD type detection, and registered-ERD tracking in one place.
   // Set via esphome_mqtt_client_adapter_set_erd_registry().
   esphome::geappliances_bridge::ErdRegistry* erd_registry;
-  // True once the single wildcard MQTT subscription for write commands has been
-  // established.  Set on the first MQTT connect after adapter init; never
-  // cleared, because ESPHome's MQTT client automatically re-subscribes all
-  // registered topics on reconnect, so we only need to call subscribe() once.
-  bool wildcard_subscribed;
-  // millis() timestamp of the most recent MQTT connection (set on the first
-  // notify_connected() call after each disconnect; reset to 0 by
-  // notify_disconnected()).  Used to gate the pending-update flush so the IDF
-  // MQTT task has time to process the broker's reconnect backlog.
-  uint32_t mqtt_connected_at_ms;
+  uint32_t erd_publish_count_;
+  uint32_t mqtt_publish_count_;
 } esphome_mqtt_client_adapter_t;
 
 #ifdef __cplusplus
@@ -84,18 +66,13 @@ void esphome_mqtt_client_adapter_notify_connected(
   esphome_mqtt_client_adapter_t* self);
 
 /*!
- * Subscribe the single wildcard write topic (geappliances/{id}/erd/+/write).
- * Idempotent — does nothing after the first successful subscribe.  Records
- * mqtt_connected_at_ms on first call after each reconnect.
- * Called by the bridge MQTT FSM in the SUBSCRIBING state.
+ * No-op: write command subscriptions are not available without MQTT.
  */
 void esphome_mqtt_client_adapter_subscribe_write_topic(
   esphome_mqtt_client_adapter_t* self);
 
 /*!
- * Flush up to MAX_FLUSH_PER_CALL pending ERD updates to the broker.
- * Returns the number of updates still pending after this call; 0 means
- * the queue is empty.  Called by the bridge MQTT FSM in FLUSHING / RUNNING.
+ * No-op: returns 0 (no pending updates).
  */
 size_t esphome_mqtt_client_adapter_drain_pending_updates(
   esphome_mqtt_client_adapter_t* self);
@@ -107,15 +84,38 @@ size_t esphome_mqtt_client_adapter_get_pending_update_count(
   const esphome_mqtt_client_adapter_t* self);
 
 /*!
- * Enqueue a publish request for the async MQTT publish task.  Non-blocking
- * on ESP-IDF (drops with warning if queue is full).  Falls back to
- * synchronous publish on non-ESP-IDF builds.
+ * Publish an MQTT message.  Used by HA discovery manager.
  */
 void esphome_mqtt_client_adapter_publish(
   esphome_mqtt_client_adapter_t* self,
   const std::string& topic,
   const std::string& payload,
   bool retain);
+
+/*!
+ * Publish raw MQTT message (C-string topic and payload).
+ * Implements the i_mqtt_client_t publish_raw vtable slot.
+ */
+void esphome_mqtt_client_adapter_publish_raw(
+  i_mqtt_client_t* self,
+  const char* topic,
+  const char* payload,
+  size_t payload_len,
+  bool retain);
+
+/*!
+ * Get and reset the ERD publish counter.
+ * Returns the count of ERD updates since the last call.
+ */
+uint32_t esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(
+  esphome_mqtt_client_adapter_t* self);
+
+/*!
+ * Get and reset the MQTT publish counter.
+ * Returns the count of MQTT publishes since the last call.
+ */
+uint32_t esphome_mqtt_client_adapter_get_and_reset_mqtt_publish_count(
+  esphome_mqtt_client_adapter_t* self);
 
 #ifdef __cplusplus
 }

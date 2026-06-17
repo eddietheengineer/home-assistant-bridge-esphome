@@ -1,18 +1,10 @@
 /*!
  * @file
- * @brief Unit tests for the startup HSM phase timeout paths.
+ * @brief Unit tests for the startup HSM phase transitions.
  *
- * Tests focus on the two timeout guards added in the Phase 3 refactoring:
- *
- *   1. Device ID phase timeout (30 s): when the DeviceIdentityManager stalls,
- *      the HSM transitions to mqtt_client_init using a fallback device ID.
- *
- *   2. Feature bits phase timeout (60 s): when feature bit ERD reads stall,
- *      the HSM marks the manager as timed-out and transitions to bridge_init
- *      as soon as MQTT becomes connected.
- *
- * Tests also cover the normal (non-timeout) happy-path transitions for these
- * two phases so regressions in the timeout guard don't mask broken happy paths.
+ * Tests focus on the normal (non-timeout) happy-path transitions for all
+ * startup phases.  MQTT connectivity gating has been removed — the HSM
+ * transitions to bridge_init as soon as feature bits are complete.
  *
  * Note: Production headers with STL containers (<set>, <vector>) must be
  * included BEFORE CppUTest headers to avoid conflicts with CppUTest's
@@ -21,7 +13,6 @@
 
 #include "geappliances_bridge_startup_hsm.h"
 #include "i_bridge_services.h"
-#include "esphome/components/mqtt/mqtt_client.h"
 
 #include "CppUTest/TestHarness.h"
 #include "CppUTestExt/MockSupport.h"
@@ -30,9 +21,6 @@ using namespace esphome::geappliances_bridge;
 
 // =============================================================================
 // MockBridgeServices — thin CppUMock wrapper around IBridgeServices
-//
-// Only the methods exercised by the tested states need mock expectations;
-// all others are stubs that do nothing / return a safe default.
 // =============================================================================
 
 class MockBridgeServices : public IBridgeServices {
@@ -93,25 +81,10 @@ class MockBridgeServices : public IBridgeServices {
   void log_poll_state_transitions() override {}
   void run_ha_discovery() override {}
   void run_all_managers() override {}
-};
 
-// =============================================================================
-// HsmMockMqttClient — minimal stub for esphome::mqtt::MQTTClientComponent
-//
-// Named distinctly to avoid ODR collision with MockMqttClient in the adapter
-// test TU, which has the same base class but a different is_connected() body.
-// =============================================================================
-
-class HsmMockMqttClient : public esphome::mqtt::MQTTClientComponent {
- public:
-  bool is_connected() override {
-    return mock().actualCall("is_connected").onObject(this)
-               .returnBoolValueOrDefault(false);
-  }
-  void publish(const std::string&, const std::string&, uint8_t, bool) override {}
-  void subscribe(const std::string&,
-                 std::function<void(const std::string&, const std::string&)>,
-                 uint8_t) override {}
+  // -- ERD cache MQTT publisher -----------------------------------------------
+  void initialize_erd_cache_publisher() override {}
+  bool is_erd_cache_publisher_initialized() const override { return false; }
 };
 
 // =============================================================================
@@ -122,24 +95,21 @@ TEST_GROUP(startup_hsm)
 {
   tiny_hsm_t hsm;
   MockBridgeServices svc;
-  HsmMockMqttClient mqtt_client;
 
   void setup()
   {
     mock().clear();
     mock().strictOrder();
-    esphome::mqtt::global_mqtt_client = nullptr;
     set_bridge_services(&svc);
   }
 
   void teardown()
   {
     mock().clear();
-    esphome::mqtt::global_mqtt_client = nullptr;
     set_bridge_services(nullptr);
   }
 
-  // Helper: expect the full mqtt_client_init → feature_bits entry chain.
+  // Helper: expect the full mqtt_client_init -> feature_bits entry chain.
   // Called whenever the device_id phase transitions out (timeout or success).
   void expect_mqtt_client_init_and_feature_bits_entry(bool mqtt_already_initialized = false)
   {
@@ -151,8 +121,6 @@ TEST_GROUP(startup_hsm)
       mock().expectOneCall("initialize_mqtt_client").onObject(&svc);
     }
     mock().expectOneCall("start_feature_bit_reading").onObject(&svc);
-    // Feature bits entry no longer calls record_feature_bits_phase_start
-    // (manager is self-driving, no timeout).
   }
 };
 
@@ -162,8 +130,6 @@ TEST_GROUP(startup_hsm)
 
 TEST(startup_hsm, device_id_phase_complete_on_entry_transitions_to_mqtt_client_init)
 {
-  // HSM entry calls init_device_id_reading, then checks is_device_id_complete.
-  // If complete immediately (e.g. all ERDs read during init), transition right away.
   mock().expectOneCall("init_device_id_reading").onObject(&svc);
   mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(true);
   expect_mqtt_client_init_and_feature_bits_entry();
@@ -180,13 +146,11 @@ TEST(startup_hsm, device_id_phase_complete_on_entry_transitions_to_mqtt_client_i
 
 TEST(startup_hsm, device_id_phase_complete_on_run_loop_transitions_to_feature_bits)
 {
-  // Entry: init_device_id_reading called, not yet complete.
   mock().expectOneCall("init_device_id_reading").onObject(&svc);
   mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(false);
 
   tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_device_id);
 
-  // run_loop: manager is self-driving, just check if complete.
   mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(true);
   expect_mqtt_client_init_and_feature_bits_entry();
 
@@ -202,13 +166,11 @@ TEST(startup_hsm, device_id_phase_complete_on_run_loop_transitions_to_feature_bi
 
 TEST(startup_hsm, device_id_phase_signal_complete_transitions_to_mqtt_client_init)
 {
-  // Entry: init_device_id_reading called, not yet complete.
   mock().expectOneCall("init_device_id_reading").onObject(&svc);
   mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(false);
 
   tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_device_id);
 
-  // External signal from ERD callback — transition immediately.
   expect_mqtt_client_init_and_feature_bits_entry();
 
   tiny_hsm_send_signal(&hsm, signal_device_id_complete, nullptr);
@@ -218,81 +180,52 @@ TEST(startup_hsm, device_id_phase_signal_complete_transitions_to_mqtt_client_ini
 }
 
 // =============================================================================
-// Feature bits phase — feature bits complete, MQTT not yet connected
+// Feature bits phase — not yet complete, stays in feature_bits
 // =============================================================================
 
-TEST(startup_hsm, feature_bits_complete_waits_for_mqtt_connection)
+TEST(startup_hsm, feature_bits_incomplete_stays_in_feature_bits)
 {
-  // Entry: no timeout logic (manager is self-driving).
   tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_feature_bits);
 
-  // global_mqtt_client is null -> MQTT not connected -> no transition yet.
-  // is_feature_bits_complete returns true but MQTT not connected.
   mock()
     .expectOneCall("is_feature_bits_complete")
     .onObject(&svc)
-    .andReturnValue(true);
-  // mqtt::global_mqtt_client == nullptr -> no transition
+    .andReturnValue(false);
 
   tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
 
-  // Still in feature_bits - MQTT hasn't connected yet.
   CHECK(hsm.current == startup_state_feature_bits);
   mock().checkExpectations();
 }
 
 // =============================================================================
-// Feature bits phase — feature bits complete then MQTT connects
+// Feature bits phase — complete on run_loop transitions to bridge_init
 // =============================================================================
 
-TEST(startup_hsm, feature_bits_complete_then_mqtt_connected_signal_transitions_to_bridge_init)
+TEST(startup_hsm, feature_bits_complete_on_run_loop_transitions_to_bridge_init)
 {
   tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_feature_bits);
 
-  // Step 1: run_loop - feature bits done but MQTT not connected.
   mock()
     .expectOneCall("is_feature_bits_complete")
     .onObject(&svc)
     .andReturnValue(true);
 
   tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
-  CHECK(hsm.current == startup_state_feature_bits);
-
-  // Step 2: MQTT connects - signal_mqtt_connected causes the state to check
-  // is_feature_bits_complete() and transition to bridge_init.
-  mock()
-    .expectOneCall("is_feature_bits_complete")
-    .onObject(&svc)
-    .andReturnValue(true);
-
-  tiny_hsm_send_signal(&hsm, signal_mqtt_connected, nullptr);
 
   CHECK(hsm.current == startup_state_bridge_init);
   mock().checkExpectations();
 }
 
 // =============================================================================
-// Feature bits phase - happy path (complete + MQTT connected in same run_loop)
+// Feature bits phase — signal_feature_bits_complete transitions immediately
 // =============================================================================
 
-TEST(startup_hsm, feature_bits_complete_with_mqtt_connected_transitions_to_bridge_init)
+TEST(startup_hsm, feature_bits_signal_complete_transitions_to_bridge_init)
 {
   tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_feature_bits);
 
-  // Set up a connected MQTT client
-  esphome::mqtt::global_mqtt_client = &mqtt_client;
-
-  // run_loop: feature bits complete, MQTT connected -> transition.
-  mock()
-    .expectOneCall("is_feature_bits_complete")
-    .onObject(&svc)
-    .andReturnValue(true);
-  mock()
-    .expectOneCall("is_connected")
-    .onObject(&mqtt_client)
-    .andReturnValue(true);
-
-  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
+  tiny_hsm_send_signal(&hsm, signal_feature_bits_complete, nullptr);
 
   CHECK(hsm.current == startup_state_bridge_init);
   mock().checkExpectations();

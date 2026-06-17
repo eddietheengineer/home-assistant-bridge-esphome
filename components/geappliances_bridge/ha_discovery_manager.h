@@ -30,9 +30,8 @@
 //   - Any post-discovery entity updates
 //
 // Dependencies:
-//   - EsphomeMqttClientAdapter (async publish)
-//   - esphome::mqtt::MQTTClientComponent
-//   - FreeRTOS task + queue on ESP-IDF builds
+//   - EsphomeMqttClientAdapter (debug log publish)
+//   - FreeRTOS task + queue on ESP-IDF builds (for fetching JSONL)
 // =============================================================================
 
 #pragma once
@@ -55,9 +54,6 @@ extern "C" {
 #endif
 
 namespace esphome {
-namespace mqtt {
-class MQTTClientComponent;
-}
 namespace geappliances_bridge {
 
 static constexpr uint32_t HA_DISCOVERY_QUIET_MS = 10000;
@@ -94,9 +90,9 @@ class HaDiscoveryManager {
   void on_erd_seen(tiny_erd_t erd);
 
   void run(bool is_poll_mode,
+           bool polling_bridge_initialized,
            bool polling_list_complete,
-           bool subscription_activity_detected,
-           mqtt::MQTTClientComponent* mqtt_client);
+           bool subscription_activity_detected);
 
   /// Set the MQTT adapter for async publishing (typed pointer, nullptr = sync fallback)
   void set_mqtt_adapter(esphome_mqtt_client_adapter_t* mqtt_adapter);
@@ -112,8 +108,8 @@ class HaDiscoveryManager {
   void cleanup();
 
  private:
-  void publish_ha_discovery_(mqtt::MQTTClientComponent* mqtt_client);
-  void publish_next_entity_(mqtt::MQTTClientComponent* mqtt_client);
+  void publish_ha_discovery_();
+  void publish_next_entity_();
 
 #ifdef USE_ESP_IDF
   static void ha_fetch_task_fn_(void* param);
