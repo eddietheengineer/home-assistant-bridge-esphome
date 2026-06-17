@@ -28,6 +28,7 @@ void erd_cache_mqtt_publisher_init(
   self->mqtt_connected = true;
   self->get_time_ms = esphome::millis;
 
+  if (!mqtt_client) return;
   /* Subscribe to MQTT disconnect event */
   tiny_event_subscription_init(
     &self->mqtt_disconnect_subscription, self,

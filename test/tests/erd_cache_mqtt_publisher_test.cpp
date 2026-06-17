@@ -90,6 +90,20 @@ TEST(erd_cache_mqtt_publisher, destroy_is_safe_when_not_initialized)
   erd_cache_mqtt_publisher_destroy(&publisher);
 }
 
+TEST(erd_cache_mqtt_publisher, init_handles_null_mqtt_client_gracefully)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    nullptr,
+    "device");
+
+  /* Should not crash; fields set before the null guard are still valid. */
+  CHECK(publisher.cache != nullptr);
+  CHECK_EQUAL(0u, publisher.publish_index);
+  CHECK(publisher.mqtt_connected);
+}
+
 /* ------------------------------------------------------------------ */
 /* loop - basic publish                                                 */
 /* ------------------------------------------------------------------ */
