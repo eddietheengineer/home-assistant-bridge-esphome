@@ -2,7 +2,7 @@
 
 ## Problem
 
-Currently, ERD data is published to MQTT every time it's read (polling) or received (subscription), even when unchanged. The existing `erd_cache` in `mqtt_bridge_polling_t` is a `std::map<tiny_erd_t, vector<uint8_t>>` — it uses heap allocation per entry (std::map nodes + std::vector allocations), which fragments ESP32 heap over time. There is no cache in the subscription bridge at all.
+Currently, ERD data is published to MQTT every time it's read (polling) or received (subscription), even when unchanged. The existing `erd_cache` in `erd_bridge_poll_t` is a `std::map<tiny_erd_t, vector<uint8_t>>` — it uses heap allocation per entry (std::map nodes + std::vector allocations), which fragments ESP32 heap over time. There is no cache in the subscription bridge at all.
 
 The goal is to add a fixed-size array-based ERD cache that:
 - Stores the latest data for each ERD
@@ -13,13 +13,13 @@ The goal is to add a fixed-size array-based ERD cache that:
 
 ### Current State
 
-**Polling bridge** (`mqtt_bridge_polling_t`):
+**Polling bridge** (`erd_bridge_poll_t`):
 - `void* erd_cache` → `map<tiny_erd_t, vector<uint8_t>>` — used only for `only_publish_on_change` comparison in `state_polling::signal_read_completed` (lines 644-660)
 - Cleared on entry to `state_polling` (line 564)
-- Destroyed in `mqtt_bridge_polling_destroy` (line 853)
+- Destroyed in `erd_bridge_poll_destroy` (line 853)
 
-**Subscription bridge** (`mqtt_bridge_t`):
-- No cache at all — every subscription publication triggers `mqtt_client_update_erd` (line 42-46 of mqtt_bridge.cpp)
+**Subscription bridge** (`erd_bridge_subscribe_t`):
+- No cache at all — every subscription publication triggers `mqtt_client_update_erd` (line 42-46 of erd_bridge_subscribe.cpp)
 
 ### Key Data Points
 
@@ -180,18 +180,18 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
 
 ### 2. Integrate into polling bridge
 
-**In `mqtt_bridge_polling.h`:**
+**In `erd_bridge_poll.h`:**
 - Replace `void* erd_cache;` (line 87) with `erd_cache_t erd_cache;` (inline struct, no pointer indirection)
 
-**In `mqtt_bridge_polling.cpp`:**
+**In `erd_bridge_poll.cpp`:**
 
 **a) Delete the `erd_cache()` helper function** (lines 54-57):
-- The `static map<tiny_erd_t, vector<uint8_t>>& erd_cache(mqtt_bridge_polling_t* self)` helper is no longer needed — the field is now a direct struct, not a `void*` cast.
+- The `static map<tiny_erd_t, vector<uint8_t>>& erd_cache(erd_bridge_poll_t* self)` helper is no longer needed — the field is now a direct struct, not a `void*` cast.
 
-**b) `mqtt_bridge_polling_init_impl` (line 760):**
+**b) `erd_bridge_poll_init_impl` (line 760):**
 - Replace `self->erd_cache = reinterpret_cast<void*>(new map<tiny_erd_t, vector<uint8_t>>())` with `erd_cache_init(&self->erd_cache)`
 
-**c) `mqtt_bridge_polling_destroy` (lines 853, 856):**
+**c) `erd_bridge_poll_destroy` (lines 853, 856):**
 - Replace `delete reinterpret_cast<map<tiny_erd_t, vector<uint8_t>>*>(self->erd_cache)` with `erd_cache_destroy(&self->erd_cache)`
 - Remove `self->erd_cache = nullptr` (no longer a pointer)
 
@@ -225,15 +225,15 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
 - In each case, add `erd_cache_init(&self->erd_cache)` immediately after the `erd_set(self).clear()` line.
 ### 3. Integrate into subscription bridge
 
-**In `mqtt_bridge.h`:**
-- Add `erd_cache_t erd_cache;` field to `mqtt_bridge_t` struct (after `erd_set`)
+**In `erd_bridge_subscribe.h`:**
+- Add `erd_cache_t erd_cache;` field to `erd_bridge_subscribe_t` struct (after `erd_set`)
 
-**In `mqtt_bridge.cpp`:**
+**In `erd_bridge_subscribe.cpp`:**
 
-**a) `mqtt_bridge_init` (after line 164):**
+**a) `erd_bridge_subscribe_init` (after line 164):**
 - Add `erd_cache_init(&self->erd_cache)` after `erd_set` allocation
 
-**b) `mqtt_bridge_destroy` (after line 235):**
+**b) `erd_bridge_subscribe_destroy` (after line 235):**
 - Add `erd_cache_destroy(&self->erd_cache)` before `delete erd_set`
 
 **c) `sub_state_top::signal_subscription_publication_received` (lines 33-47):**
@@ -270,14 +270,14 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
 
 ### 5. Include and build system cleanup
 
-**In `mqtt_bridge_polling.cpp`:**
+**In `erd_bridge_poll.cpp`:**
 - Remove `#include <cstring>` (line 25) — only used by old cache `memcmp`
 - Remove `#include <map>` (line 26) — no longer needed
 - Remove `#include <vector>` (line 28) — no longer needed
 - Add `#include "erd_cache.h"`
 - Update the destroy comment (line 840) to reference `erd_cache` by name instead of `self->erd_cache`
 
-**In `mqtt_bridge.cpp`:**
+**In `erd_bridge_subscribe.cpp`:**
 - Add `#include "erd_cache.h"`
 
 **In `Makefile` (line 23+):**
@@ -289,10 +289,10 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
 components/geappliances_bridge/
   ├── erd_cache.h          ← new: struct definitions + API
   ├── erd_cache.cpp        ← new: implementation
-  ├── mqtt_bridge.h        ← modified: add erd_cache_t field
-  ├── mqtt_bridge.cpp      ← modified: init/destroy/update cache, add #include
-  ├── mqtt_bridge_polling.h ← modified: replace void* erd_cache with erd_cache_t
-  └── mqtt_bridge_polling.cpp ← modified: use erd_cache API, remove map/vector includes
+  ├── erd_bridge_subscribe.h        ← modified: add erd_cache_t field
+  ├── erd_bridge_subscribe.cpp      ← modified: init/destroy/update cache, add #include
+  ├── erd_bridge_poll.h ← modified: replace void* erd_cache with erd_cache_t
+  └── erd_bridge_poll.cpp ← modified: use erd_cache API, remove map/vector includes
 ```
 
 ### 7. Tests
@@ -328,7 +328,7 @@ When all 200 slots are full and a new ERD arrives:
 
 The following code becomes obsolete and must be removed:
 
-**`mqtt_bridge_polling.cpp`:**
+**`erd_bridge_poll.cpp`:**
 - Lines 54-57: `erd_cache()` helper function — the `void*` cast to `map<tiny_erd_t, vector<uint8_t>>`
 - Line 25: `#include <cstring>` — only used by old cache `memcmp`
 - Line 26: `#include <map>` — no longer needed
@@ -339,20 +339,20 @@ The following code becomes obsolete and must be removed:
 - Lines 853, 856: `delete reinterpret_cast<map<tiny_erd_t, vector<uint8_t>>*>(self->erd_cache)` and `self->erd_cache = nullptr`
 - Line 840: Update destroy comment referencing `self->erd_cache` as heap pointer
 
-**`mqtt_bridge_polling.h`:**
+**`erd_bridge_poll.h`:**
 - Line 87: `void* erd_cache;` — replaced with `erd_cache_t erd_cache;`
 
-**`mqtt_bridge.cpp`:**
+**`erd_bridge_subscribe.cpp`:**
 - No removals — only additions (new field, init, destroy, cache update)
 
 ## Execution Order
 
 1. Create `erd_cache.h` and `erd_cache.cpp` with the core API
 2. Write `erd_cache_test.cpp` and verify it passes
-3. Modify `mqtt_bridge_polling.h` to use `erd_cache_t` inline
-4. Modify `mqtt_bridge_polling.cpp` to use the new cache API
-5. Modify `mqtt_bridge.h` to add `erd_cache_t` field
-6. Modify `mqtt_bridge.cpp` to use the new cache API
+3. Modify `erd_bridge_poll.h` to use `erd_cache_t` inline
+4. Modify `erd_bridge_poll.cpp` to use the new cache API
+5. Modify `erd_bridge_subscribe.h` to add `erd_cache_t` field
+6. Modify `erd_bridge_subscribe.cpp` to use the new cache API
 7. Update `Makefile` or build system to include new files
 8. Run existing tests to ensure no regressions
 9. Update component tests if they reference the old cache

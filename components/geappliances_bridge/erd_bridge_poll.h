@@ -17,7 +17,7 @@
 //   - Report polling health metrics (cycle count, last cycle time)
 //
 // NOT responsible for:
-//   - Subscription-mode operation (see mqtt_bridge.h)
+//   - Subscription-mode operation (see erd_bridge_subscribe.h)
 //   - Deciding which ERDs are valid (filtered upstream by i_mqtt_client)
 //   - Bridge initialization or startup phase management
 //
@@ -58,8 +58,8 @@
 //   - erd_lists.h (appliance ERD list arrays)
 // =============================================================================
 
-#ifndef mqtt_bridge_polling_h
-#define mqtt_bridge_polling_h
+#ifndef erd_bridge_poll_h
+#define erd_bridge_poll_h
 
 #include "i_mqtt_client.h"
 #include "i_tiny_gea3_erd_client.h"
@@ -108,22 +108,22 @@ typedef struct {
   bool polling_list_complete;
   // Updated at each state entry with a human-readable name of the current HSM
   // state. Initialized to nullptr; callers may watch this for changes to emit
-  // debug log messages without coupling mqtt_bridge.cpp to ESP logging headers.
+  // debug log messages without coupling erd_bridge_subscribe.cpp to ESP logging headers.
   const char* current_state_name;
   // Optional pre-populated polling list from appliance API parsing.
   // When non-NULL, discovery states are skipped and this list is polled directly.
   const tiny_erd_t* api_parsed_list;
   uint16_t api_parsed_list_count;
   // Optional list of user-configured custom ERDs to poll in addition to the
-  // standard list. Set after mqtt_bridge_polling_init(). Works with both
+  // standard list. Set after erd_bridge_poll_init(). Works with both
   // discovery mode and api_parsed_list mode.
   const tiny_erd_t* custom_erd_list;
   uint16_t custom_erd_list_count;
-  // When mqtt_bridge_polling_init_at_address() is used this stores the
+  // When erd_bridge_poll_init_at_address() is used this stores the
   // pre-known appliance address so that the bridge never broadcasts to 0xFF
   // on re-identification (e.g. after appliance_lost_timer fires).  Zero means
   // "no pre-known address — use broadcast discovery" (the default from
-  // mqtt_bridge_polling_init()).
+  // erd_bridge_poll_init()).
   uint8_t known_host_address;
   // Health metrics: updated by the polling bridge as cycles complete.
   // cycle_start_ms: millis() when the current cycle's first read was sent.
@@ -144,17 +144,17 @@ typedef struct {
   bool restart_pending;
   // Called once when the HSM enters state_polling (discovery complete).
   // The callback may send a signal to the startup HSM to transition to the
-  // next phase.  Set after mqtt_bridge_polling_init() and before the HSM
+  // next phase.  Set after erd_bridge_poll_init() and before the HSM
   // processes its first signal.  NULL means no callback.
   void (*on_discovery_complete)(void* context);
   void* on_discovery_complete_context;
-} mqtt_bridge_polling_t;
+} erd_bridge_poll_t;
 
 /*!
- * Initialize the MQTT polling bridge.
+ * Initialize the ERD polling bridge.
  */
-void mqtt_bridge_polling_init(
-  mqtt_bridge_polling_t* self,
+void erd_bridge_poll_init(
+  erd_bridge_poll_t* self,
   tiny_timer_group_t* timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t* mqtt_client,
@@ -163,9 +163,9 @@ void mqtt_bridge_polling_init(
   erd_cache_t* cache);
 
 /*!
- * Initialize the MQTT polling bridge with a pre-known host address.
+ * Initialize the ERD polling bridge with a pre-known host address.
  *
- * Unlike mqtt_bridge_polling_init(), this variant skips the broadcast
+ * Unlike erd_bridge_poll_init(), this variant skips the broadcast
  * identification step (reading ERD 0x0008 from 0xFF) because the appliance
  * address is already known.  If api_list is non-NULL the bridge goes directly
  * to state_polling; otherwise it runs the full ERD discovery chain starting at
@@ -173,8 +173,8 @@ void mqtt_bridge_polling_init(
  * polling bridge alongside a subscription bridge that has already identified
  * the appliance.
  */
-void mqtt_bridge_polling_init_at_address(
-  mqtt_bridge_polling_t* self,
+void erd_bridge_poll_init_at_address(
+  erd_bridge_poll_t* self,
   tiny_timer_group_t* timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t* mqtt_client,
@@ -186,9 +186,9 @@ void mqtt_bridge_polling_init_at_address(
   erd_cache_t* cache);
 
 /*!
- * Destroy the MQTT polling bridge.
+ * Destroy the ERD polling bridge.
  */
-void mqtt_bridge_polling_destroy(
-  mqtt_bridge_polling_t* self);
+void erd_bridge_poll_destroy(
+  erd_bridge_poll_t* self);
 
 #endif

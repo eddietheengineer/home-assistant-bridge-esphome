@@ -369,7 +369,7 @@ void GeappliancesBridge::run_protocol_stack_()
   if (loop_elapsed >= 1000) {
     ESP_LOGW(TAG, "Long run_protocol_stack: %ums (mode=%s, polling=%s)",
              loop_elapsed, this->mode_ == BRIDGE_MODE_SUBSCRIBE ? "sub" : (this->mode_ == BRIDGE_MODE_AUTO ? "auto" : "poll"),
-             this->mqtt_bridge_initialized_ ? "yes" : "no");
+             this->erd_bridge_initialized_ ? "yes" : "no");
   }
 }
 
@@ -379,7 +379,7 @@ void GeappliancesBridge::run_protocol_stack_()
 
 void GeappliancesBridge::log_poll_state_transitions_()
 {
-  if (!this->mqtt_bridge_initialized_) {
+  if (!this->erd_bridge_initialized_) {
     return;
   }
   bool is_poll_mode = !((this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
@@ -387,7 +387,7 @@ void GeappliancesBridge::log_poll_state_transitions_()
   if (!is_poll_mode) {
     return;
   }
-  const char* new_state = this->mqtt_bridge_polling_.current_state_name;
+  const char* new_state = this->erd_bridge_poll_.current_state_name;
   if (new_state != nullptr && new_state != this->last_logged_poll_state_) {
     ESP_LOGD(TAG, "Polling bridge state: %s (ERDs registered: %zu)",
              new_state, this->erd_registry_.registered_erds().size());
@@ -398,7 +398,7 @@ void GeappliancesBridge::log_poll_state_transitions_()
 void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args) {
   // Subscription publications: track AUTO mode activity and reset the HA
   // discovery quiet window for both AUTO and SUBSCRIBE modes.
-  if (this->mqtt_bridge_initialized_ &&
+  if (this->erd_bridge_initialized_ &&
       args->address == this->autodiscovery_manager_.get_host_address() &&
       args->type == tiny_gea3_erd_client_activity_type_subscription_publication_received) {
     if (this->mode_ == BRIDGE_MODE_AUTO && this->subscription_mode_active_ &&
@@ -417,7 +417,7 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
   // Device ID reads (after discovery, before bridge init)
   // Note: FeatureBitManager subscribes directly to ERD client activity events,
   // so the bridge no longer routes feature bit ERDs to it.
-  if (!this->mqtt_bridge_initialized_ && args->address == this->autodiscovery_manager_.get_host_address()) {
+  if (!this->erd_bridge_initialized_ && args->address == this->autodiscovery_manager_.get_host_address()) {
     if (args->type == tiny_gea3_erd_client_activity_type_read_completed) {
       tiny_erd_t erd = args->read_completed.erd;
       const uint8_t* data = reinterpret_cast<const uint8_t*>(args->read_completed.data);
@@ -539,10 +539,10 @@ bool GeappliancesBridge::teardown() {
   // Using explicit ownership flags makes this unambiguous and prevents
   // double-free or missed cleanup.
   if (this->subscription_bridge_initialized_) {
-    mqtt_bridge_destroy(&this->mqtt_bridge_);
+    erd_bridge_subscribe_destroy(&this->erd_bridge_subscribe_);
   }
   if (this->polling_bridge_initialized_) {
-    mqtt_bridge_polling_destroy(&this->mqtt_bridge_polling_);
+    erd_bridge_poll_destroy(&this->erd_bridge_poll_);
   }
 
   // Destroy the shared ERD cache after bridges are torn down.
@@ -647,12 +647,12 @@ bool GeappliancesBridge::is_startup_delay_elapsed() const
 
 bool GeappliancesBridge::is_bridge_initialized() const
 {
-  return mqtt_bridge_initialized_;
+  return erd_bridge_initialized_;
 }
 
-void GeappliancesBridge::initialize_mqtt_bridge()
+void GeappliancesBridge::initialize_erd_bridge()
 {
-  initialize_mqtt_bridge_();
+  initialize_erd_bridge_();
 }
 
 // -- Operating mode -----------------------------------------------------------
@@ -690,7 +690,7 @@ void GeappliancesBridge::run_ha_discovery()
       !((mode_ == BRIDGE_MODE_SUBSCRIBE) ||
         (mode_ == BRIDGE_MODE_AUTO && subscription_mode_active_)),
       polling_bridge_initialized_,
-      mqtt_bridge_polling_.polling_list_complete,
+      erd_bridge_poll_.polling_list_complete,
       subscription_activity_detected_);
 }
 

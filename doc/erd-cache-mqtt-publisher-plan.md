@@ -11,7 +11,7 @@ Connect the ERD cache to MQTT publishing via a standalone module that scans the 
 - Round-robin fairness: A persistent index ensures all ERDs in the cache get published over time.
 - Disconnect handling: Publisher stops on MQTT disconnect, resumes on reconnect, with warning logs.
 - Write commands: Out of scope for this plan.
-- Naming: `mqtt_bridge_t` / `mqtt_bridge_polling_t` rename deferred to a future pass.
+- Naming: `erd_bridge_subscribe_t` / `erd_bridge_poll_t` rename deferred to a future pass.
 
 ## Architecture
 
@@ -36,26 +36,26 @@ Connect the ERD cache to MQTT publishing via a standalone module that scans the 
 - In `setup()`, after `tiny_timer_group_init()`: call `erd_cache_init(&this->erd_cache_);`
 - In `teardown()`, before bridge destroys: call `erd_cache_destroy(&this->erd_cache_);`
 
-### 1.3 Remove embedded cache from mqtt_bridge_t
+### 1.3 Remove embedded cache from erd_bridge_subscribe_t
 
-**`mqtt_bridge.h`**
+**`erd_bridge_subscribe.h`**
 - Replace `erd_cache_t erd_cache;` with `erd_cache_t* erd_cache;` (pointer)
 
-**`mqtt_bridge.cpp`**
-- Change `mqtt_bridge_init()` signature to add `erd_cache_t* cache` parameter after `address`
+**`erd_bridge_subscribe.cpp`**
+- Change `erd_bridge_subscribe_init()` signature to add `erd_cache_t* cache` parameter after `address`
 - Store pointer: `self->erd_cache = cache;`
 - Remove `erd_cache_init(&self->erd_cache);` from init
 - Change all `&self->erd_cache` references to `self->erd_cache` (already a pointer)
 - Remove `erd_cache_destroy(&self->erd_cache);` from destroy
 
-### 1.4 Remove embedded cache from mqtt_bridge_polling_t
+### 1.4 Remove embedded cache from erd_bridge_poll_t
 
-**`mqtt_bridge_polling.h`**
+**`erd_bridge_poll.h`**
 - Replace `erd_cache_t erd_cache;` with `erd_cache_t* erd_cache;` (pointer)
 
-**`mqtt_bridge_polling.cpp`**
-- Change `mqtt_bridge_polling_init()` and `mqtt_bridge_polling_init_at_address()` signatures to add `erd_cache_t* cache` parameter
-- Update `mqtt_bridge_polling_init_impl()` to accept and store the cache pointer
+**`erd_bridge_poll.cpp`**
+- Change `erd_bridge_poll_init()` and `erd_bridge_poll_init_at_address()` signatures to add `erd_cache_t* cache` parameter
+- Update `erd_bridge_poll_init_impl()` to accept and store the cache pointer
 - Remove `erd_cache_init(&self->erd_cache);` from init
 - Change all `&self->erd_cache` references to `self->erd_cache`
 - Change `erd_cache_init(&self->erd_cache)` calls in state handlers (re-entry after appliance lost) to `erd_cache_init(self->erd_cache)`
@@ -64,8 +64,8 @@ Connect the ERD cache to MQTT publishing via a standalone module that scans the 
 ### 1.5 Wire the shared cache in bridge initialization
 
 **`geappliances_bridge_bridge_init.cpp`**
-- In `initialize_mqtt_bridge_()`, pass `&this->erd_cache_` to both `mqtt_bridge_init()` and `mqtt_bridge_polling_init()` calls
-- In `start_custom_erd_polling_()`, pass `&this->erd_cache_` to `mqtt_bridge_polling_init_at_address()`
+- In `initialize_erd_bridge_()`, pass `&this->erd_cache_` to both `erd_bridge_subscribe_init()` and `erd_bridge_poll_init()` calls
+- In `start_custom_erd_polling_()`, pass `&this->erd_cache_` to `erd_bridge_poll_init_at_address()`
 
 ### 1.6 Simplify cache stats sensor reading
 
@@ -74,16 +74,16 @@ Connect the ERD cache to MQTT publishing via a standalone module that scans the 
 
 ### 1.7 Update tests
 
-**`test/tests/mqtt_bridge_test.cpp`**
+**`test/tests/erd_bridge_subscribe_test.cpp`**
 - Add `erd_cache_t test_cache;` to TEST_GROUP
 - Initialize in setup: `erd_cache_init(&test_cache);`
 - Destroy in teardown: `erd_cache_destroy(&test_cache);`
-- Pass `&test_cache` to `mqtt_bridge_init()`
+- Pass `&test_cache` to `erd_bridge_subscribe_init()`
 
-**`test/tests/mqtt_bridge_polling_test.cpp`**
+**`test/tests/erd_bridge_poll_test.cpp`**
 - Add `erd_cache_t test_cache;` to TEST_GROUP
 - Initialize/destroy same as above
-- Pass `&test_cache` to `mqtt_bridge_polling_init()`
+- Pass `&test_cache` to `erd_bridge_poll_init()`
 - Update any tests that reference `self.erd_cache` to use the shared cache
 
 ---
@@ -297,15 +297,15 @@ Test cases:
 
 ### 4.2 Update existing tests
 
-**`test/tests/mqtt_bridge_test.cpp`**
+**`test/tests/erd_bridge_subscribe_test.cpp`**
 - Add `erd_cache_t test_cache;` member to TEST_GROUP
 - Init/destroy in setup/teardown
-- Pass `&test_cache` to `mqtt_bridge_init()`
+- Pass `&test_cache` to `erd_bridge_subscribe_init()`
 
-**`test/tests/mqtt_bridge_polling_test.cpp`**
+**`test/tests/erd_bridge_poll_test.cpp`**
 - Add `erd_cache_t test_cache;` member to TEST_GROUP
 - Init/destroy in setup/teardown
-- Pass `&test_cache` to `mqtt_bridge_polling_init()`
+- Pass `&test_cache` to `erd_bridge_poll_init()`
 - Update any assertions that reference `self.erd_cache` to use `test_cache`
 
 ### 4.3 Update Makefile
@@ -326,7 +326,7 @@ make test
 ```
 
 Verify:
-- All existing tests pass (mqtt_bridge_test, mqtt_bridge_polling_test, esphome_mqtt_client_adapter_test)
+- All existing tests pass (erd_bridge_subscribe_test, erd_bridge_poll_test, esphome_mqtt_client_adapter_test)
 - New erd_cache_mqtt_publisher_test passes
 - No compiler warnings
 
@@ -346,10 +346,10 @@ Verify the component compiles in the ESPHome environment.
 |------|--------|
 | `erd_cache.h` | No changes |
 | `erd_cache.cpp` | No changes |
-| `mqtt_bridge.h` | `erd_cache_t erd_cache` → `erd_cache_t* erd_cache` |
-| `mqtt_bridge.cpp` | Accept cache pointer in init, remove init/destroy calls |
-| `mqtt_bridge_polling.h` | `erd_cache_t erd_cache` → `erd_cache_t* erd_cache` |
-| `mqtt_bridge_polling.cpp` | Accept cache pointer in init, remove init/destroy calls |
+| `erd_bridge_subscribe.h` | `erd_cache_t erd_cache` → `erd_cache_t* erd_cache` |
+| `erd_bridge_subscribe.cpp` | Accept cache pointer in init, remove init/destroy calls |
+| `erd_bridge_poll.h` | `erd_cache_t erd_cache` → `erd_cache_t* erd_cache` |
+| `erd_bridge_poll.cpp` | Accept cache pointer in init, remove init/destroy calls |
 | `geappliances_bridge.h` | Add `erd_cache_` member, `erd_cache_publisher_` member, new methods |
 | `geappliances_bridge.cpp` | Init/destroy cache, call publisher loop(), IBridgeServices impl |
 | `geappliances_bridge_bridge_init.cpp` | Wire cache pointer to bridges, init publisher after device ID |
@@ -362,6 +362,6 @@ Verify the component compiles in the ESPHome environment.
 | `erd_cache_mqtt_publisher.h` | **NEW** - Publisher struct and API |
 | `erd_cache_mqtt_publisher.cpp` | **NEW** - Publisher implementation |
 | `erd_cache_mqtt_publisher_test.cpp` | **NEW** - Unit tests |
-| `mqtt_bridge_test.cpp` | Pass cache pointer to init |
-| `mqtt_bridge_polling_test.cpp` | Pass cache pointer to init |
+| `erd_bridge_subscribe_test.cpp` | Pass cache pointer to init |
+| `erd_bridge_poll_test.cpp` | Pass cache pointer to init |
 | `Makefile` | Add new source file to SRC_FILES |

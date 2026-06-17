@@ -21,7 +21,7 @@ Hierarchical state machine that drives the linear startup sequence of the GE App
 | `signal_device_id_failed` | Device ID read failed, using fallback |
 | `signal_mqtt_connected` | MQTT broker connection established |
 | `signal_feature_bits_complete` | All feature bit ERDs read and parsed |
-| `signal_bridge_ready` | MQTT bridge (poll/subscribe) initialized |
+| `signal_bridge_ready` | ERD bridge (poll/subscribe) initialized |
 | `signal_subscription_fallback` | AUTO mode: subscription timed out, fell back to polling |
 
 ## State Machine

@@ -15,7 +15,7 @@
 //   - Route write commands from i_mqtt_client_t back to the ERD client
 //
 // NOT responsible for:
-//   - Polling (see mqtt_bridge_polling.h)
+//   - Polling (see erd_bridge_poll.h)
 //   - Deciding which ERDs to publish (filtered upstream by i_mqtt_client)
 //   - Bridge initialization or startup phase management
 //
@@ -23,8 +23,8 @@
 //   - i_mqtt_client.h, i_tiny_gea3_erd_client.h, tiny_hsm.h, tiny_timer.h
 // =============================================================================
 
-#ifndef mqtt_bridge_h
-#define mqtt_bridge_h
+#ifndef erd_bridge_subscribe_h
+#define erd_bridge_subscribe_h
 
 struct erd_cache_t;
 
@@ -45,13 +45,13 @@ typedef struct {
   erd_cache_t* erd_cache;
   tiny_hsm_t hsm;
   uint8_t erd_host_address;
-} mqtt_bridge_t;
+} erd_bridge_subscribe_t;
 
 /*!
- * Initialize the MQTT bridge.
+ * Initialize the ERD subscription bridge.
  */
-void mqtt_bridge_init(
-  mqtt_bridge_t* self,
+void erd_bridge_subscribe_init(
+  erd_bridge_subscribe_t* self,
   tiny_timer_group_t* timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t* mqtt_client,
@@ -59,9 +59,9 @@ void mqtt_bridge_init(
   erd_cache_t* cache);
 
 /*!
- * Destroy the MQTT bridge.
+ * Destroy the ERD subscription bridge.
  */
-void mqtt_bridge_destroy(
-  mqtt_bridge_t* self);
+void erd_bridge_subscribe_destroy(
+  erd_bridge_subscribe_t* self);
 
 #endif

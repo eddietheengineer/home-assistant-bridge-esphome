@@ -15,7 +15,7 @@
  * string-ERD type detection), and passes the registry to the adapter so it
  * is ready to publish ERD values immediately.
  *
- * initialize_mqtt_bridge_() runs once after feature bit reading and MQTT are
+ * initialize_erd_bridge_() runs once after feature bit reading and MQTT are
  * both ready (Phase 6).  It applies the valid-ERD filter to the registry
  * (built from feature bit results), selects the operating mode
  * (poll / subscribe / auto), and initializes the appropriate bridge HSMs.
@@ -116,16 +116,16 @@ void GeappliancesBridge::initialize_mqtt_client_()
 }
 
 // ---------------------------------------------------------------------------
-// Phase 4: Initialize the MQTT bridge (called once from loop())
+// Phase 6: Initialize the ERD bridge (called once from loop())
 // ---------------------------------------------------------------------------
 
-void GeappliancesBridge::initialize_mqtt_bridge_()
+void GeappliancesBridge::initialize_erd_bridge_()
 {
-  if (!this->mqtt_client_adapter_initialized_ || this->mqtt_bridge_initialized_) {
+  if (!this->mqtt_client_adapter_initialized_ || this->erd_bridge_initialized_) {
     return;
   }
 
-  ESP_LOGI(TAG, "Initializing MQTT bridge");
+  ESP_LOGI(TAG, "Initializing ERD bridge");
 
   // Apply the valid-ERD filter when appliance API parsing is enabled and
   // produced results. An empty set is ignored by the registry so all ERDs
@@ -165,8 +165,8 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
 
   // Initialize the appropriate bridge(s).
   if (use_polling) {
-    mqtt_bridge_polling_init(
-      &this->mqtt_bridge_polling_,
+    erd_bridge_poll_init(
+      &this->erd_bridge_poll_,
       &this->timer_group_,
       this->autodiscovery_manager_.get_active_erd_client(),
       &this->mqtt_client_adapter_.interface,
@@ -175,12 +175,12 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
       &this->erd_cache_);
     // Wire the discovery-complete callback so the startup HSM waits for
     // ERD discovery to finish before transitioning to steady-state.
-    this->mqtt_bridge_polling_.on_discovery_complete = +[](void* ctx) {
+    this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
       auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
       bridge->ha_discovery_manager_.set_registered_erds(bridge->erd_registry_.registered_erds());
       tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
     };
-    this->mqtt_bridge_polling_.on_discovery_complete_context = this;
+    this->erd_bridge_poll_.on_discovery_complete_context = this;
     this->polling_bridge_initialized_ = true;
     this->configure_polling_optional_lists_();
   }
@@ -189,8 +189,8 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
   // In polling mode (GEA2 or explicit poll), subscriptions are not used, but
   // the bridge is still initialized above for custom ERD subscription support.
   if (!use_polling) {
-    mqtt_bridge_init(
-      &this->mqtt_bridge_,
+    erd_bridge_subscribe_init(
+      &this->erd_bridge_subscribe_,
       &this->timer_group_,
       this->autodiscovery_manager_.get_active_erd_client(),
       &this->mqtt_client_adapter_.interface,
@@ -203,8 +203,8 @@ void GeappliancesBridge::initialize_mqtt_bridge_()
     tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
   }
 
-  this->mqtt_bridge_initialized_ = true;
-  ESP_LOGI(TAG, "MQTT bridge initialized successfully");
+  this->erd_bridge_initialized_ = true;
+  ESP_LOGI(TAG, "ERD bridge initialized successfully");
 
   // Defer HA device discovery until ERD registration has settled.
   if (this->generate_device_config_) {
@@ -234,18 +234,18 @@ void GeappliancesBridge::configure_polling_optional_lists_()
   if (this->appliance_api_parsing_ &&
       this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE &&
       !this->feature_bit_manager_.get_valid_erds_vec().empty()) {
-    this->mqtt_bridge_polling_.api_parsed_list       = this->feature_bit_manager_.get_valid_erds_vec().data();
-    this->mqtt_bridge_polling_.api_parsed_list_count =
+    this->erd_bridge_poll_.api_parsed_list       = this->feature_bit_manager_.get_valid_erds_vec().data();
+    this->erd_bridge_poll_.api_parsed_list_count =
       static_cast<uint16_t>(this->feature_bit_manager_.get_valid_erds_vec().size());
     ESP_LOGI(TAG, "Polling with API-parsed list of %u ERDs (ERDs will be probed before polling)",
-             this->mqtt_bridge_polling_.api_parsed_list_count);
+             this->erd_bridge_poll_.api_parsed_list_count);
   }
 
   if (!this->custom_erds_vec_.empty()) {
-    this->mqtt_bridge_polling_.custom_erd_list       = this->custom_erds_vec_.data();
-    this->mqtt_bridge_polling_.custom_erd_list_count =
+    this->erd_bridge_poll_.custom_erd_list       = this->custom_erds_vec_.data();
+    this->erd_bridge_poll_.custom_erd_list_count =
       static_cast<uint16_t>(this->custom_erds_vec_.size());
-    ESP_LOGI(TAG, "Polling with %u custom ERD(s)", this->mqtt_bridge_polling_.custom_erd_list_count);
+    ESP_LOGI(TAG, "Polling with %u custom ERD(s)", this->erd_bridge_poll_.custom_erd_list_count);
   }
 }
 
@@ -275,8 +275,8 @@ void GeappliancesBridge::start_custom_erd_polling_()
 
   // Initialize a polling bridge with the custom ERDs as the api_parsed_list.
   // This skips discovery states and goes straight to polling with an exact-size list.
-  mqtt_bridge_polling_init_at_address(
-    &this->mqtt_bridge_polling_,
+  erd_bridge_poll_init_at_address(
+    &this->erd_bridge_poll_,
     &this->timer_group_,
     this->autodiscovery_manager_.get_active_erd_client(),
     &this->mqtt_client_adapter_.interface,
@@ -293,7 +293,7 @@ void GeappliancesBridge::start_custom_erd_polling_()
 void GeappliancesBridge::maybe_start_custom_erd_polling_()
 {
   if (this->custom_erds_vec_.empty() ||
-      !this->mqtt_bridge_initialized_ ||
+      !this->erd_bridge_initialized_ ||
       this->custom_erd_polling_started_) {
     return;
   }
@@ -337,20 +337,20 @@ void GeappliancesBridge::check_subscription_activity_()
            SUBSCRIPTION_TIMEOUT_MS / 1000);
 
   // Tear down the subscription bridge.
-  mqtt_bridge_destroy(&this->mqtt_bridge_);
+  erd_bridge_subscribe_destroy(&this->erd_bridge_subscribe_);
   this->subscription_bridge_initialized_ = false;
 
   // Destroy any existing polling bridge (e.g., from custom ERD polling)
   // before re-initializing to avoid leaking heap allocations.
   if (this->custom_erd_polling_started_) {
-    mqtt_bridge_polling_destroy(&this->mqtt_bridge_polling_);
+    erd_bridge_poll_destroy(&this->erd_bridge_poll_);
     this->custom_erd_polling_started_ = false;
     this->polling_bridge_initialized_ = false;
   }
 
   // Stand up the polling bridge.
-  mqtt_bridge_polling_init(
-    &this->mqtt_bridge_polling_,
+  erd_bridge_poll_init(
+    &this->erd_bridge_poll_,
     &this->timer_group_,
     this->autodiscovery_manager_.get_active_erd_client(),
     &this->mqtt_client_adapter_.interface,
@@ -360,12 +360,12 @@ void GeappliancesBridge::check_subscription_activity_()
   this->polling_bridge_initialized_ = true;
   // Wire the discovery-complete callback so HA discovery registration
   // works correctly after subscription fallback.
-  this->mqtt_bridge_polling_.on_discovery_complete = +[](void* ctx) {
+  this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
     auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
     bridge->ha_discovery_manager_.set_registered_erds(bridge->erd_registry_.registered_erds());
     tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
   };
-  this->mqtt_bridge_polling_.on_discovery_complete_context = this;
+  this->erd_bridge_poll_.on_discovery_complete_context = this;
   this->configure_polling_optional_lists_();
   this->subscription_mode_active_ = false;
 

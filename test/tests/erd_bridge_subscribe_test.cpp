@@ -5,7 +5,7 @@
 
 extern "C" {
 #include "erd_cache.h"
-#include "mqtt_bridge.h"
+#include "erd_bridge_subscribe.h"
 }
 
 #include "CppUTest/TestHarness.h"
@@ -14,14 +14,14 @@ extern "C" {
 #include "double/tiny_gea3_erd_client_double.hpp"
 #include "double/tiny_timer_group_double.hpp"
 
-TEST_GROUP(mqtt_bridge)
+TEST_GROUP(erd_bridge_subscribe)
 {
   enum {
     resubscribe_delay = 1000,
     subscription_retention_period = 30 * 1000
   };
 
-  mqtt_bridge_t self;
+  erd_bridge_subscribe_t self;
   erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
@@ -40,13 +40,13 @@ TEST_GROUP(mqtt_bridge)
 
   void teardown()
   {
-    mqtt_bridge_destroy(&self);
+    erd_bridge_subscribe_destroy(&self);
     erd_cache_destroy(&test_cache);
   }
 
   void when_the_bridge_is_initialized(uint8_t address = 0xC0)
   {
-    mqtt_bridge_init(
+    erd_bridge_subscribe_init(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -258,13 +258,13 @@ TEST_GROUP(mqtt_bridge)
   }
 };
 
-TEST(mqtt_bridge, should_subscribe_when_initialized)
+TEST(erd_bridge_subscribe, should_subscribe_when_initialized)
 {
   a_subscription_to_should_be_requested_for(0xC0);
   when_the_bridge_is_initialized();
 }
 
-TEST(mqtt_bridge, should_retry_subscribe_after_a_delay_if_the_subscribe_request_fails_to_queue)
+TEST(erd_bridge_subscribe, should_retry_subscribe_after_a_delay_if_the_subscribe_request_fails_to_queue)
 {
   a_subscription_should_be_requested_and_will_fail_to_queue_for(0xC0);
   when_the_bridge_is_initialized();
@@ -279,35 +279,35 @@ TEST(mqtt_bridge, should_retry_subscribe_after_a_delay_if_the_subscribe_request_
   after(resubscribe_delay);
 }
 
-TEST(mqtt_bridge, should_retry_subscribe_if_the_subscribe_request_fails)
+TEST(erd_bridge_subscribe, should_retry_subscribe_if_the_subscribe_request_fails)
 {
   given_that_the_bridge_has_been_initialized();
   a_subscription_to_should_be_requested_for(0xC0);
   when_a_subscribe_failure_is_received_for(0xC0);
 }
 
-TEST(mqtt_bridge, should_not_retry_subscribe_if_the_subscribe_request_fails_for_a_different_address)
+TEST(erd_bridge_subscribe, should_not_retry_subscribe_if_the_subscribe_request_fails_for_a_different_address)
 {
   given_that_the_bridge_has_been_initialized();
   nothing_should_happen();
   when_a_subscribe_failure_is_received_for(0xC1);
 }
 
-TEST(mqtt_bridge, should_resubscribe_after_receiving_a_subscription_host_came_online_from_the_erd_host)
+TEST(erd_bridge_subscribe, should_resubscribe_after_receiving_a_subscription_host_came_online_from_the_erd_host)
 {
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
   a_subscription_to_should_be_requested_for(0xC0);
   when_a_subscription_host_came_online_is_received_for(0xC0);
 }
 
-TEST(mqtt_bridge, should_ignore_subscription_host_came_online_from_other_addresses)
+TEST(erd_bridge_subscribe, should_ignore_subscription_host_came_online_from_other_addresses)
 {
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
   nothing_should_happen();
   when_a_subscription_host_came_online_is_received_for(0xC1);
 }
 
-TEST(mqtt_bridge, should_ignore_subscription_added_activity_for_other_addresses)
+TEST(erd_bridge_subscribe, should_ignore_subscription_added_activity_for_other_addresses)
 {
   given_that_the_bridge_has_been_initialized();
   nothing_should_happen();
@@ -315,7 +315,7 @@ TEST(mqtt_bridge, should_ignore_subscription_added_activity_for_other_addresses)
   after(subscription_retention_period);
 }
 
-TEST(mqtt_bridge, should_periodically_retain_an_active_subscription)
+TEST(erd_bridge_subscribe, should_periodically_retain_an_active_subscription)
 {
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
 
@@ -326,7 +326,7 @@ TEST(mqtt_bridge, should_periodically_retain_an_active_subscription)
   after(1);
 }
 
-TEST(mqtt_bridge, should_register_and_update_newly_discovered_erds_when_published_by_the_erd_client)
+TEST(erd_bridge_subscribe, should_register_and_update_newly_discovered_erds_when_published_by_the_erd_client)
 {
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
   should_register_erd(0xABCD);
@@ -334,7 +334,7 @@ TEST(mqtt_bridge, should_register_and_update_newly_discovered_erds_when_publishe
   when_an_erd_publication_is_received(0xC0, 0xABCD, uint32_t(0x12345678));
 }
 
-TEST(mqtt_bridge, should_update_known_erds_when_published_by_the_erd_client)
+TEST(erd_bridge_subscribe, should_update_known_erds_when_published_by_the_erd_client)
 {
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
   given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
@@ -345,7 +345,7 @@ TEST(mqtt_bridge, should_update_known_erds_when_published_by_the_erd_client)
 // This makes sure that if we miss the ERD subscription added message that we still handle ERD publications
 // Since the ERD client acknowledges publications even if a subscription isn't known to be active, this is
 // necessary to make sure that we don't miss any ERD publications
-TEST(mqtt_bridge, should_handle_erd_publications_even_when_a_subscription_is_not_confirmed_active)
+TEST(erd_bridge_subscribe, should_handle_erd_publications_even_when_a_subscription_is_not_confirmed_active)
 {
   given_that_the_bridge_has_been_initialized();
   should_register_erd(0xABCD);
@@ -353,21 +353,21 @@ TEST(mqtt_bridge, should_handle_erd_publications_even_when_a_subscription_is_not
   when_an_erd_publication_is_received(0xC0, 0xABCD, uint32_t(0x12345678));
 }
 
-TEST(mqtt_bridge, should_ignore_erd_publications_from_other_hosts)
+TEST(erd_bridge_subscribe, should_ignore_erd_publications_from_other_hosts)
 {
   given_that_the_bridge_has_been_initialized();
   nothing_should_happen();
   when_an_erd_publication_is_received(0xC1, 0xABCD, uint32_t(0x12345678));
 }
 
-TEST(mqtt_bridge, should_forward_write_requests_from_the_mqtt_client)
+TEST(erd_bridge_subscribe, should_forward_write_requests_from_the_mqtt_client)
 {
   given_that_the_bridge_has_been_initialized();
   should_request_erd_write(0xC0, 0xABCD, uint32_t(0x12345678));
   when_a_write_request_is_received(0xABCD, uint32_t(0x12345678));
 }
 
-TEST(mqtt_bridge, should_report_write_results_to_the_mqtt_client)
+TEST(erd_bridge_subscribe, should_report_write_results_to_the_mqtt_client)
 {
   given_that_the_bridge_has_been_initialized();
 
@@ -378,7 +378,7 @@ TEST(mqtt_bridge, should_report_write_results_to_the_mqtt_client)
   when_a_write_request_completes_unsuccessfully(0xC0, 0xABCD, uint32_t(0x12345678), tiny_gea3_erd_client_write_failure_reason_not_supported);
 }
 
-TEST(mqtt_bridge, should_register_and_update_newly_discovered_erds_when_published_by_the_erd_client_after_mqtt_reconnects)
+TEST(erd_bridge_subscribe, should_register_and_update_newly_discovered_erds_when_published_by_the_erd_client_after_mqtt_reconnects)
 {
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
   given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
@@ -389,7 +389,7 @@ TEST(mqtt_bridge, should_register_and_update_newly_discovered_erds_when_publishe
   when_an_erd_publication_is_received(0xC0, 0xABCD, uint32_t(0x12345678));
 }
 
-TEST(mqtt_bridge, should_resubscribe_after_mqtt_disconnects)
+TEST(erd_bridge_subscribe, should_resubscribe_after_mqtt_disconnects)
 {
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
   a_subscription_to_should_be_requested_for(0xC0);
@@ -401,7 +401,7 @@ TEST(mqtt_bridge, should_resubscribe_after_mqtt_disconnects)
 // different appliance address and publishing to its own MQTT client.
 // ---------------------------------------------------------------------------
 
-TEST_GROUP(mqtt_bridge_dual)
+TEST_GROUP(erd_bridge_subscribe_dual)
 {
   enum {
     address_a = 0xC0,
@@ -410,8 +410,8 @@ TEST_GROUP(mqtt_bridge_dual)
     subscription_retention_period = 30 * 1000
   };
 
-  mqtt_bridge_t bridge_a;
-  mqtt_bridge_t bridge_b;
+  erd_bridge_subscribe_t bridge_a;
+  erd_bridge_subscribe_t bridge_b;
   erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
@@ -432,22 +432,22 @@ TEST_GROUP(mqtt_bridge_dual)
 
   void teardown()
   {
-    mqtt_bridge_destroy(&bridge_a);
-    mqtt_bridge_destroy(&bridge_b);
+    erd_bridge_subscribe_destroy(&bridge_a);
+    erd_bridge_subscribe_destroy(&bridge_b);
     erd_cache_destroy(&test_cache);
   }
 
   void given_both_bridges_are_initialized()
   {
     mock().disable();
-    mqtt_bridge_init(
+    erd_bridge_subscribe_init(
       &bridge_a,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client_a.interface,
       address_a,
       &test_cache);
-    mqtt_bridge_init(
+    erd_bridge_subscribe_init(
       &bridge_b,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -525,18 +525,18 @@ TEST_GROUP(mqtt_bridge_dual)
   }
 };
 
-TEST(mqtt_bridge_dual, each_bridge_subscribes_to_its_own_address_at_init)
+TEST(erd_bridge_subscribe_dual, each_bridge_subscribes_to_its_own_address_at_init)
 {
   a_subscription_should_be_requested_for(address_a);
   a_subscription_should_be_requested_for(address_b);
-  mqtt_bridge_init(
+  erd_bridge_subscribe_init(
     &bridge_a,
     &timer_group.timer_group,
     &erd_client.interface,
     &mqtt_client_a.interface,
     address_a,
     &test_cache);
-  mqtt_bridge_init(
+  erd_bridge_subscribe_init(
     &bridge_b,
     &timer_group.timer_group,
     &erd_client.interface,
@@ -545,7 +545,7 @@ TEST(mqtt_bridge_dual, each_bridge_subscribes_to_its_own_address_at_init)
     &test_cache);
 }
 
-TEST(mqtt_bridge_dual, publications_from_each_appliance_are_routed_to_the_correct_mqtt_client)
+TEST(erd_bridge_subscribe_dual, publications_from_each_appliance_are_routed_to_the_correct_mqtt_client)
 {
   given_both_bridges_are_initialized();
   given_both_subscriptions_are_active();
@@ -559,7 +559,7 @@ TEST(mqtt_bridge_dual, publications_from_each_appliance_are_routed_to_the_correc
   when_an_erd_publication_is_received(address_b, 0x0001, uint32_t(0xBBBB0001));
 }
 
-TEST(mqtt_bridge_dual, each_bridge_ignores_publications_from_the_other_appliance_address)
+TEST(erd_bridge_subscribe_dual, each_bridge_ignores_publications_from_the_other_appliance_address)
 {
   given_both_bridges_are_initialized();
   given_both_subscriptions_are_active();
@@ -575,7 +575,7 @@ TEST(mqtt_bridge_dual, each_bridge_ignores_publications_from_the_other_appliance
   when_an_erd_publication_is_received(address_b, 0x0002, uint32_t(0x55667788));
 }
 
-TEST(mqtt_bridge_dual, each_bridge_independently_retains_its_subscription)
+TEST(erd_bridge_subscribe_dual, each_bridge_independently_retains_its_subscription)
 {
   given_both_bridges_are_initialized();
   given_both_subscriptions_are_active();
@@ -596,7 +596,7 @@ TEST(mqtt_bridge_dual, each_bridge_independently_retains_its_subscription)
   after(1);
 }
 
-TEST(mqtt_bridge_dual, resubscribing_one_bridge_does_not_affect_the_other)
+TEST(erd_bridge_subscribe_dual, resubscribing_one_bridge_does_not_affect_the_other)
 {
   given_both_bridges_are_initialized();
   given_both_subscriptions_are_active();

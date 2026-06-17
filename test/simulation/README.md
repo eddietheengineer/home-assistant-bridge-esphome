@@ -8,7 +8,7 @@ The simulation testing framework allows testing of:
 - **Configuration-based testing** - Different YAML configuration scenarios
 - Complete application workflows (device ID generation, subscription, polling)
 - GEA3 protocol interactions with mock appliance responses
-- MQTT bridge behavior with simulated ERD reads/writes
+- ERD bridge behavior with simulated ERD reads/writes
 - Mode switching (subscription mode fallback to polling mode)
 - Multiple appliance types (dishwashers, refrigerators, washers)
 

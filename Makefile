@@ -22,8 +22,8 @@ SRC_DIRS := \
 
 SRC_FILES := \
   components/geappliances_bridge/erd_cache.cpp \
-  components/geappliances_bridge/mqtt_bridge.cpp \
-  components/geappliances_bridge/mqtt_bridge_polling.cpp \
+  components/geappliances_bridge/erd_bridge_subscribe.cpp \
+  components/geappliances_bridge/erd_bridge_poll.cpp \
   components/geappliances_bridge/gea2_erd_client_adapter.cpp \
   components/geappliances_bridge/device_identity_manager.cpp \
   components/geappliances_bridge/feature_bit_manager.cpp \

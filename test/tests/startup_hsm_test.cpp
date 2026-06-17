@@ -60,7 +60,7 @@ class MockBridgeServices : public IBridgeServices {
 
   // -- Bridge initialization --------------------------------------------------
   bool is_bridge_initialized() const override { return false; }
-  void initialize_mqtt_bridge() override {}
+  void initialize_erd_bridge() override {}
 
   // -- Operating mode ---------------------------------------------------------
   BridgeMode get_mode() const override { return BRIDGE_MODE_AUTO; }

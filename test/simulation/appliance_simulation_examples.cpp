@@ -8,8 +8,8 @@
  */
 
 extern "C" {
-#include "mqtt_bridge.h"
-#include "mqtt_bridge_polling.h"
+#include "erd_bridge_subscribe.h"
+#include "erd_bridge_poll.h"
 }
 
 #include "CppUTest/TestHarness.h"
@@ -54,8 +54,8 @@ TEST_GROUP(appliance_simulation_examples)
     APPLIANCE_TYPE_REFRIGERATOR = 5,
   };
   
-  mqtt_bridge_t mqtt_bridge;
-  mqtt_bridge_polling_t mqtt_bridge_polling;
+  erd_bridge_subscribe_t erd_bridge_subscribe;
+  erd_bridge_poll_t erd_bridge_poll;
   erd_cache_t test_cache;
   
   tiny_timer_group_double_t timer_group;
@@ -74,16 +74,16 @@ TEST_GROUP(appliance_simulation_examples)
   
   void teardown()
   {
-    mqtt_bridge_destroy(&mqtt_bridge);
-    mqtt_bridge_polling_destroy(&mqtt_bridge_polling);
+    erd_bridge_subscribe_destroy(&erd_bridge_subscribe);
+    erd_bridge_poll_destroy(&erd_bridge_poll);
     erd_cache_destroy(&test_cache);
     mock().clear();
   }
   
-  void initialize_mqtt_bridge_subscription_mode()
+  void initialize_erd_bridge_subscription_mode()
   {
-    mqtt_bridge_init(
-      &mqtt_bridge,
+    erd_bridge_subscribe_init(
+      &erd_bridge_subscribe,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
@@ -91,10 +91,10 @@ TEST_GROUP(appliance_simulation_examples)
       &test_cache);
   }
   
-  void initialize_mqtt_bridge_polling_mode()
+  void initialize_erd_bridge_polling_mode()
   {
-    mqtt_bridge_polling_init(
-      &mqtt_bridge_polling,
+    erd_bridge_poll_init(
+      &erd_bridge_poll,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
@@ -207,7 +207,7 @@ TEST_GROUP(appliance_simulation_examples)
  * 
  * Note: This is a conceptual example showing the approach. The actual 
  * device ID generation happens in the GeappliancesBridge component, not 
- * in mqtt_bridge, so this test would need to be adapted for the full component.
+ * in erd_bridge_subscribe, so this test would need to be adapted for the full component.
  */
 TEST(appliance_simulation_examples, example_device_id_generation_workflow)
 {
@@ -216,7 +216,7 @@ TEST(appliance_simulation_examples, example_device_id_generation_workflow)
   // ERD_SERIAL_NUMBER, the bridge registers each ERD and publishes the value.
 
   mock().disable();
-  initialize_mqtt_bridge_subscription_mode();
+  initialize_erd_bridge_subscription_mode();
   simulate_subscription_added();
   mock().enable();
 
@@ -271,7 +271,7 @@ TEST(appliance_simulation_examples, example_device_id_generation_workflow)
 TEST(appliance_simulation_examples, example_dishwasher_cycle_simulation)
 {
   mock().disable();
-  initialize_mqtt_bridge_subscription_mode();
+  initialize_erd_bridge_subscription_mode();
   simulate_subscription_added();
   mock().enable();
   
@@ -323,7 +323,7 @@ TEST(appliance_simulation_examples, example_error_recovery_on_failed_erd_read)
   // on the appliance side, and correctly reports the failure back to MQTT.
 
   mock().disable();
-  initialize_mqtt_bridge_subscription_mode();
+  initialize_erd_bridge_subscription_mode();
   simulate_subscription_added();
   mock().enable();
 
@@ -375,7 +375,7 @@ TEST(appliance_simulation_examples, example_subscription_to_polling_fallback)
   // subscription mode loses connectivity and must recover.
 
   mock().disable();
-  initialize_mqtt_bridge_subscription_mode();
+  initialize_erd_bridge_subscription_mode();
   simulate_subscription_added();
   mock().enable();
 
@@ -402,7 +402,7 @@ TEST(appliance_simulation_examples, example_subscription_to_polling_fallback)
 TEST(appliance_simulation_examples, example_mqtt_write_with_appliance_response)
 {
   mock().disable();
-  initialize_mqtt_bridge_subscription_mode();
+  initialize_erd_bridge_subscription_mode();
   simulate_subscription_added();
   mock().enable();
   
@@ -451,7 +451,7 @@ TEST(appliance_simulation_examples, example_periodic_polling_behavior)
   // from the appliance, registering each new ERD and publishing values.
 
   mock().disable();
-  initialize_mqtt_bridge_subscription_mode();
+  initialize_erd_bridge_subscription_mode();
   simulate_subscription_added();
   mock().enable();
 

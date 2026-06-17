@@ -3,7 +3,7 @@
  * @brief Adapter that wraps a GEA2 ERD client (i_tiny_gea2_erd_client_t)
  *        and presents it as a GEA3 ERD client (i_tiny_gea3_erd_client_t).
  *
- * This allows the existing mqtt_bridge_polling (which requires i_tiny_gea3_erd_client_t)
+ * This allows the existing erd_bridge_poll (which requires i_tiny_gea3_erd_client_t)
  * to operate over a GEA2 bus without modification.
  *
  * The GEA2 and GEA3 on_activity args are layout-compatible for read/write event

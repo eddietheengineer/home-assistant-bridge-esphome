@@ -6,8 +6,8 @@
 // =============================================================================
 // MODULE GOAL
 // =============================================================================
-// Goal: Define the abstract interface through which mqtt_bridge and
-//       mqtt_bridge_polling report ERD values and receive write commands,
+// Goal: Define the abstract interface through which erd_bridge_subscribe and
+//       erd_bridge_poll report ERD values and receive write commands,
 //       keeping the bridge implementations independent of ESPHome.
 //
 // Responsibilities:

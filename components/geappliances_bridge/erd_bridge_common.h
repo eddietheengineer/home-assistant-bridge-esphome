@@ -2,7 +2,7 @@
 // MODULE GOAL
 // =============================================================================
 // Goal: Provide shared timing constants, HSM signal identifiers, and utility
-//       templates used by both mqtt_bridge.cpp and mqtt_bridge_polling.cpp.
+//       templates used by both erd_bridge_subscribe.cpp and erd_bridge_poll.cpp.
 //
 // Responsibilities:
 //   - Declare signal enum values shared by both bridge implementations
@@ -14,7 +14,7 @@
 //   - Anything not shared between both bridge implementations
 //
 // Dependencies:
-//   - mqtt_bridge.h, mqtt_bridge_polling.h, tiny_utils.h, tiny_gea_constants.h
+//   - erd_bridge_subscribe.h, erd_bridge_poll.h, tiny_utils.h, tiny_gea_constants.h
 // =============================================================================
 
 #pragma once
@@ -22,16 +22,16 @@
 /*!
  * @file
  * @brief Shared signals, timing constants, and utility templates used by both
- *        the subscription bridge (mqtt_bridge.cpp) and the polling bridge
- *        (mqtt_bridge_polling.cpp).
+ *        the subscription bridge (erd_bridge_subscribe.cpp) and the polling bridge
+ *        (erd_bridge_poll.cpp).
  *
  * All functions are either template functions (implicitly inline) or declared
  * `inline` so that each translation unit gets its own copy without ODR violations.
  */
 
 extern "C" {
-#include "mqtt_bridge.h"
-#include "mqtt_bridge_polling.h"
+#include "erd_bridge_subscribe.h"
+#include "erd_bridge_poll.h"
 #include "tiny_utils.h"
 #include "tiny_gea_constants.h"
 }

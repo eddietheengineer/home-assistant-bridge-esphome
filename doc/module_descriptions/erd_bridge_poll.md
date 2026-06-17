@@ -1,16 +1,16 @@
-# MQTT Bridge Polling
+# ERD Bridge Polling
 
 ## Purpose
 
-Discovers the connected appliance by reading ERD 0x0008 (appliance type) on the broadcast address, then walks through a chain of per-appliance ERD discovery states before settling into steady-state polling. Publishes ERD values to MQTT and handles write requests.
+Discovers the connected appliance by reading ERD 0x0008 (appliance type) on the broadcast address, then walks through a chain of per-appliance ERD discovery states before settling into steady-state polling. Publishes ERD values to the shared ERD cache and handles write requests.
 
 ## Public API
 
 | Function | Description |
 |----------|-------------|
-| `mqtt_bridge_polling_init(self, timer_group, erd_client, mqtt_client, interval_ms, only_publish_on_change)` | Initialize with broadcast discovery |
-| `mqtt_bridge_polling_init_at_address(self, timer_group, erd_client, mqtt_client, interval_ms, only_publish_on_change, known_address, api_list, api_list_count)` | Initialize with a pre-known host address (skips broadcast) |
-| `mqtt_bridge_polling_destroy(self)` | Stop timers, unsubscribe events, free heap state |
+| `erd_bridge_poll_init(self, timer_group, erd_client, mqtt_client, interval_ms, only_publish_on_change, cache)` | Initialize with broadcast discovery |
+| `erd_bridge_poll_init_at_address(self, timer_group, erd_client, mqtt_client, interval_ms, only_publish_on_change, known_address, api_list, api_list_count, cache)` | Initialize with a pre-known host address (skips broadcast) |
+| `erd_bridge_poll_destroy(self)` | Stop timers, unsubscribe events, free heap state |
 
 ## State Machine
 
@@ -65,12 +65,12 @@ Discovery states use a shared `handle_discovery_list_signals` handler that reads
 - `tiny_hsm` — hierarchical state machine
 - `tiny_timer` — polling, retry, and appliance-lost timers
 - `erd_lists.h` — static ERD lists (common, energy, appliance-type-specific)
-- `mqtt_bridge_common.h` — shared signals, timing constants, and utility templates
+- `erd_bridge_common.h` — shared signals, timing constants, and utility templates
 
 ## Key Design Decisions
 
 - **Dynamic polling list**: The `erd_polling_list` is heap-allocated and grows in increments of 32 ERDs (up to `POLLING_LIST_MAX_SIZE`). This avoids fixed-size buffer limitations while bounding memory usage.
-- **ERD cache for "publish on change"**: When `only_publish_on_change` is true, a `std::map<tiny_erd_t, vector<uint8_t>>` caches the last published value per ERD. Only changed values are published to MQTT.
+- **ERD cache for "publish on change"**: When `only_publish_on_change` is true, the shared `erd_cache_t` caches the last published value per ERD. Only changed values are published to MQTT.
 - **Sequential polling — one read at a time**: Each ERD read is sent only after
   the previous one has completed (success or failure).  Forward progress is
   driven by `signal_read_completed` and `signal_read_failed`, each calling
@@ -98,4 +98,4 @@ Discovery states use a shared `handle_discovery_list_signals` handler that reads
 
 ## Testing
 
-Covered by unit tests in `test/tests/test_mqtt_bridge_polling.cpp` and integration tests through the full polling bridge flow. Discovery state transitions, ERD caching, and appliance loss recovery are tested with simulated ERD client activity.
+Covered by unit tests in `test/tests/erd_bridge_poll_test.cpp` and integration tests through the full polling bridge flow. Discovery state transitions, ERD caching, and appliance loss recovery are tested with simulated ERD client activity.

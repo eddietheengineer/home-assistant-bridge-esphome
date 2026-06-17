@@ -36,8 +36,8 @@
 
 extern "C" {
 #include "erd_cache.h"
-#include "mqtt_bridge.h"
-#include "mqtt_bridge_polling.h"
+#include "erd_bridge_subscribe.h"
+#include "erd_bridge_poll.h"
 #include "tiny_gea3_erd_client.h"
 #include "tiny_gea3_interface.h"
 #include "tiny_gea2_erd_client.h"
@@ -117,7 +117,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool is_startup_delay_elapsed() const override;
 
   bool is_bridge_initialized() const override;
-  void initialize_mqtt_bridge() override;
+  void initialize_erd_bridge() override;
 
   BridgeMode get_mode() const override;
   bool is_subscription_mode_active() const override;
@@ -132,7 +132,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // ── Internal bridge methods (event callbacks and per-phase helpers) ─────────
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();
-  void initialize_mqtt_bridge_();
+  void initialize_erd_bridge_();
   void start_custom_erd_polling_();
   void maybe_start_custom_erd_polling_();
   void configure_polling_optional_lists_();
@@ -157,7 +157,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   uint8_t client_address_{0xE4};
 
   bool mqtt_client_adapter_initialized_{false};
-  bool mqtt_bridge_initialized_{false};
+  bool erd_bridge_initialized_{false};
   BridgeMode mode_{BRIDGE_MODE_AUTO};
   uint32_t polling_interval_ms_{10000};
   bool polling_only_publish_on_change_{false};
@@ -257,7 +257,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
    * Increased from 1024 to 2048 to prevent ring-buffer overflow when the
    * polling bridge and subscription bridge share the same ERD client;
    * overflow corrupts adjacent heap metadata causing
-   * prvCheckTasksWaitingTermination crashes (see mqtt_bridge_polling.cpp). */
+   * prvCheckTasksWaitingTermination crashes (see erd_bridge_poll.cpp). */
   uint8_t client_queue_buffer_[8192];
 
   // GEA2 components (only used when gea2_uart_ is set)
@@ -279,12 +279,12 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // Adapter that wraps the GEA2 ERD client as a GEA3 ERD client interface
   gea2_erd_client_adapter_t gea2_erd_client_adapter_;
 
-  mqtt_bridge_t mqtt_bridge_;
-  mqtt_bridge_polling_t mqtt_bridge_polling_;
+  erd_bridge_subscribe_t erd_bridge_subscribe_;
+  erd_bridge_poll_t erd_bridge_poll_;
 
   // Track which bridge(s) were actually initialized so teardown is unambiguous.
-  // A subscription bridge (mqtt_bridge_) is created when use_polling is false.
-  // A polling bridge (mqtt_bridge_polling_) is created when use_polling is true,
+  // A subscription bridge (erd_bridge_subscribe_) is created when use_polling is false.
+  // A polling bridge (erd_bridge_poll_) is created when use_polling is true,
   // or when custom ERD polling is started alongside a subscription bridge.
   bool subscription_bridge_initialized_{false};
   bool polling_bridge_initialized_{false};
