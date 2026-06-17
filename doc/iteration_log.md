@@ -47,7 +47,7 @@ This file tracks issues found during iterative improvement of the codebase and h
 #### 5. Misleading comment on active_erd_client_ initialization
 **File:** `geappliances_bridge.h`
 
-**Problem:** Comment said "set during initialize_mqtt_bridge_()" but it's actually set during `sync_autodiscovery_legacy_members_()` when autodiscovery completes.
+**Problem:** Comment said "set during initialize_erd_bridge_()" but it's actually set during `sync_autodiscovery_legacy_members_()` when autodiscovery completes.
 
 **Fix:** Updated comment to reflect actual initialization path.
 

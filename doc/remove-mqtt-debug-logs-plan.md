@@ -369,11 +369,11 @@ Specific test changes:
 - `write_request_callback_registered` → remove (no subscription)
 - `update_erd_overwrites_pending_for_same_erd` → remove (no queue)
 
-**File:** `test/tests/mqtt_bridge_polling_test.cpp`
+**File:** `test/tests/erd_bridge_poll_test.cpp`
 
 Check for any direct MQTT client references. The polling bridge tests use `mqtt_client_double.cpp` which implements `i_mqtt_client_t` — these should continue to work as the interface is unchanged.
 
-**File:** `test/tests/mqtt_bridge_test.cpp`
+**File:** `test/tests/erd_bridge_subscribe_test.cpp`
 
 Same as above — uses the `i_mqtt_client_t` interface via doubles.
 
@@ -440,7 +440,7 @@ After flashing to hardware, the serial log should show lines like:
 
 2. **HA discovery is disabled by default** (`generate_device_config: false` in many configs). Even if enabled, the HA discovery manager gracefully handles null mqtt_client by logging a warning and transitioning to COMPLETE state.
 
-3. **The `i_mqtt_client_t` interface remains unchanged**. The bridges (`mqtt_bridge.cpp`, `mqtt_bridge_polling.cpp`) call `mqtt_client_register_erd()` and `mqtt_client_update_erd()` through the interface. The adapter still implements this interface — it just logs instead of publishing. No changes needed in the bridge files.
+3. **The `i_mqtt_client_t` interface remains unchanged**. The bridges (`erd_bridge_subscribe.cpp`, `erd_bridge_poll.cpp`) call `mqtt_client_register_erd()` and `mqtt_client_update_erd()` through the interface. The adapter still implements this interface — it just logs instead of publishing. No changes needed in the bridge files.
 
 4. **If the user later wants MQTT back**: They would need to revert this change or use a separate branch/config. There is no compile-time toggle — this is a clean cutover.
 

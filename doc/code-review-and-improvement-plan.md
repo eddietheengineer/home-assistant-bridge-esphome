@@ -105,11 +105,11 @@ However, there is a subtle issue: if `init()` is called with a valid `cache` but
 
 **Status: UNFIXED**
 
-When AUTO mode falls back from subscription to polling, `mqtt_bridge_polling_init()` sets `on_discovery_complete = nullptr`. The callback is only wired in `initialize_mqtt_bridge_()` (lines 178–183) for the initial polling path. The fallback polling bridge never calls `ha_discovery_manager_.set_registered_erds()`. Combined with issue #1, HA discovery is doubly broken in this path.
+When AUTO mode falls back from subscription to polling, `erd_bridge_poll_init()` sets `on_discovery_complete = nullptr`. The callback is only wired in `initialize_erd_bridge_()` (lines 178–183) for the initial polling path. The fallback polling bridge never calls `ha_discovery_manager_.set_registered_erds()`. Combined with issue #1, HA discovery is doubly broken in this path.
 
-**Evidence:** `check_subscription_activity_()` calls `mqtt_bridge_polling_init()` at line 352 but does not set `on_discovery_complete` or `on_discovery_complete_context` afterward. `mqtt_bridge_polling_init_impl()` sets both to `nullptr` at lines 742–743.
+**Evidence:** `check_subscription_activity_()` calls `erd_bridge_poll_init()` at line 352 but does not set `on_discovery_complete` or `on_discovery_complete_context` afterward. `erd_bridge_poll_init_impl()` sets both to `nullptr` at lines 742–743.
 
-**Fix:** After `mqtt_bridge_polling_init()` at line 352, set the `on_discovery_complete` callback and context the same way `initialize_mqtt_bridge_()` does (lines 178–183).
+**Fix:** After `erd_bridge_poll_init()` at line 352, set the `on_discovery_complete` callback and context the same way `initialize_erd_bridge_()` does (lines 178–183).
 
 ---
 
