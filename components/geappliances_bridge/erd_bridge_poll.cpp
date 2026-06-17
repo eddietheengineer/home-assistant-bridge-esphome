@@ -104,6 +104,20 @@ static set<tiny_erd_t>& pending_registration_set(erd_bridge_poll_t* self)
 {
   return *reinterpret_cast<set<tiny_erd_t>*>(self->pending_registration_set);
 }
+/* Reset the polling list, erd_set, pending_registration_set, and cache.
+ * Called from the canonical discovery entry points so that a new discovery
+ * phase always starts from a clean slate.  There are two callers:
+ *   - state_add_common_erds (full-discovery path)
+ *   - state_identify_appliance re-entry (api_parsed path after appliance lost)
+ * Adding a third caller in the future requires only calling this helper,
+ * rather than duplicating the four-line clear sequence. */
+static void clear_discovery_state(erd_bridge_poll_t* self)
+{
+  erd_set(self).clear();
+  pending_registration_set(self).clear();
+  erd_cache_init(self->erd_cache);
+  self->polling_list_count = 0;
+}
 
 static void add_erd_to_polling_list_no_register(erd_bridge_poll_t* self, tiny_erd_t erd)
 {
@@ -371,10 +385,7 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
         // to Phase 2 probe (when api_parsed_list is set) or discovery.
         bool is_reentry = (self->polling_list_count > 0 && self->api_parsed_list != nullptr);
         if (is_reentry) {
-          erd_set(self).clear();
-          pending_registration_set(self).clear();
-          erd_cache_init(self->erd_cache);
-          self->polling_list_count = 0;
+          clear_discovery_state(self);
         }
         tiny_hsm_state_t next;
         if (self->api_parsed_list != nullptr) {
@@ -451,10 +462,7 @@ static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     // path (appliance first seen, or appliance_lost re-discovery), NOT on every
     // transient MQTT reconnect. Clearing in the disconnect handler caused the
     // set's tree nodes to be freed and reallocated on each reconnect, fragmenting
-    erd_set(self).clear();
-    pending_registration_set(self).clear();
-    erd_cache_init(self->erd_cache);
-    self->polling_list_count       = 0;
+    clear_discovery_state(self);
     self->request_id++;
     tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
     return tiny_hsm_result_signal_consumed;
@@ -588,16 +596,23 @@ static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_sign
   erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
 
   if (signal == tiny_hsm_signal_entry) {
+    // Skip appliance-specific ERD discovery if the type is out of range.
+    // Type 0 is a real appliance type (water heater), so clamping to 0
+    // would incorrectly poll water heater ERDs for an unknown appliance.
     if (self->appliance_type >= maximumApplianceType) {
-      self->appliance_type = 0;
+      ESP_LOGW(TAG, "Invalid appliance type 0x%02x; skipping appliance-specific ERD discovery",
+               self->appliance_type);
+      self->appliance_erd_list       = nullptr;
+      self->appliance_erd_list_count = 0;
+    } else {
+      self->appliance_erd_list       = applianceTypeToErdGroupTranslation[self->appliance_type].erdList;
+      self->appliance_erd_list_count = applianceTypeToErdGroupTranslation[self->appliance_type].erdCount;
     }
     self->current_state_name      = "add_appliance_erds";
     // If custom ERDs are configured, discover them after appliance ERDs.
     self->next_discovery_state    = (self->custom_erd_list != nullptr && self->custom_erd_list_count > 0)
       ? state_add_custom_erds
       : state_polling;
-    self->appliance_erd_list       = applianceTypeToErdGroupTranslation[self->appliance_type].erdList;
-    self->appliance_erd_list_count = applianceTypeToErdGroupTranslation[self->appliance_type].erdCount;
     self->erd_index                = 0;
     self->request_id++;
     if (self->appliance_erd_list_count > 0) {
@@ -805,10 +820,11 @@ static void erd_bridge_poll_init_impl(
   self->api_parsed_list        = api_parsed_list;
   self->api_parsed_list_count  = api_parsed_list_count;
   self->custom_erd_list        = nullptr;
-  self->custom_erd_list_count  = 0;
   self->erd_polling_list       = nullptr;
   self->polling_list_count     = 0;
   self->polling_list_capacity  = 0;
+  self->erd_set                = nullptr;
+  self->pending_registration_set = nullptr;
   self->restart_pending             = false;
   self->cycle_sending_in_progress   = false;
   self->polling_timer_armed         = false;
@@ -912,10 +928,17 @@ void erd_bridge_poll_destroy(erd_bridge_poll_t* self)
     mqtt_client_on_mqtt_disconnect(self->mqtt_client),
     &self->mqtt_disconnect_subscription);
 
-  delete reinterpret_cast<set<tiny_erd_t>*>(self->erd_set);
-  delete reinterpret_cast<set<tiny_erd_t>*>(self->pending_registration_set);
-  self->erd_set = nullptr;
-  self->pending_registration_set = nullptr;
+  // Guard against partial init (e.g., if the first new set<tiny_erd_t>()
+  // failed and init returned early).  delete nullptr is safe in C++, but
+  // the reinterpret_cast from a non-null garbage pointer is not.
+  if (self->erd_set) {
+    delete reinterpret_cast<set<tiny_erd_t>*>(self->erd_set);
+    self->erd_set = nullptr;
+  }
+  if (self->pending_registration_set) {
+    delete reinterpret_cast<set<tiny_erd_t>*>(self->pending_registration_set);
+    self->pending_registration_set = nullptr;
+  }
 
   if (self->erd_polling_list != nullptr) {
     delete[] self->erd_polling_list;

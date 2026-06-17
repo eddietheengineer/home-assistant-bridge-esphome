@@ -120,7 +120,7 @@ template<typename T>
 static void setup_disconnect_subscription(T* self, i_mqtt_client_t* mqtt_client)
 {
   tiny_event_subscription_init(
-    &self->mqtt_disconnect_subscription, self, +[](void* context, const void*) {
+    &self->mqtt_disconnect_subscription, self, +[](void* context, [[maybe_unused]] const void* data) {
       auto self = reinterpret_cast<T*>(context);
       // Do NOT clear erd_set here. Clearing it on every transient MQTT
       // reconnect causes two problems:
