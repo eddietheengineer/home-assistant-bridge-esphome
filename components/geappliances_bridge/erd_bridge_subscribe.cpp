@@ -14,7 +14,7 @@
 
 using namespace std;
 
-static const char* const TAG __attribute__((unused)) = "mqtt_bridge";
+static const char* const TAG __attribute__((unused)) = "erd_bridge_subscribe";
 
 // ============================================================================
 // Subscription bridge
@@ -26,7 +26,7 @@ static tiny_hsm_result_t state_subscribed(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
 
 static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  mqtt_bridge_t* self = container_of(mqtt_bridge_t, hsm, hsm);
+  erd_bridge_subscribe_t* self = container_of(erd_bridge_subscribe_t, hsm, hsm);
 
   switch(signal) {
     case signal_subscription_publication_received: {
@@ -63,7 +63,7 @@ static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
 
 static tiny_hsm_result_t state_subscribing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  mqtt_bridge_t* self = container_of(mqtt_bridge_t, hsm, hsm);
+  erd_bridge_subscribe_t* self = container_of(erd_bridge_subscribe_t, hsm, hsm);
   (void)data;
 
   switch(signal) {
@@ -104,17 +104,17 @@ static tiny_hsm_result_t state_subscribing(tiny_hsm_t* hsm, tiny_hsm_signal_t si
   return tiny_hsm_result_signal_consumed;
 }
 
-static void arm_periodic_timer(mqtt_bridge_t* self, tiny_timer_ticks_t ticks)
+static void arm_periodic_timer(erd_bridge_subscribe_t* self, tiny_timer_ticks_t ticks)
 {
   tiny_timer_start_periodic(
     self->timer_group, &self->timer, ticks, self, +[](void* context) {
-      tiny_hsm_send_signal(&reinterpret_cast<mqtt_bridge_t*>(context)->hsm, signal_timer_expired, nullptr);
+      tiny_hsm_send_signal(&reinterpret_cast<erd_bridge_subscribe_t*>(context)->hsm, signal_timer_expired, nullptr);
     });
 }
 
 static tiny_hsm_result_t state_subscribed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  mqtt_bridge_t* self = container_of(mqtt_bridge_t, hsm, hsm);
+  erd_bridge_subscribe_t* self = container_of(erd_bridge_subscribe_t, hsm, hsm);
   (void)data;
   (void)self;
 
@@ -153,8 +153,8 @@ static const tiny_hsm_configuration_t sub_hsm_configuration = {
   .state_count = element_count(sub_hsm_state_descriptors)
 };
 
-void mqtt_bridge_init(
-  mqtt_bridge_t* self,
+void erd_bridge_subscribe_init(
+  erd_bridge_subscribe_t* self,
   tiny_timer_group_t* timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t* mqtt_client,
@@ -170,7 +170,7 @@ void mqtt_bridge_init(
 
   tiny_event_subscription_init(
     &self->erd_client_activity_subscription, self, +[](void* context, const void* _args) {
-      auto self = reinterpret_cast<mqtt_bridge_t*>(context);
+      auto self = reinterpret_cast<erd_bridge_subscribe_t*>(context);
       auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(_args);
 
       if(args->address != self->erd_host_address) {
@@ -208,7 +208,7 @@ void mqtt_bridge_init(
   tiny_hsm_init(&self->hsm, &sub_hsm_configuration, state_subscribing);
 }
 
-void mqtt_bridge_destroy(mqtt_bridge_t* self)
+void erd_bridge_subscribe_destroy(erd_bridge_subscribe_t* self)
 {
   // Guard against destroy() being called on a never-initialized struct (e.g.
   // in test teardowns that always call both bridge and polling destroy).
@@ -222,7 +222,7 @@ void mqtt_bridge_destroy(mqtt_bridge_t* self)
 
   // Remove all event subscriptions before freeing heap state.
   //
-  // mqtt_bridge_init() subscribes three event callbacks that reference this
+  // erd_bridge_subscribe_init() subscribes three event callbacks that reference this
   // struct: erd_client_activity_subscription, mqtt_write_request_subscription,
   // and mqtt_disconnect_subscription.  If these remain registered after
   // destroy(), any subsequent event fires the HSM which dereferences

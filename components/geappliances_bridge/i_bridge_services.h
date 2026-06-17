@@ -67,10 +67,10 @@ class IBridgeServices {
 
   // -- Bridge initialization -------------------------------------------------
 
-  /// Returns true if the MQTT bridge (poll/subscribe) has been initialized.
+  /// Returns true if the ERD bridge (poll/subscribe) has been initialized.
   virtual bool is_bridge_initialized() const = 0;
-  /// Initialize the MQTT bridge in the mode selected by configuration.
-  virtual void initialize_mqtt_bridge() = 0;
+  /// Initialize the ERD bridge in the mode selected by configuration.
+  virtual void initialize_erd_bridge() = 0;
 
   // -- Operating mode --------------------------------------------------------
 

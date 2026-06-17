@@ -328,8 +328,8 @@ tiny_hsm_result_t startup_state_bridge_init(tiny_hsm_t* hsm, tiny_hsm_signal_t s
     case signal_run_loop:
       if (!svc->is_bridge_initialized() &&
           svc->is_autodiscovery_complete()) {
-        ESP_LOGI(TAG, "Device ID ready, initializing MQTT bridge");
-        svc->initialize_mqtt_bridge();
+        ESP_LOGI(TAG, "Device ID ready, initializing ERD bridge");
+        svc->initialize_erd_bridge();
         // Do NOT transition here — wait for signal_bridge_ready from the
         // polling bridge when ERD discovery is complete.
       }

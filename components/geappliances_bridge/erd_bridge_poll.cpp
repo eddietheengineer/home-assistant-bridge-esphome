@@ -27,7 +27,7 @@
 
 using namespace std;
 
-static const char* const TAG __attribute__((unused)) = "mqtt_bridge_polling";
+static const char* const TAG __attribute__((unused)) = "erd_bridge_poll";
 
 // ============================================================================
 // Polling bridge — forward declarations
@@ -42,28 +42,28 @@ static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_s
 static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_add_custom_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-static void send_poll_read_requests_bounded(mqtt_bridge_polling_t* self, uint32_t budget_ms);
+static void send_poll_read_requests_bounded(erd_bridge_poll_t* self, uint32_t budget_ms);
 static constexpr uint32_t POLL_YIELD_MS = 50;  // tuning: per-batch time budget
 
 // ============================================================================
 // Polling bridge — private helpers
 // ============================================================================
 
-static void arm_polling_timer(mqtt_bridge_polling_t* self, tiny_timer_ticks_t ticks)
+static void arm_polling_timer(erd_bridge_poll_t* self, tiny_timer_ticks_t ticks)
 {
   self->polling_timer_armed = true;
   tiny_timer_start(
     self->timer_group, &self->polling_timer, ticks, self, +[](void* context) {
-      tiny_hsm_send_signal(&reinterpret_cast<mqtt_bridge_polling_t*>(context)->hsm, signal_polling_timer_expired, nullptr);
+      tiny_hsm_send_signal(&reinterpret_cast<erd_bridge_poll_t*>(context)->hsm, signal_polling_timer_expired, nullptr);
     });
 }
 
-static void reset_lost_appliance_timer(mqtt_bridge_polling_t* self)
+static void reset_lost_appliance_timer(erd_bridge_poll_t* self)
 {
   tiny_timer_stop(self->timer_group, &self->appliance_lost_timer);
   tiny_timer_start(
     self->timer_group, &self->appliance_lost_timer, appliance_lost_timeout, self, +[](void* context) {
-      tiny_hsm_send_signal(&reinterpret_cast<mqtt_bridge_polling_t*>(context)->hsm, signal_appliance_lost, nullptr);
+      tiny_hsm_send_signal(&reinterpret_cast<erd_bridge_poll_t*>(context)->hsm, signal_appliance_lost, nullptr);
     });
 }
 
@@ -73,7 +73,7 @@ static const uint16_t POLLING_LIST_GROWTH_INCREMENT = 32;
 
 // Allocate or grow the polling list to at least the requested capacity.
 // If the list is already large enough, this is a no-op.
-static void ensure_polling_list_capacity(mqtt_bridge_polling_t* self, uint16_t needed)
+static void ensure_polling_list_capacity(erd_bridge_poll_t* self, uint16_t needed)
 {
   if (needed <= self->polling_list_capacity) {
     return;
@@ -96,12 +96,12 @@ static void ensure_polling_list_capacity(mqtt_bridge_polling_t* self, uint16_t n
   self->polling_list_capacity = new_capacity;
 }
 
-static set<tiny_erd_t>& pending_registration_set(mqtt_bridge_polling_t* self)
+static set<tiny_erd_t>& pending_registration_set(erd_bridge_poll_t* self)
 {
   return *reinterpret_cast<set<tiny_erd_t>*>(self->pending_registration_set);
 }
 
-static void add_erd_to_polling_list_no_register(mqtt_bridge_polling_t* self, tiny_erd_t erd)
+static void add_erd_to_polling_list_no_register(erd_bridge_poll_t* self, tiny_erd_t erd)
 {
   /* Add to erd_set to prevent add_erd_to_polling_list() from treating this
    * as a new ERD.  Add to pending_registration_set so signal_read_completed
@@ -116,7 +116,7 @@ static void add_erd_to_polling_list_no_register(mqtt_bridge_polling_t* self, tin
   }
 }
 
-static void add_erd_to_polling_list(mqtt_bridge_polling_t* self, tiny_erd_t erd)
+static void add_erd_to_polling_list(erd_bridge_poll_t* self, tiny_erd_t erd)
 {
   if (erd_set(self).find(erd) == erd_set(self).end()) {
     mqtt_client_register_erd(self->mqtt_client, erd);
@@ -135,7 +135,7 @@ static void add_erd_to_polling_list(mqtt_bridge_polling_t* self, tiny_erd_t erd)
 // the timer has already expired).  When 'immediate' is false, only arms
 // the timer if it isn't already armed (used from send_next_poll_read_request
 // where restart_pending is never set).
-static void on_polling_cycle_complete(mqtt_bridge_polling_t* self, bool immediate)
+static void on_polling_cycle_complete(erd_bridge_poll_t* self, bool immediate)
 {
   self->last_cycle_time_ms = (uint32_t)(esphome::millis() - self->cycle_start_ms);
   self->cycle_count++;
@@ -156,7 +156,7 @@ static void on_polling_cycle_complete(mqtt_bridge_polling_t* self, bool immediat
   // else: timer still armed — wait for it to fire and restart.
 }
 
-static bool send_next_read_request(mqtt_bridge_polling_t* self)
+static bool send_next_read_request(erd_bridge_poll_t* self)
 {
   reset_lost_appliance_timer(self);
   self->erd_index++;
@@ -168,7 +168,7 @@ static bool send_next_read_request(mqtt_bridge_polling_t* self)
   return more_erds_to_try;
 }
 
-static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
+static void send_next_poll_read_request(erd_bridge_poll_t* self)
 {
   if (self->erd_index < self->polling_list_count) {
     self->request_id++;
@@ -210,7 +210,7 @@ static void send_next_poll_read_request(mqtt_bridge_polling_t* self)
 //     }
 // so that all ERDs are queued before proceeding.
 
-static void send_poll_read_requests_bounded(mqtt_bridge_polling_t* self, uint32_t budget_ms)
+static void send_poll_read_requests_bounded(erd_bridge_poll_t* self, uint32_t budget_ms)
 {
   uint32_t start = esphome::millis();
   uint16_t count = 0;
@@ -234,7 +234,7 @@ static void send_poll_read_requests_bounded(mqtt_bridge_polling_t* self, uint32_
 // entry, the signal silently defers rather than causing undefined behavior.
 static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
+  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
   if (data == nullptr) {
     // Signal with no payload (entry, exit, or unknown).  Callers are
     // responsible for handling entry before reaching this point.
@@ -272,7 +272,7 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
 }
 static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
+  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
 
   switch (signal) {
     case signal_write_requested: {
@@ -301,7 +301,7 @@ static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
 
 static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
+  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
   auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
 
   switch (signal) {
@@ -309,7 +309,7 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
       self->polling_list_complete = false;
       self->current_state_name = "identify_appliance";
       // If the caller pre-initialized the host address (via
-      // mqtt_bridge_polling_init_at_address), skip the broadcast and transition
+      // erd_bridge_poll_init_at_address), skip the broadcast and transition
       // directly to the appropriate state.  This is used by the custom ERD bridge
       // (start_custom_erd_polling_) which already knows the appliance address and
       // supplies an api_parsed_list (the custom ERDs), so full discovery and
@@ -386,7 +386,7 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
 
 static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
+  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
 
   if (signal == tiny_hsm_signal_entry) {
     self->current_state_name      = "add_common_erds";
@@ -413,7 +413,7 @@ static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
 
 static tiny_hsm_result_t state_add_energy_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
+  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
 
   if (signal == tiny_hsm_signal_entry) {
     self->current_state_name      = "add_energy_erds";
@@ -431,7 +431,7 @@ static tiny_hsm_result_t state_add_energy_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
 
 static tiny_hsm_result_t state_add_appliance_api_feature_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
+  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
 
   if (signal == tiny_hsm_signal_entry) {
     self->current_state_name = "add_appliance_api_feature_erds";
@@ -463,7 +463,7 @@ static tiny_hsm_result_t state_add_appliance_api_feature_erds(tiny_hsm_t* hsm, t
 
 static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
+  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
 
   if (signal == tiny_hsm_signal_entry) {
     self->current_state_name      = "probe_api_parsed_erds";
@@ -500,7 +500,7 @@ static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_s
 
 static tiny_hsm_result_t state_add_custom_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
+  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
 
   if (signal == tiny_hsm_signal_entry) {
     self->current_state_name      = "add_custom_erds";
@@ -522,7 +522,7 @@ static tiny_hsm_result_t state_add_custom_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
 
 static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
+  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
 
   if (signal == tiny_hsm_signal_entry) {
     if (self->appliance_type >= maximumApplianceType) {
@@ -551,7 +551,7 @@ static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_sign
 
 static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
-  mqtt_bridge_polling_t* self = container_of(mqtt_bridge_polling_t, hsm, hsm);
+  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
   auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
 
   switch (signal) {
@@ -703,8 +703,8 @@ static const tiny_hsm_configuration_t poll_hsm_configuration = {
 // and self->api_parsed_list BEFORE calling tiny_hsm_init(), so that
 // state_identify_appliance's entry signal can inspect them and skip the
 // broadcast when the host is already known.
-static void mqtt_bridge_polling_init_impl(
-  mqtt_bridge_polling_t*    self,
+static void erd_bridge_poll_init_impl(
+  erd_bridge_poll_t*    self,
   tiny_timer_group_t*       timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t*          mqtt_client,
@@ -725,7 +725,7 @@ static void mqtt_bridge_polling_init_impl(
   self->erd_host_address       = initial_host_address;
   // Store the pre-known address so that signal_appliance_lost can restore it
   // after a transient read failure instead of falling back to 0xFF broadcast.
-  // Zero means "unknown — use broadcast" (set by mqtt_bridge_polling_init()).
+  // Zero means "unknown — use broadcast" (set by erd_bridge_poll_init()).
   self->known_host_address     = (initial_host_address != tiny_gea_broadcast_address)
     ? initial_host_address : 0;
   self->api_parsed_list        = api_parsed_list;
@@ -744,7 +744,7 @@ static void mqtt_bridge_polling_init_impl(
 
   tiny_event_subscription_init(
     &self->erd_client_activity_subscription, self, +[](void* context, const void* _args) {
-      auto self = reinterpret_cast<mqtt_bridge_polling_t*>(context);
+      auto self = reinterpret_cast<erd_bridge_poll_t*>(context);
       auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(_args);
 
       switch (args->type) {
@@ -768,8 +768,8 @@ static void mqtt_bridge_polling_init_impl(
   tiny_hsm_init(&self->hsm, &poll_hsm_configuration, state_identify_appliance);
 }
 
-void mqtt_bridge_polling_init(
-  mqtt_bridge_polling_t*    self,
+void erd_bridge_poll_init(
+  erd_bridge_poll_t*    self,
   tiny_timer_group_t*       timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t*          mqtt_client,
@@ -777,13 +777,13 @@ void mqtt_bridge_polling_init(
   bool                      only_publish_on_change,
   erd_cache_t*              cache)
 {
-  mqtt_bridge_polling_init_impl(
+  erd_bridge_poll_init_impl(
     self, timer_group, erd_client, mqtt_client, polling_interval_ms, only_publish_on_change,
     tiny_gea_broadcast_address, nullptr, 0, cache);
 }
 
-void mqtt_bridge_polling_init_at_address(
-  mqtt_bridge_polling_t*    self,
+void erd_bridge_poll_init_at_address(
+  erd_bridge_poll_t*    self,
   tiny_timer_group_t*       timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t*          mqtt_client,
@@ -794,12 +794,12 @@ void mqtt_bridge_polling_init_at_address(
   uint16_t                  api_list_count,
   erd_cache_t*              cache)
 {
-  mqtt_bridge_polling_init_impl(
+  erd_bridge_poll_init_impl(
     self, timer_group, erd_client, mqtt_client, polling_interval_ms, only_publish_on_change,
     known_host_address, api_list, api_list_count, cache);
 }
 
-void mqtt_bridge_polling_destroy(mqtt_bridge_polling_t* self)
+void erd_bridge_poll_destroy(erd_bridge_poll_t* self)
 {
   // Guard against destroy() being called on a never-initialized struct (e.g.
   // in test teardowns that always call both bridge and polling destroy).
@@ -815,7 +815,7 @@ void mqtt_bridge_polling_destroy(mqtt_bridge_polling_t* self)
 
   // Remove all event subscriptions before freeing heap state.
   //
-  // mqtt_bridge_polling_init() subscribes three event callbacks that reference
+  // erd_bridge_poll_init() subscribes three event callbacks that reference
   // this struct: erd_client_activity_subscription,
   // mqtt_write_request_subscription, and mqtt_disconnect_subscription.  If
   // these remain registered after destroy(), any subsequent event fires the

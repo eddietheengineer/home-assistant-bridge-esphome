@@ -15,14 +15,14 @@ extern "C" {
 #include "double/tiny_gea3_erd_client_double.hpp"
 #include "double/tiny_timer_group_double.hpp"
 
-TEST_GROUP(mqtt_bridge_polling)
+TEST_GROUP(erd_bridge_poll)
 {
   enum {
     polling_interval = 1000,
     polled_erd = 0x0001
   };
 
-  mqtt_bridge_polling_t self;
+  erd_bridge_poll_t self;
   erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
@@ -42,14 +42,14 @@ TEST_GROUP(mqtt_bridge_polling)
   void teardown()
   {
     mock().disable();
-    mqtt_bridge_polling_destroy(&self);
+    erd_bridge_poll_destroy(&self);
     erd_cache_destroy(&test_cache);
     mock().enable();
   }
 
   void when_the_bridge_is_initialized(bool only_publish_on_change = false)
   {
-    mqtt_bridge_polling_init(
+    erd_bridge_poll_init(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -164,7 +164,7 @@ TEST_GROUP(mqtt_bridge_polling)
   }
 };
 
-TEST(mqtt_bridge_polling, should_always_publish_mqtt_when_only_publish_on_change_is_disabled)
+TEST(erd_bridge_poll, should_always_publish_mqtt_when_only_publish_on_change_is_disabled)
 {
   given_that_the_bridge_has_entered_polling_state();
 
@@ -179,7 +179,7 @@ TEST(mqtt_bridge_polling, should_always_publish_mqtt_when_only_publish_on_change
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 }
 
-TEST(mqtt_bridge_polling, should_publish_mqtt_on_first_poll_when_only_publish_on_change_is_enabled)
+TEST(erd_bridge_poll, should_publish_mqtt_on_first_poll_when_only_publish_on_change_is_enabled)
 {
   given_that_the_bridge_has_entered_polling_state(true);
 
@@ -190,7 +190,7 @@ TEST(mqtt_bridge_polling, should_publish_mqtt_on_first_poll_when_only_publish_on
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 }
 
-TEST(mqtt_bridge_polling, should_not_republish_mqtt_when_polled_erd_data_is_unchanged_and_only_publish_on_change_is_enabled)
+TEST(erd_bridge_poll, should_not_republish_mqtt_when_polled_erd_data_is_unchanged_and_only_publish_on_change_is_enabled)
 {
   given_that_the_bridge_has_entered_polling_state(true);
 
@@ -205,7 +205,7 @@ TEST(mqtt_bridge_polling, should_not_republish_mqtt_when_polled_erd_data_is_unch
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 }
 
-TEST(mqtt_bridge_polling, should_republish_mqtt_when_polled_erd_data_changes_and_only_publish_on_change_is_enabled)
+TEST(erd_bridge_poll, should_republish_mqtt_when_polled_erd_data_changes_and_only_publish_on_change_is_enabled)
 {
   given_that_the_bridge_has_entered_polling_state(true);
 
@@ -228,7 +228,7 @@ TEST(mqtt_bridge_polling, should_republish_mqtt_when_polled_erd_data_changes_and
 // A late response from a discovery-phase read that arrives after the state
 // machine has already transitioned to polling (device responded slower than
 // retry_delay). The ERD must be registered and added to the polling list.
-TEST(mqtt_bridge_polling, should_register_and_poll_erd_whose_discovery_response_arrives_late_in_polling_state)
+TEST(erd_bridge_poll, should_register_and_poll_erd_whose_discovery_response_arrives_late_in_polling_state)
 {
   enum { late_erd = 0x7b00 };
 
@@ -264,7 +264,7 @@ TEST(mqtt_bridge_polling, should_register_and_poll_erd_whose_discovery_response_
 }
 
 // Same late-response scenario with only_publish_on_change enabled.
-TEST(mqtt_bridge_polling, should_register_and_poll_late_erd_when_only_publish_on_change_is_enabled)
+TEST(erd_bridge_poll, should_register_and_poll_late_erd_when_only_publish_on_change_is_enabled)
 {
   enum { late_erd = 0x7b05 };
 
@@ -299,7 +299,7 @@ TEST(mqtt_bridge_polling, should_register_and_poll_late_erd_when_only_publish_on
 // Tests for appliance API-parsed polling list (api_parsed_list feature)
 // ============================================================================
 
-TEST_GROUP(mqtt_bridge_polling_api_list)
+TEST_GROUP(erd_bridge_poll_api_list)
 {
   enum {
     polling_interval = 1000,
@@ -307,7 +307,7 @@ TEST_GROUP(mqtt_bridge_polling_api_list)
     api_erd_2 = 0x2000
   };
 
-  mqtt_bridge_polling_t self;
+  erd_bridge_poll_t self;
   erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
@@ -328,14 +328,14 @@ TEST_GROUP(mqtt_bridge_polling_api_list)
   void teardown()
   {
     mock().disable();
-    mqtt_bridge_polling_destroy(&self);
+    erd_bridge_poll_destroy(&self);
     erd_cache_destroy(&test_cache);
     mock().enable();
   }
 
   void when_the_bridge_is_initialized()
   {
-    mqtt_bridge_polling_init(
+    erd_bridge_poll_init(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -428,7 +428,7 @@ TEST_GROUP(mqtt_bridge_polling_api_list)
 
 // When api_parsed_list is set, the bridge should probe each ERD in the list and
 // only poll the ones that respond. Feature-bit ERDs are still read first.
-TEST(mqtt_bridge_polling_api_list, should_skip_discovery_and_poll_api_list_directly)
+TEST(erd_bridge_poll_api_list, should_skip_discovery_and_poll_api_list_directly)
 {
   // Init sends broadcast (appliance type read)
   should_request_read(0xFF, 0x0008);
@@ -464,7 +464,7 @@ TEST(mqtt_bridge_polling_api_list, should_skip_discovery_and_poll_api_list_direc
   when_a_poll_read_completes(0xC0, api_erd_2, uint8_t(0xBB));
 }
 
-TEST(mqtt_bridge_polling_api_list, should_restart_poll_cycle_on_polling_timer)
+TEST(erd_bridge_poll_api_list, should_restart_poll_cycle_on_polling_timer)
 {
   // Init + appliance discovery
   should_request_read(0xFF, 0x0008);
@@ -509,7 +509,7 @@ TEST(mqtt_bridge_polling_api_list, should_restart_poll_cycle_on_polling_timer)
 }
 // An ERD that the appliance explicitly rejects with "not_supported" during probe
 // must never appear in the polling list — not even for lazy registration.
-TEST(mqtt_bridge_polling_api_list, should_permanently_exclude_erds_rejected_as_not_supported_during_probe)
+TEST(erd_bridge_poll_api_list, should_permanently_exclude_erds_rejected_as_not_supported_during_probe)
 {
   // api_list with 3 ERDs; the middle one (0x3000) is explicitly rejected.
   const tiny_erd_t api_list_3[3] = {api_erd_1, 0x3000, api_erd_2};
@@ -551,7 +551,7 @@ TEST(mqtt_bridge_polling_api_list, should_permanently_exclude_erds_rejected_as_n
 // Tests for user-configured custom ERD polling list (custom_erd_list feature)
 // ============================================================================
 
-TEST_GROUP(mqtt_bridge_polling_custom_erds)
+TEST_GROUP(erd_bridge_poll_custom_erds)
 {
   enum {
     retry_delay = 100,
@@ -561,7 +561,7 @@ TEST_GROUP(mqtt_bridge_polling_custom_erds)
     custom_erd_2 = 0x7001
   };
 
-  mqtt_bridge_polling_t self;
+  erd_bridge_poll_t self;
   erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
@@ -583,14 +583,14 @@ TEST_GROUP(mqtt_bridge_polling_custom_erds)
   void teardown()
   {
     mock().disable();
-    mqtt_bridge_polling_destroy(&self);
+    erd_bridge_poll_destroy(&self);
     erd_cache_destroy(&test_cache);
     mock().enable();
   }
 
   void when_the_bridge_is_initialized_with_api_list_and_custom_erds()
   {
-    mqtt_bridge_polling_init(
+    erd_bridge_poll_init(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -606,7 +606,7 @@ TEST_GROUP(mqtt_bridge_polling_custom_erds)
 
   void when_the_bridge_is_initialized_with_custom_erds_only()
   {
-    mqtt_bridge_polling_init(
+    erd_bridge_poll_init(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -699,7 +699,7 @@ TEST_GROUP(mqtt_bridge_polling_custom_erds)
 
 // Custom ERDs should be polled after api_parsed_list ERDs when both are configured.
 // api_parsed_list ERDs are registered during probe; custom ERDs use deferred registration.
-TEST(mqtt_bridge_polling_custom_erds, should_poll_custom_erds_alongside_api_parsed_list)
+TEST(erd_bridge_poll_custom_erds, should_poll_custom_erds_alongside_api_parsed_list)
 {
   // Init sends broadcast
   should_request_read(0xFF, 0x0008);
@@ -747,7 +747,7 @@ TEST(mqtt_bridge_polling_custom_erds, should_poll_custom_erds_alongside_api_pars
 
 // Custom ERDs should be polled in every cycle when only custom_erds are configured
 // (no api_parsed_list, going through discovery).
-TEST(mqtt_bridge_polling_custom_erds, should_poll_custom_erds_in_discovery_mode)
+TEST(erd_bridge_poll_custom_erds, should_poll_custom_erds_in_discovery_mode)
 {
   mock().disable();
   // Initialize with custom ERDs only (no api_parsed_list)
@@ -786,11 +786,11 @@ TEST(mqtt_bridge_polling_custom_erds, should_poll_custom_erds_in_discovery_mode)
 // erd_client) must not cause a premature transition to state_polling with
 // erd_host_address still set to the broadcast address (0xFF).  The bridge must
 // wait for the genuine ERD 0x0008 response before polling begins.
-TEST(mqtt_bridge_polling_custom_erds, should_ignore_spurious_read_completed_during_identification)
+TEST(erd_bridge_poll_custom_erds, should_ignore_spurious_read_completed_during_identification)
 {
   // Init sends broadcast identification read.
   should_request_read(0xFF, 0x0008);
-  mqtt_bridge_polling_init(
+  erd_bridge_poll_init(
     &self,
     &timer_group.timer_group,
     &erd_client.interface,
@@ -843,11 +843,11 @@ TEST(mqtt_bridge_polling_custom_erds, should_ignore_spurious_read_completed_duri
 // (Phase 2 verification) instead of going directly to state_polling.  After ERDs
 // are verified they are registered during probe and polled without deferred
 // registration thereafter.
-TEST(mqtt_bridge_polling_custom_erds, should_poll_only_custom_erds_when_used_alongside_subscribe_bridge)
+TEST(erd_bridge_poll_custom_erds, should_poll_only_custom_erds_when_used_alongside_subscribe_bridge)
 {
   // Phase 2: state_probe_api_parsed_erds entry sends read for custom_erd_1 immediately.
   should_request_read(0xC0, custom_erd_1);
-  mqtt_bridge_polling_init_at_address(
+  erd_bridge_poll_init_at_address(
     &self,
     &timer_group.timer_group,
     &erd_client.interface,
@@ -894,11 +894,11 @@ TEST(mqtt_bridge_polling_custom_erds, should_poll_only_custom_erds_when_used_alo
 // polling at the pre-known address WITHOUT broadcasting to 0xFF.  On re-entry
 // after appliance_lost the probe phase is skipped (deferred for future spec)
 // and ERDs are lazily re-registered on first read.
-TEST(mqtt_bridge_polling_custom_erds, should_resume_polling_at_known_address_after_appliance_lost)
+TEST(erd_bridge_poll_custom_erds, should_resume_polling_at_known_address_after_appliance_lost)
 {
   // Phase 2: state_probe_api_parsed_erds entry sends read for custom_erd_1.
   should_request_read(0xC0, custom_erd_1);
-  mqtt_bridge_polling_init_at_address(
+  erd_bridge_poll_init_at_address(
     &self,
     &timer_group.timer_group,
     &erd_client.interface,
@@ -958,7 +958,7 @@ TEST(mqtt_bridge_polling_custom_erds, should_resume_polling_at_known_address_aft
 // when all ERDs have completed AND the polling timer has expired
 // ============================================================================
 
-TEST_GROUP(mqtt_bridge_polling_sequential)
+TEST_GROUP(erd_bridge_poll_sequential)
 {
   enum {
     retry_delay = 100,
@@ -968,7 +968,7 @@ TEST_GROUP(mqtt_bridge_polling_sequential)
     erd_c = 0x1003
   };
 
-  mqtt_bridge_polling_t self;
+  erd_bridge_poll_t self;
   erd_cache_t test_cache;
 
   tiny_timer_group_double_t timer_group;
@@ -989,14 +989,14 @@ TEST_GROUP(mqtt_bridge_polling_sequential)
   void teardown()
   {
     mock().disable();
-    mqtt_bridge_polling_destroy(&self);
+    erd_bridge_poll_destroy(&self);
     erd_cache_destroy(&test_cache);
     mock().enable();
   }
 
   void when_the_bridge_is_initialized()
   {
-    mqtt_bridge_polling_init(
+    erd_bridge_poll_init(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -1089,7 +1089,7 @@ TEST_GROUP(mqtt_bridge_polling_sequential)
 // The polling timer should NOT restart a new cycle while ERDs are still
 // in-flight mid-cycle.  Only the first cycle (erd_index == polling_list_count)
 // or a fully completed cycle should trigger a restart.
-TEST(mqtt_bridge_polling_sequential, should_fire_all_reads_simultaneously_on_cycle_start)
+TEST(erd_bridge_poll_sequential, should_fire_all_reads_simultaneously_on_cycle_start)
 {
   // Init + skip feature ERD discovery; probe phase: all 3 api ERDs respond
   should_request_read(0xFF, 0x0008);
@@ -1133,7 +1133,7 @@ TEST(mqtt_bridge_polling_sequential, should_fire_all_reads_simultaneously_on_cyc
 
 // Verify that all reads in a cycle are fired simultaneously from the polling
 // timer, rather than sequentially one at a time.
-TEST(mqtt_bridge_polling_sequential, should_read_all_erds_simultaneously_each_cycle)
+TEST(erd_bridge_poll_sequential, should_read_all_erds_simultaneously_each_cycle)
 {
   // Init + skip feature ERD discovery; probe phase: all 3 api ERDs respond
   should_request_read(0xFF, 0x0008);
@@ -1193,7 +1193,7 @@ TEST(mqtt_bridge_polling_sequential, should_read_all_erds_simultaneously_each_cy
 // A single failed read in a cycle must not stall the cycle indefinitely.
 // The cycle completes when all ERDs have responded (success or failure),
 // and the next cycle begins when the polling timer fires again.
-TEST(mqtt_bridge_polling_sequential, failed_read_does_not_block_cycle_completion)
+TEST(erd_bridge_poll_sequential, failed_read_does_not_block_cycle_completion)
 {
   // Init; probe phase: all 3 api ERDs respond
   should_request_read(0xFF, 0x0008);
@@ -1235,7 +1235,7 @@ TEST(mqtt_bridge_polling_sequential, failed_read_does_not_block_cycle_completion
 
 // All ERDs failing in a cycle must still allow the cycle to complete and
 // the next cycle to begin — no infinite stall.
-TEST(mqtt_bridge_polling_sequential, all_failed_reads_still_complete_cycle)
+TEST(erd_bridge_poll_sequential, all_failed_reads_still_complete_cycle)
 {
   // Init; probe phase: all 3 api ERDs respond
   should_request_read(0xFF, 0x0008);
@@ -1273,7 +1273,7 @@ TEST(mqtt_bridge_polling_sequential, all_failed_reads_still_complete_cycle)
 
 // A mix of failures and successes across multiple cycles must not accumulate
 // cycle_completed_count errors that cause premature or missed cycle restarts.
-TEST(mqtt_bridge_polling_sequential, mixed_failures_across_multiple_cycles)
+TEST(erd_bridge_poll_sequential, mixed_failures_across_multiple_cycles)
 {
   // Init; probe phase: all 3 api ERDs respond
   should_request_read(0xFF, 0x0008);
@@ -1329,7 +1329,7 @@ TEST(mqtt_bridge_polling_sequential, mixed_failures_across_multiple_cycles)
 
 // An ERD that times out during discovery (retries_exhausted) must be excluded
 // from the polling list, same as not_supported.
-TEST(mqtt_bridge_polling_api_list, should_permanently_exclude_erds_that_timeout_during_probe)
+TEST(erd_bridge_poll_api_list, should_permanently_exclude_erds_that_timeout_during_probe)
 {
   const tiny_erd_t api_list_3[3] = {api_erd_1, 0x4000, api_erd_2};
 
@@ -1368,7 +1368,7 @@ TEST(mqtt_bridge_polling_api_list, should_permanently_exclude_erds_that_timeout_
 // another timer expiration.
 // ============================================================================
 
-TEST(mqtt_bridge_polling_sequential, restart_pending_starts_next_cycle_immediately)
+TEST(erd_bridge_poll_sequential, restart_pending_starts_next_cycle_immediately)
 {
   // Init; probe phase: all 3 api ERDs respond
   should_request_read(0xFF, 0x0008);
@@ -1439,7 +1439,7 @@ TEST(mqtt_bridge_polling_sequential, restart_pending_starts_next_cycle_immediate
 // phase, reads are issued one at a time (sequentially) rather than all at once.
 // ============================================================================
 
-TEST(mqtt_bridge_polling_api_list, discovery_reads_erds_sequentially_one_at_a_time)
+TEST(erd_bridge_poll_api_list, discovery_reads_erds_sequentially_one_at_a_time)
 {
   const tiny_erd_t api_list_3[3] = {api_erd_1, 0x5000, api_erd_2};
 

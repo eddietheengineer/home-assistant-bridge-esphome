@@ -41,8 +41,8 @@ TEST_GROUP(application_level)
     ERD_TEMPERATURE = 0x1004,  // Example ERD for testing
   };
   
-  mqtt_bridge_t mqtt_bridge;
-  mqtt_bridge_polling_t mqtt_bridge_polling;
+  erd_bridge_subscribe_t erd_bridge_subscribe;
+  erd_bridge_poll_t erd_bridge_poll;
   erd_cache_t test_cache;
   
   tiny_timer_group_double_t timer_group;
@@ -63,8 +63,8 @@ TEST_GROUP(application_level)
   
   void teardown()
   {
-    mqtt_bridge_destroy(&mqtt_bridge);
-    mqtt_bridge_polling_destroy(&mqtt_bridge_polling);
+    erd_bridge_subscribe_destroy(&erd_bridge_subscribe);
+    erd_bridge_poll_destroy(&erd_bridge_poll);
     erd_cache_destroy(&test_cache);
     mock().clear();
   }
@@ -72,10 +72,10 @@ TEST_GROUP(application_level)
   /*!
    * Initialize the MQTT bridge in subscription mode.
    */
-  void initialize_mqtt_bridge_subscription_mode()
+  void initialize_erd_bridge_subscription_mode()
   {
-    mqtt_bridge_init(
-      &mqtt_bridge,
+    erd_bridge_subscribe_init(
+      &erd_bridge_subscribe,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
@@ -86,10 +86,10 @@ TEST_GROUP(application_level)
   /*!
    * Initialize the MQTT bridge in polling mode.
    */
-  void initialize_mqtt_bridge_polling_mode()
+  void initialize_erd_bridge_polling_mode()
   {
-    mqtt_bridge_polling_init(
-      &mqtt_bridge_polling,
+    erd_bridge_poll_init(
+      &erd_bridge_poll,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
@@ -186,7 +186,7 @@ TEST(application_level, should_read_device_id_erds_in_sequence)
   // Validate that the polling bridge initializes, identifies the appliance,
   // then transitions into a discovery state.
   mock().disable();
-  initialize_mqtt_bridge_polling_mode();
+  initialize_erd_bridge_polling_mode();
 
   // Respond to the initial appliance type read.
   uint8_t appliance_type = 0x00;
@@ -195,8 +195,8 @@ TEST(application_level, should_read_device_id_erds_in_sequence)
 
   // Bridge should now be in a discovery state (current_state_name is set).
   mock().enable();
-  CHECK(mqtt_bridge_polling.current_state_name != nullptr);
-  CHECK(strcmp(mqtt_bridge_polling.current_state_name, "add_common_erds") == 0);
+  CHECK(erd_bridge_poll.current_state_name != nullptr);
+  CHECK(strcmp(erd_bridge_poll.current_state_name, "add_common_erds") == 0);
 }
 
 /*!
@@ -205,7 +205,7 @@ TEST(application_level, should_read_device_id_erds_in_sequence)
 TEST(application_level, should_handle_erd_publications_in_subscription_mode)
 {
   mock().disable();
-  initialize_mqtt_bridge_subscription_mode();
+  initialize_erd_bridge_subscription_mode();
   simulate_subscription_added(appliance_address);
   mock().enable();
 
@@ -233,12 +233,12 @@ TEST(application_level, should_poll_erds_periodically_in_polling_mode)
   // Validate that the polling bridge can be initialized and enters
   // the identification state, ready to discover the appliance.
   mock().disable();
-  initialize_mqtt_bridge_polling_mode();
+  initialize_erd_bridge_polling_mode();
 
   // Bridge should be in the identification state initially.
   mock().enable();
-  CHECK(mqtt_bridge_polling.current_state_name != nullptr);
-  CHECK(strcmp(mqtt_bridge_polling.current_state_name, "identify_appliance") == 0);
+  CHECK(erd_bridge_poll.current_state_name != nullptr);
+  CHECK(strcmp(erd_bridge_poll.current_state_name, "identify_appliance") == 0);
 }
 
 /*!
@@ -247,7 +247,7 @@ TEST(application_level, should_poll_erds_periodically_in_polling_mode)
 TEST(application_level, should_forward_mqtt_write_requests_to_appliance)
 {
   mock().disable();
-  initialize_mqtt_bridge_subscription_mode();
+  initialize_erd_bridge_subscription_mode();
   mock().enable();
   
   // Simulate an MQTT write request
@@ -273,9 +273,9 @@ TEST(application_level, should_forward_mqtt_write_requests_to_appliance)
  */
 TEST(application_level, should_complete_subscription_workflow_with_publications)
 {
-  // Use the same approach as the existing mqtt_bridge tests
+  // Use the same approach as the existing erd_bridge_subscribe tests
   mock().disable();
-  initialize_mqtt_bridge_subscription_mode();
+  initialize_erd_bridge_subscription_mode();
   simulate_subscription_added(appliance_address);
   mock().enable();
   

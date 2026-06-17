@@ -64,8 +64,8 @@ TEST_GROUP(configuration_based_tests)
     APPLIANCE_TYPE_WASHER = 3,
   };
   
-  mqtt_bridge_t mqtt_bridge;
-  mqtt_bridge_polling_t mqtt_bridge_polling;
+  erd_bridge_subscribe_t erd_bridge_subscribe;
+  erd_bridge_poll_t erd_bridge_poll;
 
   erd_cache_t test_cache;
   
@@ -85,8 +85,8 @@ TEST_GROUP(configuration_based_tests)
   
   void teardown()
   {
-    mqtt_bridge_destroy(&mqtt_bridge);
-    mqtt_bridge_polling_destroy(&mqtt_bridge_polling);
+    erd_bridge_subscribe_destroy(&erd_bridge_subscribe);
+    erd_bridge_poll_destroy(&erd_bridge_poll);
     erd_cache_destroy(&test_cache);
     mock().clear();
   }
@@ -98,8 +98,8 @@ TEST_GROUP(configuration_based_tests)
    */
   void configure_subscription_mode(uint8_t address = host_address)
   {
-    mqtt_bridge_init(
-      &mqtt_bridge,
+    erd_bridge_subscribe_init(
+      &erd_bridge_subscribe,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
@@ -115,8 +115,8 @@ TEST_GROUP(configuration_based_tests)
     uint32_t polling_interval = default_polling_interval,
     bool only_publish_on_change = false)
   {
-    mqtt_bridge_polling_init(
-      &mqtt_bridge_polling,
+    erd_bridge_poll_init(
+      &erd_bridge_poll,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
@@ -306,8 +306,8 @@ TEST(configuration_based_tests, config_polling_mode_default_interval)
 
   // Bridge should be in identification state after init.
   mock().enable();
-  CHECK(mqtt_bridge_polling.current_state_name != nullptr);
-  CHECK(strcmp(mqtt_bridge_polling.current_state_name, "identify_appliance") == 0);
+  CHECK(erd_bridge_poll.current_state_name != nullptr);
+  CHECK(strcmp(erd_bridge_poll.current_state_name, "identify_appliance") == 0);
 }
 
 // ============================================================================
@@ -327,8 +327,8 @@ TEST(configuration_based_tests, config_polling_mode_fast_interval)
 
   // Bridge should be in identification state after init.
   mock().enable();
-  CHECK(mqtt_bridge_polling.current_state_name != nullptr);
-  CHECK(strcmp(mqtt_bridge_polling.current_state_name, "identify_appliance") == 0);
+  CHECK(erd_bridge_poll.current_state_name != nullptr);
+  CHECK(strcmp(erd_bridge_poll.current_state_name, "identify_appliance") == 0);
 }
 
 // ============================================================================
@@ -348,8 +348,8 @@ TEST(configuration_based_tests, config_polling_mode_slow_interval)
 
   // Bridge should be in identification state after init.
   mock().enable();
-  CHECK(mqtt_bridge_polling.current_state_name != nullptr);
-  CHECK(strcmp(mqtt_bridge_polling.current_state_name, "identify_appliance") == 0);
+  CHECK(erd_bridge_poll.current_state_name != nullptr);
+  CHECK(strcmp(erd_bridge_poll.current_state_name, "identify_appliance") == 0);
 }
 
 // ============================================================================
@@ -567,7 +567,7 @@ TEST(configuration_based_tests, config_subscription_mode_retention)
 //     uart_id: gea3_uart
 //     mode: subscribe
 //
-// Validates PR#58: mqtt_bridge_init now accepts an address parameter, enabling
+// Validates PR#58: erd_bridge_subscribe_init now accepts an address parameter, enabling
 // two independent bridge instances to subscribe to different appliances.
 // ============================================================================
 
@@ -581,8 +581,8 @@ TEST_GROUP(dual_subscription_config)
     ERD_FRIDGE_TEMP      = 0x0502,
   };
 
-  mqtt_bridge_t bridge_a;
-  mqtt_bridge_t bridge_b;
+  erd_bridge_subscribe_t bridge_a;
+  erd_bridge_subscribe_t bridge_b;
 
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -603,8 +603,8 @@ TEST_GROUP(dual_subscription_config)
 
   void teardown()
   {
-    mqtt_bridge_destroy(&bridge_a);
-    mqtt_bridge_destroy(&bridge_b);
+    erd_bridge_subscribe_destroy(&bridge_a);
+    erd_bridge_subscribe_destroy(&bridge_b);
     erd_cache_destroy(&test_cache);
     mock().clear();
   }
@@ -612,14 +612,14 @@ TEST_GROUP(dual_subscription_config)
   void given_both_bridges_are_initialized()
   {
     mock().disable();
-    mqtt_bridge_init(
+    erd_bridge_subscribe_init(
       &bridge_a,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client_a.interface,
       address_appliance_a,
       &test_cache);
-    mqtt_bridge_init(
+    erd_bridge_subscribe_init(
       &bridge_b,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -673,7 +673,7 @@ TEST(dual_subscription_config, each_bridge_subscribes_to_its_own_address)
     .withParameter("address", address_appliance_a)
     .andReturnValue(true);
 
-  mqtt_bridge_init(
+  erd_bridge_subscribe_init(
     &bridge_a,
     &timer_group.timer_group,
     &erd_client.interface,
@@ -687,7 +687,7 @@ TEST(dual_subscription_config, each_bridge_subscribes_to_its_own_address)
     .onObject(&erd_client)
     .withParameter("address", address_appliance_b)
     .andReturnValue(true);
-  mqtt_bridge_init(
+  erd_bridge_subscribe_init(
     &bridge_b,
     &timer_group.timer_group,
     &erd_client.interface,
@@ -792,7 +792,7 @@ TEST_GROUP(only_publish_on_change_config)
     ERD_CYCLE_STATE = 0x3001,
   };
 
-  mqtt_bridge_polling_t bridge;
+  erd_bridge_poll_t bridge;
 
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
@@ -812,7 +812,7 @@ TEST_GROUP(only_publish_on_change_config)
   void teardown()
   {
     mock().disable();
-    mqtt_bridge_polling_destroy(&bridge);
+    erd_bridge_poll_destroy(&bridge);
     erd_cache_destroy(&test_cache);
     mock().enable();
     mock().clear();
@@ -820,7 +820,7 @@ TEST_GROUP(only_publish_on_change_config)
 
   void configure_only_publish_on_change()
   {
-    mqtt_bridge_polling_init(
+    erd_bridge_poll_init(
       &bridge,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -832,7 +832,7 @@ TEST_GROUP(only_publish_on_change_config)
 
   void configure_always_publish()
   {
-    mqtt_bridge_polling_init(
+    erd_bridge_poll_init(
       &bridge,
       &timer_group.timer_group,
       &erd_client.interface,
