@@ -172,26 +172,6 @@ void GeappliancesBridge::setup() {
 
 void GeappliancesBridge::loop() {
 
-  // ── Startup HSM ────────────────────────────────────────────────────────
-  // The bridge progresses through a linear sequence of startup phases via
-  // a tiny_hsm-based state machine.  Each state handles its own entry/exit
-  // logic and waits for signals from managers before transitioning.
-  //
-  // Phase dependency chain:
-  //   PROTOCOL → AUTODISCOVERY → DEVICE_ID → MQTT_CLIENT → FEATURE_BITS
-  //           → BRIDGE_INIT → SUBSCRIPTION_WATCH → HA_DISCOVERY → HEAP
-  //           → RUNNING (steady-state)
-  // ────────────────────────────────────────────────────────────────────────
-
-  // Drive the GEA2/GEA3 protocol stack on every loop iteration so that
-  // UART bytes are processed and ERD read responses are delivered to the
-  // active manager (autodiscovery, device ID, feature bits, polling bridge).
-  this->run_protocol_stack_();
-#ifdef USE_ESP32
-  // Feed the task watchdog after the protocol stack — the GEA2 tight loop
-  // can run for 200 ms wall-clock time, exceeding the default TWDT timeout.
-  esp_task_wdt_reset();
-#endif
 
   // Initialize the startup HSM on the first loop() call.
   if (this->startup_hsm_.current == nullptr) {
