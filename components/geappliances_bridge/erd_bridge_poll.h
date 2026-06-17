@@ -141,6 +141,10 @@ typedef struct {
   // cycle is allowed to finish, then the cycle-completion handler restarts
   // immediately instead of waiting for another timer interval.
   bool restart_pending;
+  // True while a cycle's read requests are being sent in budgeted chunks.
+  // When set, the polling timer handler resumes sending instead of starting
+  // a new cycle.  Cleared once all ERD reads for the cycle are queued.
+  bool cycle_sending_in_progress;
   // Called once when the HSM enters state_polling (discovery complete).
   // The callback may send a signal to the startup HSM to transition to the
   // next phase.  Set after erd_bridge_poll_init() and before the HSM

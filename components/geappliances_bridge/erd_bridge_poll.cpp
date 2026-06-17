@@ -43,7 +43,9 @@ static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_sign
 static tiny_hsm_result_t state_add_custom_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static void send_poll_read_requests_bounded(erd_bridge_poll_t* self, uint32_t budget_ms);
-static constexpr uint32_t POLL_YIELD_MS = 50;  // tuning: per-batch time budget
+static bool send_cycle_reads(erd_bridge_poll_t* self);
+static constexpr uint32_t POLL_YIELD_MS = 50;          // per-batch time budget
+static constexpr uint32_t POLL_CYCLE_SEND_BUDGET_MS = 500;  // max time per send invocation
 
 // ============================================================================
 // Polling bridge — private helpers
@@ -145,10 +147,10 @@ static void on_polling_cycle_complete(erd_bridge_poll_t* self, bool immediate)
     self->erd_index = 0;
     self->cycle_completed_count = 0;
     self->cycle_start_ms = esphome::millis();
-    arm_polling_timer(self, self->polling_interval_ms);
-    while (self->erd_index < self->polling_list_count) {
-      send_poll_read_requests_bounded(self, POLL_YIELD_MS);
-      esphome::delay(0);
+    if (send_cycle_reads(self)) {
+      arm_polling_timer(self, self->polling_interval_ms);
+    } else {
+      arm_polling_timer(self, 100);
     }
   } else if (!self->polling_timer_armed) {
     arm_polling_timer(self, self->polling_interval_ms);
@@ -222,6 +224,33 @@ static void send_poll_read_requests_bounded(erd_bridge_poll_t* self, uint32_t bu
       break;
     }
   }
+}
+
+/* Send cycle read requests within a time budget.  Does NOT arm any timer —
+ * the caller is responsible for arming the next timer based on the return
+ * value.  This prevents a single blocking call from holding the main loop
+ * long enough to trigger the ESP32 task watchdog timer.
+ *
+ * Returns true if all reads were sent within budget, false if the budget
+ * was exceeded and a resume timer should be armed. */
+static bool send_cycle_reads(erd_bridge_poll_t* self)
+{
+  uint32_t start = esphome::millis();
+  while (self->erd_index < self->polling_list_count) {
+    send_poll_read_requests_bounded(self, POLL_YIELD_MS);
+    esphome::delay(0);
+    if ((esphome::millis() - start) >= POLL_CYCLE_SEND_BUDGET_MS) {
+      self->cycle_sending_in_progress = true;
+      return false;
+    }
+  }
+  /* All reads sent. */
+  self->cycle_sending_in_progress = false;
+  uint32_t elapsed = esphome::millis() - start;
+  if (elapsed >= 1000) {
+    ESP_LOGW(TAG, "Long cycle send: %ums for %u ERDs", elapsed, self->polling_list_count);
+  }
+  return true;
 }
 
 // Shared handler for all discovery states (common, energy, appliance API, appliance).
@@ -603,21 +632,27 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         self->restart_pending = true;
         break;
       }
-      // Cycle was already complete when the timer fired — start next cycle now.
-      self->erd_index = 0;
-      self->cycle_completed_count = 0;
-      self->cycle_start_ms = esphome::millis();
-      uint32_t cycle_start = esphome::millis();
-      while (self->erd_index < self->polling_list_count) {
-        send_poll_read_requests_bounded(self, POLL_YIELD_MS);
-        // Yield to main loop to allow other components to run
-        esphome::delay(0);
+      // If we were in the middle of sending reads for a cycle, resume.
+      bool all_sent;
+      if (self->cycle_sending_in_progress) {
+        all_sent = send_cycle_reads(self);
+        if (all_sent) {
+          arm_polling_timer(self, self->polling_interval_ms);
+        } else {
+          arm_polling_timer(self, 100);
+        }
+      } else {
+        /* Cycle was already complete when the timer fired — start next cycle. */
+        self->erd_index = 0;
+        self->cycle_completed_count = 0;
+        self->cycle_start_ms = esphome::millis();
+        all_sent = send_cycle_reads(self);
+        if (all_sent) {
+          arm_polling_timer(self, self->polling_interval_ms);
+        } else {
+          arm_polling_timer(self, 100);
+        }
       }
-      uint32_t elapsed = esphome::millis() - cycle_start;
-      if (elapsed >= 1000) {
-        ESP_LOGW(TAG, "Long cycle start: %ums for %u ERDs", elapsed, self->polling_list_count);
-      }
-      arm_polling_timer(self, self->polling_interval_ms);
       break;
     }
 
@@ -736,6 +771,7 @@ static void erd_bridge_poll_init_impl(
   self->polling_list_count     = 0;
   self->polling_list_capacity  = 0;
   self->restart_pending        = false;
+  self->cycle_sending_in_progress = false;
   self->erd_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
   self->erd_cache = cache;
   self->pending_registration_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
