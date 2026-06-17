@@ -7,6 +7,7 @@
 #include "esphome/core/log.h"
 
 #include <string.h>
+#include <new>
 
 static const char* const TAG = "erd_cache";
 
@@ -69,7 +70,14 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
 
     // Store new data
     if (needs_heap) {
-      existing->heap_data = new uint8_t[data_size];
+      existing->heap_data = new (std::nothrow) uint8_t[data_size];
+      if (!existing->heap_data) {
+        ESP_LOGW(TAG, "Failed to allocate %u bytes for ERD 0x%04X", data_size, erd);
+        existing->uses_heap = false;
+        memcpy(existing->inline_data, data, (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE);
+        existing->data_size = (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE;
+        return false;
+      }
       memcpy(existing->heap_data, data, data_size);
     } else {
       memcpy(existing->inline_data, data, data_size);
@@ -116,8 +124,15 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   slot->update_required = true;
 
   if (needs_heap) {
-    slot->heap_data = new uint8_t[data_size];
-    memcpy(slot->heap_data, data, data_size);
+    slot->heap_data = new (std::nothrow) uint8_t[data_size];
+    if (!slot->heap_data) {
+      ESP_LOGW(TAG, "Failed to allocate %u bytes for ERD 0x%04X", data_size, erd);
+      slot->uses_heap = false;
+      memcpy(slot->inline_data, data, (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE);
+      slot->data_size = (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE;
+    } else {
+      memcpy(slot->heap_data, data, data_size);
+    }
   } else {
     memcpy(slot->inline_data, data, data_size);
   }
