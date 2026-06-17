@@ -1,15 +1,15 @@
-# MQTT Bridge (Subscription Mode)
+# ERD Bridge (Subscription Mode)
 
 ## Purpose
 
-Manages the GEA3 ERD subscription lifecycle in subscription mode. Subscribes to appliance ERD publications, retains the subscription every 30 seconds, and publishes received ERD values via MQTT. Handles write requests from MQTT and forwards them to the appliance.
+Manages the GEA3 ERD subscription lifecycle in subscription mode. Subscribes to appliance ERD publications, retains the subscription every 30 seconds, and publishes received ERD values to the shared ERD cache. Handles write requests from MQTT and forwards them to the appliance.
 
 ## Public API
 
 | Function | Description |
 |----------|-------------|
-| `mqtt_bridge_init(self, timer_group, erd_client, mqtt_client, address)` | Initialize the subscription bridge |
-| `mqtt_bridge_destroy(self)` | Unsubscribe events, stop timers, free heap state |
+| `erd_bridge_subscribe_init(self, timer_group, erd_client, mqtt_client, address, cache)` | Initialize the subscription bridge |
+| `erd_bridge_subscribe_destroy(self)` | Unsubscribe events, stop timers, free heap state |
 
 ## State Machine
 
@@ -28,8 +28,8 @@ sub_state_top (parent state — handles publication and write signals globally)
        └─ exit: disarm timer
 ```
 
-Shared signals (handled in `mqtt_bridge_common.h`):
-- `signal_subscription_publication_received` — publish ERD value to MQTT
+Shared signals (handled in `erd_bridge_common.h`):
+- `signal_subscription_publication_received` — publish ERD value to ERD cache
 - `signal_write_requested` — forward write to ERD client
 - `signal_mqtt_disconnected` — transition back to subscribing
 
@@ -39,7 +39,7 @@ Shared signals (handled in `mqtt_bridge_common.h`):
 - `i_mqtt_client` — MQTT client adapter
 - `tiny_hsm` — hierarchical state machine
 - `tiny_timer` — periodic retention timer
-- `mqtt_bridge_common.h` — shared signals, timing constants, and utility templates
+- `erd_bridge_common.h` — shared signals, timing constants, and utility templates
 
 ## Key Design Decisions
 
@@ -50,4 +50,4 @@ Shared signals (handled in `mqtt_bridge_common.h`):
 
 ## Testing
 
-Covered by unit tests in `test/tests/test_mqtt_bridge.cpp` and integration tests through the full bridge subscription flow. The state machine transitions are tested with simulated ERD client activity events.
+Covered by unit tests in `test/tests/erd_bridge_subscribe_test.cpp` and integration tests through the full bridge subscription flow. The state machine transitions are tested with simulated ERD client activity events.

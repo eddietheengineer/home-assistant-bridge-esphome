@@ -1,8 +1,8 @@
-# MQTT Bridge Common
+# ERD Bridge Common
 
 ## Purpose
 
-Header-only shared utilities used by both the subscription bridge (`mqtt_bridge.cpp`) and the polling bridge (`mqtt_bridge_polling.cpp`). All functions are either template functions (implicitly inline) or declared `inline` so that each translation unit gets its own copy without ODR violations.
+Header-only shared utilities used by both the subscription bridge (`erd_bridge_subscribe.cpp`) and the polling bridge (`erd_bridge_poll.cpp`). All functions are either template functions (implicitly inline) or declared `inline` so that each translation unit gets its own copy without ODR violations.
 
 ## Shared Timing Constants
 
@@ -37,7 +37,7 @@ Signal IDs shared between both bridge state machines, defined as an anonymous `e
 
 ### `arm_timer(T* self, tiny_timer_ticks_t ticks)`
 
-Starts a one-shot timer that sends `signal_timer_expired` to the HSM when it fires. Template parameter `T` is the bridge type (`mqtt_bridge_t` or `mqtt_bridge_polling_t`).
+Starts a one-shot timer that sends `signal_timer_expired` to the HSM when it fires. Template parameter `T` is the bridge type (`erd_bridge_subscribe_t` or `erd_bridge_poll_t`).
 
 ### `disarm_timer(T* self)`
 
@@ -70,11 +70,11 @@ Subscribes to the MQTT client's `on_mqtt_disconnect` event and forwards it as `s
 
 ## Key Design Decisions
 
-- **Header-only with inline**: All functions are template or inline, avoiding ODR violations when both `mqtt_bridge.cpp` and `mqtt_bridge_polling.cpp` include this header.
+- **Header-only with inline**: All functions are template or inline, avoiding ODR violations when both `erd_bridge_subscribe.cpp` and `erd_bridge_poll.cpp` include this header.
 - **Shared signal namespace**: Both bridges use the same signal ID range (starting from `tiny_hsm_signal_user_start`) to avoid conflicts. Each bridge's HSM only receives signals relevant to its own state machine.
 - **Disconnect handler preserves erd_set**: The `setup_disconnect_subscription` callback intentionally does not clear the ERD set. This was a critical fix — the previous behavior of clearing on every disconnect caused heap fragmentation and polling list growth over time.
 - **Void* for C++ types in C structs**: The C struct definitions use `void*` for C++ types (`std::set`, `std::map`) to maintain C compatibility. The template helpers in this header safely cast them back.
 
 ## Testing
 
-Exercised indirectly through the unit tests for `mqtt_bridge` and `mqtt_bridge_polling`. The shared utilities themselves are not tested in isolation.
+Exercised indirectly through the unit tests for `erd_bridge_subscribe` and `erd_bridge_poll`. The shared utilities themselves are not tested in isolation.
