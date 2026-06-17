@@ -100,6 +100,10 @@ class DeviceIdentityManager {
    * Get the model number string (used by HA discovery manager).
    */
   const std::string& get_model_number() const { return model_number_; }
+  /*
+   * Get the appliance type byte (from ERD 0x0008).
+   */
+  uint8_t get_appliance_type() const { return appliance_type_; }
 
   /*
    * Get the serial number string (used by HA discovery manager).

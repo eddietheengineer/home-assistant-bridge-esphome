@@ -49,7 +49,7 @@ TEST_GROUP(erd_bridge_poll)
 
   void when_the_bridge_is_initialized(bool only_publish_on_change = false)
   {
-    erd_bridge_poll_init(
+    erd_bridge_poll_init_legacy(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -335,7 +335,7 @@ TEST_GROUP(erd_bridge_poll_api_list)
 
   void when_the_bridge_is_initialized()
   {
-    erd_bridge_poll_init(
+    erd_bridge_poll_init_legacy(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -590,7 +590,7 @@ TEST_GROUP(erd_bridge_poll_custom_erds)
 
   void when_the_bridge_is_initialized_with_api_list_and_custom_erds()
   {
-    erd_bridge_poll_init(
+    erd_bridge_poll_init_legacy(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -606,7 +606,7 @@ TEST_GROUP(erd_bridge_poll_custom_erds)
 
   void when_the_bridge_is_initialized_with_custom_erds_only()
   {
-    erd_bridge_poll_init(
+    erd_bridge_poll_init_legacy(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -790,7 +790,7 @@ TEST(erd_bridge_poll_custom_erds, should_ignore_spurious_read_completed_during_i
 {
   // Init sends broadcast identification read.
   should_request_read(0xFF, 0x0008);
-  erd_bridge_poll_init(
+  erd_bridge_poll_init_legacy(
     &self,
     &timer_group.timer_group,
     &erd_client.interface,
@@ -847,14 +847,15 @@ TEST(erd_bridge_poll_custom_erds, should_poll_only_custom_erds_when_used_alongsi
 {
   // Phase 2: state_probe_api_parsed_erds entry sends read for custom_erd_1 immediately.
   should_request_read(0xC0, custom_erd_1);
-  erd_bridge_poll_init_at_address(
+  erd_bridge_poll_init(
     &self,
     &timer_group.timer_group,
     &erd_client.interface,
     &mqtt_client.interface,
     polling_interval,
     false,
-    0xC0,     // pre-known host address — no 0xFF broadcast
+    0xC0,
+    0,
     custom_list, 2,
     &test_cache);
 
@@ -898,7 +899,7 @@ TEST(erd_bridge_poll_custom_erds, should_resume_polling_at_known_address_after_a
 {
   // Phase 2: state_probe_api_parsed_erds entry sends read for custom_erd_1.
   should_request_read(0xC0, custom_erd_1);
-  erd_bridge_poll_init_at_address(
+  erd_bridge_poll_init(
     &self,
     &timer_group.timer_group,
     &erd_client.interface,
@@ -906,6 +907,7 @@ TEST(erd_bridge_poll_custom_erds, should_resume_polling_at_known_address_after_a
     polling_interval,
     false,
     0xC0,
+    0,
     custom_list, 2,
     &test_cache);
 
@@ -996,7 +998,7 @@ TEST_GROUP(erd_bridge_poll_sequential)
 
   void when_the_bridge_is_initialized()
   {
-    erd_bridge_poll_init(
+    erd_bridge_poll_init_legacy(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,

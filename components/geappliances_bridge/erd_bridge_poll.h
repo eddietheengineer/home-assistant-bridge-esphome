@@ -118,11 +118,11 @@ typedef struct {
   // discovery mode and api_parsed_list mode.
   const tiny_erd_t* custom_erd_list;
   uint16_t custom_erd_list_count;
-  // When erd_bridge_poll_init_at_address() is used this stores the
-  // pre-known appliance address so that the bridge never broadcasts to 0xFF
+  // When erd_bridge_poll_init() is called with a non-zero host_address
+  // this stores the pre-known appliance address so that the bridge never broadcasts to 0xFF
   // on re-identification (e.g. after appliance_lost_timer fires).  Zero means
   // "no pre-known address — use broadcast discovery" (the default from
-  // erd_bridge_poll_init()).
+  // erd_bridge_poll_init() with host_address = 0).
   uint8_t known_host_address;
   // Health metrics: updated by the polling bridge as cycles complete.
   // cycle_start_ms: millis() when the current cycle's first read was sent.
@@ -155,6 +155,17 @@ typedef struct {
 
 /*!
  * Initialize the ERD polling bridge.
+ *
+ * The host_address should be the discovered appliance address from
+ * autodiscovery (not the broadcast address).  The appliance_type should
+ * be the value read from ERD 0x0008 during device identity discovery.
+ * When both are provided, the bridge skips broadcast identification and
+ * proceeds directly to ERD discovery or polling.
+ *
+ * If api_list is non-NULL, the bridge probes each ERD in the list before
+ * polling (verifying the appliance actually supports it).  If NULL, the
+ * bridge runs the full discovery chain (common → energy → feature →
+ * appliance-specific ERDs).
  */
 void erd_bridge_poll_init(
   erd_bridge_poll_t* self,
@@ -163,29 +174,24 @@ void erd_bridge_poll_init(
   i_mqtt_client_t* mqtt_client,
   uint32_t polling_interval_ms,
   bool only_publish_on_change,
+  uint8_t host_address,
+  uint8_t appliance_type,
+  const tiny_erd_t* api_list,
+  uint16_t api_list_count,
   erd_cache_t* cache);
 
-/*!
- * Initialize the ERD polling bridge with a pre-known host address.
- *
- * Unlike erd_bridge_poll_init(), this variant skips the broadcast
- * identification step (reading ERD 0x0008 from 0xFF) because the appliance
- * address is already known.  If api_list is non-NULL the bridge goes directly
- * to state_polling; otherwise it runs the full ERD discovery chain starting at
- * state_add_common_erds.  Use this when starting a secondary (custom-ERD-only)
- * polling bridge alongside a subscription bridge that has already identified
- * the appliance.
+/*
+ * Legacy convenience wrapper for callers that do not have a known host
+ * address or appliance type (broadcast discovery path).  Retained for
+ * backward compatibility with existing test code.
  */
-void erd_bridge_poll_init_at_address(
+void erd_bridge_poll_init_legacy(
   erd_bridge_poll_t* self,
   tiny_timer_group_t* timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t* mqtt_client,
   uint32_t polling_interval_ms,
   bool only_publish_on_change,
-  uint8_t known_host_address,
-  const tiny_erd_t* api_list,
-  uint16_t api_list_count,
   erd_cache_t* cache);
 
 /*!

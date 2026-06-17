@@ -172,6 +172,10 @@ void GeappliancesBridge::initialize_erd_bridge_()
       &this->mqtt_client_adapter_.interface,
       this->polling_interval_ms_,
       this->polling_only_publish_on_change_,
+      this->autodiscovery_manager_.get_host_address(),
+      this->device_identity_manager_.get_appliance_type(),
+      nullptr,
+      0,
       &this->erd_cache_);
     // Wire the discovery-complete callback so the startup HSM waits for
     // ERD discovery to finish before transitioning to steady-state.
@@ -275,17 +279,18 @@ void GeappliancesBridge::start_custom_erd_polling_()
 
   // Initialize a polling bridge with the custom ERDs as the api_parsed_list.
   // This skips discovery states and goes straight to polling with an exact-size list.
-  erd_bridge_poll_init_at_address(
-    &this->erd_bridge_poll_,
-    &this->timer_group_,
-    this->autodiscovery_manager_.get_active_erd_client(),
-    &this->mqtt_client_adapter_.interface,
-    this->polling_interval_ms_,
-    this->polling_only_publish_on_change_,
-    this->autodiscovery_manager_.get_host_address(),
-    this->custom_erds_vec_.data(),
-    static_cast<uint16_t>(this->custom_erds_vec_.size()),
-    &this->erd_cache_);
+    erd_bridge_poll_init(
+      &this->erd_bridge_poll_,
+      &this->timer_group_,
+      this->autodiscovery_manager_.get_active_erd_client(),
+      &this->mqtt_client_adapter_.interface,
+      this->polling_interval_ms_,
+      this->polling_only_publish_on_change_,
+      this->autodiscovery_manager_.get_host_address(),
+      this->device_identity_manager_.get_appliance_type(),
+      this->custom_erds_vec_.data(),
+      static_cast<uint16_t>(this->custom_erds_vec_.size()),
+      &this->erd_cache_);
   this->custom_erd_polling_started_ = true;
   this->polling_bridge_initialized_ = true;
 }
@@ -349,14 +354,18 @@ void GeappliancesBridge::check_subscription_activity_()
   }
 
   // Stand up the polling bridge.
-  erd_bridge_poll_init(
-    &this->erd_bridge_poll_,
-    &this->timer_group_,
-    this->autodiscovery_manager_.get_active_erd_client(),
-    &this->mqtt_client_adapter_.interface,
-    this->polling_interval_ms_,
-    this->polling_only_publish_on_change_,
-    &this->erd_cache_);
+    erd_bridge_poll_init(
+      &this->erd_bridge_poll_,
+      &this->timer_group_,
+      this->autodiscovery_manager_.get_active_erd_client(),
+      &this->mqtt_client_adapter_.interface,
+      this->polling_interval_ms_,
+      this->polling_only_publish_on_change_,
+      this->autodiscovery_manager_.get_host_address(),
+      this->device_identity_manager_.get_appliance_type(),
+      nullptr,
+      0,
+      &this->erd_cache_);
   this->polling_bridge_initialized_ = true;
   // Wire the discovery-complete callback so HA discovery registration
   // works correctly after subscription fallback.

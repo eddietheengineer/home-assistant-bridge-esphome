@@ -115,7 +115,7 @@ TEST_GROUP(configuration_based_tests)
     uint32_t polling_interval = default_polling_interval,
     bool only_publish_on_change = false)
   {
-    erd_bridge_poll_init(
+    erd_bridge_poll_init_legacy(
       &erd_bridge_poll,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -820,7 +820,7 @@ TEST_GROUP(only_publish_on_change_config)
 
   void configure_only_publish_on_change()
   {
-    erd_bridge_poll_init(
+    erd_bridge_poll_init_legacy(
       &bridge,
       &timer_group.timer_group,
       &erd_client.interface,
@@ -832,7 +832,7 @@ TEST_GROUP(only_publish_on_change_config)
 
   void configure_always_publish()
   {
-    erd_bridge_poll_init(
+    erd_bridge_poll_init_legacy(
       &bridge,
       &timer_group.timer_group,
       &erd_client.interface,

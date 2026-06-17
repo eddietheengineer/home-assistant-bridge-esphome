@@ -339,11 +339,11 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
       self->polling_list_complete = false;
       self->current_state_name = "identify_appliance";
       // If the caller pre-initialized the host address (via
-      // erd_bridge_poll_init_at_address), skip the broadcast and transition
-      // directly to the appropriate state.  This is used by the custom ERD bridge
-      // (start_custom_erd_polling_) which already knows the appliance address and
-      // supplies an api_parsed_list (the custom ERDs), so full discovery and
-      // feature-bit reads are unnecessary.
+      // erd_bridge_poll_init with a non-broadcast address), skip the broadcast
+      // and transition directly to the appropriate state.  This is used by the
+      // custom ERD bridge (start_custom_erd_polling_) and the main polling bridge
+      // (initialize_erd_bridge_), both of which already know the appliance
+      // address from autodiscovery.
       if (self->erd_host_address != tiny_gea_broadcast_address) {
         // Re-entry after appliance lost: polling list is non-empty — clear
         // everything so ERDs are re-added via _no_register and lazily
@@ -747,6 +747,7 @@ static void erd_bridge_poll_init_impl(
   uint32_t                  polling_interval_ms,
   bool                      only_publish_on_change,
   uint8_t                   initial_host_address,
+  uint8_t                   initial_appliance_type,
   const tiny_erd_t*         api_parsed_list,
   uint16_t                  api_parsed_list_count,
   erd_cache_t*              cache)
@@ -759,6 +760,7 @@ static void erd_bridge_poll_init_impl(
   // Must be set before tiny_hsm_init() so state_identify_appliance entry
   // can decide whether to broadcast or skip straight to discovery/polling.
   self->erd_host_address       = initial_host_address;
+  self->appliance_type         = initial_appliance_type;
   // Store the pre-known address so that signal_appliance_lost can restore it
   // after a transient read failure instead of falling back to 0xFF broadcast.
   // Zero means "unknown — use broadcast" (set by erd_bridge_poll_init()).
@@ -812,28 +814,29 @@ void erd_bridge_poll_init(
   i_mqtt_client_t*          mqtt_client,
   uint32_t                  polling_interval_ms,
   bool                      only_publish_on_change,
-  erd_cache_t*              cache)
-{
-  erd_bridge_poll_init_impl(
-    self, timer_group, erd_client, mqtt_client, polling_interval_ms, only_publish_on_change,
-    tiny_gea_broadcast_address, nullptr, 0, cache);
-}
-
-void erd_bridge_poll_init_at_address(
-  erd_bridge_poll_t*    self,
-  tiny_timer_group_t*       timer_group,
-  i_tiny_gea3_erd_client_t* erd_client,
-  i_mqtt_client_t*          mqtt_client,
-  uint32_t                  polling_interval_ms,
-  bool                      only_publish_on_change,
-  uint8_t                   known_host_address,
+  uint8_t                   host_address,
+  uint8_t                   appliance_type,
   const tiny_erd_t*         api_list,
   uint16_t                  api_list_count,
   erd_cache_t*              cache)
 {
   erd_bridge_poll_init_impl(
     self, timer_group, erd_client, mqtt_client, polling_interval_ms, only_publish_on_change,
-    known_host_address, api_list, api_list_count, cache);
+    host_address, appliance_type, api_list, api_list_count, cache);
+}
+
+void erd_bridge_poll_init_legacy(
+  erd_bridge_poll_t*    self,
+  tiny_timer_group_t*       timer_group,
+  i_tiny_gea3_erd_client_t* erd_client,
+  i_mqtt_client_t*          mqtt_client,
+  uint32_t                  polling_interval_ms,
+  bool                      only_publish_on_change,
+  erd_cache_t*              cache)
+{
+  erd_bridge_poll_init_impl(
+    self, timer_group, erd_client, mqtt_client, polling_interval_ms, only_publish_on_change,
+    tiny_gea_broadcast_address, 0, nullptr, 0, cache);
 }
 
 void erd_bridge_poll_destroy(erd_bridge_poll_t* self)
