@@ -37,6 +37,7 @@ void HaDiscoveryManager::init(const std::string& base_url,
   this->model_number_           = model_number;
   this->serial_number_          = serial_number;
   this->registered_erds_        = registered_erds;
+  this->registered_erds_snapshot_ = registered_erds;
   this->generate_device_config_ = generate_device_config;
   this->state_                  = HA_DISCOVERY_WAITING_FOR_READY;
   this->last_activity_          = millis();
@@ -46,6 +47,7 @@ void HaDiscoveryManager::init(const std::string& base_url,
 void HaDiscoveryManager::set_registered_erds(const std::set<tiny_erd_t>& erds)
 {
   this->registered_erds_ = erds;
+  this->registered_erds_snapshot_ = erds;
 }
 
 void HaDiscoveryManager::on_erd_seen(tiny_erd_t erd)
