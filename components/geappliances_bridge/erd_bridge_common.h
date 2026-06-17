@@ -1,6 +1,7 @@
 // =============================================================================
 // MODULE GOAL
 // =============================================================================
+// Goal: Provide shared timing constants, HSM signal identifiers, and utility
 //       templates used by both erd_bridge_subscribe.cpp and erd_bridge_poll.cpp.
 //
 // Responsibilities:
