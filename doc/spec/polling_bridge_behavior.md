@@ -182,11 +182,11 @@ When auto mode falls back from subscription to poll mode, custom ERDs are handle
 
 **Subscription mode:**
 - `maybe_start_custom_erd_polling_()` gates on three conditions: in subscription mode, subscription activity confirmed, and `custom_erd_subscription_last_activity_` older than `HA_DISCOVERY_QUIET_MS` (10s).
-- `start_custom_erd_polling_()` initializes a separate polling bridge via `mqtt_bridge_polling_init_at_address()` with the custom ERDs as the `api_parsed_list`, which goes through the probe phase.
+- `start_custom_erd_polling_()` initializes a separate polling bridge via `erd_bridge_poll_init_at_address()` with the custom ERDs as the `api_parsed_list`, which goes through the probe phase.
 - The subscription bridge is NOT destroyed; both bridges share the same ERD client.
 
 **Poll mode:**
-- `configure_polling_optional_lists_()` sets `mqtt_bridge_polling_.custom_erd_list` and `custom_erd_list_count` before any events fire.
+- `configure_polling_optional_lists_()` sets `erd_bridge_poll_.custom_erd_list` and `custom_erd_list_count` before any events fire.
 - `state_add_appliance_erds` transitions to `state_add_custom_erds` (instead of `state_polling`) when custom ERDs are configured.
 - `state_add_custom_erds` discovers each custom ERD through `handle_discovery_list_signals`, adding successful ones to the polling list and excluding failures.
 
