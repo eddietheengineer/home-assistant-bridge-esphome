@@ -522,6 +522,8 @@ bool GeappliancesBridge::teardown() {
   // Clean up HA discovery manager first (may have a running FreeRTOS task).
   this->ha_discovery_manager_.cleanup();
 
+  // Clean up feature bit manager (unsubscribe from ERD client events, stop timers).
+  this->feature_bit_manager_.cleanup();
   // Destroy whichever bridge(s) were actually initialized.
   // Using explicit ownership flags makes this unambiguous and prevents
   // double-free or missed cleanup.

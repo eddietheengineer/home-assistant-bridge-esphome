@@ -101,8 +101,11 @@ uint16_t erd_cache_mqtt_publisher_loop(
 
     /* Build topic: geappliances/{device_id}/erd/0x{ERD:04X}/value */
     char topic[128];
-    snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04X/value", self->device_id, entry->erd);
-
+    int topic_len = snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04X/value", self->device_id, entry->erd);
+    if (topic_len < 0 || (unsigned)topic_len >= sizeof(topic)) {
+      ESP_LOGW(TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
+      return published;
+    }
     /* Build hex payload: max data_size is 255 (uint8_t), so hex is 510 chars + null */
     size_t data_len = entry->data_size;
     char hex[512];

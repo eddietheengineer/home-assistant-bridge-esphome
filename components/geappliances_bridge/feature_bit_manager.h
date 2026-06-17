@@ -96,6 +96,9 @@ class FeatureBitManager {
             uint8_t host_address,
             tiny_timer_group_t* timer_group);
 
+  /// Unsubscribe from events and stop timers. Safe to call multiple times.
+  void cleanup();
+
   /// Start the feature-bit reading sequence.  Idempotent if already past the first state.
   void start();
 

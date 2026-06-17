@@ -25,6 +25,17 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
                               uint8_t host_address,
                               tiny_timer_group_t* timer_group)
 {
+  // Unsubscribe from any previous init() to avoid dangling subscriptions on re-init.
+  if (this->erd_client_) {
+    tiny_event_unsubscribe(
+      tiny_gea3_erd_client_on_activity(this->erd_client_),
+      &this->erd_activity_subscription_);
+  }
+  if (this->timer_group_) {
+    tiny_timer_stop(this->timer_group_, &this->parse_timer_);
+    tiny_timer_stop(this->timer_group_, &this->queue_retry_timer_);
+  }
+
   if (erd_client == nullptr) {
     ESP_LOGE(TAG, "init() called with null erd_client");
     return;
@@ -33,7 +44,6 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
     ESP_LOGE(TAG, "init() called with null timer_group");
     return;
   }
-
   this->erd_client_    = erd_client;
   this->host_address_  = host_address;
   this->timer_group_   = timer_group;
@@ -60,6 +70,29 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
   tiny_event_subscribe(
     tiny_gea3_erd_client_on_activity(this->erd_client_),
     &this->erd_activity_subscription_);
+}
+
+void FeatureBitManager::cleanup()
+{
+  // Unsubscribe from ERD client activity events.
+  if (this->erd_client_) {
+    tiny_event_unsubscribe(
+      tiny_gea3_erd_client_on_activity(this->erd_client_),
+      &this->erd_activity_subscription_);
+  }
+
+  // Stop any active timers.
+  if (this->timer_group_) {
+    tiny_timer_stop(this->timer_group_, &this->parse_timer_);
+    tiny_timer_stop(this->timer_group_, &this->queue_retry_timer_);
+  }
+
+  // Reset state so a subsequent init() starts fresh.
+  this->erd_client_ = nullptr;
+  this->timer_group_ = nullptr;
+  this->host_address_ = 0;
+  this->state_ = FEATURE_BIT_STATE_READING_0008;
+  this->read_queued_ = false;
 }
 
 void FeatureBitManager::start()
