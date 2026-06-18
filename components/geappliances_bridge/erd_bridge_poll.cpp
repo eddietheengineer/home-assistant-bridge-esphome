@@ -778,7 +778,6 @@ static void erd_bridge_poll_init_impl(
   self->erd_polling_list       = nullptr;
   self->polling_list_count     = 0;
   self->polling_list_capacity  = 0;
-  self->erd_set                = nullptr;
   self->restart_pending             = false;
   self->cycle_sending_in_progress   = false;
   self->polling_timer_armed         = false;
@@ -787,6 +786,9 @@ static void erd_bridge_poll_init_impl(
   self->cycle_start_ms              = 0;
   self->last_cycle_time_ms          = 0;
   self->cycle_count                 = 0;
+  // Initialize to nullptr so that if the new below throws,
+  // erd_bridge_poll_destroy() will safely skip the delete.
+  self->erd_set = nullptr;
   self->erd_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
   self->erd_cache = cache;
   self->on_discovery_complete        = nullptr;
