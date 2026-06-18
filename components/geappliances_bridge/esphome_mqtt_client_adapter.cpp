@@ -44,11 +44,11 @@ static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value
   size_t log_bytes = size < 64 ? size : 64;
   char hex[130];
   for (size_t i = 0; i < log_bytes; i++) {
-    snprintf(hex + i * 2, 3, "%02X", bytes[i]);
+    snprintf(hex + i * 2, 3, "%02x", bytes[i]);
   }
   hex[log_bytes * 2] = '\0';
 
-  ESP_LOGV(TAG, "ERD 0x%04X: %s", erd, hex);
+  ESP_LOGV(TAG, "ERD 0x%04x: %s", erd, hex);
   self->erd_publish_count_++;
 }
 

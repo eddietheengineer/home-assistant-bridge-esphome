@@ -99,9 +99,9 @@ uint16_t erd_cache_mqtt_publisher_loop(
     /* Determine data pointer */
     const uint8_t* data = entry->uses_heap ? entry->heap_data : entry->inline_data;
 
-    /* Build topic: geappliances/{device_id}/erd/0x{ERD:04X}/value */
+    /* Build topic: geappliances/{device_id}/erd/0x{ERD:04x}/value */
     char topic[128];
-    int topic_len = snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04X/value", self->device_id, entry->erd);
+    int topic_len = snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/value", self->device_id, entry->erd);
     if (topic_len < 0 || (unsigned)topic_len >= sizeof(topic)) {
       ESP_LOGW(TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
       return published;
@@ -110,7 +110,7 @@ uint16_t erd_cache_mqtt_publisher_loop(
     size_t data_len = entry->data_size;
     char hex[512];
     for (size_t i = 0; i < data_len; i++) {
-      snprintf(hex + i * 2, 3, "%02X", data[i]);
+      snprintf(hex + i * 2, 3, "%02x", data[i]);
     }
     hex[data_len * 2] = '\0';
 
