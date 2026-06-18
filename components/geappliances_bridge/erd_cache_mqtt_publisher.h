@@ -38,6 +38,10 @@ typedef struct {
   uint32_t missed_loops;           // Loop iterations skipped while MQTT disconnected
   // Time callback (defaults to esphome::millis; overridable for testing)
   uint32_t (*get_time_ms)(void);
+  // When true, publish every valid cache entry each loop pass (not just
+  // those with update_required=true).  Used when
+  // polling_only_publish_on_change is disabled.
+  bool publish_all;
 } erd_cache_mqtt_publisher_t;
 
 #ifdef __cplusplus
@@ -70,6 +74,17 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self);
  * Called when MQTT broker disconnects.
  */
 void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self);
+
+/*!
+ * Set whether to publish all valid cache entries each loop pass.
+ * When true (polling_only_publish_on_change=false), every valid entry
+ * is published regardless of whether its data changed.
+ * When false (polling_only_publish_on_change=true), only entries with
+ * update_required=true are published (the default).
+ */
+void erd_cache_mqtt_publisher_set_publish_all(
+  erd_cache_mqtt_publisher_t* self,
+  bool publish_all);
 
 /*!
  * Override the time source (defaults to esphome::millis).

@@ -88,7 +88,12 @@ uint16_t erd_cache_mqtt_publisher_loop(
   uint16_t published = 0;
 
   while (published < max_publishes) {
-    erd_cache_entry_t* entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
+    erd_cache_entry_t* entry;
+    if (self->publish_all) {
+      entry = erd_cache_get_next_entry(self->cache, &self->publish_index);
+    } else {
+      entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
+    }
     if (!entry) {
       break;
     }
@@ -119,6 +124,12 @@ uint16_t erd_cache_mqtt_publisher_loop(
 
     self->total_published++;
     published++;
+    /* In publish_all mode, re-mark the entry as updated so it gets
+     * picked up on the next loop pass.  In change-only mode,
+     * erd_cache_get_next_updated already cleared the flag. */
+    if (self->publish_all) {
+      entry->update_required = true;
+    }
   }
 
   return published;
@@ -141,4 +152,11 @@ void erd_cache_mqtt_publisher_set_time_fn(
   uint32_t (*get_time_ms)(void))
 {
   self->get_time_ms = get_time_ms;
+}
+
+void erd_cache_mqtt_publisher_set_publish_all(
+  erd_cache_mqtt_publisher_t* self,
+  bool publish_all)
+{
+  self->publish_all = publish_all;
 }
