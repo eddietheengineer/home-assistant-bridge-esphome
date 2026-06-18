@@ -723,11 +723,6 @@ void GeappliancesBridge::init_erd_cache_publisher_()
     &this->erd_cache_,
     &this->mqtt_client_adapter_.interface,
     this->device_identity_manager_.get_device_id().c_str());
-  /* When polling_only_publish_on_change is false, publish every
-   * polled ERD each cycle regardless of whether its data changed. */
-  erd_cache_mqtt_publisher_set_publish_all(
-    &this->erd_cache_publisher_,
-    !this->polling_only_publish_on_change_);
   ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
 }
 

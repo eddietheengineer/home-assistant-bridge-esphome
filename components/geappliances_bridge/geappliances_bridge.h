@@ -86,12 +86,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_device_id(const std::string &device_id) { this->configured_device_id_ = device_id; }
   void set_mode(uint8_t mode) { this->mode_ = static_cast<BridgeMode>(mode); }
   void set_polling_interval(uint32_t polling_interval) { this->polling_interval_ms_ = polling_interval; }
-  void set_polling_only_publish_on_change(bool only_publish_on_change) {
-    this->polling_only_publish_on_change_ = only_publish_on_change;
-    if (this->erd_cache_publisher_.cache) {
-      erd_cache_mqtt_publisher_set_publish_all(&this->erd_cache_publisher_, !only_publish_on_change);
-    }
-  }
+  void set_polling_only_publish_on_change(bool only_publish_on_change) { this->polling_only_publish_on_change_ = only_publish_on_change; }
   void set_appliance_api_parsing(bool appliance_api_parsing) { this->appliance_api_parsing_ = appliance_api_parsing; }
   void set_generate_device_config(bool generate_device_config) { this->generate_device_config_ = generate_device_config; }
   void set_ha_discovery_base_url(const std::string& url) { this->ha_discovery_base_url_ = url; }
