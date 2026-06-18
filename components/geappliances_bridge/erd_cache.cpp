@@ -123,6 +123,8 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   slot->uses_heap = needs_heap;
   slot->valid = true;
   slot->update_required = true;
+  ESP_LOGD(TAG, "ERD 0x%04X added to cache (%u bytes, %s)", erd, data_size,
+           is_subscription ? "subscription" : "polling");
 
   if (needs_heap) {
     slot->heap_data = new (std::nothrow) uint8_t[data_size];

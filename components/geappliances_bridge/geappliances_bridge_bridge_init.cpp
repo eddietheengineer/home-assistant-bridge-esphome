@@ -332,13 +332,9 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
   if (!subscription_confirmed) {
     return;
   }
-  // Wait until all custom ERDs have been seen via subscription, so we don't
-  // poll ERDs the subscription bridge will already cover.
-  for (tiny_erd_t erd : this->custom_erds_vec_) {
-    if (this->custom_erd_subscription_seen_erds_.find(erd) == this->custom_erd_subscription_seen_erds_.end()) {
-      return;
-    }
-  }
+  // Wait for the quiet window to elapse before starting custom ERD polling.
+  // This gives the subscription bridge time to publish its ERDs, so we can
+  // avoid redundant polling of ERDs already covered by subscription.
 
   if (millis() - this->custom_erd_subscription_last_activity_ < HA_DISCOVERY_QUIET_MS) {
     return;
