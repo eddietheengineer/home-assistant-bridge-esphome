@@ -196,7 +196,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
       tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
     };
     this->erd_bridge_poll_.on_discovery_complete_context = this;
-    this->polling_bridge_initialized_ = true;
+    erd_bridge_poll_set_publish_all(&this->erd_bridge_poll_, !this->polling_only_publish_on_change_);
     this->configure_polling_optional_lists_();
   }
 
@@ -308,7 +308,7 @@ void GeappliancesBridge::start_custom_erd_polling_()
       this->custom_erds_vec_.data(),
       static_cast<uint16_t>(this->custom_erds_vec_.size()),
       &this->erd_cache_);
-  this->custom_erd_polling_started_ = true;
+  erd_bridge_poll_set_publish_all(&this->erd_bridge_poll_, !this->polling_only_publish_on_change_);
   this->polling_bridge_initialized_ = true;
 }
 
@@ -390,7 +390,7 @@ void GeappliancesBridge::check_subscription_activity_()
     tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
   };
   this->erd_bridge_poll_.on_discovery_complete_context = this;
-  this->configure_polling_optional_lists_();
+  erd_bridge_poll_set_publish_all(&this->erd_bridge_poll_, !this->polling_only_publish_on_change_);
   this->subscription_mode_active_ = false;
 
   // Signal the startup HSM that subscription fallback has occurred.

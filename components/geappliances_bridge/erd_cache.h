@@ -48,12 +48,13 @@ void erd_cache_destroy(erd_cache_t* self);
 erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd);
 
 // Updates or inserts ERD data.
-// For reads (is_subscription=false): compares new data against cached;
-//   returns true if data changed (or entry was new).
-// For subscriptions (is_subscription=true): always sets update_required=true;
-//   returns true.
+// For subscriptions (is_subscription=true): always sets update_required=true.
+// For polling (is_subscription=false):
+//   - If publish_all is true: always sets update_required=true.
+//   - If publish_all is false: sets update_required=true only if data changed.
+// Returns true if update_required was set (or entry was new).
 // Returns false if cache is full and the ERD is not already cached.
-bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool is_subscription);
+bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool is_subscription, bool publish_all);
 
 // Returns the next entry with update_required=true, then clears the flag.
 // Caller provides an iterator (uint16_t) initialized to 0.

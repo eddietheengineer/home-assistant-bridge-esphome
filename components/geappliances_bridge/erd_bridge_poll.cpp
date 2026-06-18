@@ -280,7 +280,7 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
     case signal_read_completed:
       add_erd_to_polling_list(self, args->read_completed.erd);
       erd_cache_update(self->erd_cache, args->read_completed.erd,
-        reinterpret_cast<const uint8_t*>(args->read_completed.data), args->read_completed.data_size, /* from_subscription= */ false);
+        reinterpret_cast<const uint8_t*>(args->read_completed.data), args->read_completed.data_size, /* is_subscription= */ false, /* publish_all= */ true);
       if (!send_next_read_request(self)) {
         tiny_hsm_transition(hsm, self->next_discovery_state);
       }
@@ -693,7 +693,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         add_erd_to_polling_list(self, erd);
       }
 
-      erd_cache_update(self->erd_cache, erd, erd_data, data_size, /* from_subscription= */ false);
+      erd_cache_update(self->erd_cache, erd, erd_data, data_size, /* is_subscription= */ false, self->publish_all);
       self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
         on_polling_cycle_complete(self, self->restart_pending || !self->polling_timer_armed);
@@ -793,6 +793,7 @@ static void erd_bridge_poll_init_impl(
   self->erd_cache = cache;
   self->on_discovery_complete        = nullptr;
   self->on_discovery_complete_context = nullptr;
+  self->publish_all                   = false;
 
   tiny_event_subscription_init(
     &self->erd_client_activity_subscription, self, +[](void* context, const void* _args) {
@@ -866,4 +867,9 @@ void erd_bridge_poll_destroy(erd_bridge_poll_t* self)
   }
   self->polling_list_count = 0;
   self->polling_list_capacity = 0;
+}
+
+void erd_bridge_poll_set_publish_all(erd_bridge_poll_t* self, bool publish_all)
+{
+  self->publish_all = publish_all;
 }

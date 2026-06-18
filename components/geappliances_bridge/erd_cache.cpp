@@ -43,9 +43,8 @@ erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd)
   return nullptr;
 }
 
-bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool is_subscription)
+bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool is_subscription, bool publish_all)
 {
-  // Look for existing entry
   erd_cache_entry_t* existing = nullptr;
   for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
     erd_cache_entry_t* e = &self->entries[i];
@@ -88,7 +87,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
     existing->data_size = data_size;
     existing->uses_heap = needs_heap;
 
-    if (is_subscription) {
+    if (is_subscription || publish_all) {
       existing->update_required = true;
       return true;
     }
