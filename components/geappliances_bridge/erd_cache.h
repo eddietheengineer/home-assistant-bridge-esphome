@@ -35,6 +35,7 @@ typedef struct erd_cache_t {
   erd_cache_entry_t entries[ERD_CACHE_CAPACITY];
   uint32_t update_count;        // total updates since last window reset
   uint32_t update_count_window; // updates in the last 60s window
+  bool only_publish_onchange;   // when true, only mark update_required on data change
 } erd_cache_t;
 
 #ifdef __cplusplus
@@ -44,17 +45,18 @@ extern "C" {
 void erd_cache_init(erd_cache_t* self);
 void erd_cache_destroy(erd_cache_t* self);
 
-// Returns pointer to entry, or NULL if not found.
-erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd);
-
 // Updates or inserts ERD data.
-// For subscriptions (is_subscription=true): always sets update_required=true.
-// For polling (is_subscription=false):
-//   - If publish_all is true: always sets update_required=true.
-//   - If publish_all is false: sets update_required=true only if data changed.
+// If force_publish is true: always marks update_required=true (used by subscriptions).
+// If force_publish is false and only_publish_onchange is true: marks update_required only when data has changed.
+// If force_publish is false and only_publish_onchange is false: always marks update_required=true.
+// New entries always mark update_required=true regardless of the flags.
 // Returns true if update_required was set (or entry was new).
 // Returns false if cache is full and the ERD is not already cached.
-bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool is_subscription, bool publish_all);
+bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool force_publish);
+
+// Set whether the cache should only mark ERDs as updated when data changes.
+// Default is false (always mark updated).
+void erd_cache_set_only_publish_onchange(erd_cache_t* self, bool only_publish_onchange);
 
 // Returns the next entry with update_required=true, then clears the flag.
 // Caller provides an iterator (uint16_t) initialized to 0.

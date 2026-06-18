@@ -43,7 +43,7 @@ erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd)
   return nullptr;
 }
 
-bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool is_subscription, bool publish_all)
+bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool force_publish)
 {
   erd_cache_entry_t* existing = nullptr;
   for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
@@ -87,11 +87,10 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
     existing->data_size = data_size;
     existing->uses_heap = needs_heap;
 
-    if (is_subscription || publish_all) {
+    if (force_publish || !self->only_publish_onchange) {
       existing->update_required = true;
       return true;
     }
-
     existing->update_required = data_changed;
     return data_changed;
   }
@@ -123,8 +122,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   slot->uses_heap = needs_heap;
   slot->valid = true;
   slot->update_required = true;
-  ESP_LOGD(TAG, "ERD 0x%04X added to cache (%u bytes, %s)", erd, data_size,
-           is_subscription ? "subscription" : "polling");
+  ESP_LOGD(TAG, "ERD 0x%04X added to cache (%u bytes)", erd, data_size);
 
   if (needs_heap) {
     slot->heap_data = new (std::nothrow) uint8_t[data_size];
@@ -141,6 +139,11 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   }
 
   return true;
+}
+
+void erd_cache_set_only_publish_onchange(erd_cache_t* self, bool only_publish_onchange)
+{
+  self->only_publish_onchange = only_publish_onchange;
 }
 
 erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* iterator)

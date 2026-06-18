@@ -141,10 +141,6 @@ typedef struct {
   // processes its first signal.  NULL means no callback.
   void (*on_discovery_complete)(void* context);
   void* on_discovery_complete_context;
-  // When true, every polled ERD read sets update_required=true regardless
-  // of whether the data changed.  When false, only changed data sets the
-  // flag (the default).  Mirrors the polling_only_publish_onchange config.
-  bool publish_all;
 } erd_bridge_poll_t;
 
 /*!
@@ -173,17 +169,8 @@ void erd_bridge_poll_init(
   erd_cache_t* cache);
 
 /*!
- * Set whether the polling bridge should mark every polled ERD as
- * update_required (publish_all=true) or only changed ones (publish_all=false).
- * Mirrors the polling_only_publish_onchange config option (inverted).
- */
-void erd_bridge_poll_set_publish_all(
-  erd_bridge_poll_t* self,
-  bool publish_all);
-
-/*!
  * Destroy the ERD polling bridge.
  */
-void erd_bridge_poll_destroy(
-  erd_bridge_poll_t* self);
+void erd_bridge_poll_destroy(erd_bridge_poll_t* self);
+
 #endif
