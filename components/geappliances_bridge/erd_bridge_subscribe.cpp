@@ -58,9 +58,10 @@ static tiny_hsm_result_t state_subscribing(tiny_hsm_t* hsm, tiny_hsm_signal_t si
     case signal_subscription_host_came_online:
       // The appliance host restarted — its ERD set may have changed, so clear
       // the local tracking set so that all ERDs are re-registered when new
-      // subscription publications arrive.
+      // subscription publications arrive.  The ERD cache is NOT cleared — it
+      // may be shared with the polling bridge, and stale entries are harmless
+      // (they occupy slots but are overwritten when new publications arrive).
       erd_set(self).clear();
-      erd_cache_init(self->erd_cache);
       __attribute__((fallthrough));
     case tiny_hsm_signal_entry:
       // Intentionally fall through to the subscribe case below.

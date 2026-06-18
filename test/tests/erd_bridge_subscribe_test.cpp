@@ -213,6 +213,30 @@ TEST(erd_bridge_subscribe, should_ignore_subscription_host_came_online_from_othe
   when_a_subscription_host_came_online_is_received_for(0xC1);
 }
 
+// Regression: the cache should NOT be cleared on host-came-online.
+// In AUTO mode the cache is shared with the polling bridge; clearing it
+// would destroy the polling bridge's data.
+TEST(erd_bridge_subscribe, should_preserve_cache_data_on_host_came_online)
+{
+  given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
+
+  // Populate the cache with an ERD value via a publication.
+  given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
+  CHECK_EQUAL(1u, erd_cache_get_count(&test_cache));
+
+  // Simulate the appliance host restarting.
+  a_subscription_to_should_be_requested_for(0xC0);
+  when_a_subscription_host_came_online_is_received_for(0xC0);
+
+  // The cache entry should still be present (not cleared).
+  CHECK_EQUAL(1u, erd_cache_get_count(&test_cache));
+
+  uint16_t iter = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_entry(&test_cache, &iter);
+  CHECK(entry != nullptr);
+  CHECK_EQUAL(0xABCDu, entry->erd);
+}
+
 TEST(erd_bridge_subscribe, should_ignore_subscription_added_activity_for_other_addresses)
 {
   given_that_the_bridge_has_been_initialized();

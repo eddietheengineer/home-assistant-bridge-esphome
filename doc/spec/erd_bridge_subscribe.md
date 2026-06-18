@@ -75,9 +75,10 @@ Initial state. Attempts to establish or re-establish the subscription.
 - If subscribe fails: arms the resubscribe timer for `resubscribe_delay` (1000 ms).
 
 **On `signal_subscription_host_came_online`:**
-- The appliance host restarted — its ERD set may have changed.
-- Clears `erd_set` and resets `erd_cache` via `erd_cache_init()`.
-- Falls through to the subscribe attempt below.
+:- The appliance host restarted — its ERD set may have changed.
+:- Clears `erd_set` so all ERDs are re-registered when new publications arrive.
+:- **Does NOT clear the ERD cache** — the cache may be shared with the polling bridge; stale entries are harmless (they occupy slots but are overwritten when new publications arrive).
+:- Falls through to the subscribe attempt below.
 
 **On `signal_timer_expired`:**
 - Resubscribe timer fired after a failed subscribe.
@@ -123,8 +124,7 @@ Signals not handled by the current child state are deferred to the parent (`sub_
 ```
 sub_state_top (parent — handles publication_received globally)
   ├─ state_subscribing (initial)
-  │    ├─ entry / timer_expired / subscription_failed → subscribe()
-  │    ├─ subscription_host_came_online → clear erd_set, erd_cache, then subscribe()
+  │    ├─ subscription_host_came_online → clear erd_set, then subscribe()
   │    ├─ subscription_added_or_retained → state_subscribed
   │    └─ exit → disarm timer
   │
@@ -191,7 +191,7 @@ typedef struct {
 1. **One subscription at a time:** The bridge subscribes to exactly one appliance address. Multiple bridge instances can be created for multiple appliances.
 2. **Address isolation:** Each bridge instance processes only events matching its `erd_host_address`.
 3. **ERD set only cleared on appliance restart:** The `erd_set` is cleared on `signal_subscription_host_came_online`, not on transient failures.
-4. **Cache cleared on appliance restart:** `erd_cache_init()` is called when the appliance host comes online, clearing stale data before re-subscribing.
+4. **Cache NOT cleared on appliance restart:** The `erd_cache` is not reset when the appliance host comes online. The cache may be shared with the polling bridge; stale entries are overwritten when new publications arrive.
 5. **Clean destroy:** All event subscriptions are removed before freeing the `erd_set`, preventing use-after-free if events fire after destroy.
 
 ---
@@ -213,4 +213,4 @@ typedef struct {
 1. **Single appliance per instance:** Each subscription bridge instance subscribes to exactly one appliance address. Supporting multiple appliances requires multiple bridge instances.
 2. **No write handling:** The subscription bridge does not handle write requests. Write handling is the responsibility of `erd_write_bridge`.
 3. **No discovery:** The subscription bridge does not discover which ERDs an appliance supports. It accepts all publications from the subscribed address and adds them to the cache.
-4. **Cache cleared on appliance restart:** When the appliance host comes online, the entire shared ERD cache is reset. If another bridge (e.g., polling) shares the cache, its data is also cleared.
+4. **Cache NOT cleared on appliance restart:** The ERD cache is not reset when the appliance host comes online. Stale entries from the previous session are overwritten when new publications arrive.

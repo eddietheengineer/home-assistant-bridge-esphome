@@ -60,7 +60,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
     // Update existing entry
     bool data_changed = (existing->data_size != data_size) ||
                         (memcmp(existing->uses_heap ? existing->heap_data : existing->inline_data,
-                                data, data_size) != 0);
+                                data, existing->data_size) != 0);
 
     bool needs_heap = data_size > ERD_CACHE_INLINE_DATA_SIZE;
 

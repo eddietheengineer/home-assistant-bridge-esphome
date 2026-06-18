@@ -428,9 +428,9 @@ static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     // path (appliance first seen, or appliance_lost re-discovery), NOT on every
     // transient MQTT reconnect. Clearing in the disconnect handler caused the
     // set's tree nodes to be freed and reallocated on each reconnect, fragmenting
-    // the heap.  In the full-discovery path the polling bridge is the only
-    // consumer of the shared cache, so it is safe to reset it here.
-    erd_cache_init(self->erd_cache);
+    // the heap.  The ERD cache is NOT cleared here — it may be shared with the
+    // subscription bridge, and stale entries are harmless (they occupy slots but
+    // are not republished to MQTT once their update_required flag is drained).
     clear_discovery_state(self);
     self->request_id++;
     tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);

@@ -85,7 +85,7 @@ Determines the appliance's host address.
 **On entry:**
 - Sets `polling_list_complete = false`.
 - If `erd_host_address != tiny_gea_broadcast_address` (pre-known address):
-  - If this is a re-entry (`polling_list_count > 0` and `api_parsed_list != NULL`): clears `erd_set`, `erd_cache`, and `polling_list_count` via `clear_discovery_state()`.
+  - If this is a re-entry (`polling_list_count > 0` and `api_parsed_list != NULL`): clears `erd_set` and `polling_list_count` via `clear_discovery_state()` (does NOT clear the ERD cache — it may be shared with the subscription bridge).
   - If `api_parsed_list != NULL`: transitions to `state_probe_api_parsed_erds` (first entry) or `state_polling` (re-entry).
   - Otherwise: transitions to `state_add_common_erds`.
 - If `erd_host_address == tiny_gea_broadcast_address`: sends a broadcast read for ERD 0x0008 (appliance type).
@@ -104,7 +104,7 @@ Determines the appliance's host address.
 Probes the common ERD list (`commonErds` from `erd_lists.h`).
 
 **On entry:**
-- Calls `clear_discovery_state()` to reset `erd_set`, `erd_cache`, and `polling_list_count`.
+- Calls `clear_discovery_state()` to reset `erd_set` and `polling_list_count` (does NOT clear the ERD cache — it may be shared with the subscription bridge; stale entries are overwritten when new data arrives).
 - Sets `appliance_erd_list` to `commonErds`, `erd_index` to 0, and `next_discovery_state` to `state_add_energy_erds`.
 - Sends the first read.
 
@@ -338,6 +338,7 @@ The polling bridge does not own the publish-on-change setting — it is controll
 3. **No polling list growth on MQTT reconnect:** `erd_set` is not cleared on MQTT disconnect, preventing duplicate ERD additions on re-entry to `state_polling`.
 4. **Failed discovery ERDs are not excluded from later phases:** In `handle_discovery_list_signals`, failed ERDs are not inserted into `erd_set`, allowing them to be independently re-probed in later discovery phases (e.g., as custom ERDs).
 5. **Failed probe ERDs are excluded:** In `state_probe_api_parsed_erds`, failed ERDs are inserted into `erd_set` as exclusions, permanently preventing them from being added to the polling list.
+6. **Cache NOT cleared on discovery re-entry:** The ERD cache is not reset during `state_add_common_erds` or on appliance-loss re-discovery. The cache may be shared with the subscription bridge; stale entries are overwritten when new data arrives.
 
 ---
 

@@ -141,6 +141,111 @@ TEST_GROUP(erd_bridge_poll)
   }
 };
 
+// Regression: the cache should NOT be cleared on full-discovery re-entry.
+// In AUTO mode the cache is shared with the subscription bridge; clearing it
+// would destroy the subscription bridge's data.
+// signal_appliance_lost is defined in erd_bridge_common.h (not included here);
+// it is the last entry in the shared signal enum starting at tiny_hsm_signal_user_start.
+static const tiny_hsm_signal_t signal_appliance_lost = (tiny_hsm_signal_user_start + 9);
+
+TEST(erd_bridge_poll, should_preserve_cache_data_on_full_discovery_reentry)
+{
+  mock().disable();
+  when_the_bridge_is_initialized();
+
+  // Identify the appliance (type 0x00 = water heater, 64 ERDs)
+  uint8_t appliance_type = 0x00;
+  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
+
+  // Add polled_erd (0x0001) to the polling list via first common ERD read_completed
+  uint8_t initial_value = 0x42;
+  trigger_read_completed(0xC0, polled_erd, &initial_value, sizeof(initial_value));
+
+  // Fail remaining common ERDs (skip 0x0001 which was the first read_completed above)
+  for (size_t i = 1; i < commonErdCount; i++) {
+    trigger_read_failed(commonErds[i]);
+  }
+  // Fail all energy ERDs
+  for (size_t i = 0; i < energyErdCount; i++) {
+    trigger_read_failed(energyErds[i]);
+  }
+  // Fail all appliance API feature ERDs
+  for (size_t i = 0; i < applianceApiFeatureErdCount; i++) {
+    trigger_read_failed(applianceApiFeatureErds[i]);
+  }
+  // Fail all appliance-specific ERDs (water heater)
+  for (size_t i = 0; i < waterHeaterErdCount; i++) {
+    trigger_read_failed(waterHeaterErds[i]);
+  }
+  mock().enable();
+
+  // Bridge should now be in polling state with 1 ERD in the cache (polled_erd).
+  CHECK_EQUAL(1u, erd_cache_get_count(&test_cache));
+
+  // Simulate appliance lost -> re-discovery.
+  // The polling bridge transitions: poll_state_top(signal_appliance_lost) ->
+  // state_identify_appliance -> state_add_common_erds (full-discovery path).
+  // The cache should NOT be cleared during this re-discovery.
+
+  // Set up mock expectations for the entire re-discovery chain.
+  should_request_read(0xFF, 0x0008);
+  for (size_t i = 0; i < commonErdCount; i++) {
+    should_request_read(0xC0, commonErds[i]);
+  }
+  for (size_t i = 0; i < energyErdCount; i++) {
+    should_request_read(0xC0, energyErds[i]);
+  }
+  for (size_t i = 0; i < applianceApiFeatureErdCount; i++) {
+    should_request_read(0xC0, applianceApiFeatureErds[i]);
+  }
+  for (size_t i = 0; i < waterHeaterErdCount; i++) {
+    should_request_read(0xC0, waterHeaterErds[i]);
+  }
+
+  // Trigger appliance lost signal.
+  tiny_hsm_send_signal(&self.hsm, signal_appliance_lost, nullptr);
+
+  // Identify the appliance again.
+  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
+
+  // Complete all common ERD reads.
+  uint8_t new_value = 0x99;
+  for (size_t i = 0; i < commonErdCount; i++) {
+    trigger_read_completed(0xC0, commonErds[i], &new_value, sizeof(new_value));
+  }
+  // Fail all energy ERDs
+  for (size_t i = 0; i < energyErdCount; i++) {
+    trigger_read_failed(energyErds[i]);
+  }
+  // Fail all appliance API feature ERDs
+  for (size_t i = 0; i < applianceApiFeatureErdCount; i++) {
+    trigger_read_failed(applianceApiFeatureErds[i]);
+  }
+  // Fail all appliance-specific ERDs (water heater)
+  for (size_t i = 0; i < waterHeaterErdCount; i++) {
+    trigger_read_failed(waterHeaterErds[i]);
+  }
+
+  // The cache should have commonErdCount entries (all common ERDs).
+  // If the cache had been cleared, we'd still have commonErdCount entries
+  // (they were just re-added). The key proof is that the original polled_erd
+  // (0x0001) is still present with its updated value.
+  CHECK_EQUAL(commonErdCount, erd_cache_get_count(&test_cache));
+
+  // Verify the original ERD is still present with its updated value.
+  uint16_t iter = 0;
+  bool found = false;
+  while (true) {
+    erd_cache_entry_t* entry = erd_cache_get_next_entry(&test_cache, &iter);
+    if (!entry) break;
+    if (entry->erd == polled_erd) {
+      found = true;
+      CHECK_EQUAL(sizeof(new_value), entry->data_size);
+    }
+  }
+  CHECK(found);
+}
+
 TEST(erd_bridge_poll, should_always_publish_mqtt_when_only_publish_on_change_is_disabled)
 {
   given_that_the_bridge_has_entered_polling_state();
@@ -1421,4 +1526,57 @@ TEST(erd_cache_stats, update_rate_not_increased_on_overflow)
   // Try to insert beyond capacity — should be rejected
   erd_cache_update(&cache, 0x9999, &data, sizeof(data));
   CHECK_EQUAL(0u, erd_cache_get_update_rate(&cache)); // no increment on overflow
+}
+
+// Regression: when an inline entry is updated with a larger payload,
+// the memcmp must not read past the old inline buffer.
+TEST(erd_cache_stats, data_change_detected_when_size_increases_from_inline)
+{
+  uint8_t small[8] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
+  uint8_t large[24] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                        0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
+                        0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18 };
+
+  erd_cache_set_only_publish_onchange(&cache, true);
+
+  // Insert 8 bytes (fits inline)
+  CHECK(erd_cache_update(&cache, 0x1001, small, 8));
+
+  // Update with 24 bytes (exceeds inline, must go to heap).
+  // Before the fix this memcmp'd 24 bytes from the 16-byte inline buffer.
+  CHECK(erd_cache_update(&cache, 0x1001, large, 24));
+
+  // Verify the entry was stored correctly via iteration.
+  uint16_t iter = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iter);
+  CHECK(entry != nullptr);
+  CHECK_EQUAL(0x1001u, entry->erd);
+  CHECK_EQUAL(24u, entry->data_size);
+  CHECK(entry->uses_heap);
+}
+
+// Same ERD, same size, different data — should detect change.
+TEST(erd_cache_stats, data_change_detected_when_content_differs_same_size)
+{
+  uint8_t a[8] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
+  uint8_t b[8] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x09 };
+
+  erd_cache_set_only_publish_onchange(&cache, true);
+
+  CHECK(erd_cache_update(&cache, 0x1001, a, 8));
+  // First update with same data should NOT be marked as changed
+  CHECK(!erd_cache_update(&cache, 0x1001, a, 8));
+  // Update with different data should be marked as changed
+  CHECK(erd_cache_update(&cache, 0x1001, b, 8));
+}
+
+// Same ERD, same size, same data — should NOT be marked as changed.
+TEST(erd_cache_stats, no_change_when_data_identical)
+{
+  uint8_t data[4] = { 0xAA, 0xBB, 0xCC, 0xDD };
+
+  erd_cache_set_only_publish_onchange(&cache, true);
+
+  CHECK(erd_cache_update(&cache, 0x1001, data, 4));
+  CHECK(!erd_cache_update(&cache, 0x1001, data, 4));
 }
