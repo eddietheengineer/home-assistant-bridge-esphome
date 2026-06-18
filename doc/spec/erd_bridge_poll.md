@@ -4,7 +4,7 @@
 
 ### 1.1 Purpose
 
-The ERD polling bridge discovers the connected GE appliance, determines which ERDs (Entity-Relationship Data points) it supports, and periodically reads their values — publishing changes to MQTT. It also fulfills write commands received from MQTT.
+The ERD polling bridge discovers the connected GE appliance, determines which ERDs (Entity-Relationship Data points) it supports, and periodically reads their values — writing them to the shared ERD cache for deferred MQTT publishing. It also fulfills write commands received from MQTT.
 
 ### 1.2 Responsibilities
 
@@ -12,7 +12,7 @@ The ERD polling bridge discovers the connected GE appliance, determines which ER
 - Determine which ERDs the appliance supports through sequential verification reads
 - Maintain a dynamic polling list of verified ERDs
 - Execute steady-state polling cycles at a configured interval
-- Publish ERD values to MQTT (optionally only on change)
+- Write ERD values to the shared ERD cache (optionally only on change); the cache publisher handles MQTT publishing
 - Forward write requests from MQTT to the appliance
 - Recover from appliance loss and MQTT disconnect
 
@@ -20,6 +20,7 @@ The ERD polling bridge discovers the connected GE appliance, determines which ER
 
 - Subscription-mode operation (see `erd_bridge_subscribe`)
 - Deciding which ERDs are valid (filtered upstream by the MQTT client adapter)
+- Actual MQTT publishing (handled by the ERD cache publisher)
 - Bridge startup phase management (see `geappliances_bridge_startup_hsm`)
 
 ---
@@ -220,7 +221,7 @@ All discovery states (except `state_probe_api_parsed_erds` for failures) delegat
 
 **On `signal_read_completed`:**
 - Calls `add_erd_to_polling_list()` — registers the ERD on MQTT and adds it to `erd_polling_list` (deduped via `erd_set`).
-- Publishes the ERD value to MQTT via `mqtt_client_update_erd()`.
+- Calls `mqtt_client_update_erd()` with the ERD value. Note: in the current adapter implementation this is a no-op (logs and increments a counter only); actual MQTT publishing is handled by the ERD cache publisher.
 - Advances to the next ERD in the current list or transitions to `next_discovery_state`.
 
 **On `signal_read_failed`:**
@@ -247,6 +248,15 @@ ERDs added via `add_erd_to_polling_list_no_register()` are placed in `pending_re
 ### 4.5 One ERD at a Time
 
 During discovery, only one ERD read is outstanding at any time. The next read is issued only after receiving a definitive response (`signal_read_completed` or `signal_read_failed`). No timers are used to advance the discovery index.
+
+### 4.6 Data Flow
+
+The polling bridge has two paths for ERD data:
+
+**Discovery phase:** Calls `mqtt_client_update_erd()` directly. In the current adapter implementation this is a no-op (logs and increments a counter only). The ERD value is **not** written to the ERD cache during discovery.
+
+**Steady-state polling:** Calls `erd_cache_update()` to store the value in the shared ERD cache, then calls `mqtt_client_update_erd()` (also a no-op). The ERD cache publisher (`erd_cache_mqtt_publisher_loop`, called from `GeappliancesBridge::loop()`) iterates cache entries marked `update_required=true` and publishes them to MQTT as hex-encoded payloads. This is the only path that actually publishes ERD values to MQTT.
+
 
 ---
 
@@ -290,8 +300,7 @@ A polling cycle consists of sending reads for all ERDs in `erd_polling_list` and
 - Resets the appliance-lost timer.
 - If the ERD is in `pending_registration_set`: registers it on MQTT and removes it from the pending set.
 - If the ERD is not in `erd_set`: adds it to the polling list via `add_erd_to_polling_list()` (handles late discovery responses that arrive during polling).
-- Updates the ERD cache. If `only_publish_on_change` is true, publishes only if the value changed.
-- Increments `cycle_completed_count`; if cycle is complete, calls `on_polling_cycle_complete()`.
+- Updates the ERD cache via `erd_cache_update()`. If `only_publish_on_change` is true, the subsequent `mqtt_client_update_erd()` call is skipped when the value hasn't changed. Note: `mqtt_client_update_erd()` is a no-op in the current adapter; actual MQTT publishing is handled by the ERD cache publisher iterating `update_required` entries.
 
 **On `signal_read_failed`:**
 - Resets the appliance-lost timer.
