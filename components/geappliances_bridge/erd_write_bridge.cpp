@@ -184,10 +184,15 @@ void erd_write_bridge_destroy(erd_write_bridge_t* self)
   }
 
   // Remove all event subscriptions before freeing state.
-  tiny_event_unsubscribe(mqtt_client_on_write_request(self->mqtt_client),
-    &self->mqtt_write_request_subscription);
-  tiny_event_unsubscribe(tiny_gea3_erd_client_on_activity(self->erd_client),
-    &self->erd_client_activity_subscription);
+  // Guard against partial init where mqtt_client or erd_client may be null.
+  if (self->mqtt_client) {
+    tiny_event_unsubscribe(mqtt_client_on_write_request(self->mqtt_client),
+      &self->mqtt_write_request_subscription);
+  }
+  if (self->erd_client) {
+    tiny_event_unsubscribe(tiny_gea3_erd_client_on_activity(self->erd_client),
+      &self->erd_client_activity_subscription);
+  }
 }
 
 void erd_write_bridge_set_host_address(erd_write_bridge_t* self, uint8_t host_address)
