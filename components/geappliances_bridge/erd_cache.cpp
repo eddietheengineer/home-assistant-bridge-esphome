@@ -60,7 +60,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
     // Update existing entry
     bool data_changed = (existing->data_size != data_size) ||
                         (memcmp(existing->uses_heap ? existing->heap_data : existing->inline_data,
-                                data, existing->data_size) != 0);
+                                data, (existing->data_size < data_size) ? existing->data_size : data_size) != 0);
 
     bool needs_heap = data_size > ERD_CACHE_INLINE_DATA_SIZE;
 
@@ -75,9 +75,14 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
       if (!existing->heap_data) {
         ESP_LOGW(TAG, "Failed to allocate %u bytes for ERD 0x%04X", data_size, erd);
         existing->uses_heap = false;
-        memcpy(existing->inline_data, data, (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE);
-        existing->data_size = (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE;
-        return false;
+        uint8_t inline_size = (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE;
+        memcpy(existing->inline_data, data, inline_size);
+        existing->data_size = inline_size;
+        // Recompute data_changed for the truncated inline data.
+        bool truncated_changed = (existing->data_size != data_size) ||
+                                 (memcmp(existing->inline_data, data, existing->data_size) != 0);
+        existing->update_required = !self->only_publish_onchange || truncated_changed;
+        return existing->update_required;
       }
       memcpy(existing->heap_data, data, data_size);
     } else {

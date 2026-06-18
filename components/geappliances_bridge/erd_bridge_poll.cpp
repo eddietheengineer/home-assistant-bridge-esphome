@@ -432,8 +432,12 @@ static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     // subscription bridge, and stale entries are harmless (they occupy slots but
     // are not republished to MQTT once their update_required flag is drained).
     clear_discovery_state(self);
-    self->request_id++;
-    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    if (commonErdCount > 0) {
+      self->request_id++;
+      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    } else {
+      tiny_hsm_transition(hsm, self->next_discovery_state);
+    }
     return tiny_hsm_result_signal_consumed;
   }
 

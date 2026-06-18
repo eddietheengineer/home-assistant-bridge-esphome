@@ -202,9 +202,11 @@ void erd_bridge_subscribe_destroy(erd_bridge_subscribe_t* self)
   // this struct: erd_client_activity_subscription.  If it remains registered
   // after destroy(), any subsequent event fires the HSM which dereferences
   // self->erd_set (freed below) — a use-after-free that corrupts the heap.
-  tiny_event_unsubscribe(
-    tiny_gea3_erd_client_on_activity(self->erd_client),
-    &self->erd_client_activity_subscription);
+  if (self->erd_client != nullptr) {
+    tiny_event_unsubscribe(
+      tiny_gea3_erd_client_on_activity(self->erd_client),
+      &self->erd_client_activity_subscription);
+  }
 
   delete reinterpret_cast<set<tiny_erd_t>*>(self->erd_set);
   self->erd_set = nullptr;

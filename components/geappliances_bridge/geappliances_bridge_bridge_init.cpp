@@ -176,6 +176,17 @@ void GeappliancesBridge::initialize_erd_bridge_()
 
   ESP_LOGI(TAG, "Using %s mode with polling interval: %u ms", mode_name, this->polling_interval_ms_);
 
+  // Wire the discovery-complete callback BEFORE initializing the bridge,
+  // so the HSM cannot fire the callback before it's set (race condition
+  // when discovery completes synchronously on first entry).
+  this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
+    auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
+    bridge->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&bridge->erd_cache_));
+    erd_write_bridge_set_host_address(&bridge->erd_write_bridge_, bridge->autodiscovery_manager_.get_host_address());
+    tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
+  };
+  this->erd_bridge_poll_.on_discovery_complete_context = this;
+
   // Initialize the appropriate bridge(s).
   if (use_polling) {
     erd_bridge_poll_init(
@@ -188,15 +199,6 @@ void GeappliancesBridge::initialize_erd_bridge_()
       nullptr,
       0,
       &this->erd_cache_);
-    // Wire the discovery-complete callback so the startup HSM waits for
-    // ERD discovery to finish before transitioning to steady-state.
-    this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
-      auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
-      bridge->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&bridge->erd_cache_));
-      erd_write_bridge_set_host_address(&bridge->erd_write_bridge_, bridge->autodiscovery_manager_.get_host_address());
-      tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
-    };
-    this->erd_bridge_poll_.on_discovery_complete_context = this;
     erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
     this->configure_polling_optional_lists_();
   }
@@ -297,6 +299,15 @@ void GeappliancesBridge::start_custom_erd_polling_()
   ESP_LOGI(TAG, "Started custom ERD polling (%zu ERD(s)) alongside subscription bridge",
            this->custom_erds_vec_.size());
 
+  // Wire the discovery-complete callback BEFORE initializing the bridge,
+  // so the HSM cannot fire the callback before it's set.
+  this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
+    auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
+    bridge->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&bridge->erd_cache_));
+    tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
+  };
+  this->erd_bridge_poll_.on_discovery_complete_context = this;
+
   // Initialize a polling bridge with the custom ERDs as the api_parsed_list.
   // This skips discovery states and goes straight to polling with an exact-size list.
     erd_bridge_poll_init(
@@ -376,6 +387,17 @@ void GeappliancesBridge::check_subscription_activity_()
   }
 
   // Stand up the polling bridge.
+    // Wire the discovery-complete callback BEFORE initializing the bridge,
+    // so the HSM cannot fire the callback before it's set (race condition
+    // when discovery completes synchronously on first entry).
+  this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
+    auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
+    bridge->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&bridge->erd_cache_));
+    erd_write_bridge_set_host_address(&bridge->erd_write_bridge_, bridge->autodiscovery_manager_.get_host_address());
+    tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
+  };
+  this->erd_bridge_poll_.on_discovery_complete_context = this;
+
     erd_bridge_poll_init(
       &this->erd_bridge_poll_,
       &this->timer_group_,
@@ -387,14 +409,6 @@ void GeappliancesBridge::check_subscription_activity_()
       0,
       &this->erd_cache_);
   this->polling_bridge_initialized_ = true;
-  // Wire the discovery-complete callback so HA discovery registration
-  this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
-    auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
-    bridge->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&bridge->erd_cache_));
-    erd_write_bridge_set_host_address(&bridge->erd_write_bridge_, bridge->autodiscovery_manager_.get_host_address());
-    tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
-  };
-  this->erd_bridge_poll_.on_discovery_complete_context = this;
   erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
   this->subscription_mode_active_ = false;
 

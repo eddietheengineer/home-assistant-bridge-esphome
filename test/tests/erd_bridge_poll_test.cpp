@@ -1580,3 +1580,43 @@ TEST(erd_cache_stats, no_change_when_data_identical)
   CHECK(erd_cache_update(&cache, 0x1001, data, 4));
   CHECK(!erd_cache_update(&cache, 0x1001, data, 4));
 }
+
+// Regression: when new data is larger than existing data, the memcmp
+// must use the smaller size to avoid reading past the old buffer.
+TEST(erd_cache_stats, data_change_detected_when_new_data_larger)
+{
+  uint8_t small[4] = { 0x01, 0x02, 0x03, 0x04 };
+  uint8_t large[8] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
+
+  erd_cache_set_only_publish_onchange(&cache, true);
+
+  CHECK(erd_cache_update(&cache, 0x1001, small, 4));
+  // Size differs, so data_changed is true regardless of memcmp range.
+  CHECK(erd_cache_update(&cache, 0x1001, large, 8));
+
+  // Verify the entry has the correct data.
+  uint16_t iter = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iter);
+  CHECK(entry != nullptr);
+  CHECK_EQUAL(8u, entry->data_size);
+}
+
+// Regression: when new data is smaller than existing data, the memcmp
+// must use the smaller size to avoid reading past the new buffer.
+TEST(erd_cache_stats, data_change_detected_when_new_data_smaller)
+{
+  uint8_t large[8] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 };
+  uint8_t small[4] = { 0x01, 0x02, 0x03, 0xFF };
+
+  erd_cache_set_only_publish_onchange(&cache, true);
+
+  CHECK(erd_cache_update(&cache, 0x1001, large, 8));
+  // Size differs, so data_changed is true.
+  CHECK(erd_cache_update(&cache, 0x1001, small, 4));
+
+  // Verify the entry has the correct data.
+  uint16_t iter = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iter);
+  CHECK(entry != nullptr);
+  CHECK_EQUAL(4u, entry->data_size);
+}

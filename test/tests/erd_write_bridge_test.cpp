@@ -211,6 +211,24 @@ TEST(erd_write_bridge, should_handle_write_with_large_data)
   when_a_write_request_is_received(0x3001, value, sizeof(value));
 }
 
+// Regression: writes should be accepted again after a previous write completes.
+TEST(erd_write_bridge, should_accept_write_after_previous_completes)
+{
+  given_that_the_bridge_has_been_initialized();
+
+  uint8_t value1 = 0x01;
+  expect_write_succeeds();
+  when_a_write_request_is_received(0x3001, &value1, sizeof(value1));
+
+  should_report_write_result(0x3001, true, 0);
+  when_a_write_is_completed(mock_request_id, 0x3001);
+
+  // After the first write completes, a second write should be accepted.
+  uint8_t value2 = 0x02;
+  expect_write_succeeds();
+  when_a_write_request_is_received(0x3002, &value2, sizeof(value2));
+}
+
 TEST(erd_write_bridge, should_not_crash_on_destroy_without_init)
 {
   erd_write_bridge_destroy(&self);

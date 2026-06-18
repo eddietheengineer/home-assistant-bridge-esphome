@@ -284,6 +284,15 @@ TEST(erd_bridge_subscribe, should_ignore_erd_publications_from_other_hosts)
   when_an_erd_publication_is_received(0xC1, 0xABCD, uint32_t(0x12345678));
 }
 
+// Regression: destroy should not crash when erd_client is null.
+TEST(erd_bridge_subscribe, should_not_crash_on_destroy_with_null_erd_client)
+{
+  erd_bridge_subscribe_t unsubscribed;
+  memset(&unsubscribed, 0, sizeof(unsubscribed));
+  // timer_group is null so the guard returns early; this should not crash.
+  erd_bridge_subscribe_destroy(&unsubscribed);
+}
+
 // ---------------------------------------------------------------------------
 // Dual-subscription tests: two independent bridge instances, each watching a
 // different appliance address and publishing to its own MQTT client.
