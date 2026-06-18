@@ -63,7 +63,7 @@ Handles the `signal_subscription_publication_received` signal regardless of the 
 
 | Signal | Behavior |
 |--------|----------|
-| `signal_subscription_publication_received` | If the ERD is not already in `erd_set`, inserts it. Calls `erd_cache_update()` with `is_subscription = true`. |
+| `signal_subscription_publication_received` | If the ERD is not already in `erd_set`, inserts it. Calls `erd_cache_update()` with `is_subscription = true` and `publish_all = false` (subscriptions always set `update_required` via `is_subscription`). |
 
 ### 3.2 Child States
 

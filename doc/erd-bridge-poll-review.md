@@ -209,10 +209,7 @@ When a read fails during steady-state polling, the handler increments `cycle_com
 
 **Severity:** Trivial
 
-`erd_cache_update(self->erd_cache, erd, erd_data, data_size, false)` always passes `false` for the subscription flag. This is correct for polling mode, but the hardcoded `false` is a code smell — it suggests the polling bridge is coupled to the cache's subscription/polling distinction.
-
-**Recommendation:** Pass `false` as a named constant or enum value for clarity.
-
+**Status:** Resolved. The hardcoded `false` has been replaced with `self->publish_all`, a configurable flag set via `erd_bridge_poll_set_publish_all()`. Discovery-phase reads use `publish_all = true` (always publish); steady-state polling uses `self->publish_all` (controlled by `polling_only_publish_onchange` config).
 ---
 
 ## Issue 21 — Write requests not gated on appliance identification (lines 308–311)

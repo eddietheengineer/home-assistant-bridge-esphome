@@ -64,6 +64,14 @@ After init, the caller may set `self->custom_erd_list` and `self->custom_erd_lis
 
 After init, the caller may set `self->on_discovery_complete` and `self->on_discovery_complete_context`. This callback fires once when the HSM enters `state_polling` (discovery complete). The callback must not send signals back to the polling HSM. It should iterate the cache via `erd_cache_get_next_entry()` to build the ERD set for HA discovery.
 
+### 2.5 Publish-All Control
+
+After init, the caller may call `erd_bridge_poll_set_publish_all()` to control whether every polled ERD read is published regardless of data changes (`publish_all = true`) or only changed data is published (`publish_all = false`, the default). This mirrors the `polling_only_publish_onchange` ESPHome config option (inverted: `publish_all = !polling_only_publish_onchange`).
+
+```c
+void erd_bridge_poll_set_publish_all(erd_bridge_poll_t* self, bool publish_all);
+```
+
 ---
 
 ## 3. State Machine
@@ -216,7 +224,7 @@ All discovery states (except `state_probe_api_parsed_erds` for failures) delegat
 
 **On `signal_read_completed`:**
 - Calls `add_erd_to_polling_list()` — adds the ERD to `erd_polling_list` (deduped via `erd_set`).
-- Calls `erd_cache_update()` to write the ERD value to the cache.
+- Calls `erd_cache_update()` with `is_subscription = false` and `publish_all = true` (discovery phase always publishes).
 - Advances to the next ERD in the current list or transitions to `next_discovery_state`.
 
 **On `signal_read_failed`:**
@@ -280,7 +288,7 @@ A polling cycle consists of sending reads for all ERDs in `erd_polling_list` and
 **On `signal_read_completed`:**
 - Resets the appliance-lost timer.
 - If the ERD is not in `erd_set`: adds it to the polling list via `add_erd_to_polling_list()` (handles late discovery responses that arrive during polling).
-- Updates the ERD cache via `erd_cache_update()`.
+- Updates the ERD cache via `erd_cache_update()` with `is_subscription = false` and `publish_all = self->publish_all` (controlled by `erd_bridge_poll_set_publish_all`).
 - Increments `cycle_completed_count`; if cycle is complete, calls `on_polling_cycle_complete()`.
 
 **On `signal_read_failed`:**
@@ -303,12 +311,16 @@ A polling cycle consists of sending reads for all ERDs in `erd_polling_list` and
 
 - `erd_set`: `std::set<tiny_erd_t>` stored as `void*` in the struct. Used for deduplication during discovery and polling list management.
 
-### 6.3 Timers
+### 6.3 Publish-All Flag
+
+- `publish_all`: `bool`. When `true`, every polled ERD read sets `update_required = true` in the cache regardless of whether data changed. When `false` (default), only changed data sets the flag. Set via `erd_bridge_poll_set_publish_all()`.
+
+### 6.4 Timers
 
 - `polling_timer`: armed for `polling_interval_ms` after each cycle starts. Fires `signal_polling_timer_expired`.
 - `appliance_lost_timer`: armed for `appliance_lost_timeout` (60 s) on each successful read. Fires `signal_appliance_lost`.
 
-### 6.4 Health Metrics
+### 6.5 Health Metrics
 
 - `cycle_start_ms`: `millis()` when the current cycle's first read was sent.
 - `last_cycle_time_ms`: duration of the last completed cycle in milliseconds.
