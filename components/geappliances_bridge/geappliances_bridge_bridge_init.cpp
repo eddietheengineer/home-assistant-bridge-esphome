@@ -310,6 +310,7 @@ void GeappliancesBridge::start_custom_erd_polling_()
       &this->erd_cache_);
   erd_bridge_poll_set_publish_all(&this->erd_bridge_poll_, !this->polling_only_publish_on_change_);
   this->polling_bridge_initialized_ = true;
+  this->custom_erd_polling_started_ = true;
 }
 
 void GeappliancesBridge::maybe_start_custom_erd_polling_()
@@ -330,6 +331,13 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
                                 this->subscription_activity_detected_;
   if (!subscription_confirmed) {
     return;
+  }
+  // Wait until all custom ERDs have been seen via subscription, so we don't
+  // poll ERDs the subscription bridge will already cover.
+  for (tiny_erd_t erd : this->custom_erds_vec_) {
+    if (this->custom_erd_subscription_seen_erds_.find(erd) == this->custom_erd_subscription_seen_erds_.end()) {
+      return;
+    }
   }
 
   if (millis() - this->custom_erd_subscription_last_activity_ < HA_DISCOVERY_QUIET_MS) {
