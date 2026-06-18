@@ -179,7 +179,8 @@ TEST_GROUP(application_level)
 TEST(application_level, should_read_device_id_erds_in_sequence)
 {
   // Validate that the polling bridge initializes, identifies the appliance,
-  // then transitions into a discovery state.
+  // then transitions to polling (probe list was empty, so probe_list
+  // transitions directly to polling).
   mock().disable();
   initialize_erd_bridge_polling_mode();
 
@@ -188,10 +189,9 @@ TEST(application_level, should_read_device_id_erds_in_sequence)
   simulate_erd_read_response(1, ERD_APPLIANCE_TYPE,
                               &appliance_type, sizeof(appliance_type));
 
-  // Bridge should now be in a discovery state (current_state_name is set).
   mock().enable();
   CHECK(erd_bridge_poll.current_state_name != nullptr);
-  CHECK(strcmp(erd_bridge_poll.current_state_name, "add_common_erds") == 0);
+  CHECK(strcmp(erd_bridge_poll.current_state_name, "polling") == 0);
 }
 
 /*!

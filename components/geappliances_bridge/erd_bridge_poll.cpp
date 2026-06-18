@@ -3,18 +3,13 @@
  * @brief ERD polling bridge implementation.
  *
  * The polling bridge discovers the connected appliance by reading ERD 0x0008
- * (appliance type) on the broadcast address, then walks through a chain of
- * per-appliance ERD discovery states before settling into steady-state polling.
+ * (appliance type) on the broadcast address, then probes a pre-built list
+ * of ERDs before settling into steady-state polling.
  *
  * State machine:
  *   state_identify_appliance
- *     → state_add_common_erds   (when no api_parsed_list)
- *       → state_add_energy_erds
- *         → state_add_appliance_api_feature_erds
- *           → state_add_appliance_erds → state_polling
- *     → state_add_appliance_api_feature_erds  (when api_parsed_list is set)
- *       → state_probe_api_parsed_erds  (reads each api_parsed_list ERD; only successful reads added)
- *         → state_polling
+ *     → state_probe_list  (reads each probe_list ERD; only successful reads added)
+ *       → state_polling
  */
 
 #include "erd_bridge_common.h"
@@ -35,12 +30,7 @@ static const char* const TAG __attribute__((unused)) = "erd_bridge_poll";
 
 static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-static tiny_hsm_result_t state_add_energy_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-static tiny_hsm_result_t state_add_appliance_api_feature_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-static tiny_hsm_result_t state_add_custom_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static void send_poll_read_requests_bounded(erd_bridge_poll_t* self, uint32_t budget_ms);
 static bool send_cycle_reads(erd_bridge_poll_t* self);
@@ -101,12 +91,9 @@ static void ensure_polling_list_capacity(erd_bridge_poll_t* self, uint16_t neede
 }
 
 /* Reset the polling bridge's discovery state (erd_set and polling list).
- * Called from the canonical discovery entry points so that a new discovery
- * phase always starts from a clean slate.  There are two callers:
- *   - state_add_common_erds (full-discovery path)
- *   - state_identify_appliance re-entry (api_parsed path after appliance lost)
- * Adding a third caller in the future requires only calling this helper,
- * rather than duplicating the clear sequence.
+ * Called from state_identify_appliance and state_probe_list on re-entry
+ * after appliance lost so that a new discovery phase always starts from
+ * a clean slate.
  *
  * Does NOT clear the shared erd_cache — that cache may be shared with the
  * subscription bridge.  Clearing it here would destroy subscription data
@@ -160,9 +147,8 @@ static void on_polling_cycle_complete(erd_bridge_poll_t* self, bool immediate)
 
 /* Send the next discovery-phase read request.  This operates on
  * appliance_erd_list / appliance_erd_list_count — NOT on erd_polling_list.
- * It is used exclusively during discovery states (common, energy, appliance
- * API feature, probe, appliance, custom) to advance one ERD at a time.
- * For steady-state polling, see send_next_poll_read_request. */
+ * It is used by state_probe_list to advance one ERD at a time during
+ * the probe phase.  For steady-state polling, see send_next_poll_read_request. */
 static bool send_next_read_request(erd_bridge_poll_t* self)
 {
   reset_lost_appliance_timer(self);
@@ -258,14 +244,15 @@ static bool send_cycle_reads(erd_bridge_poll_t* self)
   return true;
 }
 
-// Shared handler for all discovery states (common, energy, appliance API, appliance).
-// Each ERD read waits for a definitive GEA-client response before the next is sent.
-//
-// Contract: callers MUST handle tiny_hsm_signal_entry before delegating here.
-// This handler only processes signal_read_completed and signal_read_failed, both
-// of which carry non-null data from the GEA client activity callback.  Any signal
-// with null data (entry, exit, etc.) is deferred — if a caller forgets to handle
-// entry, the signal silently defers rather than causing undefined behavior.
+/* Shared handler for discovery read signals, used by state_probe_list.
+ * Handles signal_read_completed by adding the ERD to the polling list
+ * and cache, then advancing to the next ERD.  When all ERDs are
+ * exhausted, transitions to state_polling.
+ *
+ * Contract: callers MUST handle tiny_hsm_signal_entry before delegating here.
+ * This handler only processes signal_read_completed and signal_read_failed, both
+ * of which carry non-null data from the GEA client activity callback.  Any signal
+ * with null data (entry, exit, etc.) is deferred. */
 static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
@@ -282,19 +269,16 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
       erd_cache_update(self->erd_cache, args->read_completed.erd,
         reinterpret_cast<const uint8_t*>(args->read_completed.data), args->read_completed.data_size);
       if (!send_next_read_request(self)) {
-        tiny_hsm_transition(hsm, self->next_discovery_state);
+        tiny_hsm_transition(hsm, state_polling);
       }
       break;
 
     case signal_read_failed:
       // Both not_supported and retries_exhausted are definitive — the GEA client
       // has finished its work.  Exclude the ERD from the polling list by simply
-      // not adding it.  Do NOT insert into erd_set: that set is a deduplication
-      // guard for successfully-added ERDs only.  Inserting failed ERDs here would
-      // block the same ERD from being independently re-probed in a later discovery
-      // phase (e.g., a custom ERD that shares a code with a failed standard ERD).
+      // not adding it.
       if (!send_next_read_request(self)) {
-        tiny_hsm_transition(hsm, self->next_discovery_state);
+        tiny_hsm_transition(hsm, state_polling);
       }
       break;
 
@@ -339,29 +323,13 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
       self->current_state_name = "identify_appliance";
       // If the caller pre-initialized the host address (via
       // erd_bridge_poll_init with a non-broadcast address), skip the broadcast
-      // and transition directly to the appropriate state.  This is used by the
-      // custom ERD bridge (start_custom_erd_polling_) and the main polling bridge
-      // (initialize_erd_bridge_), both of which already know the appliance
-      // address from autodiscovery.
+      // and transition directly to probing.  On re-entry after appliance lost,
+      // clear discovery state so ERDs are re-probed from scratch.
       if (self->erd_host_address != tiny_gea_broadcast_address) {
-        // Re-entry after appliance lost: polling list is non-empty — clear
-        // everything so ERDs are re-added via _no_register and lazily
-        // re-registered on first read (appliance-lost behavior is deferred).
-        // First entry: polling list is empty — skip broadcast and go straight
-        // to Phase 2 probe (when api_parsed_list is set) or discovery.
-        bool is_reentry = (self->polling_list_count > 0 && self->api_parsed_list != nullptr);
-        if (is_reentry) {
+        if (self->polling_list_count > 0) {
           clear_discovery_state(self);
         }
-        tiny_hsm_state_t next;
-        if (self->api_parsed_list != nullptr) {
-          // First entry: verify ERDs via Phase 2 before polling.
-          // Re-entry (appliance lost): skip re-probe; go directly to polling.
-          next = is_reentry ? state_polling : state_probe_api_parsed_erds;
-        } else {
-          next = state_add_common_erds;
-        }
-        tiny_hsm_transition(hsm, next);
+        tiny_hsm_transition(hsm, state_probe_list);
         break;
       }
       // Broadcast read for appliance type ERD (0x0008).
@@ -385,14 +353,7 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
         self->erd_host_address = args->address;
         self->appliance_type = *reinterpret_cast<const uint8_t*>(args->read_completed.data);
       }
-      // If an API-parsed ERD list is available, skip straight to the appliance
-      // API feature ERD discovery state and then into polling. Otherwise run the
-      // full chain: common → energy → appliance_api_feature → appliance.
-      if (self->api_parsed_list != nullptr) {
-        tiny_hsm_transition(hsm, state_add_appliance_api_feature_erds);
-      } else {
-        tiny_hsm_transition(hsm, state_add_common_erds);
-      }
+      tiny_hsm_transition(hsm, state_probe_list);
       break;
 
     case signal_read_failed:
@@ -413,117 +374,24 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
   return tiny_hsm_result_signal_consumed;
 }
 
-static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
+static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
+  auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
 
   if (signal == tiny_hsm_signal_entry) {
-    self->current_state_name      = "add_common_erds";
-    self->next_discovery_state    = state_add_energy_erds;
-    self->appliance_erd_list       = commonErds;
-    self->appliance_erd_list_count = commonErdCount;
-    self->erd_index                = 0;
-    // Reset the polling list and the erd_set that deduplicates it. This is
-    // the correct place to clear erd_set: it only runs in the full-discovery
-    // path (appliance first seen, or appliance_lost re-discovery), NOT on every
-    // transient MQTT reconnect. Clearing in the disconnect handler caused the
-    // set's tree nodes to be freed and reallocated on each reconnect, fragmenting
-    // the heap.  The ERD cache is NOT cleared here — it may be shared with the
-    // subscription bridge, and stale entries are harmless (they occupy slots but
-    // are not republished to MQTT once their update_required flag is drained).
-    clear_discovery_state(self);
-    if (commonErdCount > 0) {
-      self->request_id++;
-      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    } else {
-      tiny_hsm_transition(hsm, self->next_discovery_state);
+    self->current_state_name = "probe_list";
+    self->appliance_erd_list = self->probe_list;
+    self->appliance_erd_list_count = self->probe_list_count;
+    self->erd_index = (uint16_t)-1;
+    // Clear discovery state on re-entry after appliance lost.
+    if (self->polling_list_count > 0) {
+      clear_discovery_state(self);
     }
-    return tiny_hsm_result_signal_consumed;
-  }
-
-  return handle_discovery_list_signals(hsm, signal, data);
-}
-
-static tiny_hsm_result_t state_add_energy_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
-{
-  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
-
-  if (signal == tiny_hsm_signal_entry) {
-    self->current_state_name      = "add_energy_erds";
-    self->next_discovery_state    = state_add_appliance_api_feature_erds;
-    self->appliance_erd_list       = energyErds;
-    self->appliance_erd_list_count = energyErdCount;
-    self->erd_index                = 0;
-    self->request_id++;
-    if (self->appliance_erd_list_count > 0) {
-      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    if (self->probe_list_count > 0) {
+      send_next_read_request(self);
     } else {
-      // No energy ERDs to discover; transition directly.
-      tiny_hsm_transition(hsm, self->next_discovery_state);
-    }
-    return tiny_hsm_result_signal_consumed;
-  }
-
-  return handle_discovery_list_signals(hsm, signal, data);
-}
-
-static tiny_hsm_result_t state_add_appliance_api_feature_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
-{
-  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
-
-  if (signal == tiny_hsm_signal_entry) {
-    self->current_state_name = "add_appliance_api_feature_erds";
-    // When reached via the api_parsed_list path (from
-    // state_identify_appliance), probe each ERD in api_parsed_list before
-    // polling to filter out ERDs the appliance does not actually support.
-    // When reached via the full discovery chain (from state_add_energy_erds),
-    // continue to appliance-specific ERDs as before.
-    // The clear of erd_set/pending_registration_set/polling_list_count that
-    // was previously done here for the api_parsed path is no longer needed:
-    // on first entry these are already empty (freshly allocated in init),
-    // and on re-entry after appliance_lost, state_identify_appliance clears
-    // them before transitioning directly to state_polling, skipping this
-    // state entirely.
-    if (self->api_parsed_list != nullptr) {
-      self->next_discovery_state = state_probe_api_parsed_erds;
-    } else {
-      self->next_discovery_state = state_add_appliance_erds;
-    }
-    self->appliance_erd_list       = applianceApiFeatureErds;
-    self->appliance_erd_list_count = applianceApiFeatureErdCount;
-    self->erd_index                = 0;
-    self->request_id++;
-    if (self->appliance_erd_list_count > 0) {
-      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    } else {
-      // No appliance API feature ERDs to discover; transition directly.
-      tiny_hsm_transition(hsm, self->next_discovery_state);
-    }
-    return tiny_hsm_result_signal_consumed;
-  }
-
-  return handle_discovery_list_signals(hsm, signal, data);
-}
-
-static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
-{
-  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
-
-  if (signal == tiny_hsm_signal_entry) {
-    self->current_state_name      = "probe_api_parsed_erds";
-    // If custom ERDs are configured, discover them after api_parsed_list probe.
-    self->next_discovery_state    = (self->custom_erd_list != nullptr && self->custom_erd_list_count > 0)
-      ? state_add_custom_erds
-      : state_polling;
-    self->appliance_erd_list       = self->api_parsed_list;
-    self->appliance_erd_list_count = self->api_parsed_list_count;
-    self->erd_index                = 0;
-    self->request_id++;
-    if (self->appliance_erd_list_count > 0) {
-      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    } else {
-      // No ERDs to probe; transition directly to polling.
-      tiny_hsm_transition(hsm, self->next_discovery_state);
+      tiny_hsm_transition(hsm, state_polling);
     }
     return tiny_hsm_result_signal_consumed;
   }
@@ -532,75 +400,9 @@ static tiny_hsm_result_t state_probe_api_parsed_erds(tiny_hsm_t* hsm, tiny_hsm_s
   // (not_supported) or timed out after all retries (retries_exhausted) —
   // permanently excludes the ERD from the Phase 3 polling list.
   if (signal == signal_read_failed) {
-    auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
     erd_set(self).insert(args->read_failed.erd);
     if (!send_next_read_request(self)) {
-      tiny_hsm_transition(hsm, self->next_discovery_state);
-    }
-    return tiny_hsm_result_signal_consumed;
-  }
-  return handle_discovery_list_signals(hsm, signal, data);
-}
-
-static tiny_hsm_result_t state_add_custom_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
-{
-  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
-
-  if (signal == tiny_hsm_signal_entry) {
-    self->current_state_name      = "add_custom_erds";
-    self->next_discovery_state    = state_polling;
-    // Rebuild erd_set from the actual polling list so that custom ERDs are
-    // evaluated independently of failures in earlier discovery phases.  A
-    // failed ERD from probe or standard discovery should not block the same
-    // ERD from being independently probed as a custom ERD.
-    erd_set(self).clear();
-    for (uint16_t i = 0; i < self->polling_list_count; i++) {
-      erd_set(self).insert(self->erd_polling_list[i]);
-    }
-    self->appliance_erd_list       = self->custom_erd_list;
-    self->appliance_erd_list_count = self->custom_erd_list_count;
-    self->erd_index                = 0;
-    self->request_id++;
-    if (self->appliance_erd_list_count > 0) {
-      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    } else {
-      tiny_hsm_transition(hsm, self->next_discovery_state);
-    }
-    return tiny_hsm_result_signal_consumed;
-  }
-
-  return handle_discovery_list_signals(hsm, signal, data);
-}
-
-static tiny_hsm_result_t state_add_appliance_erds(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
-{
-  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
-
-  if (signal == tiny_hsm_signal_entry) {
-    // Skip appliance-specific ERD discovery if the type is out of range.
-    // Type 0 is a real appliance type (water heater), so clamping to 0
-    // would incorrectly poll water heater ERDs for an unknown appliance.
-    if (self->appliance_type >= maximumApplianceType) {
-      ESP_LOGW(TAG, "Invalid appliance type 0x%02x; skipping appliance-specific ERD discovery",
-               self->appliance_type);
-      self->appliance_erd_list       = nullptr;
-      self->appliance_erd_list_count = 0;
-    } else {
-      self->appliance_erd_list       = applianceTypeToErdGroupTranslation[self->appliance_type].erdList;
-      self->appliance_erd_list_count = applianceTypeToErdGroupTranslation[self->appliance_type].erdCount;
-    }
-    self->current_state_name      = "add_appliance_erds";
-    // If custom ERDs are configured, discover them after appliance ERDs.
-    self->next_discovery_state    = (self->custom_erd_list != nullptr && self->custom_erd_list_count > 0)
-      ? state_add_custom_erds
-      : state_polling;
-    self->erd_index                = 0;
-    self->request_id++;
-    if (self->appliance_erd_list_count > 0) {
-      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
-    } else {
-      // No appliance-specific ERDs to discover; transition directly.
-      tiny_hsm_transition(hsm, self->next_discovery_state);
+      tiny_hsm_transition(hsm, state_polling);
     }
     return tiny_hsm_result_signal_consumed;
   }
@@ -615,19 +417,6 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
 
   switch (signal) {
     case tiny_hsm_signal_entry:
-      // api_parsed_list ERDs that were successfully probed in
-      // state_probe_api_parsed_erds are already in erd_set and
-      // erd_polling_list — the dedup check below silently skips them.
-      // ERDs that failed during probe are in erd_set as exclusions, so
-      // they are also skipped (correctly excluded from polling).
-      // This path is primarily useful on re-entry after appliance lost,
-      // where erd_set has been cleared and all api_parsed_list ERDs are
-      // re-added to the polling list.
-      if (self->api_parsed_list != nullptr) {
-        for (uint16_t i = 0; i < self->api_parsed_list_count; i++) {
-          add_erd_to_polling_list(self, self->api_parsed_list[i]);
-        }
-      }
       self->erd_index = 0;
       self->cycle_completed_count = 0;
       self->restart_pending = false;
@@ -732,12 +521,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
 static const tiny_hsm_state_descriptor_t poll_hsm_state_descriptors[] = {
   { .state = poll_state_top,                      .parent = nullptr         },
   { .state = state_identify_appliance,            .parent = poll_state_top  },
-  { .state = state_add_common_erds,               .parent = poll_state_top  },
-  { .state = state_add_energy_erds,               .parent = poll_state_top  },
-  { .state = state_add_appliance_api_feature_erds,.parent = poll_state_top  },
-  { .state = state_add_appliance_erds,            .parent = poll_state_top  },
-  { .state = state_probe_api_parsed_erds,         .parent = poll_state_top  },
-  { .state = state_add_custom_erds,               .parent = poll_state_top  },
+  { .state = state_probe_list,                    .parent = poll_state_top  },
   { .state = state_polling,                       .parent = poll_state_top  }
 };
 static const tiny_hsm_configuration_t poll_hsm_configuration = {
@@ -748,9 +532,8 @@ static const tiny_hsm_configuration_t poll_hsm_configuration = {
 // ============================================================================
 // Polling bridge — public API
 // ============================================================================
-
-// Shared initialization helper.  Sets self->erd_host_address = initial_host_address
-// and self->api_parsed_list BEFORE calling tiny_hsm_init(), so that
+// Shared initialization helper.  Sets self->erd_host_address and
+// self->probe_list BEFORE calling tiny_hsm_init(), so that
 // state_identify_appliance's entry signal can inspect them and skip the
 // broadcast when the host is already known.
 static void erd_bridge_poll_init_impl(
@@ -760,15 +543,15 @@ static void erd_bridge_poll_init_impl(
   uint32_t                  polling_interval_ms,
   uint8_t                   initial_host_address,
   uint8_t                   initial_appliance_type,
-  const tiny_erd_t*         api_parsed_list,
-  uint16_t                  api_parsed_list_count,
+  const tiny_erd_t*         probe_list,
+  uint16_t                  probe_list_count,
   erd_cache_t*              cache)
 {
   self->timer_group            = timer_group;
   self->erd_client             = erd_client;
   self->polling_interval_ms    = polling_interval_ms;
   // Must be set before tiny_hsm_init() so state_identify_appliance entry
-  // can decide whether to broadcast or skip straight to discovery/polling.
+  // can decide whether to broadcast or skip straight to probing.
   self->erd_host_address       = initial_host_address;
   self->appliance_type         = initial_appliance_type;
   // Store the pre-known address so that signal_appliance_lost can restore it
@@ -776,9 +559,8 @@ static void erd_bridge_poll_init_impl(
   // Zero means "unknown — use broadcast" (set by erd_bridge_poll_init()).
   self->known_host_address     = (initial_host_address != tiny_gea_broadcast_address)
     ? initial_host_address : 0;
-  self->api_parsed_list        = api_parsed_list;
-  self->api_parsed_list_count  = api_parsed_list_count;
-  self->custom_erd_list        = nullptr;
+  self->probe_list             = probe_list;
+  self->probe_list_count       = probe_list_count;
   self->erd_polling_list       = nullptr;
   self->polling_list_count     = 0;
   self->polling_list_capacity  = 0;
@@ -824,13 +606,13 @@ void erd_bridge_poll_init(
   uint32_t                  polling_interval_ms,
   uint8_t                   host_address,
   uint8_t                   appliance_type,
-  const tiny_erd_t*         api_list,
-  uint16_t                  api_list_count,
+  const tiny_erd_t*         probe_list,
+  uint16_t                  probe_list_count,
   erd_cache_t*              cache)
 {
   erd_bridge_poll_init_impl(
     self, timer_group, erd_client, polling_interval_ms,
-    host_address, appliance_type, api_list, api_list_count, cache);
+    host_address, appliance_type, probe_list, probe_list_count, cache);
 }
 
 void erd_bridge_poll_destroy(erd_bridge_poll_t* self)

@@ -60,6 +60,7 @@ extern "C" {
 #include "autodiscovery_manager.h"
 #include "ha_discovery_manager.h"
 #include "geappliances_bridge_startup_hsm.h"
+#include "erd_poll_list_builder.h"
 
 // Forward declaration of the generated function
 std::string appliance_type_to_string(uint8_t appliance_type);
@@ -69,7 +70,9 @@ namespace geappliances_bridge {
 
 // BridgeMode is now defined in bridge_mode.h (included via i_bridge_services.h).
 
+
 class GeappliancesBridge : public Component, public IBridgeServices {
+  friend ErdPollListResult build_poll_list_(GeappliancesBridge* bridge);
 
  public:
   static constexpr unsigned long baud = 230400;
@@ -136,7 +139,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void initialize_erd_bridge_();
   void start_custom_erd_polling_();
   void maybe_start_custom_erd_polling_();
-  void configure_polling_optional_lists_();
   void check_subscription_activity_();
   void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
@@ -174,6 +176,10 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   uint32_t subscription_start_time_{0};
   uint32_t custom_erd_subscription_last_activity_{0};
   std::set<tiny_erd_t> custom_erd_subscription_seen_erds_;
+  // Pre-built ERD probe list for the polling bridge.
+  // Owned by the bridge so the pointer passed to erd_bridge_poll_init
+  // remains valid across the probe phase.
+  std::vector<uint16_t> poll_probe_list_;
   bool custom_erd_polling_started_{false};  // Guard to prevent re-initialization
   static constexpr uint32_t SUBSCRIPTION_TIMEOUT_MS = 10000; // 10 seconds
 

@@ -12,8 +12,7 @@
 // Responsibilities:
 //   - Maintain and iterate a dynamic polling list
 //   - Drive a tiny_hsm for ERD discovery, polling, and appliance-lost recovery
-//   - Accept optional pre-populated lists (api_parsed_list, custom_erd_list)
-//     to skip or augment runtime ERD discovery
+//   - Accept a pre-built probe list to verify ERDs before polling
 //   - Report polling health metrics (cycle count, last cycle time)
 //
 // NOT responsible for:
@@ -77,7 +76,6 @@ typedef struct {
   tiny_timer_t polling_timer;
   tiny_event_subscription_t erd_client_activity_subscription;
   tiny_hsm_t hsm;
-  tiny_hsm_state_t next_discovery_state;
   void* erd_set;
   erd_cache_t* erd_cache;
   tiny_gea3_erd_client_request_id_t request_id;
@@ -99,15 +97,11 @@ typedef struct {
   // state. Initialized to nullptr; callers may watch this for changes to emit
   // debug log messages without coupling erd_bridge_subscribe.cpp to ESP logging headers.
   const char* current_state_name;
-  // Optional pre-populated polling list from appliance API parsing.
-  // When non-NULL, discovery states are skipped and this list is polled directly.
-  const tiny_erd_t* api_parsed_list;
-  uint16_t api_parsed_list_count;
-  // Optional list of user-configured custom ERDs to poll in addition to the
-  // standard list. Set after erd_bridge_poll_init(). Works with both
-  // discovery mode and api_parsed_list mode.
-  const tiny_erd_t* custom_erd_list;
-  uint16_t custom_erd_list_count;
+  // Pre-built list of ERDs to probe during discovery.
+  // Set by the caller before erd_bridge_poll_init(); the bridge copies
+  // successfully-probed ERDs into erd_polling_list during the probe phase.
+  const tiny_erd_t* probe_list;
+  uint16_t probe_list_count;
   // When erd_bridge_poll_init() is called with a non-zero host_address
   // this stores the pre-known appliance address so that the bridge never broadcasts to 0xFF
   // on re-identification (e.g. after appliance_lost_timer fires).  Zero means
@@ -152,10 +146,10 @@ typedef struct {
  * When both are provided, the bridge skips broadcast identification and
  * proceeds directly to ERD discovery or polling.
  *
- * If api_list is non-NULL, the bridge probes each ERD in the list before
- * polling (verifying the appliance actually supports it).  If NULL, the
- * bridge runs the full discovery chain (common → energy → feature →
- * appliance-specific ERDs).
+ * The probe_list is a pre-built array of ERDs to verify during the
+ * discovery phase.  Each ERD is read once; successful reads are added
+ * to the polling list, failed reads are excluded.  After probing
+ * completes, the bridge transitions to steady-state polling.
  */
 void erd_bridge_poll_init(
   erd_bridge_poll_t* self,
@@ -164,8 +158,8 @@ void erd_bridge_poll_init(
   uint32_t polling_interval_ms,
   uint8_t host_address,
   uint8_t appliance_type,
-  const tiny_erd_t* api_list,
-  uint16_t api_list_count,
+  const tiny_erd_t* probe_list,
+  uint16_t probe_list_count,
   erd_cache_t* cache);
 
 /*!
