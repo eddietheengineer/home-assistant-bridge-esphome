@@ -544,6 +544,9 @@ bool GeappliancesBridge::teardown() {
   if (this->polling_bridge_initialized_) {
     erd_bridge_poll_destroy(&this->erd_bridge_poll_);
   }
+  if (this->write_bridge_initialized_) {
+    erd_write_bridge_destroy(&this->erd_write_bridge_);
+  }
 
   // Destroy the shared ERD cache after bridges are torn down.
 

@@ -38,6 +38,7 @@ extern "C" {
 #include "erd_cache.h"
 #include "erd_bridge_subscribe.h"
 #include "erd_bridge_poll.h"
+#include "erd_write_bridge.h"
 #include "tiny_gea3_erd_client.h"
 #include "tiny_gea3_interface.h"
 #include "tiny_gea2_erd_client.h"
@@ -281,6 +282,10 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   erd_bridge_subscribe_t erd_bridge_subscribe_;
   erd_bridge_poll_t erd_bridge_poll_;
+
+  // Write bridge: relays MQTT write requests to the ERD client
+  erd_write_bridge_t erd_write_bridge_;
+  bool write_bridge_initialized_{false};
 
   // Track which bridge(s) were actually initialized so teardown is unambiguous.
   // A subscription bridge (erd_bridge_subscribe_) is created when use_polling is false.

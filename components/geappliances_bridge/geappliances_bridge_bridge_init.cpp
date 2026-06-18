@@ -30,6 +30,7 @@
 #include "geappliances_bridge_constants.h"
 #include "geappliances_bridge_startup_hsm.h"
 #include "esphome/core/log.h"
+#include "tiny_gea_constants.h"
 
 namespace esphome {
 namespace geappliances_bridge {
@@ -191,6 +192,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
     this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
       auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
       bridge->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&bridge->erd_cache_));
+      erd_write_bridge_set_host_address(&bridge->erd_write_bridge_, bridge->autodiscovery_manager_.get_host_address());
       tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
     };
     this->erd_bridge_poll_.on_discovery_complete_context = this;
@@ -214,6 +216,15 @@ void GeappliancesBridge::initialize_erd_bridge_()
     // immediately so it can transition to subscription_watch.
     tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
   }
+  // Initialize the write bridge. It starts with the broadcast address so that
+  // write requests are dropped until the appliance is identified.
+  erd_write_bridge_init(
+    &this->erd_write_bridge_,
+    &this->timer_group_,
+    this->autodiscovery_manager_.get_active_erd_client(),
+    &this->mqtt_client_adapter_.interface,
+    tiny_gea_broadcast_address);
+  this->write_bridge_initialized_ = true;
 
   this->erd_bridge_initialized_ = true;
   ESP_LOGI(TAG, "ERD bridge initialized successfully");
@@ -372,10 +383,10 @@ void GeappliancesBridge::check_subscription_activity_()
       &this->erd_cache_);
   this->polling_bridge_initialized_ = true;
   // Wire the discovery-complete callback so HA discovery registration
-  // works correctly after subscription fallback.
   this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
     auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
     bridge->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&bridge->erd_cache_));
+    erd_write_bridge_set_host_address(&bridge->erd_write_bridge_, bridge->autodiscovery_manager_.get_host_address());
     tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
   };
   this->erd_bridge_poll_.on_discovery_complete_context = this;
