@@ -100,17 +100,20 @@ static void ensure_polling_list_capacity(erd_bridge_poll_t* self, uint16_t neede
   self->polling_list_capacity = (uint16_t)new_capacity;
 }
 
-/* Reset the polling list, erd_set, and cache.
+/* Reset the polling bridge's discovery state (erd_set and polling list).
  * Called from the canonical discovery entry points so that a new discovery
  * phase always starts from a clean slate.  There are two callers:
  *   - state_add_common_erds (full-discovery path)
  *   - state_identify_appliance re-entry (api_parsed path after appliance lost)
  * Adding a third caller in the future requires only calling this helper,
- * rather than duplicating the four-line clear sequence. */
+ * rather than duplicating the clear sequence.
+ *
+ * Does NOT clear the shared erd_cache — that cache may be shared with the
+ * subscription bridge.  Clearing it here would destroy subscription data
+ * when the polling bridge re-discovers after appliance loss. */
 static void clear_discovery_state(erd_bridge_poll_t* self)
 {
   erd_set(self).clear();
-  erd_cache_init(self->erd_cache);
   self->polling_list_count = 0;
 }
 
@@ -425,6 +428,9 @@ static tiny_hsm_result_t state_add_common_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     // path (appliance first seen, or appliance_lost re-discovery), NOT on every
     // transient MQTT reconnect. Clearing in the disconnect handler caused the
     // set's tree nodes to be freed and reallocated on each reconnect, fragmenting
+    // the heap.  In the full-discovery path the polling bridge is the only
+    // consumer of the shared cache, so it is safe to reset it here.
+    erd_cache_init(self->erd_cache);
     clear_discovery_state(self);
     self->request_id++;
     tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
