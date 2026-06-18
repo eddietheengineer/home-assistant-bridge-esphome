@@ -451,7 +451,12 @@ static tiny_hsm_result_t state_add_energy_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     self->appliance_erd_list_count = energyErdCount;
     self->erd_index                = 0;
     self->request_id++;
-    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    if (self->appliance_erd_list_count > 0) {
+      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    } else {
+      // No energy ERDs to discover; transition directly.
+      tiny_hsm_transition(hsm, self->next_discovery_state);
+    }
     return tiny_hsm_result_signal_consumed;
   }
 
@@ -484,7 +489,12 @@ static tiny_hsm_result_t state_add_appliance_api_feature_erds(tiny_hsm_t* hsm, t
     self->appliance_erd_list_count = applianceApiFeatureErdCount;
     self->erd_index                = 0;
     self->request_id++;
-    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    if (self->appliance_erd_list_count > 0) {
+      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    } else {
+      // No appliance API feature ERDs to discover; transition directly.
+      tiny_hsm_transition(hsm, self->next_discovery_state);
+    }
     return tiny_hsm_result_signal_consumed;
   }
 
