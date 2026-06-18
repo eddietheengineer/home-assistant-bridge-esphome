@@ -33,7 +33,7 @@ TEST_GROUP(erd_write_bridge)
     mqtt_client_double_init(&mqtt_client);
     erd_cache_init(&test_cache);
   }
-  tiny_gea3_erd_client_request_id_t mock_request_id;
+  tiny_gea3_erd_client_request_id_t mock_request_id{1};
 
   void teardown()
   {
@@ -115,6 +115,7 @@ TEST_GROUP(erd_write_bridge)
       .expectOneCall("write")
       .onObject(&erd_client)
       .ignoreOtherParameters()
+      .withOutputParameterReturning("request_id", &mock_request_id, sizeof(mock_request_id))
       .andReturnValue(true);
   }
 };
@@ -144,9 +145,8 @@ TEST(erd_write_bridge, should_report_write_success_to_mqtt)
   uint8_t value = 0x01;
   expect_write_succeeds();
   when_a_write_request_is_received(0x3001, &value, sizeof(value));
-
-  should_report_write_result(0x3001, true, tiny_gea3_erd_client_write_failure_reason_retries_exhausted);
-  when_a_write_is_completed(1, 0x3001);
+  should_report_write_result(0x3001, true, 0);
+  when_a_write_is_completed(mock_request_id, 0x3001);
 }
 
 TEST(erd_write_bridge, should_report_write_failure_to_mqtt)
@@ -158,7 +158,7 @@ TEST(erd_write_bridge, should_report_write_failure_to_mqtt)
   when_a_write_request_is_received(0x3001, &value, sizeof(value));
 
   should_report_write_result(0x3001, false, tiny_gea3_erd_client_write_failure_reason_not_supported);
-  when_a_write_fails(1, 0x3001, tiny_gea3_erd_client_write_failure_reason_not_supported);
+  when_a_write_fails(mock_request_id, 0x3001, tiny_gea3_erd_client_write_failure_reason_not_supported);
 }
 
 TEST(erd_write_bridge, should_drop_second_write_while_first_is_in_progress)
@@ -172,8 +172,8 @@ TEST(erd_write_bridge, should_drop_second_write_while_first_is_in_progress)
   uint8_t value2 = 0x02;
   when_a_write_request_is_received(0x3002, &value2, sizeof(value2));
 
-  should_report_write_result(0x3001, true, tiny_gea3_erd_client_write_failure_reason_retries_exhausted);
-  when_a_write_is_completed(1, 0x3001);
+  should_report_write_result(0x3001, true, 0);
+  when_a_write_is_completed(mock_request_id, 0x3001);
 }
 
 TEST(erd_write_bridge, should_enable_writes_after_host_address_update)
