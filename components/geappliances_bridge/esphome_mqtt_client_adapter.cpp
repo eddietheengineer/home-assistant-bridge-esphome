@@ -26,30 +26,10 @@ static void register_erd(i_mqtt_client_t* _self, tiny_erd_t erd)
 
 static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value, uint8_t size)
 {
-  auto self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(_self);
-
-  if (self->erd_registry != nullptr && !self->erd_registry->is_valid(erd)) {
-    return;
-  }
-
-  if (value == nullptr || size == 0) {
-    ESP_LOGW(TAG, "Invalid ERD update: null value or zero size for ERD 0x%04X", erd);
-    return;
-  }
-
-  const uint8_t* bytes = reinterpret_cast<const uint8_t*>(value);
-
-  /* Build hex string on the stack for verbose logging only.
-   * Cap at 64 bytes (128 hex chars) to avoid huge log lines. */
-  size_t log_bytes = size < 64 ? size : 64;
-  char hex[130];
-  for (size_t i = 0; i < log_bytes; i++) {
-    snprintf(hex + i * 2, 3, "%02x", bytes[i]);
-  }
-  hex[log_bytes * 2] = '\0';
-
-  ESP_LOGV(TAG, "ERD 0x%04x: %s", erd, hex);
+  (void)_self; (void)erd; (void)value; (void)size;
+  // No-op: bridges write to erd_cache directly; the cache publisher drains to MQTT.
 }
+
 
 static const char* write_failure_reason_to_string(tiny_gea3_erd_client_write_failure_reason_t reason)
 {
