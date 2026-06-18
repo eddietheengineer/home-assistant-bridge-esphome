@@ -85,13 +85,24 @@ static tiny_hsm_result_t state_writing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
     } break;
 
     case signal_write_completed: {
+      auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
+      if (args->write_completed.request_id != self->pending_request_id) {
+        ESP_LOGW(TAG, "Stale write completion for request_id %u (expected %u); ignoring",
+          args->write_completed.request_id, self->pending_request_id);
+        break;
+      }
       mqtt_client_update_erd_write_result(self->mqtt_client, self->pending_erd, true,
-        tiny_gea3_erd_client_write_failure_reason_retries_exhausted);
+        0);
       tiny_hsm_transition(hsm, state_ready);
     } break;
 
     case signal_write_failed: {
       auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
+      if (args->write_failed.request_id != self->pending_request_id) {
+        ESP_LOGW(TAG, "Stale write failure for request_id %u (expected %u); ignoring",
+          args->write_failed.request_id, self->pending_request_id);
+        break;
+      }
       mqtt_client_update_erd_write_result(self->mqtt_client, self->pending_erd, false,
         args->write_failed.reason);
       tiny_hsm_transition(hsm, state_ready);
