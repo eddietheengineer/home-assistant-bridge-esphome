@@ -209,7 +209,7 @@ When a read fails during steady-state polling, the handler increments `cycle_com
 
 **Severity:** Trivial
 
-**Status:** Resolved. The hardcoded `false` has been replaced with `self->publish_all`, a configurable flag set via `erd_bridge_poll_set_publish_all()`. Discovery-phase reads use `publish_all = true` (always publish); steady-state polling uses `self->publish_all` (controlled by `polling_only_publish_onchange` config).
+**Status:** Resolved. The publish-on-change logic has been moved into the shared ERD cache. The cache has an `only_publish_onchange` field set via `erd_cache_set_only_publish_onchange()`. Discovery-phase reads pass `force_publish = true` (always publish); steady-state polling passes `force_publish = false` (respects the cache setting).
 ---
 
 ## Issue 21 — Write requests not gated on appliance identification (lines 308–311)

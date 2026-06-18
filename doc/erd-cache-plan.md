@@ -154,13 +154,11 @@ void erd_cache_destroy(erd_cache_t* self);
 erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd);
 
 // Updates or inserts ERD data.
-// For subscriptions (is_subscription=true): always sets update_required=true.
-// For polling (is_subscription=false):
-//   - If publish_all is true: always sets update_required=true.
-//   - If publish_all is false: sets update_required=true only if data changed.
+// When force_publish is true: always sets update_required=true.
+// When force_publish is false: sets update_required=true only if data changed.
 // Returns true if update_required was set (or entry was new).
 // Returns false if cache is full and the ERD is not already cached.
-bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool is_subscription, bool publish_all);
+bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool force_publish);
 
 // Returns the next entry with update_required=true, then clears the flag.
 // Caller provides an iterator (uint16_t) initialized to 0.
@@ -169,11 +167,8 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
 ```
 
 **API contract:**
-- `erd_cache_update(erd, data, size, true, false)` — subscription: always sets `update_required = true`; inserts new entry or updates existing one; returns `true`
-- `erd_cache_update(erd, data, size, false, false)` — polling onchange: compares new data against cached; only sets `update_required = true` if data differs; returns `true` if data changed (or entry was new)
-- `erd_cache_update(erd, data, size, false, true)` — polling always-publish: always sets `update_required = true` regardless of data change
-- `erd_cache_find(erd)` — returns entry pointer or NULL
-- Data access: callers use `entry->uses_heap ? entry->heap_data : entry->inline_data` and `entry->data_size`
+- `erd_cache_update(erd, data, size, true)` — force publish: always sets `update_required = true`; inserts new entry or updates existing one; returns `true`
+- `erd_cache_update(erd, data, size, false)` — onchange: compares new data against cached; only sets `update_required = true` if data differs; returns `true` if data changed (or entry was new)
 
 **Note:** `erd_cache_get_next_updated()` is declared for future use (e.g., batch republish after MQTT reconnect). It is **not used** in the initial implementation.
 
@@ -202,14 +197,14 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
 **e) `state_polling::signal_read_completed` (lines 630-669):**
 - Cache write happens **after** the registration block (lines 636-641). At this point the ERD is confirmed in `erd_set`.
 - **Always** write to the cache — the cache is the source of truth for latest data:
-  ```c
-  erd_cache_update(&self->erd_cache, erd, erd_data, data_size, false, self->publish_all);
-  ```
-- The `publish_all` flag on the polling bridge controls whether every read publishes or only changed data publishes. The cache handles this internally: when `publish_all` is `true`, `update_required` is always set; when `false`, only changed data sets the flag.
+```c
+erd_cache_update(&self->erd_cache, erd, erd_data, data_size, false);
+```
+- The cache's `only_publish_onchange` setting (set via `erd_cache_set_only_publish_onchange()`) controls the behavior: when `true`, only changed data sets `update_required`; when `false` (default), every read always sets it.
 
 **f) `handle_discovery_list_signals` (lines 253-259):**
 - `add_erd_to_polling_list()` on line 254 calls `mqtt_client_register_erd()` — ERD is now confirmed.
-- After `add_erd_to_polling_list()`, store in cache: `erd_cache_update(&self->erd_cache, erd, data, data_size, false, true)` — discovery phase always publishes
+- After `add_erd_to_polling_list()`, store in cache: `erd_cache_update(&self->erd_cache, erd, data, data_size, true)` — discovery phase always publishes
 
 **g) `state_identify_appliance::signal_read_completed` (lines 352-373):**
 - The 0x0008 appliance type read is **not registered** (it's not added to `erd_set` or the polling list). Do **not** cache it — it's discovery metadata, not a polled ERD.
@@ -240,8 +235,7 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
   erd_cache_update(&self->erd_cache, erd,
     args->subscription_publication_received.data,
     args->subscription_publication_received.data_size,
-    true,  // is_subscription = true
-    false); // publish_all = false (subscriptions always set update_required via is_subscription)
+    true); // force_publish = true (subscriptions always publish)
   mqtt_client_update_erd(self->mqtt_client, erd,
     args->subscription_publication_received.data,
     args->subscription_publication_received.data_size);
@@ -261,9 +255,9 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
 2. Maintain a record of latest ERD values for future features
 
 **Decision:** The cache replaces the existing `map<tiny_erd_t, vector<uint8_t>>` comparison logic. The publish decision remains immediate — we just use the cache's `update_required` flag instead of doing a fresh memcmp each cycle.
-**For polling bridge:** `erd_cache_update(..., false, self->publish_all)` — when `publish_all` is `false`, returns true only if data changed → publish only on change. When `publish_all` is `true`, always returns true → always publish.
+**For polling bridge:** `erd_cache_update(..., false)` — respects the cache's `only_publish_onchange` setting. When `true`, returns true only if data changed → publish only on change. When `false` (default), always returns true → always publish.
 
-**For subscription bridge:** `erd_cache_update(..., true, false)` always returns true → always publish. The cache serves as a record of latest values for potential future use.
+**For subscription bridge:** `erd_cache_update(..., true)` always returns true → always publish. The cache serves as a record of latest values for potential future use.
 
 ### 5. Include and build system cleanup
 
@@ -303,7 +297,7 @@ components/geappliances_bridge/
 - Test update same ERD with different size (change detected)
 - Test update ERD from inline to heap path (size grows past 16)
 - Test update ERD from heap to inline path (size shrinks below 16)
-- Test subscription update (always marks as updated)
+- Test force_publish update (always marks as updated)
 - Test capacity overflow (200+ ERDs — new ones rejected)
 - Test find non-existent ERD returns NULL
 - Test iteration over updated entries
