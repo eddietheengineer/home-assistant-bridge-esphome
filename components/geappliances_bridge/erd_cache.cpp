@@ -15,11 +15,13 @@ static bool s_overflow_warned = false;
 
 void erd_cache_init(erd_cache_t* self)
 {
+  // Free any heap-allocated data before zeroing the struct.
+  // The loop must run before memset because it reads e->valid and
+  // e->uses_heap to determine which entries have heap data.
   for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
     erd_cache_entry_t* e = &self->entries[i];
     if (e->valid && e->uses_heap) {
       delete[] e->heap_data;
-      e->heap_data = nullptr;
     }
   }
   (void)memset(self, 0, sizeof(*self));
