@@ -36,7 +36,7 @@ typedef struct {
   // Stats
   uint32_t total_published;        // Total ERD publishes since init
   uint32_t missed_loops;           // Loop iterations skipped while MQTT disconnected
-  // Time callback (defaults to esphome::millis; overridable for testing)
+  uint32_t publish_count_window;   // Publishes in the last 60s window
   uint32_t (*get_time_ms)(void);
 } erd_cache_mqtt_publisher_t;
 
@@ -78,6 +78,11 @@ void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self);
 void erd_cache_mqtt_publisher_set_time_fn(
   erd_cache_mqtt_publisher_t* self,
   uint32_t (*get_time_ms)(void));
+
+/*!
+ * Returns the number of ERD publishes in the last 60 seconds, then resets the window.
+ */
+uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* self);
 
 #ifdef __cplusplus
 }

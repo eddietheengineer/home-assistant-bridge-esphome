@@ -33,9 +33,11 @@ typedef struct {
 
 typedef struct erd_cache_t {
   erd_cache_entry_t entries[ERD_CACHE_CAPACITY];
-  uint32_t update_count;        // total updates since last window reset
-  uint32_t update_count_window; // updates in the last 60s window
-  bool only_publish_onchange;   // when true, only mark update_required on data change
+  uint32_t update_count;              // total cache updates since last window reset
+  uint32_t update_count_window;       // total cache updates in the last 60s window
+  uint32_t required_update_count;     // total updates setting update_required=true since reset
+  uint32_t required_update_count_window; // updates setting update_required=true in last 60s
+  bool only_publish_onchange;         // when true, only mark update_required on data change
 } erd_cache_t;
 
 #ifdef __cplusplus
@@ -76,6 +78,10 @@ erd_cache_entry_t* erd_cache_get_next_entry(erd_cache_t* self, uint16_t* iterato
 // Returns the number of cache updates that occurred in the last 60 seconds,
 // then resets the window counter.
 uint32_t erd_cache_get_update_rate(erd_cache_t* self);
+
+// Returns the number of cache updates that set update_required=true in the last 60 seconds,
+// then resets the window counter.
+uint32_t erd_cache_get_required_update_rate(erd_cache_t* self);
 
 #ifdef __cplusplus
 }

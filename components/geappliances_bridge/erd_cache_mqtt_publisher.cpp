@@ -118,6 +118,7 @@ uint16_t erd_cache_mqtt_publisher_loop(
     mqtt_client_publish_raw(self->mqtt_client, topic, hex, data_len * 2, true);
 
     self->total_published++;
+    self->publish_count_window++;
     published++;
   }
 
@@ -141,4 +142,11 @@ void erd_cache_mqtt_publisher_set_time_fn(
   uint32_t (*get_time_ms)(void))
 {
   self->get_time_ms = get_time_ms;
+}
+
+uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* self)
+{
+  uint32_t count = self->publish_count_window;
+  self->publish_count_window = 0;
+  return count;
 }

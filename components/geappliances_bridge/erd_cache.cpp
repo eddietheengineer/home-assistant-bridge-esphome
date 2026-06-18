@@ -82,6 +82,10 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
         bool truncated_changed = (existing->data_size != data_size) ||
                                  (memcmp(existing->inline_data, data, existing->data_size) != 0);
         existing->update_required = !self->only_publish_onchange || truncated_changed;
+        if (existing->update_required) {
+          self->required_update_count++;
+          self->required_update_count_window++;
+        }
         return existing->update_required;
       }
       memcpy(existing->heap_data, data, data_size);
@@ -93,6 +97,10 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
     existing->uses_heap = needs_heap;
 
     existing->update_required = !self->only_publish_onchange || data_changed;
+    if (existing->update_required) {
+      self->required_update_count++;
+      self->required_update_count_window++;
+    }
     return existing->update_required;
   }
 
@@ -118,6 +126,8 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   bool needs_heap = data_size > ERD_CACHE_INLINE_DATA_SIZE;
   self->update_count++;
   self->update_count_window++;
+  self->required_update_count++;
+  self->required_update_count_window++;
   slot->erd = erd;
   slot->data_size = data_size;
   slot->uses_heap = needs_heap;
@@ -189,5 +199,12 @@ uint32_t erd_cache_get_update_rate(erd_cache_t* self)
 {
   uint32_t count = self->update_count_window;
   self->update_count_window = 0;
+  return count;
+}
+
+uint32_t erd_cache_get_required_update_rate(erd_cache_t* self)
+{
+  uint32_t count = self->required_update_count_window;
+  self->required_update_count_window = 0;
   return count;
 }

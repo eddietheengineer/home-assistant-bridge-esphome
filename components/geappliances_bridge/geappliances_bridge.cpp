@@ -221,13 +221,11 @@ void GeappliancesBridge::loop() {
     uint32_t now = esphome::millis();
     if (now - this->last_erd_publish_rate_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
       if (this->erd_publish_rate_sensor_ != nullptr) {
-        uint32_t count = esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(
-          &this->mqtt_client_adapter_);
+        uint32_t count = erd_cache_get_update_rate(&this->erd_cache_);
         this->erd_publish_rate_sensor_->publish_state(static_cast<float>(count));
       }
       if (this->mqtt_publish_rate_sensor_ != nullptr) {
-        uint32_t count = esphome_mqtt_client_adapter_get_and_reset_mqtt_publish_count(
-          &this->mqtt_client_adapter_);
+        uint32_t count = erd_cache_mqtt_publisher_get_publish_rate(&this->erd_cache_publisher_);
         this->mqtt_publish_rate_sensor_->publish_state(static_cast<float>(count));
       }
       this->last_erd_publish_rate_publish_ = now;
@@ -244,7 +242,7 @@ void GeappliancesBridge::loop() {
       }
       if (this->erd_cache_updates_sensor_ != nullptr) {
         this->erd_cache_updates_sensor_->publish_state(
-          static_cast<float>(erd_cache_get_update_rate(&this->erd_cache_)));
+          static_cast<float>(erd_cache_get_required_update_rate(&this->erd_cache_)));
       }
       this->last_erd_cache_stats_publish_ = now;
     }

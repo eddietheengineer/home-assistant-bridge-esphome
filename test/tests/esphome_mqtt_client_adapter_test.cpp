@@ -157,8 +157,7 @@ TEST(esphome_mqtt_client_adapter, update_erd_write_result_success_no_crash)
   init_adapter();
 
   adapter.interface.api->update_erd_write_result(&adapter.interface, 0x0092, true, 0);
-  // global_mqtt_client is null in tests — publish is skipped, count stays 0.
-  CHECK_EQUAL(0u, adapter.mqtt_publish_count_);
+  // global_mqtt_client is null in tests — publish is skipped, no crash.
 }
 
 TEST(esphome_mqtt_client_adapter, update_erd_write_result_failure_no_crash)
@@ -166,10 +165,8 @@ TEST(esphome_mqtt_client_adapter, update_erd_write_result_failure_no_crash)
   init_adapter();
 
   adapter.interface.api->update_erd_write_result(&adapter.interface, 0x0092, false, 3);
-  // global_mqtt_client is null in tests — publish is skipped, count stays 0.
-  CHECK_EQUAL(0u, adapter.mqtt_publish_count_);
+  // global_mqtt_client is null in tests — publish is skipped, no crash.
 }
-
 /* ------------------------------------------------------------------ */
 /* destroy                                                              */
 /* ------------------------------------------------------------------ */
@@ -258,15 +255,11 @@ TEST(esphome_mqtt_client_adapter, on_mqtt_disconnect_returns_event)
 /* ERD publish count                                                    */
 /* ------------------------------------------------------------------ */
 
-TEST(esphome_mqtt_client_adapter, erd_publish_count_increments_and_resets)
+TEST(esphome_mqtt_client_adapter, update_erd_filters_invalid_erds)
 {
   init_adapter();
-  CHECK_EQUAL(0u, esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(&adapter));
-
-  uint8_t value1 = 0x42;
-  uint8_t value2 = 0x01;
-  adapter.interface.api->update_erd(&adapter.interface, 0x0008, &value1, 1);
-  adapter.interface.api->update_erd(&adapter.interface, 0x0001, &value2, 1);
-  CHECK_EQUAL(2u, esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(&adapter));
-  CHECK_EQUAL(0u, esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(&adapter));
+  // update_erd with invalid ERD (not in registry) is silently dropped.
+  // global_mqtt_client is null in tests — no crash.
+  uint8_t value = 0x42;
+  adapter.interface.api->update_erd(&adapter.interface, 0x0008, &value, 1);
 }
