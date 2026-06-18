@@ -229,6 +229,55 @@ TEST(erd_write_bridge, should_accept_write_after_previous_completes)
   when_a_write_request_is_received(0x3002, &value2, sizeof(value2));
 }
 
+// Regression: a write completion with a stale request_id must be ignored
+// and the bridge must remain in state_writing without reporting a result.
+TEST(erd_write_bridge, should_ignore_stale_write_completion_with_wrong_request_id)
+{
+  given_that_the_bridge_has_been_initialized();
+
+  uint8_t value = 0x01;
+  expect_write_succeeds();
+  when_a_write_request_is_received(0x3001, &value, sizeof(value));
+
+  // Send a write completion with a different request_id — should be ignored.
+  uint8_t dummy = 0;
+  tiny_gea3_erd_client_on_activity_args_t args;
+  args.type = tiny_gea3_erd_client_activity_type_write_completed;
+  args.address = 0xC0;
+  args.write_completed.request_id = 99;  // wrong request_id
+  args.write_completed.erd = 0x3001;
+  args.write_completed.data = &dummy;
+  args.write_completed.data_size = 1;
+  tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
+
+  // No update_erd_write_result call expected — the stale event is ignored.
+  // The bridge is still in state_writing, waiting for the correct request_id.
+}
+
+// Same for write failure with stale request_id.
+TEST(erd_write_bridge, should_ignore_stale_write_failure_with_wrong_request_id)
+{
+  given_that_the_bridge_has_been_initialized();
+
+  uint8_t value = 0x01;
+  expect_write_succeeds();
+  when_a_write_request_is_received(0x3001, &value, sizeof(value));
+
+  // Send a write failure with a different request_id — should be ignored.
+  uint8_t dummy = 0;
+  tiny_gea3_erd_client_on_activity_args_t args;
+  args.type = tiny_gea3_erd_client_activity_type_write_failed;
+  args.address = 0xC0;
+  args.write_failed.request_id = 99;  // wrong request_id
+  args.write_failed.erd = 0x3001;
+  args.write_failed.data = &dummy;
+  args.write_failed.data_size = 1;
+  args.write_failed.reason = tiny_gea3_erd_client_write_failure_reason_not_supported;
+  tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
+
+  // No update_erd_write_result call expected.
+}
+
 TEST(erd_write_bridge, should_not_crash_on_destroy_without_init)
 {
   erd_write_bridge_destroy(&self);

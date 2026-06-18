@@ -52,14 +52,40 @@ static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value
   self->erd_publish_count_++;
 }
 
+static const char* write_failure_reason_to_string(tiny_gea3_erd_client_write_failure_reason_t reason)
+{
+  switch (reason) {
+    case tiny_gea3_erd_client_write_failure_reason_retries_exhausted: return "retries_exhausted";
+    case tiny_gea3_erd_client_write_failure_reason_not_supported: return "not_supported";
+    case tiny_gea3_erd_client_write_failure_reason_incorrect_size: return "incorrect_size";
+    default: return "unknown";
+  }
+}
+
 static void update_erd_write_result(
   i_mqtt_client_t* _self,
   tiny_erd_t erd,
   bool success,
-  tiny_gea3_erd_client_write_failure_reason_t /*failure_reason*/)
+  tiny_gea3_erd_client_write_failure_reason_t failure_reason)
 {
-  ESP_LOGD(TAG, "Write result for ERD 0x%04X: %s", erd, success ? "success" : "failure");
-  (void)_self; (void)erd; (void)success;
+  auto self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(_self);
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client == nullptr || !mqtt_client->is_connected()) return;
+
+  char topic[128];
+  snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/write_result",
+           self->device_id->c_str(), erd);
+
+  std::string payload;
+  if (success) {
+    payload = "ok";
+  } else {
+    payload = "{\"error\":\"" + std::string(write_failure_reason_to_string(failure_reason)) + "\"}";
+  }
+
+  ESP_LOGD(TAG, "Write result for ERD 0x%04X: %s", erd, payload.c_str());
+  self->mqtt_publish_count_++;
+  mqtt_client->publish(topic, payload, 0, true);
 }
 
 static i_tiny_event_t* on_write_request(i_mqtt_client_t* _self)
