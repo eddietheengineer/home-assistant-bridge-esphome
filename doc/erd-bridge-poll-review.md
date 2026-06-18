@@ -209,7 +209,7 @@ When a read fails during steady-state polling, the handler increments `cycle_com
 
 **Severity:** Trivial
 
-**Status:** Resolved. The publish-on-change logic has been moved into the shared ERD cache. The cache has an `only_publish_onchange` field set via `erd_cache_set_only_publish_onchange()`. Discovery-phase reads pass `force_publish = true` (always publish); steady-state polling passes `force_publish = false` (respects the cache setting).
+**Status:** Resolved. The publish-on-change logic has been moved into the shared ERD cache. The cache has an `only_publish_onchange` field set via `erd_cache_set_only_publish_onchange()`. The `erd_cache_update()` API no longer takes a `force_publish` parameter — it relies on `only_publish_onchange` and data comparison for all cases.
 ---
 
 ## Issue 21 — Write requests not gated on appliance identification (lines 308–311)

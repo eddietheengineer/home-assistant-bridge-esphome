@@ -62,7 +62,7 @@ The subscription bridge uses a hierarchical state machine (`tiny_hsm`) with a pa
 Handles the `signal_subscription_publication_received` signal regardless of the current child state:
 
 | Signal | Behavior |
-| `signal_subscription_publication_received` | If the ERD is not already in `erd_set`, inserts it. Calls `erd_cache_update()` with `force_publish = true` (subscriptions always set `update_required`). |
+| `signal_subscription_publication_received` | If the ERD is not already in `erd_set`, inserts it. Calls `erd_cache_update()` to store the ERD data. |
 
 ### 3.2 Child States
 

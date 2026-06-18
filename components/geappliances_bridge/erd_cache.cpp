@@ -43,7 +43,7 @@ erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd)
   return nullptr;
 }
 
-bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool force_publish)
+bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size)
 {
   erd_cache_entry_t* existing = nullptr;
   for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
@@ -87,12 +87,8 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
     existing->data_size = data_size;
     existing->uses_heap = needs_heap;
 
-    if (force_publish || !self->only_publish_onchange) {
-      existing->update_required = true;
-      return true;
-    }
-    existing->update_required = data_changed;
-    return data_changed;
+    existing->update_required = !self->only_publish_onchange || data_changed;
+    return existing->update_required;
   }
 
   // New entry — find a free slot

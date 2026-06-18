@@ -154,11 +154,12 @@ void erd_cache_destroy(erd_cache_t* self);
 erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd);
 
 // Updates or inserts ERD data.
-// When force_publish is true: always sets update_required=true.
-// When force_publish is false: sets update_required=true only if data changed.
+// When only_publish_onchange is true: sets update_required only when data has changed.
+// When only_publish_onchange is false: always sets update_required=true.
+// New entries always mark update_required=true regardless of the setting.
 // Returns true if update_required was set (or entry was new).
 // Returns false if cache is full and the ERD is not already cached.
-bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool force_publish);
+bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size);
 
 // Returns the next entry with update_required=true, then clears the flag.
 // Caller provides an iterator (uint16_t) initialized to 0.
@@ -167,8 +168,7 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
 ```
 
 **API contract:**
-- `erd_cache_update(erd, data, size, true)` — force publish: always sets `update_required = true`; inserts new entry or updates existing one; returns `true`
-- `erd_cache_update(erd, data, size, false)` — onchange: compares new data against cached; only sets `update_required = true` if data differs; returns `true` if data changed (or entry was new)
+- `erd_cache_update(erd, data, size)` — updates existing entry or inserts new one. When `only_publish_onchange` is true, only sets `update_required = true` if data differs. When false (default), always sets `update_required = true`. New entries always set `update_required = true`.
 
 **Note:** `erd_cache_get_next_updated()` is declared for future use (e.g., batch republish after MQTT reconnect). It is **not used** in the initial implementation.
 
@@ -198,13 +198,13 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
 - Cache write happens **after** the registration block (lines 636-641). At this point the ERD is confirmed in `erd_set`.
 - **Always** write to the cache — the cache is the source of truth for latest data:
 ```c
-erd_cache_update(&self->erd_cache, erd, erd_data, data_size, false);
+erd_cache_update(&self->erd_cache, erd, erd_data, data_size);
 ```
 - The cache's `only_publish_onchange` setting (set via `erd_cache_set_only_publish_onchange()`) controls the behavior: when `true`, only changed data sets `update_required`; when `false` (default), every read always sets it.
 
 **f) `handle_discovery_list_signals` (lines 253-259):**
 - `add_erd_to_polling_list()` on line 254 calls `mqtt_client_register_erd()` — ERD is now confirmed.
-- After `add_erd_to_polling_list()`, store in cache: `erd_cache_update(&self->erd_cache, erd, data, data_size, true)` — discovery phase always publishes
+- After `add_erd_to_polling_list()`, store in cache: `erd_cache_update(&self->erd_cache, erd, data, data_size)` — new entries always publish
 
 **g) `state_identify_appliance::signal_read_completed` (lines 352-373):**
 - The 0x0008 appliance type read is **not registered** (it's not added to `erd_set` or the polling list). Do **not** cache it — it's discovery metadata, not a polled ERD.
@@ -234,13 +234,12 @@ erd_cache_update(&self->erd_cache, erd, erd_data, data_size, false);
   ```c
   erd_cache_update(&self->erd_cache, erd,
     args->subscription_publication_received.data,
-    args->subscription_publication_received.data_size,
-    true); // force_publish = true (subscriptions always publish)
+    args->subscription_publication_received.data_size);
   mqtt_client_update_erd(self->mqtt_client, erd,
     args->subscription_publication_received.data,
     args->subscription_publication_received.data_size);
   ```
-- Subscriptions always set `update_required = true` and always publish immediately. The cache serves as a record of latest values for potential future use.
+- Subscriptions always publish: new entries set `update_required = true` automatically; existing entries are updated and `data_changed` determines whether to publish. The cache serves as a record of latest values for potential future use.
 
 **d) `state_subscribing::signal_subscription_host_came_online` (line 72):**
 - Add `erd_cache_init(&self->erd_cache)` right after `erd_set(self).clear()` — matches the existing `erd_set` clear when the host restarts.
@@ -255,9 +254,9 @@ erd_cache_update(&self->erd_cache, erd, erd_data, data_size, false);
 2. Maintain a record of latest ERD values for future features
 
 **Decision:** The cache replaces the existing `map<tiny_erd_t, vector<uint8_t>>` comparison logic. The publish decision remains immediate — we just use the cache's `update_required` flag instead of doing a fresh memcmp each cycle.
-**For polling bridge:** `erd_cache_update(..., false)` — respects the cache's `only_publish_onchange` setting. When `true`, returns true only if data changed → publish only on change. When `false` (default), always returns true → always publish.
+**For polling bridge:** `erd_cache_update(...)` — respects the cache's `only_publish_onchange` setting. When `true`, returns true only if data changed → publish only on change. When `false` (default), always returns true → always publish.
 
-**For subscription bridge:** `erd_cache_update(..., true)` always returns true → always publish. The cache serves as a record of latest values for potential future use.
+**For subscription bridge:** `erd_cache_update(...)` — new entries always publish; existing entries publish when data changes. The cache serves as a record of latest values for potential future use.
 
 ### 5. Include and build system cleanup
 
@@ -297,7 +296,6 @@ components/geappliances_bridge/
 - Test update same ERD with different size (change detected)
 - Test update ERD from inline to heap path (size grows past 16)
 - Test update ERD from heap to inline path (size shrinks below 16)
-- Test force_publish update (always marks as updated)
 - Test capacity overflow (200+ ERDs — new ones rejected)
 - Test find non-existent ERD returns NULL
 - Test iteration over updated entries

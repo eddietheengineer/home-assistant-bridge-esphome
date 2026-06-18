@@ -1345,16 +1345,16 @@ TEST(erd_cache_stats, empty_cache_has_zero_count)
 TEST(erd_cache_stats, count_increments_on_insert)
 {
   uint8_t data = 0x01;
-  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
   CHECK_EQUAL(1u, erd_cache_get_count(&cache));
 }
 
 TEST(erd_cache_stats, count_unchanged_on_update)
 {
   uint8_t data = 0x01;
-  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
   data = 0x02;
-  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
   CHECK_EQUAL(1u, erd_cache_get_count(&cache));
 }
 
@@ -1363,9 +1363,9 @@ TEST(erd_cache_stats, count_for_multiple_erds)
   uint8_t data_a = 0x01;
   uint8_t data_b = 0x02;
   uint8_t data_c = 0x03;
-  erd_cache_update(&cache, 0x1001, &data_a, sizeof(data_a), false);
-  erd_cache_update(&cache, 0x1002, &data_b, sizeof(data_b), false);
-  erd_cache_update(&cache, 0x1003, &data_c, sizeof(data_c), false);
+  erd_cache_update(&cache, 0x1001, &data_a, sizeof(data_a));
+  erd_cache_update(&cache, 0x1002, &data_b, sizeof(data_b));
+  erd_cache_update(&cache, 0x1003, &data_c, sizeof(data_c));
   CHECK_EQUAL(3u, erd_cache_get_count(&cache));
 }
 
@@ -1377,17 +1377,17 @@ TEST(erd_cache_stats, update_rate_returns_zero_when_empty)
 TEST(erd_cache_stats, update_rate_counts_updates)
 {
   uint8_t data = 0x01;
-  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
-  erd_cache_update(&cache, 0x1002, &data, sizeof(data), false);
-  erd_cache_update(&cache, 0x1003, &data, sizeof(data), false);
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
+  erd_cache_update(&cache, 0x1002, &data, sizeof(data));
+  erd_cache_update(&cache, 0x1003, &data, sizeof(data));
   CHECK_EQUAL(3u, erd_cache_get_update_rate(&cache));
 }
 
 TEST(erd_cache_stats, update_rate_resets_after_read)
 {
   uint8_t data = 0x01;
-  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
-  erd_cache_update(&cache, 0x1002, &data, sizeof(data), false);
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
+  erd_cache_update(&cache, 0x1002, &data, sizeof(data));
   CHECK_EQUAL(2u, erd_cache_get_update_rate(&cache));
   CHECK_EQUAL(0u, erd_cache_get_update_rate(&cache));
 }
@@ -1395,17 +1395,17 @@ TEST(erd_cache_stats, update_rate_resets_after_read)
 TEST(erd_cache_stats, update_rate_counts_reupdates)
 {
   uint8_t data = 0x01;
-  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
   data = 0x02;
-  erd_cache_update(&cache, 0x1001, &data, sizeof(data), false);
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
   CHECK_EQUAL(2u, erd_cache_get_update_rate(&cache));
 }
 
-TEST(erd_cache_stats, update_rate_counts_subscription_updates)
+TEST(erd_cache_stats, update_rate_counts_new_entries)
 {
   uint8_t data = 0x01;
-  erd_cache_update(&cache, 0x1001, &data, sizeof(data), true);
-  erd_cache_update(&cache, 0x1002, &data, sizeof(data), true);
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
+  erd_cache_update(&cache, 0x1002, &data, sizeof(data));
   CHECK_EQUAL(2u, erd_cache_get_update_rate(&cache));
 }
 
@@ -1414,11 +1414,11 @@ TEST(erd_cache_stats, update_rate_not_increased_on_overflow)
   // Fill the cache
   uint8_t data = 0x01;
   for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
-    erd_cache_update(&cache, (tiny_erd_t)(0x1000 + i), &data, sizeof(data), false);
+    erd_cache_update(&cache, (tiny_erd_t)(0x1000 + i), &data, sizeof(data));
   }
   CHECK_EQUAL(ERD_CACHE_CAPACITY, erd_cache_get_update_rate(&cache));
 
   // Try to insert beyond capacity — should be rejected
-  erd_cache_update(&cache, 0x9999, &data, sizeof(data), false);
+  erd_cache_update(&cache, 0x9999, &data, sizeof(data));
   CHECK_EQUAL(0u, erd_cache_get_update_rate(&cache)); // no increment on overflow
 }

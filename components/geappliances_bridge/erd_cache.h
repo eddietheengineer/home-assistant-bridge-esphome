@@ -46,13 +46,12 @@ void erd_cache_init(erd_cache_t* self);
 void erd_cache_destroy(erd_cache_t* self);
 
 // Updates or inserts ERD data.
-// If force_publish is true: always marks update_required=true (used by subscriptions).
-// If force_publish is false and only_publish_onchange is true: marks update_required only when data has changed.
-// If force_publish is false and only_publish_onchange is false: always marks update_required=true.
-// New entries always mark update_required=true regardless of the flags.
+// If only_publish_onchange is true: marks update_required only when data has changed.
+// If only_publish_onchange is false: always marks update_required=true.
+// New entries always mark update_required=true regardless of the setting.
 // Returns true if update_required was set (or entry was new).
 // Returns false if cache is full and the ERD is not already cached.
-bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size, bool force_publish);
+bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size);
 
 // Set whether the cache should only mark ERDs as updated when data changes.
 // Default is false (always mark updated).

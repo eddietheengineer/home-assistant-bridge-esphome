@@ -214,7 +214,7 @@ All discovery states (except `state_probe_api_parsed_erds` for failures) delegat
 
 **On `signal_read_completed`:**
 Calls `add_erd_to_polling_list()` — adds the ERD to `erd_polling_list` (deduped via `erd_set`).
-Calls `erd_cache_update()` with `force_publish = true` (discovery phase always publishes).
+Calls `erd_cache_update()` to store the ERD data (new entries always mark `update_required = true`).
 Advances to the next ERD in the current list or transitions to `next_discovery_state`.
 
 **On `signal_read_failed`:**
@@ -278,7 +278,7 @@ A polling cycle consists of sending reads for all ERDs in `erd_polling_list` and
 **On `signal_read_completed`:**
 - Resets the appliance-lost timer.
 - If the ERD is not in `erd_set`: adds it to the polling list via `add_erd_to_polling_list()` (handles late discovery responses that arrive during polling).
-- Updates the ERD cache via `erd_cache_update()` with `force_publish = false` (respects the cache's `only_publish_onchange` setting).
+- Updates the ERD cache via `erd_cache_update()` (respects the cache's `only_publish_onchange` setting).
 - Increments `cycle_completed_count`; if cycle is complete, calls `on_polling_cycle_complete()`.
 
 **On `signal_read_failed`:**
