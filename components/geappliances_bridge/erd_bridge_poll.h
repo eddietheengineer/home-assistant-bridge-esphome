@@ -1,13 +1,13 @@
 /*!
  * @file
- * @brief Polls ERDs and publishes to MQTT server (polling mode)
+ * @brief Polls ERDs and updates the ERD cache (polling mode)
  */
 
 // =============================================================================
 // MODULE GOAL
 // =============================================================================
-// Goal: Periodically poll a list of ERDs from the appliance and publish their
-//       values to MQTT; fulfill write commands received from MQTT.
+// Goal: Periodically poll a list of ERDs from the appliance and update their
+//       values in the ERD cache; fulfill write commands received from MQTT.
 //
 // Responsibilities:
 //   - Maintain and iterate a dynamic polling list
@@ -18,7 +18,6 @@
 //
 // NOT responsible for:
 //   - Subscription-mode operation (see erd_bridge_subscribe.h)
-//   - Deciding which ERDs are valid (filtered upstream by i_mqtt_client)
 //   - Bridge initialization or startup phase management
 //
 // ---- 3-Phase Polling Lifecycle ----
@@ -54,14 +53,13 @@
 //       start next cycle immediately; re-arm timer.
 //
 // Dependencies:
-//   - i_mqtt_client.h, i_tiny_gea3_erd_client.h, tiny_hsm.h, tiny_timer.h
+//   - i_tiny_gea3_erd_client.h, tiny_hsm.h, tiny_timer.h
 //   - erd_lists.h (appliance ERD list arrays)
 // =============================================================================
 
 #ifndef erd_bridge_poll_h
 #define erd_bridge_poll_h
 
-#include "i_mqtt_client.h"
 #include "i_tiny_gea3_erd_client.h"
 #include "tiny_hsm.h"
 #include "tiny_timer.h"
@@ -75,20 +73,13 @@ typedef struct {
   uint32_t polling_interval_ms;
   tiny_timer_group_t* timer_group;
   i_tiny_gea3_erd_client_t* erd_client;
-  i_mqtt_client_t* mqtt_client;
   tiny_timer_t appliance_lost_timer;
   tiny_timer_t polling_timer;
-  tiny_event_subscription_t mqtt_write_request_subscription;
-  tiny_event_subscription_t mqtt_disconnect_subscription;
   tiny_event_subscription_t erd_client_activity_subscription;
   tiny_hsm_t hsm;
   tiny_hsm_state_t next_discovery_state;
   void* erd_set;
   erd_cache_t* erd_cache;
-  // Set of ERDs that have been added to the polling list but not yet
-  // registered on MQTT (added via add_erd_to_polling_list_no_register).
-  // On first successful read, these are registered and removed from this set.
-  void* pending_registration_set;
   tiny_gea3_erd_client_request_id_t request_id;
   uint8_t erd_host_address;
   uint8_t appliance_type;
@@ -100,7 +91,6 @@ typedef struct {
   // has finished — the cycle only restarts when cycle_completed_count equals
   // polling_list_count AND the polling timer has expired.
   uint16_t cycle_completed_count;
-  bool only_publish_on_change;
   // Set to true once the HSM transitions into state_polling (all ERD
   // discovery phases have completed). Reset to false on appliance loss/
   // reconnect. Used externally to gate HA discovery until polling is steady.
@@ -171,9 +161,7 @@ void erd_bridge_poll_init(
   erd_bridge_poll_t* self,
   tiny_timer_group_t* timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
-  i_mqtt_client_t* mqtt_client,
   uint32_t polling_interval_ms,
-  bool only_publish_on_change,
   uint8_t host_address,
   uint8_t appliance_type,
   const tiny_erd_t* api_list,

@@ -165,6 +165,19 @@ uint16_t erd_cache_get_count(erd_cache_t* self)
   return count;
 }
 
+erd_cache_entry_t* erd_cache_get_next_entry(erd_cache_t* self, uint16_t* iterator)
+{
+  for (uint16_t i = *iterator; i < ERD_CACHE_CAPACITY; i++) {
+    erd_cache_entry_t* e = &self->entries[i];
+    if (e->valid) {
+      *iterator = i + 1;
+      return e;
+    }
+  }
+  *iterator = 0; // Reset iterator for next pass
+  return nullptr;
+}
+
 uint32_t erd_cache_get_update_rate(erd_cache_t* self)
 {
   uint32_t count = self->update_count_window;

@@ -4,7 +4,7 @@
 
 ### 1.1 Purpose
 
-The ERD polling bridge discovers the connected GE appliance, determines which ERDs (Entity-Relationship Data points) it supports, and periodically reads their values — writing them to the shared ERD cache for deferred MQTT publishing. It also fulfills write commands received from MQTT.
+The ERD polling bridge discovers the connected GE appliance, determines which ERDs (Entity-Relationship Data points) it supports, and periodically reads their values — writing them to the shared ERD cache. It has **zero** direct interaction with the MQTT client.
 
 ### 1.2 Responsibilities
 
@@ -12,15 +12,14 @@ The ERD polling bridge discovers the connected GE appliance, determines which ER
 - Determine which ERDs the appliance supports through sequential verification reads
 - Maintain a dynamic polling list of verified ERDs
 - Execute steady-state polling cycles at a configured interval
-- Write ERD values to the shared ERD cache (optionally only on change); the cache publisher handles MQTT publishing
-- Forward write requests from MQTT to the appliance
-- Recover from appliance loss and MQTT disconnect
+- Write ERD values to the shared ERD cache (change detection via `erd_cache_update`)
+- Recover from appliance loss
 
 ### 1.3 Not Responsible For
 
 - Subscription-mode operation (see `erd_bridge_subscribe`)
+- Any MQTT behavior (publishing, write requests, disconnect handling)
 - Deciding which ERDs are valid (filtered upstream by the MQTT client adapter)
-- Actual MQTT publishing (handled by the ERD cache publisher)
 - Bridge startup phase management (see `geappliances_bridge_startup_hsm`)
 
 ---
@@ -34,9 +33,7 @@ void erd_bridge_poll_init(
     erd_bridge_poll_t* self,
     tiny_timer_group_t* timer_group,
     i_tiny_gea3_erd_client_t* erd_client,
-    i_mqtt_client_t* mqtt_client,
     uint32_t polling_interval_ms,
-    bool only_publish_on_change,
     uint8_t host_address,
     uint8_t appliance_type,
     const tiny_erd_t* api_list,
@@ -49,7 +46,7 @@ void erd_bridge_poll_init(
 | `host_address` | The appliance's GEA bus address. If `tiny_gea_broadcast_address` (0xFF), the bridge performs broadcast discovery. Otherwise, it skips broadcast and proceeds directly to discovery/polling. |
 | `appliance_type` | The appliance type byte from ERD 0x0008. Used to select appliance-specific ERD lists. |
 | `api_list` / `api_list_count` | Optional pre-populated ERD list from appliance API feature bit parsing. When non-NULL, the bridge probes each ERD before polling (verifying support). When NULL, the bridge runs the full discovery chain. |
-| `cache` | Shared `erd_cache_t` for change detection when `only_publish_on_change` is true. |
+| `cache` | Shared `erd_cache_t` for storing ERD values. |
 
 ### 2.2 Destroy
 
@@ -57,15 +54,15 @@ void erd_bridge_poll_init(
 void erd_bridge_poll_destroy(erd_bridge_poll_t* self);
 ```
 
-Stops timers, unsubscribes all event handlers, and frees heap-allocated state (`erd_set`, `pending_registration_set`, `erd_polling_list`). Guards against being called on a never-initialized struct or a partially-initialized one (e.g., if a `new` allocation failed during init).
+Stops timers, unsubscribes all event handlers, and frees heap-allocated state (`erd_set`, `erd_polling_list`). Guards against being called on a never-initialized struct or a partially-initialized one (e.g., if a `new` allocation failed during init).
 
 ### 2.3 Custom ERD List
 
 After init, the caller may set `self->custom_erd_list` and `self->custom_erd_list_count` to configure user-defined ERDs. These are discovered after the standard ERD lists and appended to the polling list.
 
-### 2.5 Discovery-Complete Callback
+### 2.4 Discovery-Complete Callback
 
-After init, the caller may set `self->on_discovery_complete` and `self->on_discovery_complete_context`. This callback fires once when the HSM enters `state_polling` (discovery complete). The callback must not send signals back to the polling HSM.
+After init, the caller may set `self->on_discovery_complete` and `self->on_discovery_complete_context`. This callback fires once when the HSM enters `state_polling` (discovery complete). The callback must not send signals back to the polling HSM. It should iterate the cache via `erd_cache_get_next_entry()` to build the ERD set for HA discovery.
 
 ---
 
@@ -79,7 +76,6 @@ Handles signals that apply regardless of the current child state:
 
 | Signal | Behavior |
 |--------|----------|
-| `signal_write_requested` | Forwards the write to the ERD client. **Gated:** if `erd_host_address == tiny_gea_broadcast_address`, the request is dropped with a warning log (appliance not yet identified). |
 | `signal_appliance_lost` | Fires after `appliance_lost_timeout` (60 s) with no successful reads. Restores `erd_host_address` to `known_host_address` if set, or to broadcast. Transitions to `state_identify_appliance`. |
 
 ### 3.2 Child States
@@ -91,7 +87,7 @@ Determines the appliance's host address.
 **On entry:**
 - Sets `polling_list_complete = false`.
 - If `erd_host_address != tiny_gea_broadcast_address` (pre-known address):
-  - If this is a re-entry (`polling_list_count > 0` and `api_parsed_list != NULL`): clears `erd_set`, `pending_registration_set`, `erd_cache`, and `polling_list_count` via `clear_discovery_state()`.
+  - If this is a re-entry (`polling_list_count > 0` and `api_parsed_list != NULL`): clears `erd_set`, `erd_cache`, and `polling_list_count` via `clear_discovery_state()`.
   - If `api_parsed_list != NULL`: transitions to `state_probe_api_parsed_erds` (first entry) or `state_polling` (re-entry).
   - Otherwise: transitions to `state_add_common_erds`.
 - If `erd_host_address == tiny_gea_broadcast_address`: sends a broadcast read for ERD 0x0008 (appliance type).
@@ -110,7 +106,7 @@ Determines the appliance's host address.
 Probes the common ERD list (`commonErds` from `erd_lists.h`).
 
 **On entry:**
-- Calls `clear_discovery_state()` to reset `erd_set`, `pending_registration_set`, `erd_cache`, and `polling_list_count`.
+- Calls `clear_discovery_state()` to reset `erd_set`, `erd_cache`, and `polling_list_count`.
 - Sets `appliance_erd_list` to `commonErds`, `erd_index` to 0, and `next_discovery_state` to `state_add_energy_erds`.
 - Sends the first read.
 
@@ -165,7 +161,6 @@ Probes user-configured custom ERDs.
 
 **On entry:**
 - Rebuilds `erd_set` from the actual `erd_polling_list` (so custom ERDs are evaluated independently of failures in earlier discovery phases).
-- Clears `pending_registration_set` (custom ERDs use deferred registration).
 - Sets `appliance_erd_list` to `custom_erd_list`, `erd_index` to 0, `next_discovery_state` to `state_polling`.
 - If `custom_erd_list_count > 0`: sends the first read. Otherwise: transitions to `state_polling`.
 
@@ -220,8 +215,8 @@ state_identify_appliance
 All discovery states (except `state_probe_api_parsed_erds` for failures) delegate to this handler for `signal_read_completed` and `signal_read_failed`.
 
 **On `signal_read_completed`:**
-- Calls `add_erd_to_polling_list()` — registers the ERD on MQTT and adds it to `erd_polling_list` (deduped via `erd_set`).
-- Calls `mqtt_client_update_erd()` with the ERD value. Note: in the current adapter implementation this is a no-op (logs and increments a counter only); actual MQTT publishing is handled by the ERD cache publisher.
+- Calls `add_erd_to_polling_list()` — adds the ERD to `erd_polling_list` (deduped via `erd_set`).
+- Calls `erd_cache_update()` to write the ERD value to the cache.
 - Advances to the next ERD in the current list or transitions to `next_discovery_state`.
 
 **On `signal_read_failed`:**
@@ -237,26 +232,12 @@ Unlike the shared handler, `state_probe_api_parsed_erds` inserts failed ERDs int
 
 `erd_set` is a `std::set<tiny_erd_t>` used for deduplication:
 - `add_erd_to_polling_list()` checks `erd_set` before adding — skips if already present.
-- `add_erd_to_polling_list_no_register()` does the same, but defers MQTT registration to the first successful read.
 - `clear_discovery_state()` clears `erd_set` at the start of a new discovery phase.
 - `state_add_custom_erds` rebuilds `erd_set` from `erd_polling_list` so custom ERDs are evaluated independently of earlier failures.
 
-### 4.4 Deferred Registration
-
-ERDs added via `add_erd_to_polling_list_no_register()` are placed in `pending_registration_set`. On the first successful read in `state_polling`, the ERD is registered on MQTT and removed from the pending set. This confirms the ERD is actually present on the appliance before registering it.
-
-### 4.5 One ERD at a Time
+### 4.4 One ERD at a Time
 
 During discovery, only one ERD read is outstanding at any time. The next read is issued only after receiving a definitive response (`signal_read_completed` or `signal_read_failed`). No timers are used to advance the discovery index.
-
-### 4.6 Data Flow
-
-The polling bridge has two paths for ERD data:
-
-**Discovery phase:** Calls `mqtt_client_update_erd()` directly. In the current adapter implementation this is a no-op (logs and increments a counter only). The ERD value is **not** written to the ERD cache during discovery.
-
-**Steady-state polling:** Calls `erd_cache_update()` to store the value in the shared ERD cache, then calls `mqtt_client_update_erd()` (also a no-op). The ERD cache publisher (`erd_cache_mqtt_publisher_loop`, called from `GeappliancesBridge::loop()`) iterates cache entries marked `update_required=true` and publishes them to MQTT as hex-encoded payloads. This is the only path that actually publishes ERD values to MQTT.
-
 
 ---
 
@@ -265,7 +246,7 @@ The polling bridge has two paths for ERD data:
 ### 5.1 Entry
 
 On entering `state_polling`:
-- If `api_parsed_list != NULL`: iterates all entries through `add_erd_to_polling_list_no_register()` (deduped via `erd_set`).
+- If `api_parsed_list != NULL`: iterates all entries through `add_erd_to_polling_list()` (deduped via `erd_set`).
 - Resets `erd_index = 0`, `cycle_completed_count = 0`, `restart_pending = false`.
 - Arms the polling timer for `polling_interval_ms`.
 - Sets `polling_list_complete = true`.
@@ -298,25 +279,15 @@ A polling cycle consists of sending reads for all ERDs in `erd_polling_list` and
 
 **On `signal_read_completed`:**
 - Resets the appliance-lost timer.
-- If the ERD is in `pending_registration_set`: registers it on MQTT and removes it from the pending set.
 - If the ERD is not in `erd_set`: adds it to the polling list via `add_erd_to_polling_list()` (handles late discovery responses that arrive during polling).
-- Updates the ERD cache via `erd_cache_update()`. If `only_publish_on_change` is true, the subsequent `mqtt_client_update_erd()` call is skipped when the value hasn't changed. Note: `mqtt_client_update_erd()` is a no-op in the current adapter; actual MQTT publishing is handled by the ERD cache publisher iterating `update_required` entries.
+- Updates the ERD cache via `erd_cache_update()`.
+- Increments `cycle_completed_count`; if cycle is complete, calls `on_polling_cycle_complete()`.
 
 **On `signal_read_failed`:**
 - Resets the appliance-lost timer.
 - Logs the failed ERD at debug level.
 - Increments `cycle_completed_count`; if cycle is complete, calls `on_polling_cycle_complete()`.
 - **Does not remove the ERD from the polling list.** Failed ERDs remain in the list and are retried each cycle.
-
-### 5.4 MQTT Disconnect
-
-On `signal_mqtt_disconnected`: the bridge continues polling. ERD values are queued in the MQTT client's `pending_updates` and flushed on reconnect. No re-identification or re-discovery is triggered.
-
-### 5.5 Appliance Lost
-
-On `signal_appliance_lost` (fired by `appliance_lost_timer` after 60 s with no successful reads):
-- Restores `erd_host_address` to `known_host_address` if non-zero, otherwise to `tiny_gea_broadcast_address`.
-- Transitions to `state_identify_appliance`, which re-runs discovery.
 
 ---
 
@@ -332,16 +303,12 @@ On `signal_appliance_lost` (fired by `appliance_lost_timer` after 60 s with no s
 
 - `erd_set`: `std::set<tiny_erd_t>` stored as `void*` in the struct. Used for deduplication during discovery and polling list management.
 
-### 6.3 Pending Registration Set
-
-- `pending_registration_set`: `std::set<tiny_erd_t>` stored as `void*` in the struct. Tracks ERDs added to the polling list without MQTT registration; registered on first successful read.
-
-### 6.4 Timers
+### 6.3 Timers
 
 - `polling_timer`: armed for `polling_interval_ms` after each cycle starts. Fires `signal_polling_timer_expired`.
 - `appliance_lost_timer`: armed for `appliance_lost_timeout` (60 s) on each successful read. Fires `signal_appliance_lost`.
 
-### 6.5 Health Metrics
+### 6.4 Health Metrics
 
 - `cycle_start_ms`: `millis()` when the current cycle's first read was sent.
 - `last_cycle_time_ms`: duration of the last completed cycle in milliseconds.
@@ -366,11 +333,9 @@ On `signal_appliance_lost` (fired by `appliance_lost_timer` after 60 s with no s
 
 1. **No overlapping cycles:** A new cycle does not start until the previous one has completed (all ERDs have responded) and the timer has expired (or `restart_pending` is set).
 2. **One read at a time during discovery:** The next discovery read is issued only after the previous one has a definitive response.
-3. **No writes before identification:** Write requests are dropped if `erd_host_address == tiny_gea_broadcast_address`.
-4. **No broadcast on re-identification with known address:** If `known_host_address` is set, appliance loss recovery uses that address instead of broadcast.
-5. **No polling list growth on MQTT reconnect:** `erd_set` is not cleared on MQTT disconnect, preventing duplicate ERD additions on re-entry to `state_polling`.
-6. **Failed discovery ERDs are not excluded from later phases:** In `handle_discovery_list_signals`, failed ERDs are not inserted into `erd_set`, allowing them to be independently re-probed in later discovery phases (e.g., as custom ERDs).
-7. **Failed probe ERDs are excluded:** In `state_probe_api_parsed_erds`, failed ERDs are inserted into `erd_set` as exclusions, permanently preventing them from being added to the polling list.
+3. **No polling list growth on MQTT reconnect:** `erd_set` is not cleared on MQTT disconnect, preventing duplicate ERD additions on re-entry to `state_polling`.
+4. **Failed discovery ERDs are not excluded from later phases:** In `handle_discovery_list_signals`, failed ERDs are not inserted into `erd_set`, allowing them to be independently re-probed in later discovery phases (e.g., as custom ERDs).
+5. **Failed probe ERDs are excluded:** In `state_probe_api_parsed_erds`, failed ERDs are inserted into `erd_set` as exclusions, permanently preventing them from being added to the polling list.
 
 ---
 
@@ -379,12 +344,11 @@ On `signal_appliance_lost` (fired by `appliance_lost_timer` after 60 s with no s
 | Dependency | Role |
 |------------|------|
 | `i_tiny_gea3_erd_client` | GEA3 ERD client interface (read, write, activity events) |
-| `i_mqtt_client` | MQTT client adapter (register ERD, update ERD, write request events) |
 | `tiny_hsm` | Hierarchical state machine |
 | `tiny_timer` | Timer group and timer instances |
-| `erd_bridge_common.h` | Shared signals, timing constants, utility templates (`erd_set`, `arm_timer`, `setup_write_request_subscription`, `setup_disconnect_subscription`) |
+| `erd_bridge_common.h` | Shared signals, timing constants, utility templates (`erd_set`, `arm_timer`) |
 | `erd_lists.h` | Static ERD lists (`commonErds`, `energyErds`, `applianceApiFeatureErds`, `applianceTypeToErdGroupTranslation`, `maximumApplianceType`, `POLLING_LIST_MAX_SIZE`) |
-| `erd_cache.h` | ERD cache for change detection (`erd_cache_init`, `erd_cache_update`) |
+| `erd_cache.h` | ERD cache for change detection (`erd_cache_init`, `erd_cache_update`, `erd_cache_get_next_entry`) |
 
 ---
 
@@ -392,5 +356,4 @@ On `signal_appliance_lost` (fired by `appliance_lost_timer` after 60 s with no s
 
 1. **Single appliance assumption:** Broadcast identification reads the appliance type from the first response to ERD 0x0008. In multi-appliance environments, this may not be the intended target.
 2. **Failed ERDs never evicted:** An ERD that permanently fails during steady-state polling (e.g., removed by a firmware update) remains in the polling list indefinitely, consuming bus bandwidth and inflating cycle time.
-3. **Burst MQTT re-registrations on re-entry:** After appliance loss recovery with `api_parsed_list`, all ERDs are re-added via deferred registration, causing a burst of MQTT registrations as they respond.
-4. **Invalid appliance type skips discovery:** When `appliance_type >= maximumApplianceType`, appliance-specific ERD discovery is skipped entirely rather than falling back to a default set.
+3. **Invalid appliance type skips discovery:** When `appliance_type >= maximumApplianceType`, appliance-specific ERD discovery is skipped entirely rather than falling back to a default set.

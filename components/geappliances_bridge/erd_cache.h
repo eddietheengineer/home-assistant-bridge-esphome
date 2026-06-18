@@ -64,6 +64,12 @@ erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* itera
 
 // Returns the number of valid entries currently in the cache.
 uint16_t erd_cache_get_count(erd_cache_t* self);
+// Returns the next valid entry in the cache, iterating all entries.
+// Caller provides an iterator (uint16_t) initialized to 0.
+// Returns NULL when no more valid entries remain (resets iterator to 0).
+// Unlike erd_cache_get_next_updated(), this does NOT require update_required=true
+// and does NOT clear any flags — it is a read-only iteration.
+erd_cache_entry_t* erd_cache_get_next_entry(erd_cache_t* self, uint16_t* iterator);
 
 // Returns the number of cache updates that occurred in the last 60 seconds,
 // then resets the window counter.

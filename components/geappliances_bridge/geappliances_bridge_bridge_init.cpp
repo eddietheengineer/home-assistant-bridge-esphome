@@ -33,6 +33,17 @@
 
 namespace esphome {
 namespace geappliances_bridge {
+static std::set<tiny_erd_t> erd_cache_to_set(erd_cache_t* cache)
+{
+  std::set<tiny_erd_t> erds;
+  uint16_t iterator = 0;
+  while (true) {
+    erd_cache_entry_t* entry = erd_cache_get_next_entry(cache, &iterator);
+    if (!entry) break;
+    erds.insert(entry->erd);
+  }
+  return erds;
+}
 
 
 // ---------------------------------------------------------------------------
@@ -169,9 +180,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
       &this->erd_bridge_poll_,
       &this->timer_group_,
       this->autodiscovery_manager_.get_active_erd_client(),
-      &this->mqtt_client_adapter_.interface,
       this->polling_interval_ms_,
-      this->polling_only_publish_on_change_,
       this->autodiscovery_manager_.get_host_address(),
       this->device_identity_manager_.get_appliance_type(),
       nullptr,
@@ -181,7 +190,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
     // ERD discovery to finish before transitioning to steady-state.
     this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
       auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
-      bridge->ha_discovery_manager_.set_registered_erds(bridge->erd_registry_.registered_erds());
+      bridge->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&bridge->erd_cache_));
       tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
     };
     this->erd_bridge_poll_.on_discovery_complete_context = this;
@@ -197,7 +206,6 @@ void GeappliancesBridge::initialize_erd_bridge_()
       &this->erd_bridge_subscribe_,
       &this->timer_group_,
       this->autodiscovery_manager_.get_active_erd_client(),
-      &this->mqtt_client_adapter_.interface,
       this->autodiscovery_manager_.get_host_address(),
       &this->erd_cache_);
     this->subscription_bridge_initialized_ = true;
@@ -217,7 +225,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
         this->device_identity_manager_.get_device_id(),
         this->device_identity_manager_.get_model_number(),
         this->device_identity_manager_.get_serial_number(),
-        this->erd_registry_.registered_erds(),
+        erd_cache_to_set(&this->erd_cache_),
         true);
     this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
     ESP_LOGI(TAG, "HA discovery deferred: will publish after ERD discovery completes "
@@ -283,9 +291,7 @@ void GeappliancesBridge::start_custom_erd_polling_()
       &this->erd_bridge_poll_,
       &this->timer_group_,
       this->autodiscovery_manager_.get_active_erd_client(),
-      &this->mqtt_client_adapter_.interface,
       this->polling_interval_ms_,
-      this->polling_only_publish_on_change_,
       this->autodiscovery_manager_.get_host_address(),
       this->device_identity_manager_.get_appliance_type(),
       this->custom_erds_vec_.data(),
@@ -358,9 +364,7 @@ void GeappliancesBridge::check_subscription_activity_()
       &this->erd_bridge_poll_,
       &this->timer_group_,
       this->autodiscovery_manager_.get_active_erd_client(),
-      &this->mqtt_client_adapter_.interface,
       this->polling_interval_ms_,
-      this->polling_only_publish_on_change_,
       this->autodiscovery_manager_.get_host_address(),
       this->device_identity_manager_.get_appliance_type(),
       nullptr,
@@ -371,7 +375,7 @@ void GeappliancesBridge::check_subscription_activity_()
   // works correctly after subscription fallback.
   this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
     auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
-    bridge->ha_discovery_manager_.set_registered_erds(bridge->erd_registry_.registered_erds());
+    bridge->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&bridge->erd_cache_));
     tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
   };
   this->erd_bridge_poll_.on_discovery_complete_context = this;

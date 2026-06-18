@@ -100,11 +100,7 @@ static void ensure_polling_list_capacity(erd_bridge_poll_t* self, uint16_t neede
   self->polling_list_capacity = (uint16_t)new_capacity;
 }
 
-static set<tiny_erd_t>& pending_registration_set(erd_bridge_poll_t* self)
-{
-  return *reinterpret_cast<set<tiny_erd_t>*>(self->pending_registration_set);
-}
-/* Reset the polling list, erd_set, pending_registration_set, and cache.
+/* Reset the polling list, erd_set, and cache.
  * Called from the canonical discovery entry points so that a new discovery
  * phase always starts from a clean slate.  There are two callers:
  *   - state_add_common_erds (full-discovery path)
@@ -114,30 +110,14 @@ static set<tiny_erd_t>& pending_registration_set(erd_bridge_poll_t* self)
 static void clear_discovery_state(erd_bridge_poll_t* self)
 {
   erd_set(self).clear();
-  pending_registration_set(self).clear();
   erd_cache_init(self->erd_cache);
   self->polling_list_count = 0;
 }
 
-static void add_erd_to_polling_list_no_register(erd_bridge_poll_t* self, tiny_erd_t erd)
-{
-  /* Add to erd_set to prevent add_erd_to_polling_list() from treating this
-   * as a new ERD.  Add to pending_registration_set so signal_read_completed
-   * knows to register on MQTT.  Do NOT register on MQTT yet — that's deferred
-   * until the ERD is first successfully read. */
-  if (erd_set(self).find(erd) == erd_set(self).end()) {
-    erd_set(self).insert(erd);
-    pending_registration_set(self).insert(erd);
-    ensure_polling_list_capacity(self, self->polling_list_count + 1);
-    self->erd_polling_list[self->polling_list_count] = erd;
-    self->polling_list_count++;
-  }
-}
 
 static void add_erd_to_polling_list(erd_bridge_poll_t* self, tiny_erd_t erd)
 {
   if (erd_set(self).find(erd) == erd_set(self).end()) {
-    mqtt_client_register_erd(self->mqtt_client, erd);
     erd_set(self).insert(erd);
     // Ensure there's room in the dynamic array.
     ensure_polling_list_capacity(self, self->polling_list_count + 1);
@@ -296,11 +276,8 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
   switch (signal) {
     case signal_read_completed:
       add_erd_to_polling_list(self, args->read_completed.erd);
-      mqtt_client_update_erd(
-        self->mqtt_client,
-        args->read_completed.erd,
-        args->read_completed.data,
-        args->read_completed.data_size);
+      erd_cache_update(self->erd_cache, args->read_completed.erd,
+        reinterpret_cast<const uint8_t*>(args->read_completed.data), args->read_completed.data_size, /* from_subscription= */ false);
       if (!send_next_read_request(self)) {
         tiny_hsm_transition(hsm, self->next_discovery_state);
       }
@@ -324,25 +301,11 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
 
   return tiny_hsm_result_signal_consumed;
 }
-static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
+static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, [[maybe_unused]] const void* data)
 {
   erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
 
   switch (signal) {
-    case signal_write_requested: {
-      // Gate writes on appliance identification: if the host address is still
-      // the broadcast address, the appliance has not been identified yet and
-      // writes would go to 0xFF (undeliverable).  Silently drop the request;
-      // it will be retried by the MQTT client or the caller.
-      if (self->erd_host_address == tiny_gea_broadcast_address) {
-        ESP_LOGW(TAG, "Dropping write request for ERD 0x%04x: appliance not identified",
-                 reinterpret_cast<const mqtt_client_on_write_request_args_t*>(data)->erd);
-        break;
-      }
-      auto args = reinterpret_cast<const mqtt_client_on_write_request_args_t*>(data);
-      tiny_gea3_erd_client_write(self->erd_client, &self->request_id, self->erd_host_address, args->erd, args->value, args->size);
-    } break;
-
     case signal_appliance_lost:
       // When a pre-known host address was supplied at init (custom ERD bridge
       // alongside a subscription bridge), preserve it on re-identification so
@@ -569,13 +532,11 @@ static tiny_hsm_result_t state_add_custom_erds(tiny_hsm_t* hsm, tiny_hsm_signal_
     // Rebuild erd_set from the actual polling list so that custom ERDs are
     // evaluated independently of failures in earlier discovery phases.  A
     // failed ERD from probe or standard discovery should not block the same
-    // ERD from being independently probed as a custom ERD.  The pending
-    // registration set is cleared because custom ERDs use deferred registration.
+    // ERD from being independently probed as a custom ERD.
     erd_set(self).clear();
     for (uint16_t i = 0; i < self->polling_list_count; i++) {
       erd_set(self).insert(self->erd_polling_list[i]);
     }
-    pending_registration_set(self).clear();
     self->appliance_erd_list       = self->custom_erd_list;
     self->appliance_erd_list_count = self->custom_erd_list_count;
     self->erd_index                = 0;
@@ -641,10 +602,10 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       // they are also skipped (correctly excluded from polling).
       // This path is primarily useful on re-entry after appliance lost,
       // where erd_set has been cleared and all api_parsed_list ERDs are
-      // re-added with deferred MQTT registration for lazy re-registration.
+      // re-added to the polling list.
       if (self->api_parsed_list != nullptr) {
         for (uint16_t i = 0; i < self->api_parsed_list_count; i++) {
-          add_erd_to_polling_list_no_register(self, self->api_parsed_list[i]);
+          add_erd_to_polling_list(self, self->api_parsed_list[i]);
         }
       }
       self->erd_index = 0;
@@ -712,20 +673,11 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       const uint8_t*  erd_data  = reinterpret_cast<const uint8_t*>(args->read_completed.data);
       uint8_t         data_size = args->read_completed.data_size;
 
-      if (pending_registration_set(self).find(erd) != pending_registration_set(self).end()) {
-        mqtt_client_register_erd(self->mqtt_client, erd);
-        pending_registration_set(self).erase(erd);
-      } else if (erd_set(self).find(erd) == erd_set(self).end()) {
+      if (erd_set(self).find(erd) == erd_set(self).end()) {
         add_erd_to_polling_list(self, erd);
       }
 
-
-      bool data_changed = erd_cache_update(self->erd_cache, erd, erd_data, data_size, /* from_subscription= */ false);
-      bool should_publish = self->only_publish_on_change ? data_changed : true;
-
-      if (should_publish) {
-        mqtt_client_update_erd(self->mqtt_client, erd, erd_data, data_size);
-      }
+      erd_cache_update(self->erd_cache, erd, erd_data, data_size, /* from_subscription= */ false);
       self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
         on_polling_cycle_complete(self, self->restart_pending || !self->polling_timer_armed);
@@ -742,15 +694,6 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       }
       break;
     }
-
-    case signal_mqtt_disconnected:
-      // MQTT broker lost connection; the appliance is still on the GEA bus
-      // and already identified.  Continue polling — ERD values are queued in
-      // pending_updates and flushed to MQTT when the broker reconnects.
-      // Transitioning to state_identify_appliance here would unnecessarily
-      // broadcast to 0xFF and re-register all ERDs, causing multi-second
-      // delays and spurious re-registrations on every MQTT blip.
-      break;
 
     case tiny_hsm_signal_exit:
       break;
@@ -794,9 +737,7 @@ static void erd_bridge_poll_init_impl(
   erd_bridge_poll_t*    self,
   tiny_timer_group_t*       timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
-  i_mqtt_client_t*          mqtt_client,
   uint32_t                  polling_interval_ms,
-  bool                      only_publish_on_change,
   uint8_t                   initial_host_address,
   uint8_t                   initial_appliance_type,
   const tiny_erd_t*         api_parsed_list,
@@ -805,9 +746,7 @@ static void erd_bridge_poll_init_impl(
 {
   self->timer_group            = timer_group;
   self->erd_client             = erd_client;
-  self->mqtt_client            = mqtt_client;
   self->polling_interval_ms    = polling_interval_ms;
-  self->only_publish_on_change = only_publish_on_change;
   // Must be set before tiny_hsm_init() so state_identify_appliance entry
   // can decide whether to broadcast or skip straight to discovery/polling.
   self->erd_host_address       = initial_host_address;
@@ -824,7 +763,6 @@ static void erd_bridge_poll_init_impl(
   self->polling_list_count     = 0;
   self->polling_list_capacity  = 0;
   self->erd_set                = nullptr;
-  self->pending_registration_set = nullptr;
   self->restart_pending             = false;
   self->cycle_sending_in_progress   = false;
   self->polling_timer_armed         = false;
@@ -835,7 +773,6 @@ static void erd_bridge_poll_init_impl(
   self->cycle_count                 = 0;
   self->erd_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
   self->erd_cache = cache;
-  self->pending_registration_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
   self->on_discovery_complete        = nullptr;
   self->on_discovery_complete_context = nullptr;
 
@@ -851,16 +788,9 @@ static void erd_bridge_poll_init_impl(
         case tiny_gea3_erd_client_activity_type_read_failed:
           tiny_hsm_send_signal(&self->hsm, signal_read_failed, args);
           break;
-        case tiny_gea3_erd_client_activity_type_write_completed:
-        case tiny_gea3_erd_client_activity_type_write_failed:
-          handle_write_result(self->mqtt_client, args);
-          break;
       }
     });
   tiny_event_subscribe(tiny_gea3_erd_client_on_activity(erd_client), &self->erd_client_activity_subscription);
-
-  setup_write_request_subscription(self, mqtt_client);
-  setup_disconnect_subscription(self, mqtt_client);
 
   tiny_hsm_init(&self->hsm, &poll_hsm_configuration, state_identify_appliance);
 }
@@ -869,9 +799,7 @@ void erd_bridge_poll_init(
   erd_bridge_poll_t*    self,
   tiny_timer_group_t*       timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
-  i_mqtt_client_t*          mqtt_client,
   uint32_t                  polling_interval_ms,
-  bool                      only_publish_on_change,
   uint8_t                   host_address,
   uint8_t                   appliance_type,
   const tiny_erd_t*         api_list,
@@ -879,7 +807,7 @@ void erd_bridge_poll_init(
   erd_cache_t*              cache)
 {
   erd_bridge_poll_init_impl(
-    self, timer_group, erd_client, mqtt_client, polling_interval_ms, only_publish_on_change,
+    self, timer_group, erd_client, polling_interval_ms,
     host_address, appliance_type, api_list, api_list_count, cache);
 }
 
@@ -896,23 +824,15 @@ void erd_bridge_poll_destroy(erd_bridge_poll_t* self)
   tiny_timer_stop(self->timer_group, &self->appliance_lost_timer);
   tiny_timer_stop(self->timer_group, &self->polling_timer);
 
-  // Remove all event subscriptions before freeing heap state.
-  //
-  // erd_bridge_poll_init() subscribes three event callbacks that reference
-  // this struct: erd_client_activity_subscription,
-  // mqtt_write_request_subscription, and mqtt_disconnect_subscription.  If
-  // these remain registered after destroy(), any subsequent event fires the
-  // HSM which dereferences self->erd_set (freed below) — a
-  // use-after-free that corrupts the heap.
+  // Remove event subscription before freeing heap state.
+  // erd_bridge_poll_init() subscribes one event callback that references
+  // this struct: erd_client_activity_subscription.  If this remains
+  // registered after destroy(), any subsequent event fires the HSM which
+  // dereferences self->erd_set (freed below) — a use-after-free that
+  // corrupts the heap.
   tiny_event_unsubscribe(
     tiny_gea3_erd_client_on_activity(self->erd_client),
     &self->erd_client_activity_subscription);
-  tiny_event_unsubscribe(
-    mqtt_client_on_write_request(self->mqtt_client),
-    &self->mqtt_write_request_subscription);
-  tiny_event_unsubscribe(
-    mqtt_client_on_mqtt_disconnect(self->mqtt_client),
-    &self->mqtt_disconnect_subscription);
 
   // Guard against partial init (e.g., if the first new set<tiny_erd_t>()
   // failed and init returned early).  delete nullptr is safe in C++, but
@@ -920,10 +840,6 @@ void erd_bridge_poll_destroy(erd_bridge_poll_t* self)
   if (self->erd_set) {
     delete reinterpret_cast<set<tiny_erd_t>*>(self->erd_set);
     self->erd_set = nullptr;
-  }
-  if (self->pending_registration_set) {
-    delete reinterpret_cast<set<tiny_erd_t>*>(self->pending_registration_set);
-    self->pending_registration_set = nullptr;
   }
 
   if (self->erd_polling_list != nullptr) {

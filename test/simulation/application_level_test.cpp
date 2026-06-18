@@ -14,7 +14,6 @@ extern "C" {
 
 #include "CppUTest/TestHarness.h"
 #include "CppUTestExt/MockSupport.h"
-#include "double/mqtt_client_double.hpp"
 #include "double/tiny_gea3_erd_client_double.hpp"
 #include "double/tiny_timer_group_double.hpp"
 
@@ -47,7 +46,6 @@ TEST_GROUP(application_level)
   
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
-  mqtt_client_double_t mqtt_client;
   
   uint8_t dummy;
   
@@ -57,7 +55,6 @@ TEST_GROUP(application_level)
     
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
-    mqtt_client_double_init(&mqtt_client);
     erd_cache_init(&test_cache);
   }
   
@@ -78,7 +75,6 @@ TEST_GROUP(application_level)
       &erd_bridge_subscribe,
       &timer_group.timer_group,
       &erd_client.interface,
-      &mqtt_client.interface,
       appliance_address,
       &test_cache);
   }
@@ -92,9 +88,7 @@ TEST_GROUP(application_level)
       &erd_bridge_poll,
       &timer_group.timer_group,
       &erd_client.interface,
-      &mqtt_client.interface,
       polling_interval,
-      false,
       0xFF, 0, nullptr, 0,
       &test_cache);
   }
@@ -212,18 +206,10 @@ TEST(application_level, should_handle_erd_publications_in_subscription_mode)
 
   // Simulate an ERD publication from the appliance.
   uint8_t temp_value = 0x1A;
-  mock()
-    .expectOneCall("register_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_TEMPERATURE);
-  mock()
-    .expectOneCall("update_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_TEMPERATURE)
-    .withMemoryBufferParameter("value", &temp_value, sizeof(temp_value));
   simulate_erd_publication(ERD_TEMPERATURE, &temp_value, sizeof(temp_value));
 
-  mock().checkExpectations();
+  // Verify the ERD is in the cache
+  CHECK(erd_cache_get_count(&test_cache) == 1);
 }
 
 /*!
@@ -242,32 +228,6 @@ TEST(application_level, should_poll_erds_periodically_in_polling_mode)
   CHECK(strcmp(erd_bridge_poll.current_state_name, "identify_appliance") == 0);
 }
 
-/*!
- * Test that ERD writes from MQTT are correctly forwarded to the appliance.
- */
-TEST(application_level, should_forward_mqtt_write_requests_to_appliance)
-{
-  mock().disable();
-  initialize_erd_bridge_subscription_mode();
-  mock().enable();
-  
-  // Simulate an MQTT write request
-  uint8_t write_data[] = {0x12, 0x34};
-  tiny_erd_t target_erd = ERD_TEMPERATURE;
-  
-  // Expect the bridge to forward the write request
-  // Note: The write function has an output parameter for request_id that we ignore here
-  mock()
-    .expectOneCall("write")
-    .onObject(&erd_client)
-    .ignoreOtherParameters()
-    .andReturnValue(true);
-  
-  // Trigger the write request
-  mqtt_client_double_trigger_write_request(&mqtt_client, target_erd, sizeof(write_data), write_data);
-  
-  mock().checkExpectations();
-}
 
 /*!
  * Test the complete workflow of subscription with publications.
@@ -282,20 +242,8 @@ TEST(application_level, should_complete_subscription_workflow_with_publications)
   
   // Appliance publishes an ERD update
   uint8_t temperature_data[] = {0x00, 0x50};  // Big-endian 80 (degrees)
-  
-  // Expect the ERD to be registered first, then updated
-  mock()
-    .expectOneCall("register_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_TEMPERATURE);
-  
-  mock()
-    .expectOneCall("update_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_TEMPERATURE)
-    .withMemoryBufferParameter("value", temperature_data, sizeof(temperature_data));
-  
   simulate_erd_publication(ERD_TEMPERATURE, temperature_data, sizeof(temperature_data));
-  
-  mock().checkExpectations();
+
+  // Verify the ERD is in the cache
+  CHECK(erd_cache_get_count(&test_cache) == 1);
 }

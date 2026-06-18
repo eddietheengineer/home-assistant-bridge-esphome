@@ -1,10 +1,10 @@
 /*!
  * @file
- * @brief MQTT subscription bridge implementation.
+ * @brief ERD subscription bridge implementation.
  *
  * Manages the GEA3 ERD subscription lifecycle: subscribing, retaining the
- * subscription every 30 s, and publishing received ERD values via MQTT.
- * The polling bridge lives in erd_bridge_poll.cpp; shared signals and
+ * subscription every 30 s, and publishing received ERD values to the ERD
+ * cache.  The polling bridge lives in erd_bridge_poll.cpp; shared signals and
  * utility templates are in erd_bridge_common.h.
  */
 
@@ -34,7 +34,6 @@ static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       auto erd = args->subscription_publication_received.erd;
 
       if(erd_set(self).find(erd) == erd_set(self).end()) {
-        mqtt_client_register_erd(self->mqtt_client, erd);
         erd_set(self).insert(erd);
       }
 
@@ -42,16 +41,6 @@ static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         reinterpret_cast<const uint8_t*>(args->subscription_publication_received.data),
         args->subscription_publication_received.data_size,
         true);  // is_subscription = true
-      mqtt_client_update_erd(
-        self->mqtt_client,
-        erd,
-        args->subscription_publication_received.data,
-        args->subscription_publication_received.data_size);
-    } break;
-    case signal_write_requested: {
-      auto args = reinterpret_cast<const mqtt_client_on_write_request_args_t*>(data);
-      tiny_gea3_erd_client_request_id_t request_id;
-      tiny_gea3_erd_client_write(self->erd_client, &request_id, self->erd_host_address, args->erd, args->value, args->size);
     } break;
 
     default:
@@ -76,11 +65,6 @@ static tiny_hsm_result_t state_subscribing(tiny_hsm_t* hsm, tiny_hsm_signal_t si
       __attribute__((fallthrough));
     case tiny_hsm_signal_entry:
       // Intentionally fall through to the subscribe case below.
-      // Do NOT clear erd_set on entry when the transition was triggered by
-      // signal_mqtt_disconnected: the appliance hasn't changed, only the MQTT
-      // broker connection was lost.  Clearing the set on every MQTT reconnect
-      // causes every ERD to be "re-registered" (logged) as subscription
-      // publications arrive, creating slow-looking logs (~2-3 s per ERD).
       __attribute__((fallthrough));
     case signal_subscription_failed:
     case signal_timer_expired:
@@ -128,7 +112,6 @@ static tiny_hsm_result_t state_subscribed(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
       break;
 
     case signal_subscription_host_came_online:
-    case signal_mqtt_disconnected:
       tiny_hsm_transition(hsm, state_subscribing);
       break;
 
@@ -157,13 +140,11 @@ void erd_bridge_subscribe_init(
   erd_bridge_subscribe_t* self,
   tiny_timer_group_t* timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
-  i_mqtt_client_t* mqtt_client,
   uint8_t address,
   erd_cache_t* cache)
 {
   self->timer_group = timer_group;
   self->erd_client = erd_client;
-  self->mqtt_client = mqtt_client;
   self->erd_host_address = address;
   self->erd_cache = cache;
   self->erd_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
@@ -193,17 +174,12 @@ void erd_bridge_subscribe_init(
         case tiny_gea3_erd_client_activity_type_subscribe_failed:
           tiny_hsm_send_signal(&self->hsm, signal_subscription_failed, nullptr);
           break;
-
         case tiny_gea3_erd_client_activity_type_write_completed:
         case tiny_gea3_erd_client_activity_type_write_failed:
-          handle_write_result(self->mqtt_client, args);
           break;
       }
     });
   tiny_event_subscribe(tiny_gea3_erd_client_on_activity(erd_client), &self->erd_client_activity_subscription);
-
-  setup_write_request_subscription(self, mqtt_client);
-  setup_disconnect_subscription(self, mqtt_client);
 
   tiny_hsm_init(&self->hsm, &sub_hsm_configuration, state_subscribing);
 }
@@ -222,20 +198,13 @@ void erd_bridge_subscribe_destroy(erd_bridge_subscribe_t* self)
 
   // Remove all event subscriptions before freeing heap state.
   //
-  // erd_bridge_subscribe_init() subscribes three event callbacks that reference this
-  // struct: erd_client_activity_subscription, mqtt_write_request_subscription,
-  // and mqtt_disconnect_subscription.  If these remain registered after
-  // destroy(), any subsequent event fires the HSM which dereferences
+  // erd_bridge_subscribe_init() subscribes one event callback that references
+  // this struct: erd_client_activity_subscription.  If it remains registered
+  // after destroy(), any subsequent event fires the HSM which dereferences
   // self->erd_set (freed below) — a use-after-free that corrupts the heap.
   tiny_event_unsubscribe(
     tiny_gea3_erd_client_on_activity(self->erd_client),
     &self->erd_client_activity_subscription);
-  tiny_event_unsubscribe(
-    mqtt_client_on_write_request(self->mqtt_client),
-    &self->mqtt_write_request_subscription);
-  tiny_event_unsubscribe(
-    mqtt_client_on_mqtt_disconnect(self->mqtt_client),
-    &self->mqtt_disconnect_subscription);
 
   delete reinterpret_cast<set<tiny_erd_t>*>(self->erd_set);
   self->erd_set = nullptr;
