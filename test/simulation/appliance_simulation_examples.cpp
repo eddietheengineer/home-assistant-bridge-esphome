@@ -93,13 +93,14 @@ TEST_GROUP(appliance_simulation_examples)
   
   void initialize_erd_bridge_polling_mode()
   {
-    erd_bridge_poll_init_legacy(
+    erd_bridge_poll_init(
       &erd_bridge_poll,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
       false,
+      0xFF, 0, nullptr, 0,
       &test_cache);
   }
   

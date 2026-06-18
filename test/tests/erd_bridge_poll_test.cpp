@@ -49,13 +49,14 @@ TEST_GROUP(erd_bridge_poll)
 
   void when_the_bridge_is_initialized(bool only_publish_on_change = false)
   {
-    erd_bridge_poll_init_legacy(
+    erd_bridge_poll_init(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
       only_publish_on_change,
+      0xFF, 0, nullptr, 0,
       &test_cache);
   }
 
@@ -335,13 +336,14 @@ TEST_GROUP(erd_bridge_poll_api_list)
 
   void when_the_bridge_is_initialized()
   {
-    erd_bridge_poll_init_legacy(
+    erd_bridge_poll_init(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
       false,
+      0xFF, 0, nullptr, 0,
       &test_cache);
     // Set the API-parsed list AFTER init (api_parsed_list is always zeroed in init)
     self.api_parsed_list = api_list;
@@ -590,13 +592,14 @@ TEST_GROUP(erd_bridge_poll_custom_erds)
 
   void when_the_bridge_is_initialized_with_api_list_and_custom_erds()
   {
-    erd_bridge_poll_init_legacy(
+    erd_bridge_poll_init(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
       false,
+      0xFF, 0, nullptr, 0,
       &test_cache);
     self.api_parsed_list = api_list;
     self.api_parsed_list_count = 1;
@@ -606,13 +609,14 @@ TEST_GROUP(erd_bridge_poll_custom_erds)
 
   void when_the_bridge_is_initialized_with_custom_erds_only()
   {
-    erd_bridge_poll_init_legacy(
+    erd_bridge_poll_init(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
       false,
+      0xFF, 0, nullptr, 0,
       &test_cache);
     self.custom_erd_list = custom_list;
     self.custom_erd_list_count = 2;
@@ -790,13 +794,14 @@ TEST(erd_bridge_poll_custom_erds, should_ignore_spurious_read_completed_during_i
 {
   // Init sends broadcast identification read.
   should_request_read(0xFF, 0x0008);
-  erd_bridge_poll_init_legacy(
+  erd_bridge_poll_init(
     &self,
     &timer_group.timer_group,
     &erd_client.interface,
     &mqtt_client.interface,
     polling_interval,
     false,
+    0xFF, 0, nullptr, 0,
     &test_cache);
   self.api_parsed_list = custom_list;
   self.api_parsed_list_count = 2;
@@ -998,13 +1003,14 @@ TEST_GROUP(erd_bridge_poll_sequential)
 
   void when_the_bridge_is_initialized()
   {
-    erd_bridge_poll_init_legacy(
+    erd_bridge_poll_init(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
       polling_interval,
       false,
+      0xFF, 0, nullptr, 0,
       &test_cache);
     self.api_parsed_list = api_list;
     self.api_parsed_list_count = 3;

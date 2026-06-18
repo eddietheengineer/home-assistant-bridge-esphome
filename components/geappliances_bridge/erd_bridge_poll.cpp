@@ -883,20 +883,6 @@ void erd_bridge_poll_init(
     host_address, appliance_type, api_list, api_list_count, cache);
 }
 
-void erd_bridge_poll_init_legacy(
-  erd_bridge_poll_t*    self,
-  tiny_timer_group_t*       timer_group,
-  i_tiny_gea3_erd_client_t* erd_client,
-  i_mqtt_client_t*          mqtt_client,
-  uint32_t                  polling_interval_ms,
-  bool                      only_publish_on_change,
-  erd_cache_t*              cache)
-{
-  erd_bridge_poll_init_impl(
-    self, timer_group, erd_client, mqtt_client, polling_interval_ms, only_publish_on_change,
-    tiny_gea_broadcast_address, 0, nullptr, 0, cache);
-}
-
 void erd_bridge_poll_destroy(erd_bridge_poll_t* self)
 {
   // Guard against destroy() being called on a never-initialized struct (e.g.

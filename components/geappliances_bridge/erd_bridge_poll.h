@@ -180,24 +180,9 @@ void erd_bridge_poll_init(
   uint16_t api_list_count,
   erd_cache_t* cache);
 
-/*
- * Legacy convenience wrapper for callers that do not have a known host
- * address or appliance type (broadcast discovery path).  Retained for
- * backward compatibility with existing test code.
- */
-void erd_bridge_poll_init_legacy(
-  erd_bridge_poll_t* self,
-  tiny_timer_group_t* timer_group,
-  i_tiny_gea3_erd_client_t* erd_client,
-  i_mqtt_client_t* mqtt_client,
-  uint32_t polling_interval_ms,
-  bool only_publish_on_change,
-  erd_cache_t* cache);
-
 /*!
  * Destroy the ERD polling bridge.
  */
 void erd_bridge_poll_destroy(
   erd_bridge_poll_t* self);
-
 #endif
