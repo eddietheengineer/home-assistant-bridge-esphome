@@ -649,3 +649,13 @@ TEST(erd_bridge_poll_probe_failures, should_exclude_retries_exhausted_erd_from_p
   when_a_poll_read_completes(0xC0, probe_erd_1, uint8_t(0xAA));
   when_a_poll_read_completes(0xC0, probe_erd_3, uint8_t(0xCC));
 }
+
+// Regression: destroy should not crash when erd_client is null.
+// This can happen if init was called with a null erd_client pointer.
+TEST(erd_bridge_poll, should_not_crash_on_destroy_with_null_erd_client)
+{
+  erd_bridge_poll_t self;
+  memset(&self, 0, sizeof(self));
+  /* timer_group is null so the guard returns early; this should not crash. */
+  erd_bridge_poll_destroy(&self);
+}

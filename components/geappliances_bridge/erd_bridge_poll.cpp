@@ -559,14 +559,12 @@ void erd_bridge_poll_destroy(erd_bridge_poll_t* self)
   tiny_timer_stop(self->timer_group, &self->polling_timer);
 
   // Remove event subscription before freeing heap state.
-  // erd_bridge_poll_init() subscribes one event callback that references
-  // this struct: erd_client_activity_subscription.  If this remains
-  // registered after destroy(), any subsequent event fires the HSM which
-  // dereferences self->erd_set (freed below) — a use-after-free that
-  // corrupts the heap.
-  tiny_event_unsubscribe(
-    tiny_gea3_erd_client_on_activity(self->erd_client),
-    &self->erd_client_activity_subscription);
+  // Guard against partial init where erd_client may be null.
+  if (self->erd_client) {
+    tiny_event_unsubscribe(
+      tiny_gea3_erd_client_on_activity(self->erd_client),
+      &self->erd_client_activity_subscription);
+  }
 
   // Guard against partial init (e.g., if the first new set<tiny_erd_t>()
   // failed and init returned early).  delete nullptr is safe in C++, but
