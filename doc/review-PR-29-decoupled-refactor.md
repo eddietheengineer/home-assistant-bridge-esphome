@@ -15,26 +15,30 @@ The architectural direction is sound — decoupling MQTT from ESPHome internals 
 
 ## Critical Issues
 
-### 1. `data_changed` comparison may miss changes on size reduction (erd_cache.cpp:61-63)
+### 1. **FIXED** `data_changed` comparison refactored (erd_cache.cpp)
 
+**Status:** ✅ Resolved on branch `review/PR-29-decoupled-refactor-review`
+
+Replaced the fragile partial `memcmp` with a clear `erd_data_changed()` helper:
 ```cpp
-bool data_changed = (existing->data_size != data_size) ||
-                    (memcmp(existing->uses_heap ? existing->heap_data : existing->inline_data,
-                            data, (existing->data_size < data_size) ? existing->data_size : data_size) != 0);
+static bool erd_data_changed(const erd_cache_entry_t* existing,
+                             const uint8_t* new_data, uint8_t new_size)
+{
+  if (existing->data_size != new_size) return true;
+  const uint8_t* old = existing->uses_heap ? existing->heap_data : existing->inline_data;
+  return memcmp(old, new_data, new_size) != 0;
+}
 ```
 
-When existing data is 16 bytes and new data is 8 bytes, `memcmp` compares only 8 bytes. If those 8 match, `data_changed` is `false` — but the size check catches it via short-circuit OR. This is **correct** due to the size check. However, the logic is fragile and hard to reason about. Consider comparing the full new data size against the old data (zero-padding the old if shorter).
+Also removed the dead `memcmp` in the OOM truncation path (was comparing data just `memcpy`'d from itself).
 
-### 2. Heap allocation failure path has redundant `memcmp` (erd_cache.cpp:82-83)
+Added 6 new tests covering: same-size same data, same-size different data, size shrink, size grow, inline-to-heap promotion, heap-to-inline shrink. All 239 tests pass.
 
-After truncating to inline storage:
-```cpp
-bool truncated_changed = (existing->data_size != data_size) ||
-                         (memcmp(existing->inline_data, data, existing->data_size) != 0);
-```
+### 2. **FIXED** Heap allocation failure path redundant `memcmp` (erd_cache.cpp)
 
-`existing->inline_data` was just written from `data` on line 79, so `memcmp` will always return 0. The size check alone determines the result. The `memcmp` is dead code — not a bug, but confusing.
+**Status:** ✅ Resolved on branch `review/PR-29-decoupled-refactor-review`
 
+The dead `memcmp` was removed and replaced with `existing->update_required = true` — truncation always changes the effective data (size shrinks). The OOM path now returns `true` directly, simplifying the logic.
 ### 3. No re-publish of retained messages after MQTT reconnect (erd_cache_mqtt_publisher.cpp:128-132)
 
 After disconnect/reconnect, the publisher resumes only entries with `update_required=true`. But retained MQTT messages on the broker are lost when the broker restarts or the client reconnects with a new client ID. There is no mechanism to force a full re-publish of all cached ERDs after reconnect. Home Assistant entities can show stale data after a broker restart.
@@ -140,12 +144,11 @@ The `void*` cast obscures the type and makes static analysis harder.
 ## Test Coverage Gaps
 
 | # | Gap |
-|---|-----|
-| 17 | No test for `erd_cache_update()` with data > 16 bytes (heap path) |
+| 17 | **FIXED** No test for `erd_cache_update()` with data > 16 bytes (heap path) |
 | 18 | No test for `erd_cache_update()` heap allocation failure (OOM path) |
 | 19 | No test for cache overflow (200+ ERDs) |
 | 20 | No test for `erd_cache_mqtt_publisher_loop()` with `max_ms = 0` |
-| 21 | `payload_uppercase_hex_no_separator` doesn't verify payload content |
+| 21 | **FIXED** `payload_uppercase_hex_no_separator` doesn't verify payload content |
 | 22 | No integration test for the full startup HSM flow |
 | 23 | No test for MQTT reconnect re-publish behavior |
 | 24 | No test for `erd_write_bridge` with concurrent write requests |

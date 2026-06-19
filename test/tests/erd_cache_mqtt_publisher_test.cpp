@@ -496,3 +496,94 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_255_byte_payload)
   CHECK_EQUAL(1u, published);
   CHECK_EQUAL(1u, publisher.total_published);
 }
+/* ------------------------------------------------------------------ */
+/* Cache change-detection tests                                        */
+/* ------------------------------------------------------------------ */
+
+TEST_GROUP(erd_cache_change_detection)
+{
+  erd_cache_t cache;
+
+  void setup()
+  {
+    erd_cache_init(&cache);
+  }
+
+  void teardown()
+  {
+    erd_cache_destroy(&cache);
+  }
+};
+
+/* same-size, same data → no change */
+TEST(erd_cache_change_detection, same_size_same_data_no_change)
+{
+  erd_cache_set_only_publish_onchange(&cache, true);
+  uint8_t data[] = { 0x01, 0x02, 0x03 };
+  erd_cache_update(&cache, 0x1001, data, sizeof(data));
+  /* update with identical data */
+  CHECK_FALSE(erd_cache_update(&cache, 0x1001, data, sizeof(data)));
+}
+
+/* same-size, different data → change detected */
+TEST(erd_cache_change_detection, same_size_different_data_change_detected)
+{
+  erd_cache_set_only_publish_onchange(&cache, true);
+  uint8_t data1[] = { 0x01, 0x02, 0x03 };
+  uint8_t data2[] = { 0x01, 0x02, 0x04 };
+  erd_cache_update(&cache, 0x1001, data1, sizeof(data1));
+  CHECK_TRUE(erd_cache_update(&cache, 0x1001, data2, sizeof(data2)));
+}
+
+/* size shrink with same prefix → change detected (size differs) */
+TEST(erd_cache_change_detection, size_shrink_same_prefix_change_detected)
+{
+  erd_cache_set_only_publish_onchange(&cache, true);
+  uint8_t data1[] = { 0x01, 0x02, 0x03, 0x04 };
+  uint8_t data2[] = { 0x01, 0x02 };
+  erd_cache_update(&cache, 0x1001, data1, sizeof(data1));
+  CHECK_TRUE(erd_cache_update(&cache, 0x1001, data2, sizeof(data2)));
+}
+
+/* size grow with same prefix → change detected (size differs) */
+TEST(erd_cache_change_detection, size_grow_same_prefix_change_detected)
+{
+  erd_cache_set_only_publish_onchange(&cache, true);
+  uint8_t data1[] = { 0x01, 0x02 };
+  uint8_t data2[] = { 0x01, 0x02, 0x03, 0x04 };
+  erd_cache_update(&cache, 0x1001, data1, sizeof(data1));
+  CHECK_TRUE(erd_cache_update(&cache, 0x1001, data2, sizeof(data2)));
+}
+
+/* inline-to-heap promotion with different size → change detected */
+TEST(erd_cache_change_detection, inline_to_heap_promotion_change_detected)
+{
+  erd_cache_set_only_publish_onchange(&cache, true);
+  /* insert inline data (≤16 bytes) */
+  uint8_t data_small[8];
+  memset(data_small, 0xAA, sizeof(data_small));
+  erd_cache_update(&cache, 0x1001, data_small, sizeof(data_small));
+
+  /* update with larger data (>16 bytes) that starts with same bytes */
+  uint8_t data_large[20];
+  memcpy(data_large, data_small, sizeof(data_small));
+  memset(data_large + sizeof(data_small), 0xBB, sizeof(data_large) - sizeof(data_small));
+  /* size differs, so change is detected */
+  CHECK_TRUE(erd_cache_update(&cache, 0x1001, data_large, sizeof(data_large)));
+}
+
+/* heap-to-inline shrink with same data prefix → change detected (size differs) */
+TEST(erd_cache_change_detection, heap_to_inline_shrink_change_detected)
+{
+  erd_cache_set_only_publish_onchange(&cache, true);
+  /* insert heap data (>16 bytes) */
+  uint8_t data_large[20];
+  memset(data_large, 0xAA, sizeof(data_large));
+  erd_cache_update(&cache, 0x1001, data_large, sizeof(data_large));
+
+  /* shrink to inline data with same prefix */
+  uint8_t data_small[8];
+  memset(data_small, 0xAA, sizeof(data_small));
+  /* size differs, so change is detected */
+  CHECK_TRUE(erd_cache_update(&cache, 0x1001, data_small, sizeof(data_small)));
+}
