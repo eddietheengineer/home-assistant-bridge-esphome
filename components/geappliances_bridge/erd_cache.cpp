@@ -73,7 +73,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
     if (needs_heap) {
       existing->heap_data = new (std::nothrow) uint8_t[data_size];
       if (!existing->heap_data) {
-        ESP_LOGW(TAG, "Failed to allocate %u bytes for ERD 0x%04X", data_size, erd);
+        // Heap allocation failed: truncate to inline storage.
         existing->uses_heap = false;
         uint8_t inline_size = (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE;
         memcpy(existing->inline_data, data, inline_size);
@@ -138,10 +138,15 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   if (needs_heap) {
     slot->heap_data = new (std::nothrow) uint8_t[data_size];
     if (!slot->heap_data) {
-      ESP_LOGW(TAG, "Failed to allocate %u bytes for ERD 0x%04X", data_size, erd);
+      // Heap allocation failed: truncate to inline storage.
+      // The entry is still marked valid and update_required=true so it will
+      // be published to MQTT with truncated data.  This is acceptable for
+      // large ERDs where the first 16 bytes carry the meaningful content.
+      ESP_LOGW(TAG, "Failed to allocate %u bytes for ERD 0x%04X, truncating to %u bytes", data_size, erd, ERD_CACHE_INLINE_DATA_SIZE);
       slot->uses_heap = false;
-      memcpy(slot->inline_data, data, (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE);
-      slot->data_size = (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE;
+      uint8_t inline_size = (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE;
+      memcpy(slot->inline_data, data, inline_size);
+      slot->data_size = inline_size;
     } else {
       memcpy(slot->heap_data, data, data_size);
     }

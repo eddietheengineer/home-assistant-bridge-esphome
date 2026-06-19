@@ -144,6 +144,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
   void start_feature_bit_reading_();
   void init_erd_cache_publisher_();
+  void on_poll_discovery_complete_();
   void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 

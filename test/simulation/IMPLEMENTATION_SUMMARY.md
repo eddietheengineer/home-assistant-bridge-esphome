@@ -99,9 +99,8 @@ simulate_subscription_added();
 uint8_t data[] = {0x00, 0x50};
 simulate_erd_publication(ERD_TEMPERATURE, data, sizeof(data));
 
-// Verify MQTT was updated
-mock().expectOneCall("update_erd")
-    .withParameter("erd", ERD_TEMPERATURE);
+// Verify the ERD was cached (bridges write to erd_cache directly)
+POINTERS_TRUE(erd_cache_find(&cache, ERD_TEMPERATURE) != nullptr);
 ```
 
 ## Benefits Achieved

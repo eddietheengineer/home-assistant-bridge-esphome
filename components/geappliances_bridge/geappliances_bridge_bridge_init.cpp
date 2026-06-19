@@ -47,6 +47,17 @@ static std::set<tiny_erd_t> erd_cache_to_set(erd_cache_t* cache)
   }
   return erds;
 }
+// ---------------------------------------------------------------------------
+// Polling bridge discovery-complete callback (shared by all three init paths)
+// ---------------------------------------------------------------------------
+
+void GeappliancesBridge::on_poll_discovery_complete_()
+{
+  this->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&this->erd_cache_));
+  erd_write_bridge_set_host_address(&this->erd_write_bridge_, this->autodiscovery_manager_.get_host_address());
+  tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
+}
+
 
 // ---------------------------------------------------------------------------
 // Build the poll list using the erd_poll_list_builder module
@@ -198,10 +209,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
   // so the HSM cannot fire the callback before it's set (race condition
   // when discovery completes synchronously on first entry).
   this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
-    auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
-    bridge->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&bridge->erd_cache_));
-    erd_write_bridge_set_host_address(&bridge->erd_write_bridge_, bridge->autodiscovery_manager_.get_host_address());
-    tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
+    reinterpret_cast<GeappliancesBridge*>(ctx)->on_poll_discovery_complete_();
   };
   this->erd_bridge_poll_.on_discovery_complete_context = this;
 
@@ -298,9 +306,7 @@ void GeappliancesBridge::start_custom_erd_polling_()
   // Wire the discovery-complete callback BEFORE initializing the bridge,
   // so the HSM cannot fire the callback before it's set.
   this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
-    auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
-    bridge->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&bridge->erd_cache_));
-    tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
+    reinterpret_cast<GeappliancesBridge*>(ctx)->on_poll_discovery_complete_();
   };
   this->erd_bridge_poll_.on_discovery_complete_context = this;
 
@@ -381,14 +387,11 @@ void GeappliancesBridge::check_subscription_activity_()
   }
 
   // Stand up the polling bridge.
-    // Wire the discovery-complete callback BEFORE initializing the bridge,
-    // so the HSM cannot fire the callback before it's set (race condition
-    // when discovery completes synchronously on first entry).
+  // Wire the discovery-complete callback BEFORE initializing the bridge,
+  // so the HSM cannot fire the callback before it's set (race condition
+  // when discovery completes synchronously on first entry).
   this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
-    auto* bridge = reinterpret_cast<GeappliancesBridge*>(ctx);
-    bridge->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&bridge->erd_cache_));
-    erd_write_bridge_set_host_address(&bridge->erd_write_bridge_, bridge->autodiscovery_manager_.get_host_address());
-    tiny_hsm_send_signal(&bridge->startup_hsm_, signal_bridge_ready, nullptr);
+    reinterpret_cast<GeappliancesBridge*>(ctx)->on_poll_discovery_complete_();
   };
   this->erd_bridge_poll_.on_discovery_complete_context = this;
 

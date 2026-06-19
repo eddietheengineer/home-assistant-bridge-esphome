@@ -72,6 +72,8 @@ static void ensure_polling_list_capacity(erd_bridge_poll_t* self, uint16_t neede
     return;
   }
   // Compute new_capacity in a wider type to avoid uint16_t overflow before the cap check.
+  // The -1 ensures the growth step is at least POLLING_LIST_GROWTH_INCREMENT even when
+  // needed is already a multiple of the increment (e.g. needed=64 → 64+31=95, not 64).
   uint32_t new_capacity = (uint32_t)needed + (POLLING_LIST_GROWTH_INCREMENT - 1);
   // Enforce a hard safety cap to prevent runaway allocations.
   if (new_capacity > POLLING_LIST_MAX_SIZE) {

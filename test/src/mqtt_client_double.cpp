@@ -14,12 +14,6 @@ static void register_erd(i_mqtt_client_t* self, tiny_erd_t erd)
     .withParameter("erd", erd);
 }
 
-static void update_erd(i_mqtt_client_t* self, tiny_erd_t erd, const void* value, uint8_t size)
-{
-  (void)self; (void)erd; (void)value; (void)size;
-  // No-op: bridges write to erd_cache directly.
-}
-
 static void update_erd_write_result(i_mqtt_client_t* self, tiny_erd_t erd, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason)
 {
   mock()
@@ -50,7 +44,6 @@ static i_tiny_event_t* on_mqtt_connect(i_mqtt_client_t* _self)
 
 static const i_mqtt_client_api_t api = {
   register_erd,
-  update_erd,
   update_erd_write_result,
   on_write_request,
   on_mqtt_disconnect,
