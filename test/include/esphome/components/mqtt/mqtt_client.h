@@ -13,6 +13,15 @@
 namespace esphome {
 namespace mqtt {
 
+
+enum class MQTTClientDisconnectReason : int8_t {
+  TCP_DISCONNECTED = 0,
+  MQTT_UNACCEPTABLE_PROTOCOL_VERSION = 1,
+  MQTT_IDENTIFIER_REJECTED = 2,
+  MQTT_SERVER_UNAVAILABLE = 3,
+  MQTT_MALFORMED_CREDENTIALS = 4,
+  MQTT_NOT_AUTHORIZED = 5,
+};
 class MQTTClientComponent {
  public:
   virtual ~MQTTClientComponent() {}
@@ -22,6 +31,11 @@ class MQTTClientComponent {
   virtual void subscribe(const std::string& topic,
                          std::function<void(const std::string&, const std::string&)> callback,
                          uint8_t qos) = 0;
+
+  using on_connect_callback_t = void(bool session_present);
+  using on_disconnect_callback_t = void(MQTTClientDisconnectReason reason);
+  virtual void set_on_connect(std::function<on_connect_callback_t> &&callback) = 0;
+  virtual void set_on_disconnect(std::function<on_disconnect_callback_t> &&callback) = 0;
 
   static MQTTClientComponent* global_mqtt_client;
 };
