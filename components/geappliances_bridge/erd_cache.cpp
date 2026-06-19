@@ -229,6 +229,12 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
     self->update_count_window++;
     bool data_changed = erd_data_changed(existing, data, data_size);
 
+    /* If data hasn't changed and we only publish on change, skip all
+     * storage churn — no alloc, free, or memcpy needed. */
+    if (!data_changed && self->only_publish_onchange) {
+      return false;
+    }
+
     /* Free old storage before assigning new.
      * Exception: if we're staying on heap and the existing buffer is large
      * enough, reuse it in place to avoid new/delete churn. */

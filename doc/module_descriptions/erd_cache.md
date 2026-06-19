@@ -15,8 +15,8 @@ Fixed-size ERD cache with hybrid inline/pool data storage. Stores the latest dat
 | `erd_cache_get_next_updated(self, iterator)` | Returns the next entry with `update_required = true`, then clears the flag. Caller provides an iterator (`uint16_t`) initialized to 0. Returns `NULL` when no more updated entries remain. |
 | `erd_cache_get_count(self)` | Returns the number of valid entries currently in the cache. |
 | `erd_cache_get_next_entry(self, iterator)` | Returns the next valid entry in the cache, iterating all entries. Does NOT require `update_required = true` and does NOT clear any flags — it is a read-only iteration. Resets iterator to 0 when exhausted. |
-| `erd_cache_get_update_rate(self)` | Returns the number of cache updates that occurred in the last 60 seconds, then resets the window counter. |
-| `erd_cache_get_required_update_rate(self)` | Returns the number of cache updates that set `update_required = true` in the last 60 seconds, then resets the window counter. |
+| `erd_cache_get_update_rate(self)` | Returns the number of cache updates since the last call, then resets the window counter. |
+| `erd_cache_get_required_update_rate(self)` | Returns the number of updates that set `update_required = true` since the last call, then resets the window counter. |
 
 ## Storage Strategy
 
@@ -57,9 +57,9 @@ ERDs with `data_size > 32` fall back to `new uint8_t[data_size]`. This is rare �
    - If data changed (or `only_publish_onchange` is false): free old storage, store new data, set `update_required = true`
    - If data unchanged and `only_publish_onchange` is true: do nothing
 3. **If not found:**
-   - If cache is full (`update_count ≥ ERD_CACHE_CAPACITY`): return `false`
-   - Find first empty slot, store data, set `valid = true` and `update_required = true`
-   - Increment `update_count`
+   - Scan `entries[]` for the first slot with `valid == false`
+   - If no free slot: return `false` (cache full)
+   - Store data, set `valid = true` and `update_required = true`
 
 ## Change Detection
 
@@ -92,10 +92,10 @@ typedef struct {
 ```c
 typedef struct erd_cache_t {
   erd_cache_entry_t entries[ERD_CACHE_CAPACITY];  // 200 entries
-  uint32_t update_count;              // total cache updates since last window reset
-  uint32_t update_count_window;       // total cache updates in the last 60s window
-  uint32_t required_update_count;     // total updates setting update_required=true since reset
-  uint32_t required_update_count_window; // updates setting update_required=true in last 60s
+  uint32_t update_count;              // total cache updates since init
+  uint32_t update_count_window;       // updates since last get_update_rate() call
+  uint32_t required_update_count;     // total updates setting update_required=true since init
+  uint32_t required_update_count_window; // such updates since last get_required_update_rate() call
   bool only_publish_onchange;         // when true, only mark update_required on data change
   bool initialized;                   // true after first successful erd_cache_init()
   uint8_t pool_blocks[ERD_CACHE_POOL_COUNT][ERD_CACHE_CAPACITY][ERD_CACHE_POOL_BLOCK_2];
@@ -115,7 +115,7 @@ typedef struct erd_cache_t {
 - **Fixed pool capacity**: Each pool tier has `ERD_CACHE_CAPACITY` slots (200), so every cache entry can hold a block from any tier without contention. No dynamic resizing needed.
 - **Change detection at update time**: `update_required` is set during `erd_cache_update()`, not during iteration. This eliminates per-read `memcmp` overhead in the publisher loop.
 - **Two iterators**: `erd_cache_get_next_updated()` for the publisher (clears `update_required` flag) and `erd_cache_get_next_entry()` for read-only iteration (used by HA discovery).
-- **60-second rate windows**: `update_count_window` and `required_update_count_window` track rates over a rolling 60-second window, reset by `get_update_rate()` and `get_required_update_rate()`.
+- **Rate counters**: `update_count_window` and `required_update_count_window` accumulate updates and are reset by `get_update_rate()` and `get_required_update_rate()`. The window is determined by the call interval of the consumer (e.g. ~60s if called once per minute).
 - **No eviction**: The cache has a fixed capacity with no eviction policy. If the cache is full and a new ERD arrives that isn't already cached, the update is silently dropped. This is acceptable because the ERD set is bounded by the appliance's supported ERDs, which is typically well under 200.
 
 ## Testing
