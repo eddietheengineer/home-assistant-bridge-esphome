@@ -79,18 +79,20 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   if (existing) {
     self->update_count++;
     self->update_count_window++;
+
+    /* ERD size is invariant after registration.  Check size BEFORE
+     * erd_data_changed to avoid reading past the old buffer when the
+     * new size is larger. */
+    if (data_size != existing->data_size) {
+      ESP_LOGE(TAG, "ERD 0x%04X size changed %u -> %u, appliance lost",
+               erd, existing->data_size, data_size);
+      return false;
+    }
+
     bool data_changed = erd_data_changed(existing, data, data_size);
 
     /* If data hasn't changed and we only publish on change, skip entirely. */
     if (!data_changed && self->only_publish_onchange) {
-      return false;
-    }
-
-    /* ERD size is invariant after registration.  A size mismatch means the
-     * appliance firmware has changed and the bridge should reinitialize. */
-    if (data_size != existing->data_size) {
-      ESP_LOGE(TAG, "ERD 0x%04X size changed %u -> %u, appliance lost",
-               erd, existing->data_size, data_size);
       return false;
     }
 

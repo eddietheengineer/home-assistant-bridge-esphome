@@ -35,9 +35,11 @@ static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         erd_set_insert(&self->erd_set, erd);
       }
 
-      erd_cache_update(self->erd_cache, erd,
-        reinterpret_cast<const uint8_t*>(args->subscription_publication_received.data),
-        args->subscription_publication_received.data_size);
+      if (!erd_cache_update(self->erd_cache, erd,
+              reinterpret_cast<const uint8_t*>(args->subscription_publication_received.data),
+              args->subscription_publication_received.data_size)) {
+        ESP_LOGW(TAG, "Failed to cache ERD 0x%04x from subscription", erd);
+      }
     } break;
 
     default:
