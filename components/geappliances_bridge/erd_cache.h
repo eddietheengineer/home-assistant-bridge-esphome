@@ -1,6 +1,6 @@
 /*!
  * @file
- * @brief Fixed-size ERD cache with hybrid inline/heap data storage.
+ * @brief Fixed-size ERD cache with hybrid inline/pool data storage.
  *
  * Stores the latest data for up to ERD_CACHE_CAPACITY ERDs.  ERDs <= 16 bytes
  * are stored inline (zero heap); larger ERDs use a fixed memory pool of
@@ -23,7 +23,7 @@
 /* Memory pool block sizes — covers the most common ERD data sizes.
  * Most ERDs are between 17 and 64 bytes.  The pool pre-allocates
  * blocks in these sizes to eliminate per-update new/delete churn.
- * ERDs larger than the largest pool block fall back to heap storage. */
+ * ERDs larger than the largest pool block fall back to inline storage. */
 #define ERD_CACHE_POOL_BLOCK_1  32
 #define ERD_CACHE_POOL_BLOCK_2  48
 #define ERD_CACHE_POOL_BLOCK_3  64
@@ -33,12 +33,11 @@ typedef struct {
   tiny_erd_t erd;
   union {
     uint8_t inline_data[ERD_CACHE_INLINE_DATA_SIZE];
-    uint8_t* ext_data;  /* pool or heap pointer */
+    uint8_t* pool_data;
   };
   uint8_t data_size;
-  uint8_t pool_block_idx;  /* which pool block (0-3) or 255 if not pool */
+  uint8_t pool_block_idx;  /* which pool block (0-3) or 255 if inline */
   bool uses_pool;
-  bool uses_heap;
   bool update_required;
   bool valid;
 } erd_cache_entry_t;
@@ -55,7 +54,7 @@ typedef struct erd_cache_t {
    * Each pool tier has ERD_CACHE_CAPACITY slots so every cache entry can
    * hold a block from any tier without contention. */
   uint8_t pool_blocks[ERD_CACHE_POOL_COUNT][ERD_CACHE_CAPACITY][ERD_CACHE_POOL_BLOCK_4];
-  bool pool_free[ERD_CACHE_POOL_COUNT][ERD_CACHE_CAPACITY];
+  uint8_t pool_free[ERD_CACHE_POOL_COUNT][ERD_CACHE_CAPACITY];
 } erd_cache_t;
 
 #ifdef __cplusplus

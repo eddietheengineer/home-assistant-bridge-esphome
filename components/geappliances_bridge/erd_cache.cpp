@@ -7,7 +7,6 @@
 #include "esphome/core/log.h"
 
 #include <string.h>
-#include <new>
 
 static const char* const TAG = "erd_cache";
 
@@ -69,27 +68,42 @@ static bool erd_data_changed(const erd_cache_entry_t* existing,
                              const uint8_t* new_data, uint8_t new_size)
 {
   if (existing->data_size != new_size) return true;
-  const uint8_t* old = (existing->uses_heap ? existing->ext_data : (existing->uses_pool ? existing->ext_data : existing->inline_data));
+  const uint8_t* old = existing->uses_pool ? existing->pool_data : existing->inline_data;
   return memcmp(old, new_data, new_size) != 0;
 }
 
 void erd_cache_init(erd_cache_t* self)
 {
-  /* Free any pool or heap data before zeroing the struct. */
+  /* Free any pool-allocated data before resetting.
+   * Only scan entries that look valid (erd != 0) to avoid reading
+   * uninitialized stack memory on first init of a local erd_cache_t. */
   for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
     erd_cache_entry_t* e = &self->entries[i];
-    if (e->valid && e->uses_pool) {
-      pool_free(self, e->pool_block_idx, e->ext_data);
-    }
-    if (e->valid && e->uses_heap) {
-      delete[] e->ext_data;
+    if (e->erd != 0 && e->uses_pool) {
+      pool_free(self, e->pool_block_idx, e->pool_data);
     }
   }
-  (void)memset(self, 0, sizeof(*self));
-  /* Mark all pool blocks as free. */
+  /* Zero entries explicitly to avoid UBSan issues with bool fields after memset. */
+  for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
+    erd_cache_entry_t* e = &self->entries[i];
+    e->erd = 0;
+    e->data_size = 0;
+    e->pool_block_idx = 255;
+    e->uses_pool = false;
+    e->update_required = false;
+    e->valid = false;
+    e->pool_data = NULL;
+  }
+  self->update_count = 0;
+  self->update_count_window = 0;
+  self->required_update_count = 0;
+  self->required_update_count_window = 0;
+  self->only_publish_onchange = false;
+  /* Zero pool blocks and mark all as free. */
+  (void)memset(self->pool_blocks, 0, sizeof(self->pool_blocks));
   for (uint8_t b = 0; b < ERD_CACHE_POOL_COUNT; b++) {
     for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
-      self->pool_free[b][i] = true;
+      self->pool_free[b][i] = 1;
     }
   }
 }
@@ -126,69 +140,39 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
     self->update_count_window++;
     bool data_changed = erd_data_changed(existing, data, data_size);
 
-    /* Free old external data if currently on pool or heap. */
+    /* Free old pool data if currently on pool. */
     if (existing->uses_pool) {
-      pool_free(self, existing->pool_block_idx, existing->ext_data);
+      pool_free(self, existing->pool_block_idx, existing->pool_data);
       existing->uses_pool = false;
       existing->pool_block_idx = 255;
     }
-    if (existing->uses_heap) {
-      delete[] existing->ext_data;
-      existing->uses_heap = false;
-    }
 
-    /* Determine storage strategy: inline, pool, or heap. */
-    if (data_size <= ERD_CACHE_INLINE_DATA_SIZE) {
-      /* Data fits inline — store directly. */
-      memcpy(existing->inline_data, data, data_size);
-      existing->data_size = data_size;
-    } else {
-      /* Try pool first, then heap as fallback. */
-      uint8_t block_idx = pool_block_for_size(data_size);
-      if (block_idx != 255) {
-        uint8_t* buf = pool_alloc(self, block_idx);
-        if (buf) {
-          memcpy(buf, data, data_size);
-          existing->ext_data = buf;
-          existing->uses_pool = true;
-          existing->pool_block_idx = block_idx;
-          existing->data_size = data_size;
-        } else {
-          /* Pool exhausted — fall back to heap. */
-          existing->ext_data = new (std::nothrow) uint8_t[data_size];
-          if (existing->ext_data) {
-            memcpy(existing->ext_data, data, data_size);
-            existing->uses_heap = true;
-            existing->data_size = data_size;
-          } else {
-            /* Heap also failed — truncate to inline. */
-            uint8_t inline_size = ERD_CACHE_INLINE_DATA_SIZE;
-            memcpy(existing->inline_data, data, inline_size);
-            existing->data_size = inline_size;
-            existing->update_required = true;
-            self->required_update_count++;
-            self->required_update_count_window++;
-            return true;
-          }
-        }
+    /* Try to store new data in pool (only for data > 16 bytes). */
+    uint8_t block_idx = pool_block_for_size(data_size);
+    if (block_idx != 255) {
+      uint8_t* buf = pool_alloc(self, block_idx);
+      if (buf) {
+        memcpy(buf, data, data_size);
+        existing->pool_data = buf;
+        existing->uses_pool = true;
+        existing->pool_block_idx = block_idx;
+        existing->data_size = data_size;
       } else {
-        /* Data too large for pool — use heap. */
-        existing->ext_data = new (std::nothrow) uint8_t[data_size];
-        if (existing->ext_data) {
-          memcpy(existing->ext_data, data, data_size);
-          existing->uses_heap = true;
-          existing->data_size = data_size;
-        } else {
-          /* Heap failed — truncate to inline. */
-          uint8_t inline_size = ERD_CACHE_INLINE_DATA_SIZE;
-          memcpy(existing->inline_data, data, inline_size);
-          existing->data_size = inline_size;
-          existing->update_required = true;
-          self->required_update_count++;
-          self->required_update_count_window++;
-          return true;
-        }
+        /* Pool exhausted — truncate to inline storage. */
+        uint8_t inline_size = (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE;
+        memcpy(existing->inline_data, data, inline_size);
+        existing->data_size = inline_size;
+        /* Truncation always changes the effective data (size shrinks). */
+        existing->update_required = true;
+        self->required_update_count++;
+        self->required_update_count_window++;
+        return true;
       }
+    } else {
+      /* Data too large for pool — truncate to inline storage. */
+      uint8_t inline_size = (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE;
+      memcpy(existing->inline_data, data, inline_size);
+      existing->data_size = inline_size;
     }
 
     existing->update_required = !self->only_publish_onchange || data_changed;
@@ -225,59 +209,32 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   slot->erd = erd;
   slot->data_size = data_size;
   slot->uses_pool = false;
-  slot->uses_heap = false;
   slot->pool_block_idx = 255;
   slot->valid = true;
   slot->update_required = true;
   ESP_LOGD(TAG, "ERD 0x%04X added to cache (%u bytes)", erd, data_size);
 
-  if (data_size <= ERD_CACHE_INLINE_DATA_SIZE) {
-    /* Data fits inline — store directly. */
-    memcpy(slot->inline_data, data, data_size);
-    slot->data_size = data_size;
-  } else {
-    /* Try pool first, then heap as fallback. */
-    uint8_t block_idx = pool_block_for_size(data_size);
-    if (block_idx != 255) {
-      uint8_t* buf = pool_alloc(self, block_idx);
-      if (buf) {
-        memcpy(buf, data, data_size);
-        slot->ext_data = buf;
-        slot->uses_pool = true;
-        slot->pool_block_idx = block_idx;
-        slot->data_size = data_size;
-      } else {
-        /* Pool exhausted — fall back to heap. */
-        slot->ext_data = new (std::nothrow) uint8_t[data_size];
-        if (slot->ext_data) {
-          memcpy(slot->ext_data, data, data_size);
-          slot->uses_heap = true;
-          slot->data_size = data_size;
-        } else {
-          /* Heap also failed — truncate to inline. */
-          ESP_LOGW(TAG, "Pool and heap exhausted for ERD 0x%04X (%u bytes), truncating to %u bytes",
-                   erd, data_size, ERD_CACHE_INLINE_DATA_SIZE);
-          uint8_t inline_size = ERD_CACHE_INLINE_DATA_SIZE;
-          memcpy(slot->inline_data, data, inline_size);
-          slot->data_size = inline_size;
-        }
-      }
+  uint8_t block_idx = pool_block_for_size(data_size);
+  if (block_idx != 255) {
+    uint8_t* buf = pool_alloc(self, block_idx);
+    if (buf) {
+      memcpy(buf, data, data_size);
+      slot->pool_data = buf;
+      slot->uses_pool = true;
+      slot->pool_block_idx = block_idx;
     } else {
-      /* Data too large for pool — use heap. */
-      slot->ext_data = new (std::nothrow) uint8_t[data_size];
-      if (slot->ext_data) {
-        memcpy(slot->ext_data, data, data_size);
-        slot->uses_heap = true;
-        slot->data_size = data_size;
-      } else {
-        /* Heap failed — truncate to inline. */
-        ESP_LOGW(TAG, "Heap allocation failed for ERD 0x%04X (%u bytes), truncating to %u bytes",
-                 erd, data_size, ERD_CACHE_INLINE_DATA_SIZE);
-        uint8_t inline_size = ERD_CACHE_INLINE_DATA_SIZE;
-        memcpy(slot->inline_data, data, inline_size);
-        slot->data_size = inline_size;
-      }
+      /* Pool exhausted — truncate to inline storage. */
+      ESP_LOGW(TAG, "Pool exhausted for ERD 0x%04X (%u bytes), truncating to %u bytes",
+               erd, data_size, ERD_CACHE_INLINE_DATA_SIZE);
+      uint8_t inline_size = (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE;
+      memcpy(slot->inline_data, data, inline_size);
+      slot->data_size = inline_size;
     }
+  } else {
+    /* Data too large for pool — truncate to inline storage. */
+    uint8_t inline_size = (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE;
+    memcpy(slot->inline_data, data, inline_size);
+    slot->data_size = inline_size;
   }
 
   return true;

@@ -487,7 +487,10 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_128_byte_payload)
   CHECK_EQUAL(1u, publisher.total_published);
 }
 
-TEST(erd_cache_mqtt_publisher, loop_publishes_255_byte_payload)
+/* Large payloads > 128 bytes (largest pool block) are truncated to inline
+ * storage (16 bytes). The entry is still created and published, just with
+ * truncated data. */
+TEST(erd_cache_mqtt_publisher, loop_publishes_truncated_255_byte_payload)
 {
   erd_cache_mqtt_publisher_init(
     &publisher,
@@ -502,6 +505,7 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_255_byte_payload)
   }
   erd_cache_update(&cache, 0x1002, data, sizeof(data));
 
+  /* Entry is created with truncated inline data (16 bytes). */
   uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 1, 100);
   CHECK_EQUAL(1u, published);
   CHECK_EQUAL(1u, publisher.total_published);
@@ -620,7 +624,7 @@ TEST(erd_cache_change_detection, heap_path_new_entry_uses_heap)
   CHECK_TRUE(entry->uses_pool);
   CHECK_EQUAL(20u, entry->data_size);
   for (uint8_t i = 0; i < 20; i++) {
-    CHECK_EQUAL(i, entry->ext_data[i]);
+    CHECK_EQUAL(i, entry->pool_data[i]);
   }
 }
 
@@ -649,7 +653,7 @@ TEST(erd_cache_change_detection, heap_path_update_existing_entry)
   CHECK_TRUE(entry->uses_pool);
   CHECK_EQUAL(20u, entry->data_size);
   for (uint8_t i = 0; i < 20; i++) {
-    CHECK_EQUAL(255 - i, entry->ext_data[i]);
+    CHECK_EQUAL(255 - i, entry->pool_data[i]);
   }
 }
 
