@@ -216,12 +216,15 @@ void GeappliancesBridge::loop() {
   esp_task_wdt_reset();
 #endif
 
-  // Drain updated ERD cache entries to MQTT each loop iteration.
-  // Budget: 5 publishes max, 20 ms max — each publish() blocks on the IDF
-  // MQTT mutex, so keep the per-loop cost small to avoid starving the
-  // ESPHome framework (which fires its watchdog at 30 ms).
+  // On ESP-IDF, signal the background MQTT publisher task instead of
+  // blocking the main loop on the IDF MQTT mutex.  On non-ESP-IDF
+  // platforms, fall back to the direct loop() call as before.
   if (this->erd_cache_publisher_.cache != nullptr) {
+#ifdef USE_ESP_IDF
+    erd_cache_mqtt_publisher_signal_work(&this->erd_cache_publisher_);
+#else
     erd_cache_mqtt_publisher_loop(&this->erd_cache_publisher_, 5, 20);
+#endif
   }
 
   // Publish ERD/MQTT publish rate + cache stats sensors every ~60 seconds.
@@ -722,6 +725,12 @@ void GeappliancesBridge::init_erd_cache_publisher_()
     &this->erd_cache_,
     &this->mqtt_client_adapter_.interface,
     this->device_identity_manager_.get_device_id().c_str());
+
+  // Start the background publishing task on ESP-IDF platforms.
+#ifdef USE_ESP_IDF
+  erd_cache_mqtt_publisher_start(&this->erd_cache_publisher_);
+#endif
+
   ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
 }
 

@@ -1,12 +1,16 @@
 /*!
  * @file
- * @brief Scans the shared ERD cache each loop() and publishes updated ERDs
+ * @brief Scans the shared ERD cache and publishes updated ERDs
  *        to MQTT topics with retain=true.
+ *
+ * On ESP-IDF platforms, publishing runs in a FreeRTOS background task
+ * to avoid blocking the ESPHome main loop on the IDF MQTT mutex.
+ * On non-ESP-IDF platforms, erd_cache_mqtt_publisher_loop() is called
+ * directly from the main loop as before.
  *
  * Responsibilities:
  *   - Iterate cache entries with update_required=true
  *   - Publish to geappliances/{deviceId}/erd/0x{ERD:04X}/value
- *   - Respect time budget and hard cap per loop() call
  *   - Pause on MQTT disconnect, resume on reconnect
  *
  * NOT responsible for:
@@ -25,6 +29,17 @@
 #include "i_mqtt_client.h"
 #include "i_tiny_event.h"
 
+#ifdef USE_ESP_IDF
+#  ifdef USE_ESP_IDF_STUBS
+#    include "esp-idf/freertos_stub.h"
+#  else
+#    include "freertos/FreeRTOS.h"
+#    include "freertos/task.h"
+#    include "freertos/semphr.h"
+#    include "freertos/queue.h"
+#  endif
+#endif
+
 typedef struct {
   erd_cache_t* cache;              // Shared cache (owned by GeappliancesBridge)
   i_mqtt_client_t* mqtt_client;    // MQTT publish interface
@@ -38,6 +53,18 @@ typedef struct {
   uint32_t missed_loops;           // Loop iterations skipped while MQTT disconnected
   uint32_t publish_count_window;   // Publishes in the last 60s window
   uint32_t (*get_time_ms)(void);
+#ifdef USE_ESP_IDF
+  TaskHandle_t    task_handle;
+  StaticTask_t    task_tcb;
+  StackType_t     task_stack[2048 / sizeof(StackType_t)];
+  SemaphoreHandle_t work_semaphore;
+  SemaphoreHandle_t state_mutex;  // Protects shared state for dual-core safety
+  SemaphoreHandle_t done_semaphore; // Task gives this before exiting (dual-core safe shutdown)
+  bool task_running;
+  // Pre-allocated buffers for the background task to avoid stack overflow.
+  char task_topic[128];
+  char task_hex[512];
+#endif
 } erd_cache_mqtt_publisher_t;
 
 #ifdef __cplusplus
@@ -53,8 +80,27 @@ void erd_cache_mqtt_publisher_init(
 void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self);
 
 /*!
+ * Start the background publishing task (ESP-IDF only; no-op otherwise).
+ * Call after init() to begin draining the cache in a background task.
+ */
+void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self);
+
+/*!
+ * Stop the background publishing task (ESP-IDF only; no-op otherwise).
+ * Call from destroy() or teardown to cleanly shut down the task.
+ */
+void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self);
+
+/*!
+ * Signal the background task that there is work to do (ESP-IDF only; no-op otherwise).
+ * Call from the main loop when cache entries have been updated.
+ */
+void erd_cache_mqtt_publisher_signal_work(erd_cache_mqtt_publisher_t* self);
+
+/*!
  * Returns the number of ERDs actually published.
  * No-ops if MQTT is disconnected (increments missed_loops).
+ * On ESP-IDF, this is called from the background task, not the main loop.
  */
 uint16_t erd_cache_mqtt_publisher_loop(
   erd_cache_mqtt_publisher_t* self,

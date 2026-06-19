@@ -12,7 +12,107 @@
 #include <string.h>
 
 static const char* const TAG = "erd_cache_mqtt_publisher";
+#ifdef USE_ESP_IDF
+#include "esp_task_wdt.h"
+#endif
 
+#ifdef USE_ESP_IDF
+static void mqtt_publisher_task(void* arg)
+{
+  erd_cache_mqtt_publisher_t* self = (erd_cache_mqtt_publisher_t*)arg;
+
+  // Defensive: if semaphore creation failed, exit immediately.
+  if (self->work_semaphore == NULL) {
+    vTaskDelete(NULL);
+    return;
+  }
+
+  while (self->task_running) {
+    // Wait for work signal or timeout (100ms).
+    if (xSemaphoreTake(self->work_semaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
+      // Work was signalled — drain all available updates.
+    }
+
+    // Acquire mutex to safely read shared state (mqtt_connected, cache pointers).
+    // On dual-core, these fields can be modified by the main loop concurrently.
+    bool connected = false;
+    bool has_deps = false;
+    if (self->state_mutex) {
+      if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        connected = self->mqtt_connected;
+        has_deps = self->cache != NULL && self->mqtt_client != NULL &&
+                   self->device_id != NULL && self->get_time_ms != NULL;
+        xSemaphoreGive(self->state_mutex);
+      }
+    } else {
+      // Fallback when mutex creation failed — read without protection.
+      connected = self->mqtt_connected;
+      has_deps = self->cache != NULL && self->mqtt_client != NULL &&
+                 self->device_id != NULL && self->get_time_ms != NULL;
+    }
+    if (!connected || !has_deps) {
+      continue;
+    }
+
+    // Drain all available updates — no per-loop budget in background task.
+    while (1) {
+      erd_cache_entry_t* entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
+      if (!entry) break;
+
+      /* Determine data pointer. */
+      const uint8_t* data;
+      if ((entry->uses_heap || entry->uses_pool) && entry->ext_data != NULL) {
+        data = entry->ext_data;
+      } else {
+        data = entry->inline_data;
+      }
+
+      /* Build topic using pre-allocated buffer. */
+      int topic_len = snprintf(self->task_topic, sizeof(self->task_topic),
+          "geappliances/%s/erd/0x%04x/value", self->device_id, entry->erd);
+      if (topic_len < 0 || (unsigned)topic_len >= sizeof(self->task_topic)) {
+        ESP_LOGW(TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
+        break;
+      }
+
+      /* Build hex payload using pre-allocated buffer. */
+      size_t data_len = entry->data_size;
+      for (size_t i = 0; i < data_len; i++) {
+        snprintf(self->task_hex + i * 2, 3, "%02x", data[i]);
+      }
+      self->task_hex[data_len * 2] = '\0';
+
+      /* Publish through the interface. */
+      uint32_t t_publish = self->get_time_ms();
+      mqtt_client_publish_raw(self->mqtt_client, self->task_topic,
+          self->task_hex, data_len * 2, true);
+      uint32_t elapsed = self->get_time_ms() - t_publish;
+
+      if (elapsed >= 1000) {
+        ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
+      }
+
+      // Update stats under mutex for dual-core safety.
+      if (self->state_mutex) {
+        if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+          self->total_published++;
+          self->publish_count_window++;
+          xSemaphoreGive(self->state_mutex);
+        }
+      } else {
+        self->total_published++;
+        self->publish_count_window++;
+      }
+    }
+  }
+
+  // Signal completion before deleting the task (dual-core safe shutdown).
+  if (self->done_semaphore) {
+    xSemaphoreGive(self->done_semaphore);
+  }
+  vTaskDelete(NULL);
+}
+#endif
 
 void erd_cache_mqtt_publisher_init(
   erd_cache_mqtt_publisher_t* self,
@@ -27,6 +127,22 @@ void erd_cache_mqtt_publisher_init(
   self->publish_index = 0;
   self->mqtt_connected = true;
   self->get_time_ms = esphome::millis;
+
+#ifdef USE_ESP_IDF
+  self->work_semaphore = xSemaphoreCreateBinary();
+  if (!self->work_semaphore) {
+    ESP_LOGE(TAG, "Failed to create work semaphore");
+  }
+  self->state_mutex = xSemaphoreCreateMutex();
+  if (!self->state_mutex) {
+    ESP_LOGE(TAG, "Failed to create state mutex");
+  }
+  self->done_semaphore = xSemaphoreCreateBinary();
+  if (!self->done_semaphore) {
+    ESP_LOGE(TAG, "Failed to create done semaphore");
+  }
+  self->task_running = false;
+#endif
 
   if (!mqtt_client) return;
   /* Subscribe to MQTT disconnect event */
@@ -56,6 +172,8 @@ void erd_cache_mqtt_publisher_init(
 
 void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self)
 {
+  erd_cache_mqtt_publisher_stop(self);
+
   if (!self->mqtt_client) {
     memset(self, 0, sizeof(*self));
     return;
@@ -68,7 +186,90 @@ void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self)
     mqtt_client_on_mqtt_connect(self->mqtt_client),
     &self->mqtt_connect_subscription);
 
+#ifdef USE_ESP_IDF
+  if (self->work_semaphore) {
+    vSemaphoreDelete(self->work_semaphore);
+    self->work_semaphore = NULL;
+  }
+  if (self->state_mutex) {
+    vSemaphoreDelete(self->state_mutex);
+    self->state_mutex = NULL;
+  }
+  if (self->done_semaphore) {
+    vSemaphoreDelete(self->done_semaphore);
+    self->done_semaphore = NULL;
+  }
+#endif
+
   memset(self, 0, sizeof(*self));
+}
+
+void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
+{
+#ifdef USE_ESP_IDF
+  if (self->task_handle != NULL) return; // already running
+  if (self->work_semaphore == NULL) return; // semaphore creation failed in init
+  self->task_running = true;
+  self->task_handle = xTaskCreateStatic(
+      mqtt_publisher_task,
+      "erd_mqtt_pub",
+      2048,
+      self,
+      2,
+      self->task_stack,
+      &self->task_tcb);
+  if (self->task_handle == NULL) {
+    ESP_LOGE(TAG, "Failed to create MQTT publisher task");
+    self->task_running = false;
+  }
+#else
+  (void)self;
+#endif
+}
+
+void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
+{
+#ifdef USE_ESP_IDF
+  if (self->task_handle == NULL) return;
+  self->task_running = false;
+  // Wake the task so it can exit.
+  if (self->work_semaphore != NULL) {
+    xSemaphoreGive(self->work_semaphore);
+  }
+  // Wait for the task to signal completion via done_semaphore.
+  // This is a dual-core safe handshake: the task gives the semaphore
+  // before calling vTaskDelete, so we know it's truly gone.
+  if (self->done_semaphore != NULL) {
+    if (xSemaphoreTake(self->done_semaphore, pdMS_TO_TICKS(1000)) != pdTRUE) {
+      ESP_LOGW(TAG, "MQTT publisher task did not terminate within 1 s");
+    }
+  } else {
+    // Fallback: poll with delay when done_semaphore creation failed.
+    uint32_t start = esphome::millis();
+    while (self->task_handle != NULL && esphome::millis() - start < 1000) {
+      esp_task_wdt_reset();
+      vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    if (self->task_handle != NULL) {
+      ESP_LOGW(TAG, "MQTT publisher task did not terminate within 1 s");
+    }
+  }
+  self->task_handle = NULL;
+#else
+  (void)self;
+#endif
+}
+
+void erd_cache_mqtt_publisher_signal_work(erd_cache_mqtt_publisher_t* self)
+{
+#ifdef USE_ESP_IDF
+  if (self->work_semaphore != NULL) {
+    // Non-blocking give — if task is already waiting, it will wake up.
+    xSemaphoreGive(self->work_semaphore);
+  }
+#else
+  (void)self;
+#endif
 }
 
 uint16_t erd_cache_mqtt_publisher_loop(
@@ -121,8 +322,14 @@ uint16_t erd_cache_mqtt_publisher_loop(
     }
     hex[data_len * 2] = '\0';
 
-    /* Publish through the interface */
+    /* Publish through the interface — measure per-publish time. */
+    uint32_t t_publish = self->get_time_ms();
     mqtt_client_publish_raw(self->mqtt_client, topic, hex, data_len * 2, true);
+    uint32_t elapsed = self->get_time_ms() - t_publish;
+
+    if (elapsed >= 1000) {
+      ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
+    }
 
     self->total_published++;
     self->publish_count_window++;
@@ -134,13 +341,36 @@ uint16_t erd_cache_mqtt_publisher_loop(
 
 void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
 {
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      self->mqtt_connected = true;
+      xSemaphoreGive(self->state_mutex);
+    }
+  } else {
+    self->mqtt_connected = true;
+  }
+#else
   self->mqtt_connected = true;
+#endif
   ESP_LOGI(TAG, "MQTT reconnected — resuming ERD cache publishing");
+  /* Wake the background task so it can start publishing again. */
+  erd_cache_mqtt_publisher_signal_work(self);
 }
-
 void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self)
 {
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      self->mqtt_connected = false;
+      xSemaphoreGive(self->state_mutex);
+    }
+  } else {
+    self->mqtt_connected = false;
+  }
+#else
   self->mqtt_connected = false;
+#endif
   ESP_LOGW(TAG, "MQTT disconnected — pausing ERD cache publishing");
 }
 
@@ -153,7 +383,21 @@ void erd_cache_mqtt_publisher_set_time_fn(
 
 uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* self)
 {
-  uint32_t count = self->publish_count_window;
+  uint32_t count = 0;
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      count = self->publish_count_window;
+      self->publish_count_window = 0;
+      xSemaphoreGive(self->state_mutex);
+    }
+  } else {
+    count = self->publish_count_window;
+    self->publish_count_window = 0;
+  }
+#else
+  count = self->publish_count_window;
   self->publish_count_window = 0;
+#endif
   return count;
 }
