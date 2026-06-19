@@ -37,6 +37,13 @@ typedef struct TaskControlBlock_t StaticTask_t;
 static inline void vTaskDelay(UBaseType_t ticks) { (void)ticks; }
 static inline void vTaskDelete(TaskHandle_t) { }
 static inline UBaseType_t uxTaskGetStackHighWaterMark(TaskHandle_t) { return 1024; }
+static inline TaskHandle_t xTaskCreateStatic(void (*fn)(void*), const char* name,
+        uint32_t stack, void* arg, UBaseType_t prio,
+        StackType_t* stack_buf, StaticTask_t* tcb) {
+    (void)fn; (void)name; (void)stack; (void)arg; (void)prio;
+    (void)stack_buf; (void)tcb;
+    return (TaskHandle_t)0x1;
+}
 
 /* ---------- queue.h types & functions ---------- */
 typedef void* QueueHandle_t;
@@ -55,6 +62,22 @@ static inline BaseType_t xQueueReceive(QueueHandle_t q, void* data, UBaseType_t 
     return pdFALSE;
 }
 static inline void vQueueDelete(QueueHandle_t) { }
+
+/* ---------- semphr.h types & functions ---------- */
+typedef void* SemaphoreHandle_t;
+
+static inline SemaphoreHandle_t xSemaphoreCreateBinary(void) {
+    return (SemaphoreHandle_t)0x1;
+}
+static inline BaseType_t xSemaphoreTake(SemaphoreHandle_t sem, UBaseType_t ticks) {
+    (void)sem; (void)ticks;
+    return pdTRUE;
+}
+static inline BaseType_t xSemaphoreGive(SemaphoreHandle_t sem) {
+    (void)sem;
+    return pdTRUE;
+}
+static inline void vSemaphoreDelete(SemaphoreHandle_t) { }
 
 #ifdef __cplusplus
 }
