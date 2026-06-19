@@ -214,6 +214,13 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   // ERD publish rate sensor: counts ERD updates per ~60s window and
   // publishes to Home Assistant.
+  // Loop timing diagnostics: logs a breakdown of loop() phase durations
+  // every 60 seconds to help diagnose high loop times.
+  uint32_t last_loop_timing_log_{0};
+  static constexpr uint32_t LOOP_TIMING_LOG_INTERVAL_MS = 60000;
+
+  // ERD publish rate sensor: counts ERD updates per ~60s window and
+  // publishes to Home Assistant.
   sensor::Sensor* erd_publish_rate_sensor_{nullptr};
   uint32_t last_erd_publish_rate_publish_{0};
   static constexpr uint32_t ERD_PUBLISH_RATE_INTERVAL_MS = 60000;
