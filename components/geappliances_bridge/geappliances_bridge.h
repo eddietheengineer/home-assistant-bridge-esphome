@@ -36,8 +36,6 @@
 
 extern "C" {
 #include "erd_cache.h"
-#include "erd_bridge_subscribe.h"
-#include "erd_bridge_poll.h"
 #include "erd_write_bridge.h"
 #include "tiny_gea3_erd_client.h"
 #include "tiny_gea3_interface.h"
@@ -47,6 +45,9 @@ extern "C" {
 #include "tiny_hsm.h"
 #include "erd_cache_mqtt_publisher.h"
 }
+
+#include "erd_bridge_subscribe.h"
+#include "erd_bridge_poll.h"
 
 #include "gea2_erd_client_adapter.h"
 

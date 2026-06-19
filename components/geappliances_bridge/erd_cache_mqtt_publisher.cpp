@@ -97,7 +97,7 @@ uint16_t erd_cache_mqtt_publisher_loop(
       break;
     }
     /* Determine data pointer */
-    const uint8_t* data = entry->uses_heap ? entry->heap_data : entry->inline_data;
+    const uint8_t* data = entry->uses_pool ? entry->pool_data : entry->inline_data;
 
     /* Build topic: geappliances/{device_id}/erd/0x{ERD:04x}/value */
     char topic[128];

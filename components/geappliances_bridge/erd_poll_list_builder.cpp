@@ -60,8 +60,7 @@ ErdPollListResult build_erd_poll_list(const ErdPollListConfig& config)
   // -----------------------------------------------------------------------
   if (config.appliance_api_parsing) {
     // Use feature-bit-validated ERDs + custom ERDs.
-    append_erds(result.erds, config.feature_bit_valid_erds ? config.feature_bit_valid_erds->data() : nullptr,
-                config.feature_bit_valid_erds ? static_cast<uint16_t>(config.feature_bit_valid_erds->size()) : 0);
+    append_erds(result.erds, config.feature_bit_valid_erds, config.feature_bit_valid_erds_count);
     append_erds(result.erds, config.custom_erds ? config.custom_erds->data() : nullptr,
                 config.custom_erds ? static_cast<uint16_t>(config.custom_erds->size()) : 0);
     result.description = "poll mode with API parsing: feature-bit ERDs + custom ERDs";

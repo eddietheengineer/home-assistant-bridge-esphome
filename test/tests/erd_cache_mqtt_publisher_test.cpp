@@ -617,10 +617,10 @@ TEST(erd_cache_change_detection, heap_path_new_entry_uses_heap)
   uint16_t iterator = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iterator);
   CHECK(entry != NULL);
-  CHECK_TRUE(entry->uses_heap);
+  CHECK_TRUE(entry->uses_pool);
   CHECK_EQUAL(20u, entry->data_size);
   for (uint8_t i = 0; i < 20; i++) {
-    CHECK_EQUAL(i, entry->heap_data[i]);
+    CHECK_EQUAL(i, entry->pool_data[i]);
   }
 }
 
@@ -646,10 +646,10 @@ TEST(erd_cache_change_detection, heap_path_update_existing_entry)
   uint16_t iterator = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iterator);
   CHECK(entry != NULL);
-  CHECK_TRUE(entry->uses_heap);
+  CHECK_TRUE(entry->uses_pool);
   CHECK_EQUAL(20u, entry->data_size);
   for (uint8_t i = 0; i < 20; i++) {
-    CHECK_EQUAL(255 - i, entry->heap_data[i]);
+    CHECK_EQUAL(255 - i, entry->pool_data[i]);
   }
 }
 

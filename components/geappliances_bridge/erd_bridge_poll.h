@@ -10,7 +10,7 @@
 //       values in the ERD cache; fulfill write commands received from MQTT.
 //
 // Responsibilities:
-//   - Maintain and iterate a dynamic polling list
+//   - Maintain and iterate a fixed-capacity polling list
 //   - Drive a tiny_hsm for probe discovery, polling, and appliance-lost recovery
 //   - Accept a pre-built probe list to verify ERDs before polling
 //   - Report polling health metrics (cycle count, last cycle time)
@@ -59,16 +59,18 @@
 #ifndef erd_bridge_poll_h
 #define erd_bridge_poll_h
 
+extern "C" {
 #include "i_tiny_gea3_erd_client.h"
 #include "tiny_hsm.h"
 #include "tiny_timer.h"
 #include "erd_cache.h"
 #include "erd_lists.h"
+}
+#include "erd_bridge_common.h"
 
 typedef struct {
-  tiny_erd_t* erd_polling_list;       // Heap-allocated, dynamically sized
+  tiny_erd_t erd_polling_list[POLLING_LIST_MAX_SIZE];  /* Fixed-capacity, no heap */
   uint16_t polling_list_count;
-  uint16_t polling_list_capacity;      // Allocated capacity of erd_polling_list
   uint32_t polling_interval_ms;
   tiny_timer_group_t* timer_group;
   i_tiny_gea3_erd_client_t* erd_client;
@@ -76,7 +78,7 @@ typedef struct {
   tiny_timer_t polling_timer;
   tiny_event_subscription_t erd_client_activity_subscription;
   tiny_hsm_t hsm;
-  void* erd_set;
+  erd_set_t erd_set;
   erd_cache_t* erd_cache;
   tiny_gea3_erd_client_request_id_t request_id;
   uint8_t erd_host_address;
@@ -84,69 +86,58 @@ typedef struct {
   const tiny_erd_t* appliance_erd_list;
   uint16_t appliance_erd_list_count;
   uint16_t erd_index;
-  // Number of ERDs in the current polling cycle that have completed (success
-  // or failure).  Used together with erd_index to determine when a full cycle
-  // has finished — the cycle only restarts when cycle_completed_count equals
-  // polling_list_count AND the polling timer has expired.
+  /* Number of ERDs in the current polling cycle that have completed (success
+   * or failure).  Used together with erd_index to determine when a full cycle
+   * has finished — the cycle only restarts when cycle_completed_count equals
+   * polling_list_count AND the polling timer has expired. */
   uint16_t cycle_completed_count;
-  // Set to true once the HSM transitions into state_polling (all ERD
-  // discovery phases have completed). Reset to false on appliance loss/
-  // reconnect. Used externally to gate HA discovery until polling is steady.
+  /* Set to true once the HSM transitions into state_polling (all ERD
+   * discovery phases have completed). Reset to false on appliance loss/
+   * reconnect. Used externally to gate HA discovery until polling is steady. */
   bool polling_list_complete;
-  // Updated at each state entry with a human-readable name of the current HSM
-  // state. Initialized to nullptr; callers may watch this for changes to emit
-  // debug log messages without coupling erd_bridge_subscribe.cpp to ESP logging headers.
+  /* Updated at each state entry with a human-readable name of the current HSM
+   * state. Initialized to nullptr; callers may watch this for changes to emit
+   * debug log messages without coupling erd_bridge_subscribe.cpp to ESP logging headers. */
   const char* current_state_name;
-  // Pre-built list of ERDs to probe during discovery.
-  // Set by the caller before erd_bridge_poll_init(); the bridge copies
-  // successfully-probed ERDs into erd_polling_list during the probe phase.
+  /* Pre-built list of ERDs to probe during discovery.
+   * Set by the caller before erd_bridge_poll_init(); the bridge copies
+   * successfully-probed ERDs into erd_polling_list during the probe phase. */
   const tiny_erd_t* probe_list;
   uint16_t probe_list_count;
-  // Stores the pre-known appliance address so that on appliance loss
-  // the bridge can re-probe at the correct address.
+  /* Stores the pre-known appliance address so that on appliance loss
+   * the bridge can re-probe at the correct address. */
   uint8_t known_host_address;
-  // Health metrics: updated by the polling bridge as cycles complete.
-  // cycle_start_ms: millis() when the current cycle's first read was sent.
-  // last_cycle_time_ms: duration of the last completed cycle (ms).
-  // cycle_count: total completed cycles since init.
+  /* Health metrics: updated by the polling bridge as cycles complete.
+   * cycle_start_ms: millis() when the current cycle's first read was sent.
+   * last_cycle_time_ms: duration of the last completed cycle (ms).
+   * cycle_count: total completed cycles since init. */
   uint32_t cycle_start_ms;
   uint32_t last_cycle_time_ms;
   uint32_t cycle_count;
-  // True while the polling timer is armed (between arm_polling_timer and the
-  // next signal_polling_timer_expired).  Used to decide whether to restart
-  // polling immediately when a cycle finishes: if the timer is armed, wait for
-  // it to fire; if not, start the next cycle right away.
+  /* True while the polling timer is armed (between arm_polling_timer and the
+   * next signal_polling_timer_expired).  Used to decide whether to restart
+   * polling immediately when a cycle finishes: if the timer is armed, wait for
+   * it to fire; if not, start the next cycle right away. */
   bool polling_timer_armed;
-  // Set to true when the polling_interval timer fires while a cycle is still
-  // in progress (cycle_completed_count < polling_list_count).  The in-progress
-  // cycle is allowed to finish, then the cycle-completion handler restarts
-  // immediately instead of waiting for another timer interval.
+  /* Set to true when the polling_interval timer fires while a cycle is still
+   * in progress (cycle_completed_count < polling_list_count).  The in-progress
+   * cycle is allowed to finish, then the cycle-completion handler restarts
+   * immediately instead of waiting for another timer interval. */
   bool restart_pending;
-  // True while a cycle's read requests are being sent in budgeted chunks.
-  // When set, the polling timer handler resumes sending instead of starting
-  // a new cycle.  Cleared once all ERD reads for the cycle are queued.
+  /* True while a cycle's read requests are being sent in budgeted chunks.
+   * When set, the polling timer handler resumes sending instead of starting
+   * a new cycle.  Cleared once all ERD reads for the cycle are queued. */
   bool cycle_sending_in_progress;
-  // Called once when the HSM enters state_polling (discovery complete).
-  // The callback may send a signal to the startup HSM to transition to the
-  // next phase.  Set after erd_bridge_poll_init() and before the HSM
-  // processes its first signal.  NULL means no callback.
+  /* Called once when the HSM enters state_polling (discovery complete).
+   * The callback may send a signal to the startup HSM to transition to the
+   * next phase.  Set after erd_bridge_poll_init() and before the HSM
+   * processes its first signal.  NULL means no callback. */
   void (*on_discovery_complete)(void* context);
   void* on_discovery_complete_context;
 } erd_bridge_poll_t;
 
 /*!
  * Initialize the ERD polling bridge.
- *
- * The host_address should be the discovered appliance address from
- * autodiscovery (not the broadcast address).  The appliance_type should
- * be the value read from ERD 0x0008 during device identity discovery.
- * When both are provided, the bridge skips broadcast identification and
- * proceeds directly to ERD discovery or polling.
- *
- * The probe_list is a pre-built array of ERDs to verify during the
- * discovery phase.  Each ERD is read once; successful reads are added
- * to the polling list, failed reads are excluded.  After probing
- * completes, the bridge transitions to steady-state polling.
  */
 void erd_bridge_poll_init(
   erd_bridge_poll_t* self,

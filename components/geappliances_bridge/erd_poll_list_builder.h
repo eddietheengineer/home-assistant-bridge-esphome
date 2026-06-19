@@ -35,6 +35,7 @@
 #include <string>
 #include <vector>
 
+#include "tiny_erd.h"
 #include "bridge_mode.h"
 
 namespace esphome {
@@ -60,8 +61,9 @@ struct ErdPollListConfig {
   bool appliance_api_parsing;
 
   /// The valid ERD set produced by the feature bit manager.
-  /// Empty if feature bits are not available or parsing is disabled.
-  const std::vector<uint16_t>* feature_bit_valid_erds;
+  /// Raw pointer into the manager's fixed array; NULL if not available.
+  const tiny_erd_t* feature_bit_valid_erds;
+  uint16_t feature_bit_valid_erds_count;
 
   /// User-configured custom ERDs to always poll.
   const std::vector<uint16_t>* custom_erds;

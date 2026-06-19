@@ -433,8 +433,7 @@ TEST(feature_bit_manager, incremental_parsing_completes_with_timer_elapse)
 
   // The valid ERD set should contain the mandatory ERDs plus any
   // ERDs indicated by the feature bits.
-  const auto& erds = manager.get_valid_erds();
-  CHECK_TRUE(erds.size() >= 14);
+  CHECK_TRUE(manager.get_valid_erd_count() >= 14);
 }
 
 TEST(feature_bit_manager, parsing_state_is_reached_before_complete)
@@ -554,9 +553,7 @@ TEST(feature_bit_manager, get_valid_erds_returns_empty_before_complete)
 {
   init_manager();
 
-  const auto& erds = manager.get_valid_erds();
-
-  CHECK_TRUE(erds.empty());
+  CHECK_EQUAL(0u, manager.get_valid_erd_count());
 }
 
 TEST(feature_bit_manager, get_valid_erds_returns_empty_during_parsing)
@@ -569,7 +566,7 @@ TEST(feature_bit_manager, get_valid_erds_returns_empty_during_parsing)
   trigger_full_read_sequence();
 
   // In PARSING state, valid_erds is still empty until parsing completes.
-  CHECK_TRUE(manager.get_valid_erds().empty());
+  CHECK_EQUAL(0u, manager.get_valid_erd_count());
 }
 
 TEST(feature_bit_manager, get_valid_erds_contains_mandatory_erds_after_full_parse)
@@ -606,15 +603,28 @@ TEST(feature_bit_manager, get_valid_erds_contains_mandatory_erds_after_full_pars
   // Elapse timer to complete parsing (16 ticks * 5ms = 80ms).
   tiny_timer_group_double_elapse_time(&timer_group, 80);
 
-  const auto& erds = manager.get_valid_erds();
-
   // Mandatory ERDs are always added after parsing completes.
-  CHECK_TRUE(erds.count(ERD_MODEL_NUMBER) > 0);
-  CHECK_TRUE(erds.count(ERD_SERIAL_NUMBER) > 0);
-  CHECK_TRUE(erds.count(ERD_APPLIANCE_TYPE) > 0);
-  CHECK_TRUE(erds.count(ERD_COMMON_FEATURE_API) > 0);
-  CHECK_TRUE(erds.count(ERD_APPLIANCE_FEATURE_API_0) > 0);
-  CHECK_TRUE(erds.count(ERD_APPLIANCE_FEATURE_API_9) > 0);
+  bool found_model = false;
+  bool found_serial = false;
+  bool found_type = false;
+  bool found_common = false;
+  bool found_api0 = false;
+  bool found_api9 = false;
+  for (uint16_t i = 0; i < manager.get_valid_erd_count(); i++) {
+    tiny_erd_t erd = manager.get_valid_erd(i);
+    if (erd == ERD_MODEL_NUMBER) found_model = true;
+    if (erd == ERD_SERIAL_NUMBER) found_serial = true;
+    if (erd == ERD_APPLIANCE_TYPE) found_type = true;
+    if (erd == ERD_COMMON_FEATURE_API) found_common = true;
+    if (erd == ERD_APPLIANCE_FEATURE_API_0) found_api0 = true;
+    if (erd == ERD_APPLIANCE_FEATURE_API_9) found_api9 = true;
+  }
+  CHECK_TRUE(found_model);
+  CHECK_TRUE(found_serial);
+  CHECK_TRUE(found_type);
+  CHECK_TRUE(found_common);
+  CHECK_TRUE(found_api0);
+  CHECK_TRUE(found_api9);
 }
 /* ------------------------------------------------------------------ */
 
@@ -633,10 +643,10 @@ TEST(feature_bit_manager, read_completed_with_null_data_skips_erd)
 }
 
 /* ------------------------------------------------------------------ */
-/* get_valid_erds_vec() consistency                                     */
+/* valid ERD count consistency                                          */
 /* ------------------------------------------------------------------ */
 
-TEST(feature_bit_manager, get_valid_erds_vec_matches_set_after_parse)
+TEST(feature_bit_manager, valid_erd_count_is_reasonable_after_parse)
 {
   init_manager();
 
@@ -648,10 +658,8 @@ TEST(feature_bit_manager, get_valid_erds_vec_matches_set_after_parse)
   // Elapse timer to complete parsing (16 ticks * 5ms = 80ms).
   tiny_timer_group_double_elapse_time(&timer_group, 80);
 
-  const auto& set_erds = manager.get_valid_erds();
-  const auto& vec_erds = manager.get_valid_erds_vec();
-
-  CHECK_EQUAL(set_erds.size(), vec_erds.size());
+  // Should have at least the 14 mandatory ERDs.
+  CHECK_TRUE(manager.get_valid_erd_count() >= 14);
 }
 
 /* ------------------------------------------------------------------ */
@@ -773,8 +781,7 @@ TEST(feature_bit_manager, parsing_with_feature_bits_adds_erds_from_common)
   CHECK_EQUAL(FEATURE_BIT_STATE_COMPLETE, manager.get_state());
 
   // The valid ERD set should include mandatory ERDs plus any from feature bits.
-  const auto& erds = manager.get_valid_erds();
-  CHECK_FALSE(erds.empty());
+  CHECK_TRUE(manager.get_valid_erd_count() > 0);
 }
 
 /* ------------------------------------------------------------------ */

@@ -30,14 +30,16 @@
  * `inline` so that each translation unit gets its own copy without ODR violations.
  */
 
+#include <string.h>
+#include <cstdint>
+
 extern "C" {
-#include "erd_bridge_subscribe.h"
-#include "erd_bridge_poll.h"
+#include "tiny_erd.h"
+#include "tiny_hsm.h"
+#include "tiny_timer.h"
 #include "tiny_utils.h"
 #include "tiny_gea_constants.h"
 }
-
-#include <set>
 
 // ============================================================================
 // Shared timing constants
@@ -67,6 +69,54 @@ enum {
 };
 
 // ============================================================================
+// Fixed-capacity ERD set — replaces std::set<tiny_erd_t> to eliminate heap
+// node allocations.  Sorted array with linear search; O(n) lookups and
+// inserts (n is small: bounded by probe list or subscription ERDs).
+// ============================================================================
+
+#define ERD_SET_CAPACITY 645  // matches POLLING_LIST_MAX_SIZE
+
+typedef struct {
+  tiny_erd_t data[ERD_SET_CAPACITY];
+  uint16_t count;
+} erd_set_t;
+
+static inline void erd_set_init(erd_set_t* self)
+{
+  self->count = 0;
+}
+
+static inline bool erd_set_contains(erd_set_t* self, tiny_erd_t erd)
+{
+  for (uint16_t i = 0; i < self->count; i++) {
+    if (self->data[i] == erd) return true;
+    if (self->data[i] > erd) return false;  /* sorted, so not present */
+  }
+  return false;
+}
+
+static inline bool erd_set_insert(erd_set_t* self, tiny_erd_t erd)
+{
+  if (erd_set_contains(self, erd)) return false;
+  if (self->count >= ERD_SET_CAPACITY) return false;
+  self->data[self->count++] = erd;
+  /* Insertion-sort to keep the array ordered. */
+  int j = (int)self->count - 1;
+  while (j > 0 && self->data[j - 1] > self->data[j]) {
+    tiny_erd_t tmp = self->data[j];
+    self->data[j] = self->data[j - 1];
+    self->data[j - 1] = tmp;
+    j--;
+  }
+  return true;
+}
+
+static inline void erd_set_clear(erd_set_t* self)
+{
+  self->count = 0;
+}
+
+// ============================================================================
 // Shared utility templates
 // ============================================================================
 
@@ -86,8 +136,7 @@ static void disarm_timer(T* self)
 }
 
 template<typename T>
-static std::set<tiny_erd_t>& erd_set(T* self)
+static erd_set_t& erd_set(T* self)
 {
-  return *reinterpret_cast<std::set<tiny_erd_t>*>(self->erd_set);
+  return self->erd_set;
 }
-

@@ -25,7 +25,7 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
                               uint8_t host_address,
                               tiny_timer_group_t* timer_group)
 {
-  // Unsubscribe from any previous init() to avoid dangling subscriptions on re-init.
+  /* Unsubscribe from any previous init() to avoid dangling subscriptions on re-init. */
   if (this->erd_client_) {
     tiny_event_unsubscribe(
       tiny_gea3_erd_client_on_activity(this->erd_client_),
@@ -53,14 +53,13 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
   this->common_parse_idx_ = 0;
   this->parse_common_done_ = false;
   this->valid_list_ready_ = false;
-  this->valid_erds_.clear();
-  this->valid_erds_vec_.clear();
+  this->valid_erds_count_ = 0;
 
-  // Reset ERD data buffers (struct has default initializers, so just re-default-construct)
+  /* Reset ERD data buffers (struct has default initializers, so just re-default-construct) */
   this->erd_data_ = FeatureBitErdData{};
 
-  // Subscribe to ERD client activity events so we can drive the read sequence
-  // without the bridge polling us.
+  /* Subscribe to ERD client activity events so we can drive the read sequence
+   * without the bridge polling us. */
   tiny_event_subscription_init(
     &this->erd_activity_subscription_,
     this,
@@ -74,20 +73,20 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
 
 void FeatureBitManager::cleanup()
 {
-  // Unsubscribe from ERD client activity events.
+  /* Unsubscribe from ERD client activity events. */
   if (this->erd_client_) {
     tiny_event_unsubscribe(
       tiny_gea3_erd_client_on_activity(this->erd_client_),
       &this->erd_activity_subscription_);
   }
 
-  // Stop any active timers.
+  /* Stop any active timers. */
   if (this->timer_group_) {
     tiny_timer_stop(this->timer_group_, &this->parse_timer_);
     tiny_timer_stop(this->timer_group_, &this->queue_retry_timer_);
   }
 
-  // Reset state so a subsequent init() starts fresh.
+  /* Reset state so a subsequent init() starts fresh. */
   this->erd_client_ = nullptr;
   this->timer_group_ = nullptr;
   this->host_address_ = 0;
@@ -97,25 +96,28 @@ void FeatureBitManager::cleanup()
 
 void FeatureBitManager::start()
 {
-  // Defensive: don't dereference null erd_client_
+  /* Defensive: don't dereference null erd_client_ */
   if (this->erd_client_ == nullptr) {
     return;
   }
-  // Idempotent: only queue the first read if we're at the start and haven't queued yet.
+  /* Idempotent: only queue the first read if we're at the start and haven't queued yet. */
   if (this->state_ != FEATURE_BIT_STATE_READING_0092 || this->read_queued_) {
     return;
   }
   this->queue_erd_read_();
 }
 
-const std::set<tiny_erd_t>& FeatureBitManager::get_valid_erds() const
+uint16_t FeatureBitManager::get_valid_erd_count() const
 {
-  return this->valid_erds_;
+  return this->valid_erds_count_;
 }
 
-const std::vector<tiny_erd_t>& FeatureBitManager::get_valid_erds_vec() const
+tiny_erd_t FeatureBitManager::get_valid_erd(uint16_t idx) const
 {
-  return this->valid_erds_vec_;
+  if (idx >= this->valid_erds_count_) {
+    return 0;
+  }
+  return this->valid_erds_[idx];
 }
 
 // =============================================================================
@@ -127,29 +129,29 @@ void FeatureBitManager::on_erd_activity_(const void* args)
   const tiny_gea3_erd_client_on_activity_args_t* a =
     reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(args);
 
-  // Ignore events for other appliances (e.g., GEA2 adapter responses)
+  /* Ignore events for other appliances (e.g., GEA2 adapter responses) */
   if (a->address != this->host_address_) {
     return;
   }
 
-  // Ignore events once we're done reading (PARSING or COMPLETE).
-  // The parse timer handles the PARSING phase independently.
+  /* Ignore events once we're done reading (PARSING or COMPLETE).
+   * The parse timer handles the PARSING phase independently. */
   if (this->state_ == FEATURE_BIT_STATE_PARSING || this->state_ == FEATURE_BIT_STATE_COMPLETE) {
     return;
   }
 
-  // Determine which ERD we're currently waiting for.
+  /* Determine which ERD we're currently waiting for. */
   tiny_erd_t expected_erd = this->get_expected_erd_();
 
-  // If we haven't queued a read yet (queue was full), retry now.
+  /* If we haven't queued a read yet (queue was full), retry now. */
   if (!this->read_queued_) {
     this->queue_erd_read_();
     return;
   }
 
-  // Only process events for the ERD we're actually waiting for.
-  // This prevents unrelated reads (e.g., from the polling bridge) from
-  // clearing read_queued_ and corrupting the read sequence.
+  /* Only process events for the ERD we're actually waiting for.
+   * This prevents unrelated reads (e.g., from the polling bridge) from
+   * clearing read_queued_ and corrupting the read sequence. */
   if (a->type == tiny_gea3_erd_client_activity_type_read_completed) {
     if (a->read_completed.erd == expected_erd) {
       this->handle_read_completed_(a->read_completed.erd,
@@ -169,7 +171,7 @@ void FeatureBitManager::on_erd_activity_(const void* args)
 
 void FeatureBitManager::handle_read_completed_(tiny_erd_t erd, const void* data, uint8_t size)
 {
-  this->read_queued_ = false;  // Read completed, clear the guard
+  this->read_queued_ = false;  /* Read completed, clear the guard */
 
   if (data == nullptr) {
     ESP_LOGW(TAG, "Feature bit ERD 0x%04X: null data pointer, skipping", erd);
@@ -183,7 +185,7 @@ void FeatureBitManager::handle_read_completed_(tiny_erd_t erd, const void* data,
              erd, size, copy_size);
   }
 
-  // Store the ERD data and advance to the next state
+  /* Store the ERD data and advance to the next state */
   if (erd == ERD_COMMON_FEATURE_API)    {
     memcpy(this->erd_data_.erd_0092, data, copy_size);
     this->erd_data_.erd_0092_size = copy_size;
@@ -247,18 +249,17 @@ void FeatureBitManager::handle_read_completed_(tiny_erd_t erd, const void* data,
   else if (erd == ERD_APPLIANCE_FEATURE_API_9) {
     memcpy(this->erd_data_.erd_010D, data, copy_size);
     this->erd_data_.erd_010D_size = copy_size;
-    ESP_LOGD(TAG, "Read appliance feature API 9 (0x010D): %u bytes", copy_size);
-    // All ERDs read - transition to parsing
+    /* All ERDs read - transition to parsing */
     this->state_ = FEATURE_BIT_STATE_PARSING;
     this->start_parse_timer_();
     return;
   }
   else {
-    // Unexpected ERD - ignore
+    /* Unexpected ERD - ignore */
     return;
   }
 
-  // Queue the next ERD in the sequence
+  /* Queue the next ERD in the sequence */
   this->queue_erd_read_();
 }
 
@@ -283,20 +284,20 @@ void FeatureBitManager::queue_erd_read_()
     case FEATURE_BIT_STATE_READING_010B: feature_erd = ERD_APPLIANCE_FEATURE_API_7; feature_name = "appliance feature API 7 (0x010B)";       break;
     case FEATURE_BIT_STATE_READING_010C: feature_erd = ERD_APPLIANCE_FEATURE_API_8; feature_name = "appliance feature API 8 (0x010C)";       break;
     case FEATURE_BIT_STATE_READING_010D: feature_erd = ERD_APPLIANCE_FEATURE_API_9; feature_name = "appliance feature API 9 (0x010D)";       break;
-    default: return;  // Not in a READING state - nothing to queue
+    default: return;  /* Not in a READING state - nothing to queue */
   }
 
-  // Try to queue the read. If the queue is full, stay in the current state
-  // and schedule a retry timer.
+  /* Try to queue the read. If the queue is full, stay in the current state
+   * and schedule a retry timer. */
   tiny_gea3_erd_client_request_id_t req_id;
   if (tiny_gea3_erd_client_read(this->erd_client_, &req_id, this->host_address_, feature_erd)) {
     ESP_LOGD(TAG, "Queued read for %s", feature_name);
     this->read_queued_ = true;
   } else {
-    // Queue is full — arm a one-shot retry timer so we don't stall
-    // indefinitely when no other ERD activity occurs.
+    /* Queue is full — arm a one-shot retry timer so we don't stall
+     * indefinitely when no other ERD activity occurs. */
     ESP_LOGD(TAG, "Queue full for %s, scheduling retry in %u ms",
-             feature_name, static_cast<uint32_t>(QUEUE_RETRY_MS));
+             feature_name, static_cast<unsigned>(QUEUE_RETRY_MS));
     tiny_timer_start(this->timer_group_,
                      &this->queue_retry_timer_,
                      QUEUE_RETRY_MS,
@@ -323,7 +324,7 @@ tiny_erd_t FeatureBitManager::get_expected_erd_() const
     case FEATURE_BIT_STATE_READING_010B: return ERD_APPLIANCE_FEATURE_API_7;
     case FEATURE_BIT_STATE_READING_010C: return ERD_APPLIANCE_FEATURE_API_8;
     case FEATURE_BIT_STATE_READING_010D: return ERD_APPLIANCE_FEATURE_API_9;
-    default: return 0;  // Not in a READING state
+    default: return 0;  /* Not in a READING state */
   }
 }
 
@@ -338,13 +339,13 @@ void FeatureBitManager::queue_retry_timer_callback_(void* context)
 
 void FeatureBitManager::queue_retry_()
 {
-  // Don't retry if we've moved past the READING state (e.g., an event
-  // arrived and completed the read before the timer fired).
+  /* Don't retry if we've moved past the READING state (e.g., an event
+   * arrived and completed the read before the timer fired). */
   if (this->state_ == FEATURE_BIT_STATE_PARSING || this->state_ == FEATURE_BIT_STATE_COMPLETE) {
     return;
   }
   if (this->read_queued_) {
-    // Read was already queued by an intervening event — nothing to do.
+    /* Read was already queued by an intervening event — nothing to do. */
     return;
   }
   this->queue_erd_read_();
@@ -356,7 +357,7 @@ void FeatureBitManager::queue_retry_()
 
 void FeatureBitManager::skip_to_next_erd_(tiny_erd_t failed_erd)
 {
-  this->read_queued_ = false;  // Read failed, clear the guard
+  this->read_queued_ = false;  /* Read failed, clear the guard */
 
   ESP_LOGD(TAG, "Feature bit ERD 0x%04X failed or not supported, skipping", failed_erd);
 
@@ -372,14 +373,14 @@ void FeatureBitManager::skip_to_next_erd_(tiny_erd_t failed_erd)
     case ERD_APPLIANCE_FEATURE_API_7: this->state_ = FEATURE_BIT_STATE_READING_010C; break;
     case ERD_APPLIANCE_FEATURE_API_8: this->state_ = FEATURE_BIT_STATE_READING_010D; break;
     case ERD_APPLIANCE_FEATURE_API_9:
-      // Last ERD failed - transition to parsing with whatever we have
+      /* Last ERD failed - transition to parsing with whatever we have */
       this->state_ = FEATURE_BIT_STATE_PARSING;
       this->start_parse_timer_();
       return;
     default: break;
   }
 
-  // Queue the next ERD read
+  /* Queue the next ERD read */
   this->queue_erd_read_();
 }
 
@@ -389,7 +390,7 @@ void FeatureBitManager::skip_to_next_erd_(tiny_erd_t failed_erd)
 
 void FeatureBitManager::start_parse_timer_()
 {
-  // Start periodic timer for incremental parsing
+  /* Start periodic timer for incremental parsing */
   tiny_timer_start_periodic(this->timer_group_,
                             &this->parse_timer_,
                             PARSE_TICK_MS,
@@ -402,12 +403,21 @@ void FeatureBitManager::parse_timer_callback_(void* context)
   reinterpret_cast<FeatureBitManager*>(context)->parse_next_step_();
 }
 
+void FeatureBitManager::add_valid_erd_(tiny_erd_t erd)
+{
+  /* Deduplicate: check if already present. */
+  for (uint16_t i = 0; i < this->valid_erds_count_; i++) {
+    if (this->valid_erds_[i] == erd) return;
+  }
+  if (this->valid_erds_count_ >= FEATURE_BIT_MAX_ERDS) return;
+  this->valid_erds_[this->valid_erds_count_++] = erd;
+}
+
 void FeatureBitManager::parse_next_step_()
 {
-  // First call: initialize (clear state).
+  /* First call: initialize (clear state). */
   if (this->parse_erd_idx_ == 0 && !this->parse_common_done_ && this->common_parse_idx_ == 0) {
-    this->valid_erds_.clear();
-    this->valid_erds_vec_.clear();
+    this->valid_erds_count_ = 0;
     this->valid_list_ready_ = false;
 
     if (this->erd_data_.erd_0092_size > 0) {
@@ -418,7 +428,7 @@ void FeatureBitManager::parse_next_step_()
     }
   }
 
-  // Parse common features incrementally (up to COMMON_PARSE_PER_CALL descriptors per call).
+  /* Parse common features incrementally (up to COMMON_PARSE_PER_CALL descriptors per call). */
   if (!this->parse_common_done_) {
     uint16_t start = this->common_parse_idx_;
     uint16_t end = (start + COMMON_PARSE_PER_CALL > common_feature_descriptor_count)
@@ -433,7 +443,7 @@ void FeatureBitManager::parse_next_step_()
           ESP_LOGI(TAG, "  [SET] Common feature: %s (mask 0x%08X, %u ERDs)",
                    desc.name, desc.bit_mask, desc.erd_count);
           for (uint16_t j = 0; j < desc.erd_count; j++) {
-            this->valid_erds_.insert(desc.erds[j]);
+            this->add_valid_erd_(desc.erds[j]);
           }
         }
       }
@@ -442,24 +452,24 @@ void FeatureBitManager::parse_next_step_()
     this->common_parse_idx_ = end;
     if (this->common_parse_idx_ >= common_feature_descriptor_count) {
       this->parse_common_done_ = true;
-      // Fall through to parse the first appliance ERD on the next tick.
+      /* Fall through to parse the first appliance ERD on the next tick. */
       return;
     }
-    // Not done with common features yet - return to keep timer tick short.
+    /* Not done with common features yet - return to keep timer tick short. */
     return;
   }
 
-  // Static tables for appliance ERDs (indexed 0-9).
+  /* Static tables for appliance ERDs (indexed 0-9). */
   [[maybe_unused]] static const char* const erd_names[10] = {
     "0x0093", "0x0094", "0x0095", "0x0096", "0x0097",
     "0x0109", "0x010A", "0x010B", "0x010C", "0x010D"
   };
 
-  // Process one appliance ERD per tick to avoid blocking the timer for too long.
+  /* Process one appliance ERD per tick to avoid blocking the timer for too long. */
   if (this->parse_erd_idx_ < 10) {
     uint8_t idx = this->parse_erd_idx_;
 
-    // Map index to the actual erd_data_ member.
+    /* Map index to the actual erd_data_ member. */
     const uint8_t* api_bufs[10] = {
       this->erd_data_.erd_0093, this->erd_data_.erd_0094,
       this->erd_data_.erd_0095, this->erd_data_.erd_0096,
@@ -477,7 +487,7 @@ void FeatureBitManager::parse_next_step_()
 
     if (api_sizes[idx] < APPLIANCE_FEATURE_ERD_SIZE) {
       this->parse_erd_idx_++;
-      return;  // Will process next ERD on next tick
+      return;  /* Will process next ERD on next tick */
     }
     const uint8_t* api_buf = api_bufs[idx];
     uint16_t appliance_type    = (static_cast<uint16_t>(api_buf[0]) << 8) | api_buf[1];
@@ -488,7 +498,7 @@ void FeatureBitManager::parse_next_step_()
 
     if (appliance_type == 0 && version == 0 && feature_bitmap == 0) {
       this->parse_erd_idx_++;
-      return;  // Will process next ERD on next tick
+      return;  /* Will process next ERD on next tick */
     }
     ESP_LOGI(TAG, "Appliance feature ERD %s: type 0x%04X, version %u, features 0x%08X",
              erd_names[idx], appliance_type, version, feature_bitmap);
@@ -501,7 +511,7 @@ void FeatureBitManager::parse_next_step_()
         ESP_LOGI(TAG, "  [SET] %s (mask 0x%08X, %u ERDs)",
                  desc.name, desc.bit_mask, desc.erd_count);
         for (uint16_t j = 0; j < desc.erd_count; j++) {
-          this->valid_erds_.insert(desc.erds[j]);
+          this->add_valid_erd_(desc.erds[j]);
         }
       }
     }
@@ -511,11 +521,11 @@ void FeatureBitManager::parse_next_step_()
     }
 
     this->parse_erd_idx_++;
-    return;  // Process only one ERD per tick.
+    return;  /* Process only one ERD per tick. */
   }
 
-  // All appliance ERDs parsed - finalize.
-  // Add mandatory ERDs (always published regardless of feature bits).
+  /* All appliance ERDs parsed - finalize.
+   * Add mandatory ERDs (always published regardless of feature bits). */
   static const tiny_erd_t mandatory_erds[] = {
     ERD_MODEL_NUMBER, ERD_SERIAL_NUMBER, ERD_APPLIANCE_TYPE,
     ERD_COMMON_FEATURE_API, ERD_APPLIANCE_FEATURE_API_0,
@@ -525,15 +535,14 @@ void FeatureBitManager::parse_next_step_()
     ERD_APPLIANCE_FEATURE_API_7, ERD_APPLIANCE_FEATURE_API_8,
     ERD_APPLIANCE_FEATURE_API_9
   };
-  for (auto erd : mandatory_erds) {
-    this->valid_erds_.insert(erd);
+  for (uint16_t i = 0; i < sizeof(mandatory_erds) / sizeof(mandatory_erds[0]); i++) {
+    this->add_valid_erd_(mandatory_erds[i]);
   }
 
-  this->valid_erds_vec_.assign(this->valid_erds_.begin(), this->valid_erds_.end());
   this->valid_list_ready_ = true;
-  ESP_LOGI(TAG, "Feature bit parsing complete: %zu valid ERDs", this->valid_erds_.size());
+  ESP_LOGI(TAG, "Feature bit parsing complete: %u valid ERDs", this->valid_erds_count_);
 
-  // Stop the parse timer and transition to COMPLETE
+  /* Stop the parse timer and transition to COMPLETE */
   tiny_timer_stop(this->timer_group_, &this->parse_timer_);
   this->state_ = FEATURE_BIT_STATE_COMPLETE;
 }

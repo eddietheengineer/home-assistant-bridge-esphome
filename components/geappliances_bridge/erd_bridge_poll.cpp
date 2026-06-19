@@ -12,15 +12,14 @@
  *     → state_polling
  */
 
+#include "erd_bridge_poll.h"
+
 #include "erd_bridge_common.h"
 #include "erd_lists.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/application.h"
 #include "erd_cache.h"
-#include <set>
-
-using namespace std;
 
 static const char* const TAG __attribute__((unused)) = "erd_bridge_poll";
 
@@ -59,36 +58,18 @@ static void reset_lost_appliance_timer(erd_bridge_poll_t* self)
     });
 }
 
-// Growth increment for dynamic polling list reallocation.
-// Large enough to amortize allocation cost, small enough to avoid wasting heap.
-static const uint16_t POLLING_LIST_GROWTH_INCREMENT = 32;
-
-// Allocate or grow the polling list to at least the requested capacity.
-// If the list is already large enough, this is a no-op.
-// POLLING_LIST_MAX_SIZE is defined in erd_lists.h (included via erd_bridge_common.h).
-static void ensure_polling_list_capacity(erd_bridge_poll_t* self, uint16_t needed)
+/* Fixed-capacity polling list — no dynamic reallocation.
+ * POLLING_LIST_MAX_SIZE is defined in erd_lists.h (included via erd_bridge_common.h). */
+static void add_erd_to_polling_list(erd_bridge_poll_t* self, tiny_erd_t erd)
 {
-  if (needed <= self->polling_list_capacity) {
+  if (erd_set_contains(&self->erd_set, erd)) {
     return;
   }
-  // Compute new_capacity in a wider type to avoid uint16_t overflow before the cap check.
-  // The -1 ensures the growth step is at least POLLING_LIST_GROWTH_INCREMENT even when
-  // needed is already a multiple of the increment (e.g. needed=64 → 64+31=95, not 64).
-  uint32_t new_capacity = (uint32_t)needed + (POLLING_LIST_GROWTH_INCREMENT - 1);
-  // Enforce a hard safety cap to prevent runaway allocations.
-  if (new_capacity > POLLING_LIST_MAX_SIZE) {
-    new_capacity = POLLING_LIST_MAX_SIZE;
+  erd_set_insert(&self->erd_set, erd);
+  if (self->polling_list_count < POLLING_LIST_MAX_SIZE) {
+    self->erd_polling_list[self->polling_list_count] = erd;
+    self->polling_list_count++;
   }
-  tiny_erd_t* new_list = new tiny_erd_t[(uint16_t)new_capacity];
-  if (self->erd_polling_list) {
-    // Copy existing entries.
-    for (uint16_t i = 0; i < self->polling_list_count; i++) {
-      new_list[i] = self->erd_polling_list[i];
-    }
-    delete[] self->erd_polling_list;
-  }
-  self->erd_polling_list = new_list;
-  self->polling_list_capacity = (uint16_t)new_capacity;
 }
 
 /* Reset the polling bridge's discovery state (erd_set and polling list).
@@ -100,20 +81,8 @@ static void ensure_polling_list_capacity(erd_bridge_poll_t* self, uint16_t neede
  * when the polling bridge re-discovers after appliance loss. */
 static void clear_discovery_state(erd_bridge_poll_t* self)
 {
-  erd_set(self).clear();
+  erd_set_clear(&self->erd_set);
   self->polling_list_count = 0;
-}
-
-
-static void add_erd_to_polling_list(erd_bridge_poll_t* self, tiny_erd_t erd)
-{
-  if (erd_set(self).find(erd) == erd_set(self).end()) {
-    erd_set(self).insert(erd);
-    // Ensure there's room in the dynamic array.
-    ensure_polling_list_capacity(self, self->polling_list_count + 1);
-    self->erd_polling_list[self->polling_list_count] = erd;
-    self->polling_list_count++;
-  }
 }
 
 // Called when all ERDs in the current polling cycle have responded.
@@ -336,7 +305,7 @@ static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
   // (not_supported) or timed out after all retries (retries_exhausted) —
   // permanently excludes the ERD from the Phase 3 polling list.
   if (signal == signal_read_failed) {
-    erd_set(self).insert(args->read_failed.erd);
+    erd_set_insert(&self->erd_set, args->read_failed.erd);
     if (!send_next_read_request(self)) {
       tiny_hsm_transition(hsm, state_polling);
     }
@@ -418,7 +387,9 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       const uint8_t*  erd_data  = reinterpret_cast<const uint8_t*>(args->read_completed.data);
       uint8_t         data_size = args->read_completed.data_size;
 
-      if (erd_set(self).find(erd) == erd_set(self).end()) {
+      if (erd_set_contains(&self->erd_set, erd)) {
+        // ERD already known — just update cache.
+      } else {
         add_erd_to_polling_list(self, erd);
       }
 
@@ -491,9 +462,7 @@ static void erd_bridge_poll_init_impl(
   self->known_host_address     = initial_host_address;
   self->probe_list             = probe_list;
   self->probe_list_count       = probe_list_count;
-  self->erd_polling_list       = nullptr;
   self->polling_list_count     = 0;
-  self->polling_list_capacity  = 0;
   self->restart_pending             = false;
   self->cycle_sending_in_progress   = false;
   self->polling_timer_armed         = false;
@@ -502,10 +471,7 @@ static void erd_bridge_poll_init_impl(
   self->cycle_start_ms              = 0;
   self->last_cycle_time_ms          = 0;
   self->cycle_count                 = 0;
-  // Initialize to nullptr so that if the new below throws,
-  // erd_bridge_poll_destroy() will safely skip the delete.
-  self->erd_set = nullptr;
-  self->erd_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
+  erd_set_init(&self->erd_set);
   self->erd_cache = cache;
   self->on_discovery_complete        = nullptr;
   self->on_discovery_complete_context = nullptr;
@@ -547,38 +513,25 @@ void erd_bridge_poll_init(
 
 void erd_bridge_poll_destroy(erd_bridge_poll_t* self)
 {
-  // Guard against destroy() being called on a never-initialized struct (e.g.
-  // in test teardowns that always call both bridge and polling destroy).
+  /* Guard against destroy() being called on a never-initialized struct (e.g.
+   * in test teardowns that always call both bridge and polling destroy). */
   if (!self->timer_group) {
     return;
   }
 
-  // Stop all active timers so they cannot fire after the bridge is torn down.
-  // tiny_timer_stop() is idempotent: safe to call even if a timer is not active.
+  /* Stop all active timers so they cannot fire after the bridge is torn down.
+   * tiny_timer_stop() is idempotent: safe to call even if a timer is not active. */
   tiny_timer_stop(self->timer_group, &self->appliance_lost_timer);
   tiny_timer_stop(self->timer_group, &self->polling_timer);
 
-  // Remove event subscription before freeing heap state.
-  // Guard against partial init where erd_client may be null.
+  /* Remove event subscription before freeing heap state.
+   * Guard against partial init where erd_client may be null. */
   if (self->erd_client) {
     tiny_event_unsubscribe(
       tiny_gea3_erd_client_on_activity(self->erd_client),
       &self->erd_client_activity_subscription);
   }
 
-  // Guard against partial init (e.g., if the first new set<tiny_erd_t>()
-  // failed and init returned early).  delete nullptr is safe in C++, but
-  // the reinterpret_cast from a non-null garbage pointer is not.
-  if (self->erd_set) {
-    delete reinterpret_cast<set<tiny_erd_t>*>(self->erd_set);
-    self->erd_set = nullptr;
-  }
-
-  if (self->erd_polling_list != nullptr) {
-    delete[] self->erd_polling_list;
-    self->erd_polling_list = nullptr;
-  }
-  self->polling_list_count = 0;
-  self->polling_list_capacity = 0;
+  /* erd_set and erd_polling_list are fixed arrays embedded in the struct —
+   * no heap cleanup needed. */
 }
-

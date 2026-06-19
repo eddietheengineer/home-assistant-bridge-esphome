@@ -36,16 +36,15 @@
 
 namespace esphome {
 namespace geappliances_bridge {
-static std::set<tiny_erd_t> erd_cache_to_set(erd_cache_t* cache)
+static void erd_cache_to_array(erd_cache_t* cache, tiny_erd_t* out, uint16_t* count)
 {
-  std::set<tiny_erd_t> erds;
+  *count = 0;
   uint16_t iterator = 0;
-  while (true) {
+  while (*count < ERD_CACHE_CAPACITY) {
     erd_cache_entry_t* entry = erd_cache_get_next_entry(cache, &iterator);
     if (!entry) break;
-    erds.insert(entry->erd);
+    out[(*count)++] = entry->erd;
   }
-  return erds;
 }
 // ---------------------------------------------------------------------------
 // Polling bridge discovery-complete callback (shared by all three init paths)
@@ -53,7 +52,10 @@ static std::set<tiny_erd_t> erd_cache_to_set(erd_cache_t* cache)
 
 void GeappliancesBridge::on_poll_discovery_complete_()
 {
-  this->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&this->erd_cache_));
+  tiny_erd_t erds[ERD_CACHE_CAPACITY];
+  uint16_t count = 0;
+  erd_cache_to_array(&this->erd_cache_, erds, &count);
+  this->ha_discovery_manager_.set_registered_erds(erds, count);
   erd_write_bridge_set_host_address(&this->erd_write_bridge_, this->autodiscovery_manager_.get_host_address());
   tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
 }
@@ -70,7 +72,8 @@ ErdPollListResult build_poll_list_(GeappliancesBridge* bridge)
   config.subscription_capable = !bridge->autodiscovery_manager_.is_gea2_protocol();
   config.subscription_active = bridge->subscription_mode_active_;
   config.appliance_api_parsing = bridge->appliance_api_parsing_;
-  config.feature_bit_valid_erds = &bridge->feature_bit_manager_.get_valid_erds_vec();
+  config.feature_bit_valid_erds = bridge->feature_bit_manager_.get_valid_erd_count() ? bridge->feature_bit_manager_.valid_erds_ : nullptr;
+  config.feature_bit_valid_erds_count = bridge->feature_bit_manager_.get_valid_erd_count();
   config.custom_erds = &bridge->custom_erds_vec_;
   config.appliance_type = bridge->device_identity_manager_.get_appliance_type();
   return build_erd_poll_list(config);
@@ -174,10 +177,11 @@ void GeappliancesBridge::initialize_erd_bridge_()
   // continue to be published in that case.
   if (this->appliance_api_parsing_ &&
       this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE &&
-      !this->feature_bit_manager_.get_valid_erds().empty()) {
-    this->erd_registry_.set_valid_erds(this->feature_bit_manager_.get_valid_erds());
-    ESP_LOGI(TAG, "Appliance API parsing enabled: publishing filtered to %zu valid ERDs",
-             this->feature_bit_manager_.get_valid_erds().size());
+      this->feature_bit_manager_.get_valid_erd_count() > 0) {
+    this->erd_registry_.set_valid_erds(this->feature_bit_manager_.valid_erds_,
+                                       this->feature_bit_manager_.get_valid_erd_count());
+    ESP_LOGI(TAG, "Appliance API parsing enabled: publishing filtered to %u valid ERDs",
+             this->feature_bit_manager_.get_valid_erd_count());
   }
 
   // Select operating mode.
@@ -263,12 +267,15 @@ void GeappliancesBridge::initialize_erd_bridge_()
 
   // Defer HA device discovery until ERD registration has settled.
   if (this->generate_device_config_) {
+    tiny_erd_t erds[ERD_CACHE_CAPACITY];
+    uint16_t count = 0;
+    erd_cache_to_array(&this->erd_cache_, erds, &count);
     this->ha_discovery_manager_.init(
         this->ha_discovery_base_url_,
         this->device_identity_manager_.get_device_id(),
         this->device_identity_manager_.get_model_number(),
         this->device_identity_manager_.get_serial_number(),
-        erd_cache_to_set(&this->erd_cache_),
+        erds, count,
         true);
     this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
     ESP_LOGI(TAG, "HA discovery deferred: will publish after ERD discovery completes "

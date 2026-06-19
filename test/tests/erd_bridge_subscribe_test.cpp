@@ -5,8 +5,9 @@
 
 extern "C" {
 #include "erd_cache.h"
-#include "erd_bridge_subscribe.h"
 }
+
+#include "erd_bridge_subscribe.h"
 
 #include "CppUTest/TestHarness.h"
 #include "CppUTestExt/MockSupport.h"
