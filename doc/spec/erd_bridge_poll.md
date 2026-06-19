@@ -4,13 +4,12 @@
 
 ### 1.1 Purpose
 
-The ERD polling bridge discovers the connected GE appliance, determines which ERDs (Entity-Relationship Data points) it supports, and periodically reads their values — writing them to the shared ERD cache. It has **zero** direct interaction with the MQTT client.
+The ERD polling bridge probes a pre-built list of ERDs at a known host address, then settles into steady-state polling. It writes ERD values to the shared ERD cache. It has **zero** direct interaction with the MQTT client.
 
 ### 1.2 Responsibilities
 
-- Discover the appliance's host address via broadcast (or accept a pre-known address)
 - Probe a pre-built list of ERDs to determine which the appliance supports
-- Maintain a dynamic polling list of verified ERDs
+- Maintain a fixed-capacity polling list of verified ERDs
 - Execute steady-state polling cycles at a configured interval
 - Write ERD values to the shared ERD cache (change detection via `erd_cache_update`)
 - Recover from appliance loss
@@ -21,6 +20,7 @@ The ERD polling bridge discovers the connected GE appliance, determines which ER
 - Any MQTT behavior (publishing, write requests, disconnect handling)
 - Building the probe list (see `erd_poll_list_builder`)
 - Bridge startup phase management (see `geappliances_bridge_startup_hsm`)
+- Broadcast discovery (see `AutodiscoveryManager`)
 
 ---
 
@@ -46,7 +46,7 @@ void erd_bridge_poll_init(
 | `timer_group` | Shared timer group for polling and appliance-lost timers. |
 | `erd_client` | GEA3 ERD client interface. |
 | `polling_interval_ms` | Interval between polling cycles (default 10000 ms). |
-| `host_address` | The appliance's GEA bus address. If `tiny_gea_broadcast_address` (0xFF), the bridge performs broadcast discovery. Otherwise, it skips broadcast and proceeds directly to probing. |
+| `host_address` | The appliance's GEA bus address. The bridge always receives a known host address from autodiscovery — broadcast discovery is the responsibility of `AutodiscoveryManager`. |
 | `appliance_type` | The appliance type byte from ERD 0x0008. Used for logging and health metrics. |
 | `probe_list` / `probe_list_count` | A pre-built array of ERDs to verify during the probe phase. Built by `erd_poll_list_builder` based on bridge mode and configuration. Each ERD is read once; successful reads are added to the polling list, failed reads are excluded. |
 | `cache` | Shared `erd_cache_t` for storing ERD values. |
@@ -59,7 +59,7 @@ The probe list pointer must remain valid for the duration of the probe phase (ty
 void erd_bridge_poll_destroy(erd_bridge_poll_t* self);
 ```
 
-Stops timers, unsubscribes all event handlers, and frees heap-allocated state (`erd_set`, `erd_polling_list`). Guards against being called on a never-initialized struct or a partially-initialized one (e.g., if a `new` allocation failed during init).
+Stops timers and unsubscribes all event handlers. All state is stack-allocated or embedded in the struct — no heap cleanup needed. Guards against being called on a never-initialized struct (e.g., in test teardowns).
 
 ### 2.3 Discovery-Complete Callback
 
@@ -210,13 +210,12 @@ A polling cycle consists of sending reads for all ERDs in `erd_polling_list` and
 
 ### 6.1 Polling List
 
-- `erd_polling_list`: heap-allocated array of `tiny_erd_t`, dynamically grown in increments of `POLLING_LIST_GROWTH_INCREMENT` (32), capped at `POLLING_LIST_MAX_SIZE` (from `erd_lists.h`).
+- `erd_polling_list`: fixed-capacity array of `tiny_erd_t[POLLING_LIST_MAX_SIZE]`. No heap allocation.
 - `polling_list_count`: number of valid entries.
-- `polling_list_capacity`: allocated capacity.
 
 ### 6.2 ERD Set
 
-- `erd_set`: `std::set<tiny_erd_t>` stored as `void*` in the struct. Used for deduplication during discovery and polling list management.
+- `erd_set`: `erd_set_t` — a fixed-capacity sorted array (capacity 645). Used for deduplication during discovery and polling list management. No heap allocation.
 
 ### 6.3 Probe List
 
@@ -248,7 +247,6 @@ The polling bridge does not own the publish-on-change setting — it is controll
 | `POLL_CYCLE_SEND_BUDGET_MS` | 500 ms | Maximum time for `send_cycle_reads()` before yielding. |
 | `POLL_CYCLE_RESUME_MS` | 100 ms | Timer interval when send budget is exceeded. |
 | `appliance_lost_timeout` | 60000 ms | Time without successful reads before triggering appliance loss. |
-| `POLLING_LIST_GROWTH_INCREMENT` | 32 | Number of ERDs to allocate per growth step. |
 | `POLLING_LIST_MAX_SIZE` | (from `erd_lists.h`) | Hard cap on polling list capacity. |
 
 ---
@@ -261,6 +259,7 @@ The polling bridge does not own the publish-on-change setting — it is controll
 4. **Failed probe ERDs are excluded:** In `state_probe_list`, failed ERDs are inserted into `erd_set` as exclusions, preventing them from being lazily registered in `state_polling`.
 5. **Cache NOT cleared on probe re-entry:** The ERD cache is not reset during `state_probe_list` entry or on appliance-loss re-discovery. The cache may be shared with the subscription bridge; stale entries are overwritten when new data arrives.
 6. **Known host address preserved:** The bridge stores the host address in `known_host_address`. On appliance loss, this address is restored and re-probing begins at the same address.
+7. **No heap allocation:** All data structures are fixed-capacity arrays embedded in the struct. No `new`/`malloc`/`std::set`/`void*` casting.
 
 ---
 

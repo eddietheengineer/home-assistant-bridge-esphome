@@ -32,7 +32,7 @@ Any read failure → skip to next ERD in sequence
 The manager is fully self-driving with no polling from the bridge:
 
 1. **`init()`** subscribes to `tiny_gea3_erd_client_on_activity` events and stores the `tiny_timer_group_t*`
-2. **`start()`** queues the first ERD read (0x0008). Uses `read_queued_` guard for idempotency - calling `start()` multiple times before the first read completes does not double-queue.
+2. **`start()`** queues the first ERD read (0x0092, Common Feature API). Uses `read_queued_` guard for idempotency - calling `start()` multiple times before the first read completes does not double-queue.
 3. **Event handler `on_erd_activity_()`** drives the read sequence:
    - Filters events by `address == host_address_` to ignore responses for other appliances
    - Ignores all events once in PARSING or COMPLETE state to prevent state machine corruption

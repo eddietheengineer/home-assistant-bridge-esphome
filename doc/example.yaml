@@ -63,8 +63,22 @@ uart:
 geappliances_bridge:
   gea3_uart_id: gea3_uart
   gea2_uart_id: gea2_uart
-  # device_id: "YourDeviceId"     # Optional: Uncomment to use a custom device ID
-  # mode: poll                    # Default: auto   Options: auto, subscribe, poll
-  # polling_interval: 10000       # Default: 10000 ms (10 seconds), used when in polling mode
-  # polling_onlypublish_onchange: false  # Default: false, only publish if value changed
-  # generate_device_config: false  # Default: true. Set to false to disable automatic HA MQTT discovery
+  # adapter_address: 0xE4                 # Default: 0xE4, bridge's bus address
+  # device_id: "YourDeviceId"             # Optional: Uncomment to use a custom device ID
+  # mode: auto                            # Default: auto   Options: auto, subscribe, poll
+  # polling_interval: 10000               # Default: 10000 ms (10 seconds), used when in polling mode
+  # polling_onlypublish_onchange: true    # Default: true, only publish if value changed
+  # appliance_api_parsing: true           # Default: true, restricts polling to appliance-supported ERDs
+  # generate_device_config: false         # Default: false, set to true to enable automatic HA MQTT discovery
+  # custom_erds: [0x0003, 0x0004]        # Optional: Additional ERDs to poll
+  # ha_discovery_base_url: "..."          # Optional: Override URL for HA discovery JSONL files
+
+  # Optional diagnostic sensors:
+  # erd_publish_rate_sensor:
+  #   name: "ERD Publish Rate"
+  # erd_cache_entries_sensor:
+  #   name: "ERD Cache Entries"
+  # erd_cache_updates_sensor:
+  #   name: "ERD Cache Updates/60s"
+  # mqtt_publish_rate_sensor:
+  #   name: "MQTT Publish Rate"

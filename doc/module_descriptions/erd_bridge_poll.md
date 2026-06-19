@@ -2,14 +2,14 @@
 
 ## Purpose
 
-Discovers the connected appliance by reading ERD 0x0008 (appliance type) on the broadcast address, then probes a pre-built list of ERDs before settling into steady-state polling. Writes ERD values to the shared ERD cache.
+Probes a pre-built list of ERDs at a known host address, then settles into steady-state polling. Writes ERD values to the shared ERD cache. Does not perform broadcast discovery — that is the responsibility of `AutodiscoveryManager`.
 
 ## Public API
 
 | Function | Description |
 |----------|-------------|
-| `erd_bridge_poll_init(self, timer_group, erd_client, interval_ms, host_address, appliance_type, probe_list, probe_list_count, cache)` | Initialize with a pre-built probe list and optional broadcast discovery |
-| `erd_bridge_poll_destroy(self)` | Stop timers, unsubscribe events, free heap state |
+| `erd_bridge_poll_init(self, timer_group, erd_client, interval_ms, host_address, appliance_type, probe_list, probe_list_count, cache)` | Initialize with a pre-built probe list and a known host address from autodiscovery |
+| `erd_bridge_poll_destroy(self)` | Stop timers, unsubscribe events (no heap cleanup needed) |
 
 ## State Machine
 
@@ -31,15 +31,9 @@ poll_state_top (parent — handles appliance loss globally)
        └─ appliance_lost (60 s timeout) → state_probe_list
 ```
 
-The `polling_timer_armed` flag gates cycle restarts: when the polling timer is armed,
-a completed cycle waits for the timer to fire before starting the next cycle (respecting
-the configured interval). When the timer is not armed (e.g., cycle finishes faster than
-the interval), the next cycle starts immediately. This prevents overlapping cycles while
-allowing fast cycles to chain together without unnecessary delay.
+The `polling_timer_armed` flag gates cycle restarts: when the polling timer is armed, a completed cycle waits for the timer to fire before starting the next cycle (respecting the configured interval). When the timer is not armed (e.g., cycle finishes faster than the interval), the next cycle starts immediately. This prevents overlapping cycles while allowing fast cycles to chain together without unnecessary delay.
 
-The `restart_pending` flag handles the case where the timer fires mid-cycle: the in-progress
-cycle is allowed to finish, then the next cycle starts immediately without waiting for
-another timer interval.
+The `restart_pending` flag handles the case where the timer fires mid-cycle: the in-progress cycle is allowed to finish, then the next cycle starts immediately without waiting for another timer interval.
 
 ## Dependencies
 
@@ -52,32 +46,18 @@ another timer interval.
 
 ## Key Design Decisions
 
-- **Pre-built probe list**: The probe list is built externally by `erd_poll_list_builder`
-  based on bridge mode and configuration. The bridge receives a pointer to the list and
-  probes each ERD sequentially. This decouples the list-building logic from the state machine.
-- **Dynamic polling list**: The `erd_polling_list` is heap-allocated and grows in increments of 32 ERDs (up to `POLLING_LIST_MAX_SIZE`). This avoids fixed-size buffer limitations while bounding memory usage.
-- **ERD cache for "publish on change"**: When `only_publish_on_change` is true, the shared `erd_cache_t` caches the last published value per ERD. Only changed values are published to MQTT.
-- **Simultaneous polling — all reads at once**: Each polling cycle sends reads for all ERDs
-  in the list simultaneously via `send_cycle_reads()`, which uses `send_poll_read_requests_bounded()`
-  to stay within a time budget (500 ms). If the budget is exceeded, a resume timer (100 ms)
-  continues sending. This prevents blocking the ESPHome main loop long enough to trigger
-  the ESP32 task watchdog timer.
-- **Cycle restarts only when complete AND timer expired (or timer not armed)**: A new polling cycle
-  (resetting `erd_index` to 0) starts only when **all** ERDs in the current
-  cycle have either read successfully or failed **and** the polling timer
-  (default 10 s) has expired.  The `polling_timer_armed` flag gates this: if
-  the cycle finishes before the timer fires, the next cycle starts immediately
-  (timer is not armed). If the timer is armed, the cycle waits for it to fire.
-  This prevents overlapping cycles from building up pressure in the shared GEA3
-  ERD client queue while allowing fast cycles to chain together without delay.
-- **No overlapping polling cycles**: Because reads are sent in budgeted batches and cycles
-  don't restart until complete, the GEA3 ERD client's fixed-size request queue cannot
-  overflow — preventing heap corruption that previously manifested as FreeRTOS
-  `prvCheckTasksWaitingTermination` crashes.
-- **60-second appliance lost timer**: If no read completes within 60 seconds, the bridge transitions back to `state_identify_appliance` to rediscover the appliance.
+- **Pre-built probe list**: The probe list is built externally by `erd_poll_list_builder` based on bridge mode and configuration. The bridge receives a pointer to the list and probes each ERD sequentially. This decouples the list-building logic from the state machine.
+- **Fixed-capacity polling list**: `erd_polling_list` is a fixed-capacity array (`tiny_erd_t[POLLING_LIST_MAX_SIZE]`). No heap allocation.
+- **Fixed-capacity ERD set**: `erd_set` is an `erd_set_t` (sorted array, capacity 645). No heap allocation.
+- **ERD cache for "publish on change"**: When `only_publish_onchange` is true, the shared `erd_cache_t` caches the last published value per ERD. Only changed values are published to MQTT.
+- **Simultaneous polling — all reads at once**: Each polling cycle sends reads for all ERDs in the list simultaneously via `send_cycle_reads()`, which uses `send_poll_read_requests_bounded()` to stay within a time budget (500 ms). If the budget is exceeded, a resume timer (100 ms) continues sending. This prevents blocking the ESPHome main loop long enough to trigger the ESP32 task watchdog timer.
+- **Cycle restarts only when complete AND timer expired (or timer not armed)**: A new polling cycle (resetting `erd_index` to 0) starts only when **all** ERDs in the current cycle have either read successfully or failed **and** the polling timer (default 10 s) has expired. The `polling_timer_armed` flag gates this: if the cycle finishes before the timer fires, the next cycle starts immediately (timer is not armed). If the timer is armed, the cycle waits for it to fire. This prevents overlapping cycles from building up pressure in the shared GEA3 ERD client queue while allowing fast cycles to chain together without delay.
+- **No overlapping polling cycles**: Because reads are sent in budgeted batches and cycles don't restart until complete, the GEA3 ERD client's fixed-size request queue cannot overflow — preventing heap corruption that previously manifested as FreeRTOS `prvCheckTasksWaitingTermination` crashes.
+- **60-second appliance lost timer**: If no read completes within 60 seconds, the bridge transitions back to `state_probe_list` to rediscover the appliance.
 - **Failed probe ERDs are excluded**: ERDs that fail during the probe phase (not_supported or retries_exhausted) are inserted into `erd_set` as exclusions, preventing them from being lazily registered in the polling state.
 - **Cache NOT cleared on re-entry**: The ERD cache is not reset during `state_probe_list` entry or on appliance-loss re-discovery. The cache may be shared with the subscription bridge; stale entries are overwritten when new data arrives.
-- **Known host address preservation**: When initialized with a non-broadcast address, the bridge stores it in `known_host_address`. On appliance loss, this address is restored instead of falling back to broadcast.
+- **Known host address preservation**: When initialized with a known address, the bridge stores it in `known_host_address`. On appliance loss, this address is restored instead of falling back to broadcast.
+- **No broadcast discovery**: The bridge always receives a known host address from `AutodiscoveryManager`. Broadcast discovery is not performed by the polling bridge.
 
 ## Testing
 

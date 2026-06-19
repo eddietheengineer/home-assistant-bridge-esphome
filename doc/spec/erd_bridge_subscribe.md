@@ -1,216 +1,121 @@
-# ERD Bridge Subscribe — Specification
+# ERD Bridge Subscribe Specification
 
-## 1. Overview
+## Overview
 
-### 1.1 Purpose
+The subscription bridge manages the GEA3 ERD subscription lifecycle. It subscribes to all ERD publications from a single appliance address, retains the subscription periodically, and writes received ERD values to the shared ERD cache. It has no dependency on MQTT — write handling and MQTT disconnect handling are delegated to `erd_write_bridge` and `erd_cache_mqtt_publisher` respectively.
 
-The ERD subscription bridge manages the GEA3 ERD subscription lifecycle: it subscribes to an appliance at a specific bus address, retains the subscription periodically, and publishes received ERD values to the shared ERD cache. It has **zero** direct interaction with the MQTT client.
-
-### 1.2 Responsibilities
-
-- Subscribe to ERD publications from a specific appliance address
-- Retain the active subscription at a fixed interval
-- Forward received ERD publications to the shared ERD cache
-- Recover from appliance restart (re-subscribe)
-- Recover from subscription failure (retry with delay)
-
-### 1.3 Not Responsible For
-
-- Polling-mode operation (see `erd_bridge_poll`)
-- Write request handling (see `erd_write_bridge`)
-- Any MQTT behavior (publishing, write requests, disconnect handling)
-- Bridge startup phase management (see `geappliances_bridge_startup_hsm`)
-
----
-
-## 2. Initialization
-
-### 2.1 Primary Init
+## Public API
 
 ```c
 void erd_bridge_subscribe_init(
-    erd_bridge_subscribe_t* self,
-    tiny_timer_group_t* timer_group,
-    i_tiny_gea3_erd_client_t* erd_client,
-    uint8_t address,
-    erd_cache_t* cache);
+  erd_bridge_subscribe_t* self,
+  tiny_timer_group_t* timer_group,
+  i_tiny_gea3_erd_client_t* erd_client,
+  uint8_t address,
+  erd_cache_t* cache);
+
+void erd_bridge_subscribe_destroy(erd_bridge_subscribe_t* self);
 ```
 
 | Parameter | Description |
 |-----------|-------------|
-| `timer_group` | Shared timer group for the retention timer. |
-| `erd_client` | GEA3 ERD client interface with subscription support. |
-| `address` | The appliance's GEA bus address (e.g., `0xC0`, `0xC4`). The bridge subscribes only to this address and filters out events from other addresses. |
-| `cache` | Shared `erd_cache_t` for storing ERD values. |
+| `self` | Pointer to the bridge struct (zero-initialized by caller) |
+| `timer_group` | Shared timer group for retention timer |
+| `erd_client` | GEA3 ERD client with subscription support |
+| `address` | Appliance host address (not broadcast) |
+| `cache` | Shared ERD cache — updated with each received publication |
 
-### 2.2 Destroy
-
-```c
-void erd_bridge_subscribe_destroy(erd_bridge_subscribe_t* self);
-```
-
-Stops the retention timer, unsubscribes all event handlers, and frees the heap-allocated `erd_set`. Guards against being called on a never-initialized struct (checks `timer_group == NULL`).
-
----
-
-## 3. State Machine
-
-The subscription bridge uses a hierarchical state machine (`tiny_hsm`) with a parent state (`sub_state_top`) and two child states.
-
-### 3.1 Parent State: `sub_state_top`
-
-Handles the `signal_subscription_publication_received` signal regardless of the current child state:
-
-| Signal | Behavior |
-| `signal_subscription_publication_received` | If the ERD is not already in `erd_set`, inserts it. Calls `erd_cache_update()` to store the ERD data. |
-
-### 3.2 Child States
-
-#### `state_subscribing`
-
-Initial state. Attempts to establish or re-establish the subscription.
-
-**On `tiny_hsm_signal_entry`:**
-- Calls `tiny_gea3_erd_client_subscribe(erd_client, erd_host_address)`.
-- If subscribe fails: arms the resubscribe timer for `resubscribe_delay` (1000 ms).
-
-**On `signal_subscription_host_came_online`:**
-:- The appliance host restarted — its ERD set may have changed.
-:- Clears `erd_set` so all ERDs are re-registered when new publications arrive.
-:- **Does NOT clear the ERD cache** — the cache may be shared with the polling bridge; stale entries are harmless (they occupy slots but are overwritten when new publications arrive).
-:- Falls through to the subscribe attempt below.
-
-**On `signal_timer_expired`:**
-- Resubscribe timer fired after a failed subscribe.
-- Retries `tiny_gea3_erd_client_subscribe()`.
-- If subscribe fails again: re-arms the resubscribe timer.
-
-**On `signal_subscription_failed`:**
-- Subscribe call returned false (queue full).
-- Retries `tiny_gea3_erd_client_subscribe()`.
-- If subscribe fails again: arms the resubscribe timer.
-
-**On `signal_subscription_added_or_retained`:**
-- Subscription is active.
-- Transitions to `state_subscribed`.
-
-**On `tiny_hsm_signal_exit`:**
-- Disarms the resubscribe timer.
-
-#### `state_subscribed`
-
-Steady state. Retains the subscription periodically and processes publications.
-
-**On `tiny_hsm_signal_entry`:**
-- Arms the retention timer for `subscription_retention_period` (30000 ms).
-
-**On `signal_timer_expired`:**
-- Calls `tiny_gea3_erd_client_retain_subscription(erd_client, erd_host_address)`.
-- If retain fails, the ERD client will fire `signal_subscription_failed`, which is deferred to `state_subscribing` (see §3.3).
-
-**On `signal_subscription_host_came_online`:**
-- Appliance restarted.
-- Transitions to `state_subscribing`.
-
-**On `tiny_hsm_signal_exit`:**
-- Disarms the retention timer.
-
-### 3.3 Signal Routing
-
-Signals not handled by the current child state are deferred to the parent (`sub_state_top`). The parent handles `signal_subscription_publication_received` in all states. Signals handled by `state_subscribing` but not `state_subscribed` (e.g., `signal_subscription_failed`) cause an implicit transition to `state_subscribing` when the ERD client fires them while in `state_subscribed`.
-
-### 3.4 State Diagram
-
-```
-sub_state_top (parent — handles publication_received globally)
-  ├─ state_subscribing (initial)
-  │    ├─ subscription_host_came_online → clear erd_set, then subscribe()
-  │    ├─ subscription_added_or_retained → state_subscribed
-  │    └─ exit → disarm timer
-  │
-  └─ state_subscribed
-       ├─ entry → arm retention timer (30 s)
-       ├─ timer_expired → retain_subscription()
-       ├─ subscription_host_came_online → state_subscribing
-       └─ exit → disarm timer
-```
-
----
-
-## 4. Address Filtering
-
-The event subscription callback filters all ERD client activity events by `erd_host_address`:
-
-```c
-if (args->address != self->erd_host_address) {
-    return;
-}
-```
-
-This enables **multiple independent subscription bridge instances** sharing the same ERD client and cache, each targeting a different appliance address. Events from appliance A (`0xC0`) are delivered only to the bridge instance initialized with `address = 0xC0`; events from appliance B (`0xC4`) are delivered only to the bridge instance initialized with `address = 0xC4`.
-
----
-
-## 5. ERD Set
-
-- `erd_set`: `std::set<tiny_erd_t>` stored as `void*` in the struct.
-- Tracks which ERDs have been seen in subscription publications.
-- Cleared only on `signal_subscription_host_came_online` (appliance restart).
-- **NOT** cleared on transient subscription failures or MQTT reconnects.
-
----
-
-## 6. Data Structures
+## Struct Layout
 
 ```c
 typedef struct {
-    tiny_timer_group_t* timer_group;
-    i_tiny_gea3_erd_client_t* erd_client;
-    tiny_timer_t timer;
-    tiny_event_subscription_t erd_client_activity_subscription;
-    void* erd_set;
-    erd_cache_t* erd_cache;
-    tiny_hsm_t hsm;
-    uint8_t erd_host_address;
+  tiny_timer_group_t* timer_group;
+  i_tiny_gea3_erd_client_t* erd_client;
+  tiny_timer_t timer;
+  tiny_event_subscription_t erd_client_activity_subscription;
+  erd_set_t erd_set;
+  erd_cache_t* erd_cache;
+  tiny_hsm_t hsm;
+  uint8_t erd_host_address;
 } erd_bridge_subscribe_t;
 ```
 
----
+All members are stack-allocated or embedded — no heap allocation.
 
-## 7. Timing Constants
+## State Machine
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `subscription_retention_period` | 30000 ms | Interval between subscription retention requests. |
-| `resubscribe_delay` | 1000 ms | Delay before retrying a failed subscription. |
+```
+sub_state_top (parent — handles publication signals globally)
+  ├─ state_subscribing (initial)
+  │    ├─ entry: attempt subscribe()
+  │    ├─ subscription_host_came_online: clear ERD set, then attempt subscribe()
+  │    ├─ subscription_failed / timer_expired: attempt subscribe()
+  │    ├─ subscription_added_or_retained → state_subscribed
+  │    └─ exit: disarm timer
+  │
+  └─ state_subscribed
+       ├─ entry: arm periodic timer (30 s retention)
+       ├─ timer_expired: retain subscription
+       ├─ subscription_host_came_online → state_subscribing
+       └─ exit: disarm timer
+```
 
----
+### `sub_state_top` (Parent)
 
-## 8. Invariants
+Handles `signal_subscription_publication_received` globally across all child states:
+- Inserts the ERD into `erd_set` (if not already present)
+- Updates the ERD cache with the received data
 
-1. **One subscription at a time:** The bridge subscribes to exactly one appliance address. Multiple bridge instances can be created for multiple appliances.
-2. **Address isolation:** Each bridge instance processes only events matching its `erd_host_address`.
-3. **ERD set only cleared on appliance restart:** The `erd_set` is cleared on `signal_subscription_host_came_online`, not on transient failures.
-4. **Cache NOT cleared on appliance restart:** The `erd_cache` is not reset when the appliance host comes online. The cache may be shared with the polling bridge; stale entries are overwritten when new publications arrive.
-5. **Clean destroy:** All event subscriptions are removed before freeing the `erd_set`, preventing use-after-free if events fire after destroy.
+### `state_subscribing` (Initial)
 
----
+- On entry: calls `tiny_gea3_erd_client_subscribe()` with the host address
+- On `signal_subscription_host_came_online`: clears `erd_set` (appliance may have changed its ERD set), then attempts subscribe
+- On `signal_subscription_failed` or `signal_timer_expired`: attempts subscribe with `resubscribe_delay` (1 s) backoff
+- On `signal_subscription_added_or_retained`: transitions to `state_subscribed`
+- On exit: disarms the retry timer
 
-## 9. Dependencies
+### `state_subscribed` (Steady State)
 
-| Dependency | Role |
-|------------|------|
-| `i_tiny_gea3_erd_client` | GEA3 ERD client interface (subscribe, retain_subscription, activity events) |
-| `tiny_hsm` | Hierarchical state machine |
-| `tiny_timer` | Timer group and timer instances |
-| `erd_bridge_common.h` | Shared signals, timing constants, and utility templates (`erd_set`, `arm_timer`, `disarm_timer`) |
-| `erd_cache.h` | ERD cache for storing values (`erd_cache_init`, `erd_cache_update`) |
+- On entry: arms a periodic retention timer at `subscription_retention_period` (30 s)
+- On `signal_timer_expired`: calls `tiny_gea3_erd_client_retain_subscription()` to keep the appliance publishing
+- On `signal_subscription_host_came_online`: transitions back to `state_subscribing`
+- On exit: disarms the retention timer
 
----
+## Event Subscription
 
-## 10. Known Limitations
+The bridge subscribes to `tiny_gea3_erd_client_on_activity` during `init()`. The callback filters events by `address == erd_host_address` and routes them to HSM signals:
 
-1. **Single appliance per instance:** Each subscription bridge instance subscribes to exactly one appliance address. Supporting multiple appliances requires multiple bridge instances.
-2. **No write handling:** The subscription bridge does not handle write requests. Write handling is the responsibility of `erd_write_bridge`.
-3. **No discovery:** The subscription bridge does not discover which ERDs an appliance supports. It accepts all publications from the subscribed address and adds them to the cache.
-4. **Cache NOT cleared on appliance restart:** The ERD cache is not reset when the appliance host comes online. Stale entries from the previous session are overwritten when new publications arrive.
+| Activity Type | HSM Signal |
+|---|---|
+| `subscription_added_or_retained` | `signal_subscription_added_or_retained` |
+| `subscription_publication_received` | `signal_subscription_publication_received` |
+| `subscription_host_came_online` | `signal_subscription_host_came_online` |
+| `subscribe_failed` | `signal_subscription_failed` |
+| `write_completed` / `write_failed` | Ignored (handled by `erd_write_bridge`) |
+
+## ERD Set
+
+The `erd_set_t` is a fixed-capacity sorted array (capacity 645). It tracks which ERDs have been seen via subscription publications. It is cleared on `signal_subscription_host_came_online` (appliance restart) so that new publications are re-registered.
+
+## Dependencies
+
+- `i_tiny_gea3_erd_client` — GEA3 ERD client with subscription support
+- `tiny_hsm` — hierarchical state machine
+- `tiny_timer` — periodic retention timer
+- `erd_bridge_common.h` — shared signals, timing constants, and utility templates
+- `erd_cache.h` — shared ERD cache for publishing values
+
+## Key Design Decisions
+
+- **No MQTT dependency**: The bridge writes to `erd_cache` only. MQTT publishing is handled by `erd_cache_mqtt_publisher`. Write handling is delegated to `erd_write_bridge`.
+- **No `signal_mqtt_disconnected`**: MQTT disconnect handling has been moved to `erd_cache_mqtt_publisher`. The subscription bridge does not react to MQTT disconnects.
+- **No `signal_write_requested`**: Write request handling has been extracted to `erd_write_bridge`.
+- **Fixed-capacity ERD set**: Uses `erd_set_t` (sorted array) instead of `std::set` to eliminate heap node allocations.
+- **30-second retention**: The subscription is retained every 30 seconds (`subscription_retention_period`) to keep the appliance publishing ERD values.
+- **1-second resubscribe delay**: If `subscribe()` fails, the bridge waits 1 second (`resubscribe_delay`) before retrying.
+- **Clean destroy**: The event subscription is unsubscribed before the struct is freed, preventing use-after-free if events fire after destroy.
+- **Cache NOT cleared on host restart**: The ERD cache is not reset during `signal_subscription_host_came_online`. The cache may be shared with the polling bridge; stale entries are overwritten when new data arrives.
+
+## Testing
+
+Covered by unit tests in `test/tests/erd_bridge_subscribe_test.cpp` and integration tests through the full bridge subscription flow. The state machine transitions are tested with simulated ERD client activity events.
