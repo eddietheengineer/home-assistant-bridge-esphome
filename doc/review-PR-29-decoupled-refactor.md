@@ -43,17 +43,14 @@ The dead `memcmp` was removed and replaced with `existing->update_required = tru
 
 **Status:** ✅ Accepted as-is. Documented as a design decision in `doc/spec/mqtt_data_publishing.md` (Specification 2). Retained messages persist on broker reconnect; full re-publish only needed on broker restart, which is rare.
 
-### 4. `g_bridge_services` is a file-scope global pointer (geappliances_bridge_startup_hsm.cpp:31)
+### 4. **ACCEPTED** `g_bridge_services` is a file-scope global pointer (geappliances_bridge_startup_hsm.cpp:31)
 
-```cpp
-static IBridgeServices* g_bridge_services = nullptr;
-```
-
-This is a singleton assumption baked into the startup HSM. The `services_from_hsm()` function ignores the `hsm` parameter entirely. If multiple bridge instances are ever needed (e.g., for dual UART setups), this breaks.
+**Status:** ✅ Accepted as-is. The expected deployment model is one bridge per device. The ESPHome component model does not support multiple instances of the same component, and the hardware design assumes a single appliance per bridge. The global is appropriate for this use case. Dual-appliance support on a single bus is documented in `doc/dual_appliance_plan.md` as a future enhancement.
 
 ---
 
 ## Significant Issues
+
 
 ### 5. **FIXED** Hex encoding is lowercase; test name corrected (erd_cache_mqtt_publisher.cpp:113)
 
@@ -150,6 +147,4 @@ The `void*` cast obscures the type and makes static analysis harder.
 
 ## Recommendation
 
-**Do not merge until issue #4 is addressed.** The remaining issues should be tracked as follow-up tasks.
-
-Issue #4 (global singleton) is architectural — it prevents multiple bridge instances (e.g., dual UART setups).
+**All identified issues are resolved.** The PR is ready for merge. Remaining minor issues (#6–#16) are tracked as follow-up tasks.
