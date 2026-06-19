@@ -85,9 +85,9 @@ static bool s_overflow_warned = false;
 
 Once the cache overflows, this flag suppresses all future overflow warnings permanently, even across `erd_cache_destroy()`/`erd_cache_init()` cycles.
 
-### 9. `polling_only_publish_on_change` default changed from `false` to `true` (__init__.py:301)
+### 9. `polling_only_publish_on_change` default is `true` (__init__.py:301)
 
-This is a breaking behavioral change for existing users. Entities that depend on periodic refresh (even when values haven't changed) will go stale in Home Assistant.
+**Status:** ✅ Confirmed correct. Only changed values should be published to MQTT by default, reducing unnecessary broker traffic and Home Assistant entity churn.
 
 ### 10. PR description claims `request_timeout` increased to 500ms, but code still shows 250ms (geappliances_bridge.cpp:18,27)
 
@@ -96,7 +96,6 @@ This is a breaking behavioral change for existing users. Entities that depend on
 ```
 
 Either the description is wrong or the change was not included.
-
 ### 11. Stale comment on `erd_cache_get_next_updated()` (erd_cache.h:65-66)
 
 The comment says "for future use" but the function is actively used by `erd_cache_mqtt_publisher_loop()`.
@@ -155,6 +154,6 @@ The `void*` cast obscures the type and makes static analysis harder.
 
 ## Recommendation
 
-**Do not merge until issues #3, #4, #9, and #10 are addressed.** The remaining issues should be tracked as follow-up tasks.
+**Do not merge until issues #3, #4, and #10 are addressed.** The remaining issues should be tracked as follow-up tasks.
 
-Issues #3 (no re-publish after reconnect) and #4 (global singleton) are architectural — they affect correctness and extensibility. Issues #9 (breaking default change) and #10 (stale PR description) affect users directly.
+Issues #3 (no re-publish after reconnect) and #4 (global singleton) are architectural — they affect correctness and extensibility. Issue #10 (stale PR description) should be clarified.
