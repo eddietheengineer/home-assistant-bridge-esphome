@@ -89,13 +89,9 @@ Once the cache overflows, this flag suppresses all future overflow warnings perm
 
 **Status:** ✅ Confirmed correct. Only changed values should be published to MQTT by default, reducing unnecessary broker traffic and Home Assistant entity churn.
 
-### 10. PR description claims `request_timeout` increased to 500ms, but code still shows 250ms (geappliances_bridge.cpp:18,27)
+### 10. PR description claims `request_timeout` increased to 500ms (geappliances_bridge.cpp:18,27)
 
-```cpp
-.request_timeout = 250,  // still 250, not 500
-```
-
-Either the description is wrong or the change was not included.
+**Status:** ✅ Code is correct at 250ms. The PR description was inaccurate — no code change needed.
 ### 11. Stale comment on `erd_cache_get_next_updated()` (erd_cache.h:65-66)
 
 The comment says "for future use" but the function is actively used by `erd_cache_mqtt_publisher_loop()`.
@@ -154,6 +150,6 @@ The `void*` cast obscures the type and makes static analysis harder.
 
 ## Recommendation
 
-**Do not merge until issues #3, #4, and #10 are addressed.** The remaining issues should be tracked as follow-up tasks.
+**Do not merge until issues #3 and #4 are addressed.** The remaining issues should be tracked as follow-up tasks.
 
-Issues #3 (no re-publish after reconnect) and #4 (global singleton) are architectural — they affect correctness and extensibility. Issue #10 (stale PR description) should be clarified.
+Issues #3 (no re-publish after reconnect) and #4 (global singleton) are architectural — they affect correctness and extensibility.
