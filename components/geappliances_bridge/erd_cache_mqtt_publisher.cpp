@@ -21,6 +21,12 @@ static void mqtt_publisher_task(void* arg)
 {
   erd_cache_mqtt_publisher_t* self = (erd_cache_mqtt_publisher_t*)arg;
 
+  // Defensive: if semaphore creation failed, exit immediately.
+  if (self->work_semaphore == NULL) {
+    vTaskDelete(NULL);
+    return;
+  }
+
   while (self->task_running) {
     // Wait for work signal or timeout (100ms).
     if (xSemaphoreTake(self->work_semaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
@@ -96,6 +102,9 @@ void erd_cache_mqtt_publisher_init(
 
 #ifdef USE_ESP_IDF
   self->work_semaphore = xSemaphoreCreateBinary();
+  if (!self->work_semaphore) {
+    ESP_LOGE(TAG, "Failed to create work semaphore");
+  }
   self->task_running = false;
 #endif
 
@@ -155,6 +164,7 @@ void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
 {
 #ifdef USE_ESP_IDF
   if (self->task_handle != NULL) return; // already running
+  if (self->work_semaphore == NULL) return; // semaphore creation failed in init
   self->task_running = true;
   self->task_handle = xTaskCreateStatic(
       mqtt_publisher_task,
@@ -179,7 +189,9 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
   if (self->task_handle == NULL) return;
   self->task_running = false;
   // Wake the task so it can exit.
-  xSemaphoreGive(self->work_semaphore);
+  if (self->work_semaphore != NULL) {
+    xSemaphoreGive(self->work_semaphore);
+  }
   // Wait for the task to actually terminate before freeing resources.
   // The main loop IS a FreeRTOS task on ESP-IDF, so vTaskDelay is safe.
   uint32_t start = esphome::millis();
