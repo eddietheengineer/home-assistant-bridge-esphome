@@ -51,19 +51,25 @@ static void pool_free(erd_cache_t* self, uint8_t block_idx, uint8_t* ptr)
 {
   if (!ptr) return;
   /* Validate that the pointer actually points into the pool.
-   * Compute bounds using byte arithmetic to avoid UBSan out-of-bounds
-   * access on the one-past-the-end pointer. */
+   * The pool array uses ERD_CACHE_POOL_BLOCK_2 as the stride for all tiers
+   * (pool_blocks[tier][slot][ERD_CACHE_POOL_BLOCK_2]), so the actual memory
+   * footprint per tier is ERD_CACHE_CAPACITY * ERD_CACHE_POOL_BLOCK_2,
+   * regardless of the logical block size.  Using the logical size here
+   * would reject valid pointers from the upper half of tier 0 (16-byte
+   * blocks stored with 32-byte stride). */
   uint8_t* base = &self->pool_blocks[block_idx][0][0];
-  size_t pool_bytes = (size_t)ERD_CACHE_CAPACITY * pool_block_sizes[block_idx];
+  size_t pool_bytes = (size_t)ERD_CACHE_CAPACITY * ERD_CACHE_POOL_BLOCK_2;
   if (ptr < base || (size_t)(ptr - base) >= pool_bytes) {
     ESP_LOGE(TAG, "pool_free: pointer 0x%08X outside pool bounds [0x%08X, 0x%08X)",
              (unsigned)(uintptr_t)ptr, (unsigned)(uintptr_t)base,
              (unsigned)(uintptr_t)(base + pool_bytes));
     return;
   }
-  /* Find the slot by pointer arithmetic. */
+  /* Find the slot by pointer arithmetic.
+   * The stride in memory is ERD_CACHE_POOL_BLOCK_2 for all tiers,
+   * not pool_block_sizes[block_idx]. */
   ptrdiff_t offset = ptr - base;
-  uint16_t slot = (uint16_t)(offset / pool_block_sizes[block_idx]);
+  uint16_t slot = (uint16_t)(offset / ERD_CACHE_POOL_BLOCK_2);
   if (slot < ERD_CACHE_CAPACITY) {
     self->pool_free[block_idx][slot] = true;
   }
