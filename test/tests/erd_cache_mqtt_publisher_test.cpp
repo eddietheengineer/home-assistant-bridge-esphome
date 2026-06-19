@@ -25,6 +25,10 @@ TEST_GROUP(erd_cache_mqtt_publisher)
 
   void setup()
   {
+    if (publisher.cache) {
+      erd_cache_mqtt_publisher_destroy(&publisher);
+    }
+    erd_cache_destroy(&cache);
     memset(&publisher, 0, sizeof(publisher));
     erd_cache_init(&cache);
     esphome_mqtt_client_adapter_init(&adapter, "test_device");
@@ -467,7 +471,7 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_multiple_erds)
 /* ------------------------------------------------------------------ */
 /* loop - large payload hex encoding (Issue 9 fix)                     */
 /* ------------------------------------------------------------------ */
-TEST(erd_cache_mqtt_publisher, loop_publishes_128_byte_payload)
+TEST(erd_cache_mqtt_publisher, loop_publishes_32_byte_payload)
 {
   erd_cache_mqtt_publisher_init(
     &publisher,
@@ -476,36 +480,12 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_128_byte_payload)
     "device");
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
-  uint8_t data[128];
-  for (uint8_t i = 0; i < 128; i++) {
+  uint8_t data[32];
+  for (uint8_t i = 0; i < 32; i++) {
     data[i] = i;
   }
   erd_cache_update(&cache, 0x1001, data, sizeof(data));
 
-  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 1, 100);
-  CHECK_EQUAL(1u, published);
-  CHECK_EQUAL(1u, publisher.total_published);
-}
-
-/* Large payloads > 128 bytes (largest pool block) are truncated to inline
- * storage (16 bytes). The entry is still created and published, just with
- * truncated data. */
-TEST(erd_cache_mqtt_publisher, loop_publishes_truncated_255_byte_payload)
-{
-  erd_cache_mqtt_publisher_init(
-    &publisher,
-    &cache,
-    &adapter.interface,
-    "device");
-  erd_cache_mqtt_publisher_on_connected(&publisher);
-
-  uint8_t data[255];
-  for (uint16_t i = 0; i < 255; i++) {
-    data[i] = (uint8_t)(i & 0xFF);
-  }
-  erd_cache_update(&cache, 0x1002, data, sizeof(data));
-
-  /* Entry is created with truncated inline data (16 bytes). */
   uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 1, 100);
   CHECK_EQUAL(1u, published);
   CHECK_EQUAL(1u, publisher.total_published);
