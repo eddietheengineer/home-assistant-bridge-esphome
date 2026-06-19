@@ -54,13 +54,13 @@ TEST(erd_cache_mqtt_publisher, init_sets_cache_pointer)
 
   CHECK(publisher.cache != nullptr);
   CHECK_EQUAL(0u, publisher.publish_index);
-  CHECK(!publisher.mqtt_connected);
+  CHECK(publisher.mqtt_connected);
   CHECK_EQUAL(0u, publisher.total_published);
   CHECK_EQUAL(0u, publisher.missed_loops);
   CHECK(strncmp(publisher.device_id, "my_device", 8) == 0);
 }
 
-TEST(erd_cache_mqtt_publisher, init_sets_mqtt_connected_false)
+TEST(erd_cache_mqtt_publisher, init_sets_mqtt_connected_true)
 {
   erd_cache_mqtt_publisher_init(
     &publisher,
@@ -68,7 +68,7 @@ TEST(erd_cache_mqtt_publisher, init_sets_mqtt_connected_false)
     &adapter.interface,
     "device");
 
-  CHECK(!publisher.mqtt_connected);
+  CHECK(publisher.mqtt_connected);
 }
 
 TEST(erd_cache_mqtt_publisher, destroy_unsubscribes_events)
@@ -101,7 +101,7 @@ TEST(erd_cache_mqtt_publisher, init_handles_null_mqtt_client_gracefully)
   /* Should not crash; fields set before the null guard are still valid. */
   CHECK(publisher.cache != nullptr);
   CHECK_EQUAL(0u, publisher.publish_index);
-  CHECK(!publisher.mqtt_connected);
+  CHECK(publisher.mqtt_connected);
 }
 
 TEST(erd_cache_mqtt_publisher, destroy_after_init_with_null_mqtt_client)
@@ -181,13 +181,13 @@ TEST(erd_cache_mqtt_publisher, loop_skips_when_mqtt_disconnected)
   uint8_t data = 0x01;
   erd_cache_update(&cache, 0x0008, &data, sizeof(data));
 
-  // Already disconnected by default after init
+  // Disconnect so loop skips publishing
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
 
   uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
   CHECK_EQUAL(0u, published);
   CHECK_EQUAL(0u, publisher.total_published);
 }
-
 TEST(erd_cache_mqtt_publisher, loop_resumes_after_reconnect)
 {
   erd_cache_mqtt_publisher_init(
@@ -199,11 +199,12 @@ TEST(erd_cache_mqtt_publisher, loop_resumes_after_reconnect)
   uint8_t data = 0x01;
   erd_cache_update(&cache, 0x0008, &data, sizeof(data));
 
-  // Initially disconnected — should not publish
+  // Disconnect — should not publish
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
   uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
   CHECK_EQUAL(0u, published);
 
-  // Connect — should publish
+  // Reconnect — should publish
   erd_cache_mqtt_publisher_on_connected(&publisher);
   published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
   CHECK_EQUAL(1u, published);
@@ -282,18 +283,17 @@ TEST(erd_cache_mqtt_publisher, on_disconnected_sets_flag)
     &cache,
     &adapter.interface,
     "device");
-
-  // Initially disconnected by default
-  CHECK(!publisher.mqtt_connected);
-
-  // Connect, then disconnect
-  erd_cache_mqtt_publisher_on_connected(&publisher);
+  // Initially connected by default
   CHECK(publisher.mqtt_connected);
+
+  // Disconnect, then reconnect
   erd_cache_mqtt_publisher_on_disconnected(&publisher);
   CHECK(!publisher.mqtt_connected);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+  CHECK(publisher.mqtt_connected);
 }
 
-TEST(erd_cache_mqtt_publisher, on_connected_sets_flag)
+TEST(erd_cache_mqtt_publisher, on_disconnected_then_connected_toggles_flag)
 {
   erd_cache_mqtt_publisher_init(
     &publisher,
@@ -301,7 +301,9 @@ TEST(erd_cache_mqtt_publisher, on_connected_sets_flag)
     &adapter.interface,
     "device");
 
-  // Initially disconnected by default
+  // Initially connected by default
+  CHECK(publisher.mqtt_connected);
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
   CHECK(!publisher.mqtt_connected);
   erd_cache_mqtt_publisher_on_connected(&publisher);
   CHECK(publisher.mqtt_connected);
@@ -318,9 +320,7 @@ TEST(erd_cache_mqtt_publisher, disconnect_event_triggers_callback)
     &adapter.interface,
     "device");
 
-  // Connect first so disconnect event has effect
-  erd_cache_mqtt_publisher_on_connected(&publisher);
-  CHECK(publisher.mqtt_connected);
+  // Already connected from init; disconnect event should set flag to false
 
   // Trigger disconnect through the adapter
   esphome_mqtt_client_adapter_notify_disconnected(&adapter);
