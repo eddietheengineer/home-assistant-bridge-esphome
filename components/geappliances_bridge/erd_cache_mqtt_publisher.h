@@ -36,6 +36,7 @@
 #    include "freertos/FreeRTOS.h"
 #    include "freertos/task.h"
 #    include "freertos/semphr.h"
+#    include "freertos/queue.h"
 #  endif
 #endif
 
@@ -52,12 +53,12 @@ typedef struct {
   uint32_t missed_loops;           // Loop iterations skipped while MQTT disconnected
   uint32_t publish_count_window;   // Publishes in the last 60s window
   uint32_t (*get_time_ms)(void);
-
 #ifdef USE_ESP_IDF
   TaskHandle_t    task_handle;
   StaticTask_t    task_tcb;
   StackType_t     task_stack[2048 / sizeof(StackType_t)];
   SemaphoreHandle_t work_semaphore;
+  SemaphoreHandle_t state_mutex;  // Protects shared state for dual-core safety
   bool task_running;
   // Pre-allocated buffers for the background task to avoid stack overflow.
   char task_topic[128];

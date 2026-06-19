@@ -33,9 +33,24 @@ static void mqtt_publisher_task(void* arg)
       // Work was signalled — drain all available updates.
     }
 
-    // Skip if not connected.
-    if (!self->mqtt_connected || !self->cache || !self->mqtt_client ||
-        !self->device_id || !self->get_time_ms) {
+    // Acquire mutex to safely read shared state (mqtt_connected, cache pointers).
+    // On dual-core, these fields can be modified by the main loop concurrently.
+    bool connected = false;
+    bool has_deps = false;
+    if (self->state_mutex) {
+      if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        connected = self->mqtt_connected;
+        has_deps = self->cache != NULL && self->mqtt_client != NULL &&
+                   self->device_id != NULL && self->get_time_ms != NULL;
+        xSemaphoreGive(self->state_mutex);
+      }
+    } else {
+      // Fallback when mutex creation failed — read without protection.
+      connected = self->mqtt_connected;
+      has_deps = self->cache != NULL && self->mqtt_client != NULL &&
+                 self->device_id != NULL && self->get_time_ms != NULL;
+    }
+    if (!connected || !has_deps) {
       continue;
     }
 
@@ -77,8 +92,17 @@ static void mqtt_publisher_task(void* arg)
         ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
       }
 
-      self->total_published++;
-      self->publish_count_window++;
+      // Update stats under mutex for dual-core safety.
+      if (self->state_mutex) {
+        if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+          self->total_published++;
+          self->publish_count_window++;
+          xSemaphoreGive(self->state_mutex);
+        }
+      } else {
+        self->total_published++;
+        self->publish_count_window++;
+      }
     }
   }
 
@@ -104,6 +128,10 @@ void erd_cache_mqtt_publisher_init(
   self->work_semaphore = xSemaphoreCreateBinary();
   if (!self->work_semaphore) {
     ESP_LOGE(TAG, "Failed to create work semaphore");
+  }
+  self->state_mutex = xSemaphoreCreateMutex();
+  if (!self->state_mutex) {
+    ESP_LOGE(TAG, "Failed to create state mutex");
   }
   self->task_running = false;
 #endif
@@ -154,6 +182,10 @@ void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self)
   if (self->work_semaphore) {
     vSemaphoreDelete(self->work_semaphore);
     self->work_semaphore = NULL;
+  }
+  if (self->state_mutex) {
+    vSemaphoreDelete(self->state_mutex);
+    self->state_mutex = NULL;
   }
 #endif
 
@@ -289,15 +321,36 @@ uint16_t erd_cache_mqtt_publisher_loop(
 
 void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
 {
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      self->mqtt_connected = true;
+      xSemaphoreGive(self->state_mutex);
+    }
+  } else {
+    self->mqtt_connected = true;
+  }
+#else
   self->mqtt_connected = true;
+#endif
   ESP_LOGI(TAG, "MQTT reconnected — resuming ERD cache publishing");
   /* Wake the background task so it can start publishing again. */
   erd_cache_mqtt_publisher_signal_work(self);
 }
-
 void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self)
 {
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      self->mqtt_connected = false;
+      xSemaphoreGive(self->state_mutex);
+    }
+  } else {
+    self->mqtt_connected = false;
+  }
+#else
   self->mqtt_connected = false;
+#endif
   ESP_LOGW(TAG, "MQTT disconnected — pausing ERD cache publishing");
 }
 
@@ -310,7 +363,21 @@ void erd_cache_mqtt_publisher_set_time_fn(
 
 uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* self)
 {
-  uint32_t count = self->publish_count_window;
+  uint32_t count = 0;
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      count = self->publish_count_window;
+      self->publish_count_window = 0;
+      xSemaphoreGive(self->state_mutex);
+    }
+  } else {
+    count = self->publish_count_window;
+    self->publish_count_window = 0;
+  }
+#else
+  count = self->publish_count_window;
   self->publish_count_window = 0;
+#endif
   return count;
 }

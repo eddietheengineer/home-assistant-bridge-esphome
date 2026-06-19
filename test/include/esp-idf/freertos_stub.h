@@ -69,6 +69,9 @@ typedef void* SemaphoreHandle_t;
 static inline SemaphoreHandle_t xSemaphoreCreateBinary(void) {
     return (SemaphoreHandle_t)0x1;
 }
+static inline SemaphoreHandle_t xSemaphoreCreateMutex(void) {
+    return (SemaphoreHandle_t)0x2;
+}
 static inline BaseType_t xSemaphoreTake(SemaphoreHandle_t sem, UBaseType_t ticks) {
     (void)sem; (void)ticks;
     return pdTRUE;
