@@ -134,9 +134,7 @@ static void send_next_poll_read_request(erd_bridge_poll_t* self)
 {
   if (self->erd_index < self->polling_list_count) {
     self->request_id++;
-    uint32_t t0 = esphome::millis();
-    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->erd_polling_list[self->erd_index]);
-    uint32_t elapsed = esphome::millis() - t0;
+    bool queued = tiny_gea3_erd_client_read_fast(self->erd_client, &self->request_id, self->erd_host_address, self->erd_polling_list[self->erd_index]);
     self->erd_index++;
     if (!queued) {
       /* Queue full — the read was silently dropped. Count it as completed
@@ -146,10 +144,6 @@ static void send_next_poll_read_request(erd_bridge_poll_t* self)
       if (self->cycle_completed_count >= self->polling_list_count) {
         on_polling_cycle_complete(self, false);
       }
-    }
-    if (elapsed >= 500) {
-      ESP_LOGW(TAG, "Slow read request: %ums for ERD 0x%04x (queued=%s)",
-               elapsed, self->erd_polling_list[self->erd_index - 1], queued ? "yes" : "no");
     }
   }
 }

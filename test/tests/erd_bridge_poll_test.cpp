@@ -112,6 +112,17 @@ TEST_GROUP(erd_bridge_poll)
       .andReturnValue(true);
   }
 
+  void should_request_read_fast(uint8_t address, tiny_erd_t erd)
+  {
+    mock()
+      .expectOneCall("read_fast")
+      .onObject(&erd_client)
+      .withParameter("address", address)
+      .withParameter("erd", erd)
+      .ignoreOtherParameters()
+      .andReturnValue(true);
+  }
+
 
   template <typename T>
   void when_a_poll_read_completes(uint8_t address, tiny_erd_t erd, T value)
@@ -170,11 +181,11 @@ TEST(erd_bridge_poll, should_always_publish_mqtt_when_only_publish_on_change_is_
   given_that_the_bridge_has_entered_polling_state();
   erd_cache_set_only_publish_onchange(&test_cache, false);
 
-  should_request_read(0xC0, polled_erd);
+  should_request_read_fast(0xC0, polled_erd);
   after(polling_interval);
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
-  should_request_read(0xC0, polled_erd);
+  should_request_read_fast(0xC0, polled_erd);
   after(polling_interval);
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 }
@@ -183,7 +194,7 @@ TEST(erd_bridge_poll, should_publish_mqtt_on_first_poll_when_only_publish_on_cha
 {
   given_that_the_bridge_has_entered_polling_state();
 
-  should_request_read(0xC0, polled_erd);
+  should_request_read_fast(0xC0, polled_erd);
   after(polling_interval);
 
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
@@ -193,11 +204,11 @@ TEST(erd_bridge_poll, should_not_republish_mqtt_when_polled_erd_data_is_unchange
 {
   given_that_the_bridge_has_entered_polling_state();
 
-  should_request_read(0xC0, polled_erd);
+  should_request_read_fast(0xC0, polled_erd);
   after(polling_interval);
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
-  should_request_read(0xC0, polled_erd);
+  should_request_read_fast(0xC0, polled_erd);
   after(polling_interval);
   nothing_should_happen();
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
@@ -207,16 +218,16 @@ TEST(erd_bridge_poll, should_republish_mqtt_when_polled_erd_data_changes_and_onl
 {
   given_that_the_bridge_has_entered_polling_state();
 
-  should_request_read(0xC0, polled_erd);
+  should_request_read_fast(0xC0, polled_erd);
   after(polling_interval);
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
-  should_request_read(0xC0, polled_erd);
+  should_request_read_fast(0xC0, polled_erd);
   after(polling_interval);
   nothing_should_happen();
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
-  should_request_read(0xC0, polled_erd);
+  should_request_read_fast(0xC0, polled_erd);
   after(polling_interval);
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x02));
 }
@@ -232,7 +243,7 @@ TEST(erd_bridge_poll, should_register_and_poll_erd_whose_discovery_response_arri
   erd_cache_set_only_publish_onchange(&test_cache, false);
 
   // Cycle 1: polling timer fires and begins reading polled_erd
-  should_request_read(0xC0, polled_erd);
+  should_request_read_fast(0xC0, polled_erd);
   after(polling_interval);
 
   // Late discovery response for late_erd arrives before polled_erd responds.
@@ -246,8 +257,8 @@ TEST(erd_bridge_poll, should_register_and_poll_erd_whose_discovery_response_arri
 
   // Cycle 2: late_erd is now in the polling list alongside polled_erd,
   // both are read simultaneously
-  should_request_read(0xC0, polled_erd);
-  should_request_read(0xC0, late_erd);
+  should_request_read_fast(0xC0, polled_erd);
+  should_request_read_fast(0xC0, late_erd);
   after(polling_interval);
 
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
@@ -262,7 +273,7 @@ TEST(erd_bridge_poll, should_register_and_poll_late_erd_when_only_publish_on_cha
 
   given_that_the_bridge_has_entered_polling_state();
 
-  should_request_read(0xC0, polled_erd);
+  should_request_read_fast(0xC0, polled_erd);
   after(polling_interval);
 
   // New ERD: always published on first read. With simultaneous reads,
@@ -273,8 +284,8 @@ TEST(erd_bridge_poll, should_register_and_poll_late_erd_when_only_publish_on_cha
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
   // Cycle 2: both ERDs polled simultaneously; values unchanged → neither republished
-  should_request_read(0xC0, polled_erd);
-  should_request_read(0xC0, late_erd);
+  should_request_read_fast(0xC0, polled_erd);
+  should_request_read_fast(0xC0, late_erd);
   after(polling_interval);
 
   nothing_should_happen();
@@ -380,6 +391,17 @@ TEST_GROUP(erd_bridge_poll_probe_list)
       .andReturnValue(true);
   }
 
+  void should_request_read_fast(uint8_t address, tiny_erd_t erd)
+  {
+    mock()
+      .expectOneCall("read_fast")
+      .onObject(&erd_client)
+      .withParameter("address", address)
+      .withParameter("erd", erd)
+      .ignoreOtherParameters()
+      .andReturnValue(true);
+  }
+
 
   template <typename T>
   void when_a_poll_read_completes(uint8_t address, tiny_erd_t erd, T value)
@@ -404,8 +426,8 @@ TEST(erd_bridge_poll_probe_list, should_probe_list_and_poll_successfully)
   mock().enable();
 
   // Polling timer fires: both ERDs read
-  should_request_read(0xC0, probe_erd_1);
-  should_request_read(0xC0, probe_erd_2);
+  should_request_read_fast(0xC0, probe_erd_1);
+  should_request_read_fast(0xC0, probe_erd_2);
   after(polling_interval);
 
   when_a_poll_read_completes(0xC0, probe_erd_1, uint8_t(0xAA));
@@ -426,7 +448,7 @@ TEST(erd_bridge_poll_probe_list, should_exclude_failed_erd_from_polling_list)
   mock().enable();
 
   // Polling timer fires: only the successful ERD is polled.
-  should_request_read(0xC0, probe_erd_1);
+  should_request_read_fast(0xC0, probe_erd_1);
   after(polling_interval);
 
   when_a_poll_read_completes(0xC0, probe_erd_1, uint8_t(0xAA));
@@ -462,16 +484,16 @@ TEST(erd_bridge_poll_probe_list, should_restart_poll_cycle_on_polling_timer)
   mock().enable();
 
   // First poll cycle
-  should_request_read(0xC0, probe_erd_1);
-  should_request_read(0xC0, probe_erd_2);
+  should_request_read_fast(0xC0, probe_erd_1);
+  should_request_read_fast(0xC0, probe_erd_2);
   after(polling_interval);
 
   when_a_poll_read_completes(0xC0, probe_erd_1, uint8_t(0xAA));
   when_a_poll_read_completes(0xC0, probe_erd_2, uint8_t(0xBB));
 
   // Second poll cycle
-  should_request_read(0xC0, probe_erd_1);
-  should_request_read(0xC0, probe_erd_2);
+  should_request_read_fast(0xC0, probe_erd_1);
+  should_request_read_fast(0xC0, probe_erd_2);
   after(polling_interval);
 
   when_a_poll_read_completes(0xC0, probe_erd_1, uint8_t(0xAA));
@@ -619,6 +641,17 @@ TEST_GROUP(erd_bridge_poll_probe_failures)
       .andReturnValue(true);
   }
 
+  void should_request_read_fast(uint8_t address, tiny_erd_t erd)
+  {
+    mock()
+      .expectOneCall("read_fast")
+      .onObject(&erd_client)
+      .withParameter("address", address)
+      .withParameter("erd", erd)
+      .ignoreOtherParameters()
+      .andReturnValue(true);
+  }
+
 
   template <typename T>
   void when_a_poll_read_completes(uint8_t address, tiny_erd_t erd, T value)
@@ -643,8 +676,8 @@ TEST(erd_bridge_poll_probe_failures, should_exclude_retries_exhausted_erd_from_p
   mock().enable();
 
   // Polling timer fires: only the two successful ERDs are polled.
-  should_request_read(0xC0, probe_erd_1);
-  should_request_read(0xC0, probe_erd_3);
+  should_request_read_fast(0xC0, probe_erd_1);
+  should_request_read_fast(0xC0, probe_erd_3);
   after(polling_interval);
 
   when_a_poll_read_completes(0xC0, probe_erd_1, uint8_t(0xAA));

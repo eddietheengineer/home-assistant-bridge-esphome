@@ -53,6 +53,16 @@ static bool adapter_retain_subscription(i_tiny_gea3_erd_client_t* /*self*/, uint
   return false;
 }
 
+/* GEA2 has no fast-path; delegate to the normal adapter read. */
+static bool adapter_read_fast(
+  i_tiny_gea3_erd_client_t* _self,
+  tiny_gea3_erd_client_request_id_t* request_id,
+  uint8_t address,
+  tiny_erd_t erd)
+{
+  return adapter_read(_self, request_id, address, erd);
+}
+
 static i_tiny_event_t* adapter_on_activity(i_tiny_gea3_erd_client_t* _self)
 {
   auto self = reinterpret_cast<gea2_erd_client_adapter_t*>(_self);
@@ -64,6 +74,7 @@ static const i_tiny_gea3_erd_client_api_t adapter_api = {
   adapter_write,
   adapter_subscribe,
   adapter_retain_subscription,
+  adapter_read_fast,
   adapter_on_activity
 };
 
