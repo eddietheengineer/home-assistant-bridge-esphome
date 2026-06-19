@@ -220,15 +220,50 @@ std::string HaDiscoveryManager::escape_json_str_(const std::string& s)
 
 std::string HaDiscoveryManager::build_device_json_()
 {
-  std::string j = "{\"identifiers\":[\"" + this->device_id_ + "\"]";
-  j += ",\"name\":\"" + this->escape_json_str_(this->device_id_) + "\"";
-  j += ",\"manufacturer\":\"GE Appliances\"";
-  if (!this->model_number_.empty())
-    j += ",\"model\":\"" + this->escape_json_str_(this->model_number_) + "\"";
-  if (!this->serial_number_.empty())
-    j += ",\"serial_number\":\"" + this->escape_json_str_(this->serial_number_) + "\"";
-  j += "}";
-  return j;
+  // Build JSON into a fixed buffer to avoid std::string concatenation
+  // creating temporary heap allocations.  Max device_id is ~64 chars,
+  // model/serial ~32 each; this buffer is more than enough.
+  char buf[512];
+  int pos = snprintf(buf, sizeof(buf),
+    "{\"identifiers\":[\"%s\"],\"name\":\"", this->device_id_.c_str());
+
+  // Escape and append name (device_id).
+  for (unsigned char c : this->device_id_) {
+    if (pos >= (int)sizeof(buf) - 8) break;
+    if      (c == '"')  { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\\""); }
+    else if (c == '\\') { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\\\"); }
+    else if (c < 0x20)  { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\u%04x", c); }
+    else                { buf[pos++] = (char)c; }
+  }
+  if (pos < (int)sizeof(buf) - 64) {
+    pos += snprintf(buf + pos, sizeof(buf) - pos,
+      "\",\"manufacturer\":\"GE Appliances\"");
+  }
+  if (!this->model_number_.empty() && pos < (int)sizeof(buf) - 128) {
+    pos += snprintf(buf + pos, sizeof(buf) - pos, ",\"model\":\"");
+    for (unsigned char c : this->model_number_) {
+      if (pos >= (int)sizeof(buf) - 8) break;
+      if      (c == '"')  { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\\""); }
+      else if (c == '\\') { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\\\"); }
+      else if (c < 0x20)  { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\u%04x", c); }
+      else                { buf[pos++] = (char)c; }
+    }
+    if (pos < (int)sizeof(buf) - 2) buf[pos++] = '"';
+  }
+  if (!this->serial_number_.empty() && pos < (int)sizeof(buf) - 128) {
+    pos += snprintf(buf + pos, sizeof(buf) - pos, ",\"serial_number\":\"");
+    for (unsigned char c : this->serial_number_) {
+      if (pos >= (int)sizeof(buf) - 8) break;
+      if      (c == '"')  { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\\""); }
+      else if (c == '\\') { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\\\"); }
+      else if (c < 0x20)  { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\u%04x", c); }
+      else                { buf[pos++] = (char)c; }
+    }
+    if (pos < (int)sizeof(buf) - 2) buf[pos++] = '"';
+  }
+  if (pos < (int)sizeof(buf) - 2) buf[pos++] = '}';
+  buf[pos] = '\0';
+  return std::string(buf);
 }
 
 #ifdef USE_ESP_IDF
