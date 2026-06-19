@@ -102,23 +102,11 @@ TEST_GROUP(feature_bit_manager)
     tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
   }
 
-  /* Full sequence: trigger all 14 ERD reads in order via activity events.
+  /* Full sequence: trigger all 11 feature-bit ERD reads in order via activity events.
    * Each completed read triggers the manager to queue the next one internally. */
   void trigger_full_read_sequence()
   {
     uint8_t dummy_data[8] = {0};
-
-    // 0x0008 -> 0x0001
-    expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-    trigger_read_completed(ERD_APPLIANCE_TYPE, dummy_data, 1);
-
-    // 0x0001 -> 0x0002
-    expect_successful_read(0xC0, ERD_SERIAL_NUMBER);
-    trigger_read_completed(ERD_MODEL_NUMBER, dummy_data, 1);
-
-    // 0x0002 -> 0x0092
-    expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
-    trigger_read_completed(ERD_SERIAL_NUMBER, dummy_data, 1);
 
     // 0x0092 -> 0x0093
     expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
@@ -183,16 +171,16 @@ TEST(feature_bit_manager, init_stores_all_parameters)
   mock().expectOneCall("read")
     .onObject(&ec.interface)
     .withParameter("address", 0xC0)
-    .withParameter("erd", ERD_APPLIANCE_TYPE)
+    .withParameter("erd", ERD_COMMON_FEATURE_API)
     .ignoreOtherParameters()
     .andReturnValue(true);
   mgr.start();
 
-  // State should remain READING_0008 after successful queue (self-driving model).
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, mgr.get_state());
+  // State should remain READING_0092 after successful queue (self-driving model).
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, mgr.get_state());
 }
 
-TEST(feature_bit_manager, init_sets_state_to_reading_0008)
+TEST(feature_bit_manager, init_sets_state_to_reading_0092)
 {
   FeatureBitManager mgr;
   tiny_gea3_erd_client_double_t ec;
@@ -202,7 +190,7 @@ TEST(feature_bit_manager, init_sets_state_to_reading_0008)
 
   mgr.init(&ec.interface, 0xC0, &tg.timer_group);
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, mgr.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, mgr.get_state());
 }
 
 TEST(feature_bit_manager, init_resets_parse_state)
@@ -215,23 +203,23 @@ TEST(feature_bit_manager, init_resets_parse_state)
 
   mgr.init(&ec.interface, 0xC0, &tg.timer_group);
 
-  // State starts at READING_0008, not PARSING or COMPLETE.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, mgr.get_state());
+  // State starts at READING_0092, not PARSING or COMPLETE.
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, mgr.get_state());
 }
 
 /* ------------------------------------------------------------------ */
 /* start() — begins the self-driving read sequence                      */
 /* ------------------------------------------------------------------ */
 
-TEST(feature_bit_manager, start_queues_appliance_type_read_first)
+TEST(feature_bit_manager, start_queues_common_feature_read_first)
 {
   init_manager();
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
 
   manager.start();
 
-  // State remains READING_0008 (self-driving; no IN_FLIGHT state).
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+  // State remains READING_0092 (self-driving; no IN_FLIGHT state).
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
 }
 
 TEST(feature_bit_manager, start_is_idempotent)
@@ -239,14 +227,14 @@ TEST(feature_bit_manager, start_is_idempotent)
   init_manager();
 
   // First call queues the read.
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  // Second call should be a no-op (state is still READING_0008, but the
+  // Second call should be a no-op (state is still READING_0092, but the
   // read was already queued).  No additional read mock expected.
   manager.start();
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
 }
 
 TEST(feature_bit_manager, start_does_nothing_when_not_at_first_state)
@@ -254,90 +242,51 @@ TEST(feature_bit_manager, start_does_nothing_when_not_at_first_state)
   init_manager();
 
   // Advance to next state first.
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  uint8_t data[1] = {0x06};
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
+  uint8_t feature_data[8] = {0};
+  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
+  trigger_read_completed(ERD_COMMON_FEATURE_API, feature_data, 8);
 
-  // Now state is READING_0001. start() should be a no-op.
+  // Now state is READING_0093. start() should be a no-op.
   manager.start();
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0001, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0093, manager.get_state());
 }
 
 /* ------------------------------------------------------------------ */
 /* Event-driven ERD read sequencing                                     */
 /* ------------------------------------------------------------------ */
 
-TEST(feature_bit_manager, read_completed_transitions_to_model_number)
-{
-  init_manager();
-
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
-  manager.start();
-
-  uint8_t data[1] = {0x06};
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
-
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0001, manager.get_state());
-}
-
-TEST(feature_bit_manager, read_completed_transitions_to_serial_number)
-{
-  init_manager();
-
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
-  manager.start();
-
-  uint8_t data[1] = {0x06};
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
-  expect_successful_read(0xC0, ERD_SERIAL_NUMBER);
-  trigger_read_completed(ERD_MODEL_NUMBER, data, 1);
-
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0002, manager.get_state());
-}
-
-TEST(feature_bit_manager, read_completed_transitions_to_common_feature_api)
-{
-  init_manager();
-
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
-  manager.start();
-
-  uint8_t data[1] = {0x06};
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
-  expect_successful_read(0xC0, ERD_SERIAL_NUMBER);
-  trigger_read_completed(ERD_MODEL_NUMBER, data, 1);
-  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
-  trigger_read_completed(ERD_SERIAL_NUMBER, data, 1);
-
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
-}
-
 TEST(feature_bit_manager, read_completed_transitions_to_appliance_feature_api_0)
 {
   init_manager();
 
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  uint8_t data[1] = {0x06};
   uint8_t feature_data[8] = {0};
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
-  expect_successful_read(0xC0, ERD_SERIAL_NUMBER);
-  trigger_read_completed(ERD_MODEL_NUMBER, data, 1);
-  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
-  trigger_read_completed(ERD_SERIAL_NUMBER, data, 1);
   expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
   trigger_read_completed(ERD_COMMON_FEATURE_API, feature_data, 8);
 
   CHECK_EQUAL(FEATURE_BIT_STATE_READING_0093, manager.get_state());
+}
+
+TEST(feature_bit_manager, read_completed_transitions_to_appliance_feature_api_1)
+{
+  init_manager();
+
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
+  manager.start();
+
+  uint8_t feature_data[8] = {0};
+  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
+  trigger_read_completed(ERD_COMMON_FEATURE_API, feature_data, 8);
+  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_1);
+  trigger_read_completed(ERD_APPLIANCE_FEATURE_API_0, feature_data, 8);
+
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0094, manager.get_state());
 }
 
 /* ------------------------------------------------------------------ */
@@ -348,69 +297,43 @@ TEST(feature_bit_manager, read_failed_skips_to_next_erd)
 {
   init_manager();
 
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
   // skip_to_next_erd_ calls queue_erd_read_ after setting the state,
   // so we must expect the next read BEFORE triggering the failure.
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_failed(ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
+  trigger_read_failed(ERD_COMMON_FEATURE_API);
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0001, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0093, manager.get_state());
 }
 
-TEST(feature_bit_manager, read_failed_skips_model_to_serial)
+TEST(feature_bit_manager, read_failed_skips_feature_api_0_to_api_1)
 {
   init_manager();
-
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
-  manager.start();
-
-  uint8_t data[1] = {0x06};
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
-
-  expect_successful_read(0xC0, ERD_SERIAL_NUMBER);
-  trigger_read_failed(ERD_MODEL_NUMBER);
-
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0002, manager.get_state());
-}
-
-TEST(feature_bit_manager, read_failed_skips_serial_to_common_feature)
-{
-  init_manager();
-
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
-  manager.start();
-
-  uint8_t data[1] = {0x06};
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
-  expect_successful_read(0xC0, ERD_SERIAL_NUMBER);
-  trigger_read_completed(ERD_MODEL_NUMBER, data, 1);
 
   expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
-  trigger_read_failed(ERD_SERIAL_NUMBER);
+  manager.start();
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+  uint8_t feature_data[8] = {0};
+  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
+  trigger_read_completed(ERD_COMMON_FEATURE_API, feature_data, 8);
+
+  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_1);
+  trigger_read_failed(ERD_APPLIANCE_FEATURE_API_0);
+
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0094, manager.get_state());
 }
 
 TEST(feature_bit_manager, read_failed_on_last_erd_transitions_to_parsing)
 {
   init_manager();
 
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  uint8_t data[1] = {0x06};
   uint8_t feature_data[8] = {0};
 
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
-  expect_successful_read(0xC0, ERD_SERIAL_NUMBER);
-  trigger_read_completed(ERD_MODEL_NUMBER, data, 1);
-  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
-  trigger_read_completed(ERD_SERIAL_NUMBER, data, 1);
   expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
   trigger_read_completed(ERD_COMMON_FEATURE_API, feature_data, 8);
   expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_1);
@@ -448,7 +371,7 @@ TEST(feature_bit_manager, full_read_sequence_transitions_to_parsing)
 {
   init_manager();
 
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
   trigger_full_read_sequence();
@@ -465,30 +388,19 @@ TEST(feature_bit_manager, incremental_parsing_completes_with_timer_elapse)
 {
   init_manager();
 
-  // Provide data with a known feature bit set (Primary = 0x00000001)
-  // for ERD 0x0092, and non-zero data for appliance ERDs so they are
-  // actually parsed (not skipped as empty).
-  uint8_t data[1] = {0x06};
-
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
-  manager.start();
-
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
-  expect_successful_read(0xC0, ERD_SERIAL_NUMBER);
-  trigger_read_completed(ERD_MODEL_NUMBER, data, 1);
-  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
-  trigger_read_completed(ERD_SERIAL_NUMBER, data, 1);
-
   // Set common feature API with "Primary" bit (0x00000001) set.
   uint8_t common_data[8] = {0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00};
-  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
-  trigger_read_completed(ERD_COMMON_FEATURE_API, common_data, 8);
 
   // Use non-zero appliance feature data so each ERD is actually parsed
   // (not skipped as empty). Format: [2B type][2B version][4B bitmap].
   // type=0x0001, version=1, bitmap=0x00000001 (non-zero so not skipped).
   uint8_t appliance_data[8] = {0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01};
+
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
+  manager.start();
+
+  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
+  trigger_read_completed(ERD_COMMON_FEATURE_API, common_data, 8);
   expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_1);
   trigger_read_completed(ERD_APPLIANCE_FEATURE_API_0, appliance_data, 8);
   expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_2);
@@ -509,26 +421,27 @@ TEST(feature_bit_manager, incremental_parsing_completes_with_timer_elapse)
   trigger_read_completed(ERD_APPLIANCE_FEATURE_API_8, appliance_data, 8);
   trigger_read_completed(ERD_APPLIANCE_FEATURE_API_9, appliance_data, 8);
 
+  // State should be PARSING after the full read sequence.
   CHECK_EQUAL(FEATURE_BIT_STATE_PARSING, manager.get_state());
 
-  // Elapse enough timer ticks to complete all parsing.
-  // Common features: ceil(17 / COMMON_PARSE_PER_CALL) = ceil(17/4) = 5 ticks
-  // Appliance ERDs: 10 ticks (one per ERD)
-  // Finalization: 1 tick
-  // Total: 16 ticks * PARSE_TICK_MS (5ms) = 80ms
-  tiny_timer_group_double_elapse_time(&timer_group, 80);
+  // Elapse time to run the parse timer through all ticks.
+  // ~16 ticks at 5ms each = 80ms.
+  tiny_timer_group_double_elapse_time(&timer_group, 100);
 
+  // After parsing completes, state should be COMPLETE.
   CHECK_EQUAL(FEATURE_BIT_STATE_COMPLETE, manager.get_state());
+
+  // The valid ERD set should contain the mandatory ERDs plus any
+  // ERDs indicated by the feature bits.
+  const auto& erds = manager.get_valid_erds();
+  CHECK_TRUE(erds.size() >= 14);
 }
 
 TEST(feature_bit_manager, parsing_state_is_reached_before_complete)
 {
   init_manager();
 
-  (void)0; /* data provided by event trigger */
-  uint8_t data[8] = {0}; (void)data;
-
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
   trigger_full_read_sequence();
@@ -551,22 +464,19 @@ TEST(feature_bit_manager, queue_full_keeps_current_state)
   init_manager();
 
   // start() tries to queue a read but the queue is full.
-  expect_failed_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_failed_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  // State remains READING_0008 when queue is full.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+  // State remains READING_0092 when queue is full.
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
 
   // Elapse 50ms to trigger the retry timer, which attempts another read (also failing).
-  expect_failed_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_failed_read(0xC0, ERD_COMMON_FEATURE_API);
   tiny_timer_group_double_elapse_time(&timer_group, 50);
 
-  // State still READING_0008 after the retry also fails.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+  // State still READING_0092 after the retry also fails.
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
 }
-
-/* ------------------------------------------------------------------ */
-/* Queue retry timer behavior                                           */
 /* ------------------------------------------------------------------ */
 
 TEST(feature_bit_manager, queue_full_retry_timer_retries_on_elapse)
@@ -574,17 +484,17 @@ TEST(feature_bit_manager, queue_full_retry_timer_retries_on_elapse)
   init_manager();
 
   // start() tries to queue a read but the queue is full.
-  expect_failed_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_failed_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
 
   // Elapse 50ms to trigger the retry timer, which attempts another read (also failing).
-  expect_failed_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_failed_read(0xC0, ERD_COMMON_FEATURE_API);
   tiny_timer_group_double_elapse_time(&timer_group, 50);
 
-  // State is still READING_0008 after the retry also fails.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+  // State is still READING_0092 after the retry also fails.
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
 }
 
 TEST(feature_bit_manager, queue_retry_timer_noop_when_already_queued)
@@ -592,53 +502,49 @@ TEST(feature_bit_manager, queue_retry_timer_noop_when_already_queued)
   init_manager();
 
   // start() tries to queue a read but the queue is full, arming the retry timer.
-  expect_failed_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_failed_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
 
   // An activity event arrives before the timer fires. Since read_queued_ is false,
   // on_erd_activity_ retries the queue and it succeeds this time. The event
   // itself is NOT processed (method returns early after queuing).
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
-  uint8_t data[1] = {0x06};
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
+  uint8_t feature_data[8] = {0};
+  trigger_read_completed(ERD_COMMON_FEATURE_API, feature_data, 8);
 
   // Now read_queued_ is true. A second activity event processes the completion.
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
+  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
+  trigger_read_completed(ERD_COMMON_FEATURE_API, feature_data, 8);
 
-  // Now read_queued_ is true (ERD_MODEL_NUMBER is in-flight).
+  // Now read_queued_ is true (ERD_APPLIANCE_FEATURE_API_0 is in-flight).
   // Elapse 50ms — the retry timer fires but queue_retry_() sees
   // read_queued_ == true and does nothing.
   tiny_timer_group_double_elapse_time(&timer_group, 50);
 
   // No additional read mock needed — the timer was a no-op.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0001, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0093, manager.get_state());
 }
-
-/* ------------------------------------------------------------------ */
-/* ERD event filtering                                                  */
-/* ------------------------------------------------------------------ */
-
 TEST(feature_bit_manager, unrelated_erd_events_are_ignored)
 {
   init_manager();
 
-  // start() queues a read for ERD_APPLIANCE_TYPE successfully.
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  // start() queues a read for ERD_COMMON_FEATURE_API successfully.
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
 
-  // Trigger a read_completed for ERD_COMMON_FEATURE_API — wrong ERD,
-  // we're waiting for ERD_APPLIANCE_TYPE. It should be silently ignored.
+  // Trigger a read_completed for ERD_APPLIANCE_FEATURE_API_0 — wrong ERD,
+  // we're waiting for ERD_COMMON_FEATURE_API. It should be silently ignored.
   uint8_t data[8] = {0};
-  trigger_read_completed(ERD_COMMON_FEATURE_API, data, 8);
+  trigger_read_completed(ERD_APPLIANCE_FEATURE_API_0, data, 8);
 
-  // State should remain READING_0008; no additional read queued.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0008, manager.get_state());
+  // State should remain READING_0092; no additional read queued.
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
 }
+
 
 /* ------------------------------------------------------------------ */
 /* get_valid_erds() — before/after parsing                              */
@@ -657,10 +563,7 @@ TEST(feature_bit_manager, get_valid_erds_returns_empty_during_parsing)
 {
   init_manager();
 
-  (void)0; /* data provided by event trigger */
-  uint8_t data[8] = {0}; (void)data;
-
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
   trigger_full_read_sequence();
@@ -673,18 +576,11 @@ TEST(feature_bit_manager, get_valid_erds_contains_mandatory_erds_after_full_pars
 {
   init_manager();
 
-  uint8_t data[1] = {0x06};
   uint8_t feature_data[8] = {0};
 
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
-  expect_successful_read(0xC0, ERD_SERIAL_NUMBER);
-  trigger_read_completed(ERD_MODEL_NUMBER, data, 1);
-  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
-  trigger_read_completed(ERD_SERIAL_NUMBER, data, 1);
   expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
   trigger_read_completed(ERD_COMMON_FEATURE_API, feature_data, 8);
   expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_1);
@@ -720,23 +616,20 @@ TEST(feature_bit_manager, get_valid_erds_contains_mandatory_erds_after_full_pars
   CHECK_TRUE(erds.count(ERD_APPLIANCE_FEATURE_API_0) > 0);
   CHECK_TRUE(erds.count(ERD_APPLIANCE_FEATURE_API_9) > 0);
 }
-
-/* ------------------------------------------------------------------ */
-/* read_completed with null data — skip behavior                        */
 /* ------------------------------------------------------------------ */
 
 TEST(feature_bit_manager, read_completed_with_null_data_skips_erd)
 {
   init_manager();
 
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, nullptr, 0);
+  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
+  trigger_read_completed(ERD_COMMON_FEATURE_API, nullptr, 0);
 
   // Null data should skip to next ERD.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0001, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0093, manager.get_state());
 }
 
 /* ------------------------------------------------------------------ */
@@ -747,10 +640,7 @@ TEST(feature_bit_manager, get_valid_erds_vec_matches_set_after_parse)
 {
   init_manager();
 
-  (void)0; /* data provided by event trigger */
-  uint8_t data[8] = {0}; (void)data;
-
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
   trigger_full_read_sequence();
@@ -772,16 +662,8 @@ TEST(feature_bit_manager, erd_data_sizes_capped_at_8)
 {
   init_manager();
 
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
-  manager.start();
-
-  uint8_t data[1] = {0x06};
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
-  expect_successful_read(0xC0, ERD_SERIAL_NUMBER);
-  trigger_read_completed(ERD_MODEL_NUMBER, data, 1);
   expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
-  trigger_read_completed(ERD_SERIAL_NUMBER, data, 1);
+  manager.start();
 
   // Provide more than 8 bytes — should be capped internally.
   uint8_t big_data[16] = {0x00, 0x00, 0x00, 0x01, 0xAA, 0xBB, 0xCC, 0xDD,
@@ -807,40 +689,7 @@ TEST(feature_bit_manager, each_reading_state_queues_correct_erd)
   tiny_timer_group_double_init(&tg);
   mgr.init(&ec.interface, 0xC0, &tg.timer_group);
 
-  (void)0; /* data provided by event trigger */
-  uint8_t data[8] = {0}; (void)data;
-
-  // READING_0008 -> queues ERD_APPLIANCE_TYPE
-  mock().expectOneCall("read")
-    .onObject(&ec.interface)
-    .withParameter("erd", ERD_APPLIANCE_TYPE)
-    .ignoreOtherParameters()
-    .andReturnValue(true);
-  mgr.start();
-
-  // READING_0001 -> queues ERD_MODEL_NUMBER
-  mock().expectOneCall("read")
-    .onObject(&ec.interface)
-    .withParameter("erd", ERD_MODEL_NUMBER)
-    .ignoreOtherParameters()
-    .andReturnValue(true);
-  tiny_gea3_erd_client_on_activity_args_t args;
-  args.type = tiny_gea3_erd_client_activity_type_read_completed;
-  args.address = 0xC0;
-  args.read_completed.request_id = 0;
-  args.read_completed.erd = ERD_APPLIANCE_TYPE;
-  args.read_completed.data = data;
-  args.read_completed.data_size = 1;
-  tiny_gea3_erd_client_double_trigger_activity_event(&ec, &args);
-
-  // READING_0002 -> queues ERD_SERIAL_NUMBER
-  mock().expectOneCall("read")
-    .onObject(&ec.interface)
-    .withParameter("erd", ERD_SERIAL_NUMBER)
-    .ignoreOtherParameters()
-    .andReturnValue(true);
-  args.read_completed.erd = ERD_MODEL_NUMBER;
-  tiny_gea3_erd_client_double_trigger_activity_event(&ec, &args);
+  uint8_t data[8] = {0};
 
   // READING_0092 -> queues ERD_COMMON_FEATURE_API
   mock().expectOneCall("read")
@@ -848,10 +697,33 @@ TEST(feature_bit_manager, each_reading_state_queues_correct_erd)
     .withParameter("erd", ERD_COMMON_FEATURE_API)
     .ignoreOtherParameters()
     .andReturnValue(true);
-  args.read_completed.erd = ERD_SERIAL_NUMBER;
+  mgr.start();
+
+  // READING_0093 -> queues ERD_APPLIANCE_FEATURE_API_0
+  mock().expectOneCall("read")
+    .onObject(&ec.interface)
+    .withParameter("erd", ERD_APPLIANCE_FEATURE_API_0)
+    .ignoreOtherParameters()
+    .andReturnValue(true);
+  tiny_gea3_erd_client_on_activity_args_t args;
+  args.type = tiny_gea3_erd_client_activity_type_read_completed;
+  args.address = 0xC0;
+  args.read_completed.request_id = 0;
+  args.read_completed.erd = ERD_COMMON_FEATURE_API;
+  args.read_completed.data = data;
+  args.read_completed.data_size = 8;
   tiny_gea3_erd_client_double_trigger_activity_event(&ec, &args);
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, mgr.get_state());
+  // READING_0094 -> queues ERD_APPLIANCE_FEATURE_API_1
+  mock().expectOneCall("read")
+    .onObject(&ec.interface)
+    .withParameter("erd", ERD_APPLIANCE_FEATURE_API_1)
+    .ignoreOtherParameters()
+    .andReturnValue(true);
+  args.read_completed.erd = ERD_APPLIANCE_FEATURE_API_0;
+  tiny_gea3_erd_client_double_trigger_activity_event(&ec, &args);
+
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0094, mgr.get_state());
 }
 
 /* ------------------------------------------------------------------ */
@@ -862,25 +734,17 @@ TEST(feature_bit_manager, parsing_with_feature_bits_adds_erds_from_common)
 {
   init_manager();
 
-  uint8_t data[1] = {0x06};
-
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
-  manager.start();
-
-  expect_successful_read(0xC0, ERD_MODEL_NUMBER);
-  trigger_read_completed(ERD_APPLIANCE_TYPE, data, 1);
-  expect_successful_read(0xC0, ERD_SERIAL_NUMBER);
-  trigger_read_completed(ERD_MODEL_NUMBER, data, 1);
-  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
-  trigger_read_completed(ERD_SERIAL_NUMBER, data, 1);
-
   // Common feature API with Primary bit (0x00000001) set.
   uint8_t common_data[8] = {0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00};
-  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
-  trigger_read_completed(ERD_COMMON_FEATURE_API, common_data, 8);
 
   // All appliance ERDs with valid data.
   uint8_t appliance_data[8] = {0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01};
+
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
+  manager.start();
+
+  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
+  trigger_read_completed(ERD_COMMON_FEATURE_API, common_data, 8);
   expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_1);
   trigger_read_completed(ERD_APPLIANCE_FEATURE_API_0, appliance_data, 8);
   expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_2);
@@ -921,10 +785,7 @@ TEST(feature_bit_manager, parse_timer_stops_after_complete)
 {
   init_manager();
 
-  (void)0; /* data provided by event trigger */
-  uint8_t data[8] = {0}; (void)data;
-
-  expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
   trigger_full_read_sequence();
@@ -939,15 +800,6 @@ TEST(feature_bit_manager, parse_timer_stops_after_complete)
   // Elapse more time — state should remain COMPLETE (timer was stopped).
   tiny_timer_group_double_elapse_time(&timer_group, 10);
   CHECK_EQUAL(FEATURE_BIT_STATE_COMPLETE, manager.get_state());
-}
-
-/* ------------------------------------------------------------------ */
-/* Constants                                                            */
-/* ------------------------------------------------------------------ */
-
-TEST(feature_bit_manager, common_parse_per_call_is_4)
-{
-  CHECK_EQUAL(4u, FeatureBitManager::COMMON_PARSE_PER_CALL);
 }
 
 TEST(feature_bit_manager, parse_tick_ms_is_5)
