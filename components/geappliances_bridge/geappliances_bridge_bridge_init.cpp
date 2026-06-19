@@ -33,6 +33,7 @@
 #include "tiny_gea_constants.h"
 #include "erd_poll_list_builder.h"
 #include "erd_cache.h"
+#include <cstring>
 
 namespace esphome {
 namespace geappliances_bridge {
@@ -74,8 +75,8 @@ ErdPollListResult build_poll_list_(GeappliancesBridge* bridge)
   config.appliance_api_parsing = bridge->appliance_api_parsing_;
   config.feature_bit_valid_erds = bridge->feature_bit_manager_.get_valid_erd_count() ? bridge->feature_bit_manager_.valid_erds_ : nullptr;
   config.feature_bit_valid_erds_count = bridge->feature_bit_manager_.get_valid_erd_count();
-  config.custom_erds = bridge->custom_erds_vec_.empty() ? nullptr : bridge->custom_erds_vec_.data();
-  config.custom_erds_count = static_cast<uint16_t>(bridge->custom_erds_vec_.size());
+  config.custom_erds = bridge->custom_erds_count_ > 0 ? bridge->custom_erds_ : nullptr;
+  config.custom_erds_count = bridge->custom_erds_count_;
   config.appliance_type = bridge->device_identity_manager_.get_appliance_type();
   return build_erd_poll_list(config);
 }
@@ -221,7 +222,8 @@ void GeappliancesBridge::initialize_erd_bridge_()
   // Initialize the appropriate bridge(s).
   if (use_polling) {
     auto result = build_poll_list_(this);
-    this->poll_probe_list_.assign(result.erds, result.erds + result.erds_count);
+    this->poll_probe_list_count_ = result.erds_count;
+    std::memcpy(this->poll_probe_list_, result.erds, result.erds_count * sizeof(uint16_t));
     ESP_LOGI(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
     erd_bridge_poll_init(
       &this->erd_bridge_poll_,
@@ -230,8 +232,8 @@ void GeappliancesBridge::initialize_erd_bridge_()
       this->polling_interval_ms_,
       this->autodiscovery_manager_.get_host_address(),
       this->device_identity_manager_.get_appliance_type(),
-      this->poll_probe_list_.data(),
-      static_cast<uint16_t>(this->poll_probe_list_.size()),
+      this->poll_probe_list_,
+      this->poll_probe_list_count_,
       &this->erd_cache_);
     erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
   }
@@ -296,7 +298,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
 
 void GeappliancesBridge::start_custom_erd_polling_()
 {
-  if (this->custom_erds_vec_.empty()) {
+  if (this->custom_erds_count_ == 0) {
     return;
   }
   // Do NOT destroy the subscription bridge - it continues to handle all
@@ -305,9 +307,10 @@ void GeappliancesBridge::start_custom_erd_polling_()
   // Both bridges subscribe to the same ERD client activity event, but they
   // handle different event types (subscription vs read_completed).
 
-    auto result = build_poll_list_(this);
-    this->poll_probe_list_.assign(result.erds, result.erds + result.erds_count);
-    ESP_LOGI(TAG, "Custom ERD polling list: %s (%u ERDs)", result.description, result.erds_count);
+  auto result = build_poll_list_(this);
+  this->poll_probe_list_count_ = result.erds_count;
+  std::memcpy(this->poll_probe_list_, result.erds, result.erds_count * sizeof(uint16_t));
+  ESP_LOGI(TAG, "Custom ERD polling list: %s (%u ERDs)", result.description, result.erds_count);
 
   // Wire the discovery-complete callback BEFORE initializing the bridge,
   // so the HSM cannot fire the callback before it's set.
@@ -323,18 +326,16 @@ void GeappliancesBridge::start_custom_erd_polling_()
       this->polling_interval_ms_,
       this->autodiscovery_manager_.get_host_address(),
       this->device_identity_manager_.get_appliance_type(),
-      this->poll_probe_list_.data(),
-      static_cast<uint16_t>(this->poll_probe_list_.size()),
+      this->poll_probe_list_,
+      this->poll_probe_list_count_,
       &this->erd_cache_);
-  erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
   this->polling_bridge_initialized_ = true;
   this->custom_erd_polling_started_ = true;
 }
 
 void GeappliancesBridge::maybe_start_custom_erd_polling_()
 {
-  if (this->custom_erds_vec_.empty() ||
-      !this->erd_bridge_initialized_ ||
+  if (this->custom_erds_count_ == 0 ||
       this->custom_erd_polling_started_) {
     return;
   }
@@ -404,7 +405,8 @@ void GeappliancesBridge::check_subscription_activity_()
   this->subscription_mode_active_ = false;
 
   auto result = build_poll_list_(this);
-  this->poll_probe_list_.assign(result.erds, result.erds + result.erds_count);
+  this->poll_probe_list_count_ = result.erds_count;
+  std::memcpy(this->poll_probe_list_, result.erds, result.erds_count * sizeof(uint16_t));
   ESP_LOGI(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
   erd_bridge_poll_init(
       &this->erd_bridge_poll_,
@@ -413,10 +415,9 @@ void GeappliancesBridge::check_subscription_activity_()
       this->polling_interval_ms_,
       this->autodiscovery_manager_.get_host_address(),
       this->device_identity_manager_.get_appliance_type(),
-      this->poll_probe_list_.data(),
-      static_cast<uint16_t>(this->poll_probe_list_.size()),
+      this->poll_probe_list_,
+      this->poll_probe_list_count_,
       &this->erd_cache_);
-  this->polling_bridge_initialized_ = true;
   erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
 
   // Signal the startup HSM that subscription fallback has occurred.

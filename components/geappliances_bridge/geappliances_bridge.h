@@ -31,8 +31,6 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/uart/uart.h"
 #include <string>
-#include <set>
-#include <vector>
 
 extern "C" {
 #include "erd_cache.h"
@@ -98,9 +96,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; }
   void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; }
   void set_mqtt_publish_rate_sensor(sensor::Sensor* sensor) { this->mqtt_publish_rate_sensor_ = sensor; }
-  void add_custom_erd(tiny_erd_t erd) { this->custom_erds_vec_.push_back(erd); }
-
-
+  void add_custom_erd(tiny_erd_t erd);
 
  protected:
   // ── IBridgeServices implementation (called exclusively by the startup HSM) ──
@@ -170,18 +166,22 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool generate_device_config_{false};
   // User-configured custom ERDs to poll in addition to the standard list.
   // Populated by add_custom_erd() calls generated from the YAML custom_erds option.
-  std::vector<tiny_erd_t> custom_erds_vec_;
+  // Fixed-capacity array to avoid heap allocation.
+  static constexpr uint16_t CUSTOM_ERDS_MAX = 64;
+  tiny_erd_t custom_erds_[CUSTOM_ERDS_MAX];
+  uint16_t custom_erds_count_{0};
 
   // Auto mode fallback tracking
   bool subscription_mode_active_{false};
   bool subscription_activity_detected_{false};
   uint32_t subscription_start_time_{0};
   uint32_t custom_erd_subscription_last_activity_{0};
-  std::set<tiny_erd_t> custom_erd_subscription_seen_erds_;
+  // Fixed-capacity set for tracking seen subscription ERDs (replaces std::set).
+  erd_set_t custom_erd_subscription_seen_erds_;
   // Pre-built ERD probe list for the polling bridge.
-  // Owned by the bridge so the pointer passed to erd_bridge_poll_init
-  // remains valid across the probe phase.
-  std::vector<uint16_t> poll_probe_list_;
+  // Fixed-capacity array to avoid heap allocation.
+  uint16_t poll_probe_list_[POLLING_LIST_MAX_SIZE];
+  uint16_t poll_probe_list_count_{0};
   bool custom_erd_polling_started_{false};  // Guard to prevent re-initialization
   static constexpr uint32_t SUBSCRIPTION_TIMEOUT_MS = 10000; // 10 seconds
 
