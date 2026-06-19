@@ -10,7 +10,7 @@ Fixed-size ERD cache with hybrid inline/pool data storage. Stores the latest dat
 |----------|-------------|
 | `erd_cache_init(self)` | Initialize the cache (zero all entries, reset counters, clear pool free lists). |
 | `erd_cache_destroy(self)` | Free any heap-allocated data for entries that couldn't fit in the pool. |
-| `erd_cache_update(self, erd, data, data_size)` | Update or insert ERD data. Returns `true` if `update_required` was set (or entry was new). Returns `false` if cache is full and the ERD is not already cached. |
+| `erd_cache_update(self, erd, data, data_size)` | Update or insert ERD data. Returns `true` if `update_required` was set (or entry was new). Returns `false` if cache is full, data is unchanged with `only_publish_onchange`, or ERD size changed (appliance lost). |
 | `erd_cache_set_only_publish_onchange(self, only_publish_onchange)` | Set whether the cache should only mark ERDs as updated when data changes. Default is `false` (always mark updated). |
 | `erd_cache_get_next_updated(self, iterator)` | Returns the next entry with `update_required = true`, then clears the flag. Caller provides an iterator (`uint16_t`) initialized to 0. Returns `NULL` when no more updated entries remain. |
 | `erd_cache_get_count(self)` | Returns the number of valid entries currently in the cache. |
@@ -41,11 +41,13 @@ ERDs with `data_size > 32` fall back to `new uint8_t[data_size]`. This is rare �
 
 ### Storage Selection
 
-`pool_block_for_size()` determines the storage strategy:
+`pool_block_for_size()` determines the storage strategy on **registration only**. ERD data size is invariant after registration — the storage tier is fixed for the lifetime of the entry:
 - `data_size ≤ 4` → inline (returns 255)
 - `5 ≤ data_size ≤ 16` → pool tier 0
 - `17 ≤ data_size ≤ 32` → pool tier 1
 - `data_size > 32` → heap (returns 255)
+
+If a size change is detected on an existing entry, `erd_cache_update()` logs an error and returns `false`, signaling the appliance firmware has changed and the bridge should reinitialize.
 
 ## Update Flow
 
@@ -53,20 +55,21 @@ ERDs with `data_size > 32` fall back to `new uint8_t[data_size]`. This is rare �
 
 1. **Find existing entry** via `erd_cache_find()` (linear scan of `entries[]`)
 2. **If found:**
-   - If `only_publish_onchange` is true: check if data has changed via `erd_data_changed()`
-   - If data changed (or `only_publish_onchange` is false): free old storage, store new data, set `update_required = true`
-   - If data unchanged and `only_publish_onchange` is true: do nothing
+   - Increment `update_count` and `update_count_window`
+   - Check if data has changed via `erd_data_changed()` (memcmp only — size is invariant)
+   - If data unchanged and `only_publish_onchange` is true: return `false` (early exit, no storage churn)
+   - If data size differs from existing: log error, return `false` (appliance lost)
+   - In-place `memcpy` into existing buffer (inline, pool, or heap — no free or alloc)
+   - Set `update_required = !only_publish_onchange || data_changed`
 3. **If not found:**
    - Scan `entries[]` for the first slot with `valid == false`
    - If no free slot: return `false` (cache full)
-   - Store data, set `valid = true` and `update_required = true`
+   - Initialize entry, call `store_data()` to allocate storage (inline → pool → heap → truncate)
+   - Set `valid = true` and `update_required = true`
 
 ## Change Detection
 
-`erd_data_changed()` compares the new data against the existing entry:
-- First checks `data_size` — if sizes differ, data has changed (fast path)
-- If sizes are equal, does a `memcmp` of the shared length
-- Avoids partial `memcmp` of mismatched lengths
+`erd_data_changed()` compares the new data against the existing entry using `memcmp`. ERD size is invariant after registration, so only the data content is compared — no size check is needed.
 
 ## Entry Structure
 
@@ -111,7 +114,10 @@ typedef struct erd_cache_t {
 
 ## Key Design Decisions
 
-- **Hybrid storage**: Inline for small ERDs (≤ 4 bytes), pool for medium (5–32 bytes), heap fallback for large (> 32 bytes). This eliminates per-update `new`/`delete` churn for the vast majority of ERDs.
+- **Hybrid storage**: Inline for small ERDs (≤ 4 bytes), pool for medium (5–32 bytes), heap fallback for large (> 32 bytes). Storage tier is assigned on registration and fixed for the lifetime of the entry.
+- **In-place updates**: Existing entries are updated with a single `memcpy` into the existing buffer — no free, no alloc. This eliminates pool churn on every poll cycle.
+- **Size invariance**: ERD data size never changes after registration. A size mismatch is treated as an appliance firmware change — `erd_cache_update()` logs an error and returns `false`, signaling the bridge should reinitialize.
+- **Early exit on unchanged data**: When `only_publish_onchange` is true and data hasn't changed, the update returns immediately without touching storage.
 - **Fixed pool capacity**: Each pool tier has `ERD_CACHE_CAPACITY` slots (200), so every cache entry can hold a block from any tier without contention. No dynamic resizing needed.
 - **Change detection at update time**: `update_required` is set during `erd_cache_update()`, not during iteration. This eliminates per-read `memcmp` overhead in the publisher loop.
 - **Two iterators**: `erd_cache_get_next_updated()` for the publisher (clears `update_required` flag) and `erd_cache_get_next_entry()` for read-only iteration (used by HA discovery).
