@@ -73,9 +73,6 @@ static bool erd_data_changed(const erd_cache_entry_t* existing,
 
 void erd_cache_init(erd_cache_t* self)
 {
-  /* Free any pool-allocated data before resetting.
-   * Only scan entries that look valid (erd != 0) to avoid reading
-   * uninitialized stack memory on first init of a local erd_cache_t. */
   /* Free any pool or heap data before resetting.
    * Only scan entries that look valid (erd != 0) to avoid reading
    * uninitialized stack memory on first init of a local erd_cache_t. */
