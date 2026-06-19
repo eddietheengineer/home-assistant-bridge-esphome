@@ -121,8 +121,14 @@ uint16_t erd_cache_mqtt_publisher_loop(
     }
     hex[data_len * 2] = '\0';
 
-    /* Publish through the interface */
+    /* Publish through the interface — measure per-publish time. */
+    uint32_t t_publish = self->get_time_ms();
     mqtt_client_publish_raw(self->mqtt_client, topic, hex, data_len * 2, true);
+    uint32_t elapsed = self->get_time_ms() - t_publish;
+
+    if (elapsed >= 50) {
+      ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
+    }
 
     self->total_published++;
     self->publish_count_window++;
