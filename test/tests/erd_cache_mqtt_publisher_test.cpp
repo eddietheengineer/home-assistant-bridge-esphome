@@ -587,3 +587,142 @@ TEST(erd_cache_change_detection, heap_to_inline_shrink_change_detected)
   /* size differs, so change is detected */
   CHECK_TRUE(erd_cache_update(&cache, 0x1001, data_small, sizeof(data_small)));
 }
+/* ------------------------------------------------------------------ */
+/* Cache edge cases                                                    */
+/* ------------------------------------------------------------------ */
+
+/* #18: Heap path — new entry with data > 16 bytes uses heap storage */
+TEST(erd_cache_change_detection, heap_path_new_entry_uses_heap)
+{
+  uint8_t data[20];
+  for (uint8_t i = 0; i < 20; i++) {
+    data[i] = i;
+  }
+  erd_cache_update(&cache, 0x1001, data, sizeof(data));
+
+  /* Verify the entry was created and is in the cache. */
+  CHECK_EQUAL(1u, erd_cache_get_count(&cache));
+
+  /* Verify update_required is set (new entries always mark update_required). */
+  uint16_t iterator = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iterator);
+  CHECK(entry != NULL);
+  CHECK_TRUE(entry->uses_heap);
+  CHECK_EQUAL(20u, entry->data_size);
+  for (uint8_t i = 0; i < 20; i++) {
+    CHECK_EQUAL(i, entry->heap_data[i]);
+  }
+}
+
+/* #18: Heap path — update existing heap entry with different data */
+TEST(erd_cache_change_detection, heap_path_update_existing_entry)
+{
+  uint8_t data1[20];
+  for (uint8_t i = 0; i < 20; i++) {
+    data1[i] = i;
+  }
+  erd_cache_update(&cache, 0x1001, data1, sizeof(data1));
+
+  uint8_t data2[20];
+  for (uint8_t i = 0; i < 20; i++) {
+    data2[i] = 255 - i;
+  }
+  erd_cache_set_only_publish_onchange(&cache, true);
+  CHECK_TRUE(erd_cache_update(&cache, 0x1001, data2, sizeof(data2)));
+
+  /* Verify the update was detected and the entry is still in the cache. */
+  CHECK_EQUAL(1u, erd_cache_get_count(&cache));
+
+  uint16_t iterator = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iterator);
+  CHECK(entry != NULL);
+  CHECK_TRUE(entry->uses_heap);
+  CHECK_EQUAL(20u, entry->data_size);
+  for (uint8_t i = 0; i < 20; i++) {
+    CHECK_EQUAL(255 - i, entry->heap_data[i]);
+  }
+}
+
+/* #19: Cache overflow — 201st insert rejected when cache is full */
+TEST(erd_cache_change_detection, cache_overflow_rejects_new_erd)
+{
+  for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
+    uint8_t data = 0x42;
+    erd_cache_update(&cache, (tiny_erd_t)(0x8000 + i), &data, sizeof(data));
+  }
+  CHECK_EQUAL(ERD_CACHE_CAPACITY, erd_cache_get_count(&cache));
+
+  /* 201st ERD should be rejected */
+  uint8_t data = 0xFF;
+  CHECK_FALSE(erd_cache_update(&cache, 0xFFFF, &data, sizeof(data)));
+  CHECK_EQUAL(ERD_CACHE_CAPACITY, erd_cache_get_count(&cache));
+}
+
+/* #20: max_ms=0 — loop publishes nothing because time check fails immediately */
+TEST(erd_cache_mqtt_publisher, loop_publishes_nothing_with_max_ms_zero)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+
+  uint8_t data = 0x42;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
+
+  esphome_hal_double_set_millis(0);
+  erd_cache_mqtt_publisher_set_time_fn(&publisher, esphome_hal_double_get_millis);
+
+  /* max_ms=0: first iteration checks get_time_ms()-start_ms >= 0, which is 0>=0=true */
+  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 0);
+  CHECK_EQUAL(0u, published);
+}
+
+/* #23: MQTT reconnect — ERD still published after disconnect/reconnect cycle */
+TEST(erd_cache_mqtt_publisher, loop_publishes_after_disconnect_reconnect)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+
+  uint8_t data = 0x42;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
+
+  /* Simulate disconnect — loop should skip publishing */
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(0u, published);
+  CHECK(publisher.missed_loops > 0);
+
+  /* Simulate reconnect — loop should publish the pending ERD */
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+  published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(1u, published);
+}
+
+/* #23: MQTT reconnect — no publish after reconnect when nothing has changed */
+TEST(erd_cache_mqtt_publisher, loop_no_publish_after_reconnect_when_no_changes)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+
+  uint8_t data = 0x42;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
+
+  /* Publish the ERD first to clear update_required */
+  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(1u, published);
+
+  /* Disconnect and reconnect */
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  /* No new data — nothing should be published */
+  published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(0u, published);
+}

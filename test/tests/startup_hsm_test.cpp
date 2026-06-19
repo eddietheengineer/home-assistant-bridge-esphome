@@ -26,10 +26,21 @@ using namespace esphome::geappliances_bridge;
 class MockBridgeServices : public IBridgeServices {
  public:
   // -- Autodiscovery ----------------------------------------------------------
-  void run_autodiscovery() override {}
-  bool is_autodiscovery_complete() const override { return true; }
-  uint8_t get_discovered_host_address() const override { return 0xC0; }
-  bool is_discovered_gea2_protocol() const override { return false; }
+  void run_autodiscovery() override {
+    mock().actualCall("run_autodiscovery").onObject(this);
+  }
+  bool is_autodiscovery_complete() const override {
+    return mock().actualCall("is_autodiscovery_complete").onObject(this)
+               .returnBoolValueOrDefault(false);
+  }
+  uint8_t get_discovered_host_address() const override {
+    return (uint8_t)mock().actualCall("get_discovered_host_address").onObject(this)
+               .returnIntValueOrDefault(0xC0);
+  }
+  bool is_discovered_gea2_protocol() const override {
+    return mock().actualCall("is_discovered_gea2_protocol").onObject(this)
+               .returnBoolValueOrDefault(false);
+  }
 
   // -- Device ID --------------------------------------------------------------
   void init_device_id_reading() override {
@@ -59,11 +70,20 @@ class MockBridgeServices : public IBridgeServices {
   }
 
   // -- Bridge initialization --------------------------------------------------
-  bool is_bridge_initialized() const override { return false; }
-  void initialize_erd_bridge() override {}
+  bool is_bridge_initialized() const override {
+    return mock().actualCall("is_bridge_initialized").onObject(this)
+               .returnBoolValueOrDefault(false);
+  }
+  void initialize_erd_bridge() override {
+    mock().actualCall("initialize_erd_bridge").onObject(this);
+  }
 
   // -- Operating mode ---------------------------------------------------------
-  BridgeMode get_mode() const override { return BRIDGE_MODE_AUTO; }
+  BridgeMode get_mode() const override {
+    return static_cast<BridgeMode>(
+      mock().actualCall("get_mode").onObject(this)
+        .returnIntValueOrDefault(BRIDGE_MODE_AUTO));
+  }
   bool is_subscription_mode_active() const override { return true; }
 
   // -- Startup delay ----------------------------------------------------------
@@ -77,14 +97,21 @@ class MockBridgeServices : public IBridgeServices {
 
   // -- Recurring tasks --------------------------------------------------------
   void check_subscription_activity() override {}
-  void maybe_start_custom_erd_polling() override {}
+  void maybe_start_custom_erd_polling() override {
+    mock().actualCall("maybe_start_custom_erd_polling").onObject(this);
+  }
+  void initialize_erd_cache_publisher() override {
+    mock().actualCall("initialize_erd_cache_publisher").onObject(this);
+  }
+  bool is_erd_cache_publisher_initialized() const override {
+    return mock().actualCall("is_erd_cache_publisher_initialized").onObject(this)
+               .returnBoolValueOrDefault(false);
+  }
+  void run_ha_discovery() override {
+    mock().actualCall("run_ha_discovery").onObject(this);
+  }
   void log_poll_state_transitions() override {}
-  void run_ha_discovery() override {}
   void run_all_managers() override {}
-
-  // -- ERD cache MQTT publisher -----------------------------------------------
-  void initialize_erd_cache_publisher() override {}
-  bool is_erd_cache_publisher_initialized() const override { return false; }
 };
 
 // =============================================================================
@@ -120,6 +147,8 @@ TEST_GROUP(startup_hsm)
     if (!mqtt_already_initialized) {
       mock().expectOneCall("initialize_mqtt_client").onObject(&svc);
     }
+    mock().expectOneCall("is_erd_cache_publisher_initialized").onObject(&svc).andReturnValue(false);
+    mock().expectOneCall("initialize_erd_cache_publisher").onObject(&svc);
     mock().expectOneCall("start_feature_bit_reading").onObject(&svc);
   }
 };
@@ -228,5 +257,63 @@ TEST(startup_hsm, feature_bits_signal_complete_transitions_to_bridge_init)
   tiny_hsm_send_signal(&hsm, signal_feature_bits_complete, nullptr);
 
   CHECK(hsm.current == startup_state_bridge_init);
+  mock().checkExpectations();
+}
+// =============================================================================
+// Full startup flow — protocol_stack through running
+// =============================================================================
+
+TEST(startup_hsm, full_startup_flow_reaches_running)
+{
+  /* Set up all mock expectations upfront in the order they will be called. */
+  /* Phase 1: protocol_stack → startup_delay entry */
+  mock().expectOneCall("record_startup_delay_start").onObject(&svc);
+  /* Phase 2: startup_delay run_loop → autodiscovery entry */
+  mock().expectOneCall("is_startup_delay_elapsed").onObject(&svc).andReturnValue(true);
+  mock().expectOneCall("run_autodiscovery").onObject(&svc);
+  /* Phase 3: autodiscovery_complete → device_id → mqtt_client_init → feature_bits */
+  mock().expectOneCall("is_autodiscovery_complete").onObject(&svc).andReturnValue(true);
+  mock().expectOneCall("init_device_id_reading").onObject(&svc);
+  mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(true);
+  mock().expectOneCall("is_mqtt_client_initialized").onObject(&svc).andReturnValue(false);
+  mock().expectOneCall("initialize_mqtt_client").onObject(&svc);
+  mock().expectOneCall("is_erd_cache_publisher_initialized").onObject(&svc).andReturnValue(false);
+  mock().expectOneCall("initialize_erd_cache_publisher").onObject(&svc);
+  mock().expectOneCall("start_feature_bit_reading").onObject(&svc);
+  /* Phase 5: bridge_init run_loop */
+  mock().expectOneCall("is_bridge_initialized").onObject(&svc).andReturnValue(false);
+  mock().expectOneCall("is_autodiscovery_complete").onObject(&svc).andReturnValue(true);
+  mock().expectOneCall("initialize_erd_bridge").onObject(&svc);
+  /* Phase 6: subscription_watch entry → ha_discovery */
+  mock().expectOneCall("get_mode").onObject(&svc).andReturnValue(BRIDGE_MODE_POLL);
+  mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
+  /* Phase 7: ha_discovery run_loop → running */
+  mock().expectOneCall("run_ha_discovery").onObject(&svc);
+
+  /* Drive the HSM through all phases. */
+  tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_protocol_stack);
+  CHECK(hsm.current == startup_state_startup_delay);
+
+  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
+  CHECK(hsm.current == startup_state_autodiscovery);
+
+  tiny_hsm_send_signal(&hsm, signal_autodiscovery_complete, nullptr);
+  CHECK(hsm.current == startup_state_feature_bits);
+
+  tiny_hsm_send_signal(&hsm, signal_feature_bits_complete, nullptr);
+  CHECK(hsm.current == startup_state_bridge_init);
+
+  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
+  CHECK(hsm.current == startup_state_bridge_init);
+
+  tiny_hsm_send_signal(&hsm, signal_bridge_ready, nullptr);
+  /* After bridge_ready, we should be in ha_discovery (non-AUTO mode). */
+  /* If we're in subscription_watch, get_mode returned AUTO. */
+  /* If we're in bridge_init, the transition didn't happen. */
+  CHECK(hsm.current == startup_state_ha_discovery);
+
+  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
+  CHECK(hsm.current == startup_state_running);
+
   mock().checkExpectations();
 }

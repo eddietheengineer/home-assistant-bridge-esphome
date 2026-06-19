@@ -282,3 +282,43 @@ TEST(erd_write_bridge, should_not_crash_on_destroy_without_init)
 {
   erd_write_bridge_destroy(&self);
 }
+/* ------------------------------------------------------------------ */
+/* Concurrent write requests                                           */
+/* ------------------------------------------------------------------ */
+
+/* #24: Two rapid writes — second is silently dropped */
+TEST(erd_write_bridge, should_drop_second_write_request_while_first_in_progress)
+{
+  when_the_bridge_is_initialized();
+
+  uint8_t value1 = 0x01;
+  expect_write_succeeds();
+  when_a_write_request_is_received(0x3001, &value1, sizeof(value1));
+
+  /* Second write arrives before first completes — should be dropped. */
+  uint8_t value2 = 0x02;
+  when_a_write_request_is_received(0x3002, &value2, sizeof(value2));
+
+  /* Only one write call should have been made to the ERD client. */
+  should_report_write_result(0x3001, true, 0);
+  when_a_write_is_completed(mock_request_id, 0x3001);
+}
+
+/* #24: Write accepted after previous write completes */
+TEST(erd_write_bridge, should_accept_new_write_after_previous_completes)
+{
+  when_the_bridge_is_initialized();
+
+  uint8_t value1 = 0x01;
+  expect_write_succeeds();
+  when_a_write_request_is_received(0x3001, &value1, sizeof(value1));
+  should_report_write_result(0x3001, true, 0);
+  when_a_write_is_completed(mock_request_id, 0x3001);
+
+  /* After completion, a new write should be accepted. */
+  uint8_t value2 = 0x02;
+  expect_write_succeeds();
+  when_a_write_request_is_received(0x3002, &value2, sizeof(value2));
+  should_report_write_result(0x3002, true, 0);
+  when_a_write_is_completed(mock_request_id, 0x3002);
+}
