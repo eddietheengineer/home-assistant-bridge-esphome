@@ -605,8 +605,8 @@ TEST(erd_cache_change_detection, heap_to_inline_shrink_change_detected)
 /* Cache edge cases                                                    */
 /* ------------------------------------------------------------------ */
 
-/* #18: Heap path — new entry with data > 16 bytes uses heap storage */
-TEST(erd_cache_change_detection, heap_path_new_entry_uses_heap)
+/* #18: Pool path — new entry with data > 4 bytes and <= 32 bytes uses pool storage */
+TEST(erd_cache_change_detection, pool_path_new_entry_uses_pool)
 {
   uint8_t data[20];
   for (uint8_t i = 0; i < 20; i++) {
@@ -624,12 +624,12 @@ TEST(erd_cache_change_detection, heap_path_new_entry_uses_heap)
   CHECK_TRUE(entry->uses_pool);
   CHECK_EQUAL(20u, entry->data_size);
   for (uint8_t i = 0; i < 20; i++) {
-    CHECK_EQUAL(i, entry->pool_data[i]);
+    CHECK_EQUAL(i, entry->ext_data[i]);
   }
 }
 
-/* #18: Heap path — update existing heap entry with different data */
-TEST(erd_cache_change_detection, heap_path_update_existing_entry)
+/* #18: Pool path — update existing pool entry with different data */
+TEST(erd_cache_change_detection, pool_path_update_existing_entry)
 {
   uint8_t data1[20];
   for (uint8_t i = 0; i < 20; i++) {
@@ -653,7 +653,7 @@ TEST(erd_cache_change_detection, heap_path_update_existing_entry)
   CHECK_TRUE(entry->uses_pool);
   CHECK_EQUAL(20u, entry->data_size);
   for (uint8_t i = 0; i < 20; i++) {
-    CHECK_EQUAL(255 - i, entry->pool_data[i]);
+    CHECK_EQUAL(255 - i, entry->ext_data[i]);
   }
 }
 

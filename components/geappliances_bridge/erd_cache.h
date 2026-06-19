@@ -17,27 +17,26 @@
 
 #include "tiny_gea3_erd_client.h"
 
-#define ERD_CACHE_INLINE_DATA_SIZE 16
+#define ERD_CACHE_INLINE_DATA_SIZE 4
 #define ERD_CACHE_CAPACITY 200
 
 /* Memory pool block sizes — covers the most common ERD data sizes.
- * Most ERDs are between 17 and 64 bytes.  The pool pre-allocates
+ * Most ERDs are between 5 and 32 bytes.  The pool pre-allocates
  * blocks in these sizes to eliminate per-update new/delete churn.
- * ERDs larger than the largest pool block fall back to inline storage. */
-#define ERD_CACHE_POOL_BLOCK_1  32
-#define ERD_CACHE_POOL_BLOCK_2  48
-#define ERD_CACHE_POOL_BLOCK_3  64
-#define ERD_CACHE_POOL_BLOCK_4  128
-#define ERD_CACHE_POOL_COUNT    4
+ * ERDs larger than the largest pool block fall back to heap storage. */
+#define ERD_CACHE_POOL_BLOCK_1  16
+#define ERD_CACHE_POOL_BLOCK_2  32
+#define ERD_CACHE_POOL_COUNT    2
 typedef struct {
   tiny_erd_t erd;
   union {
     uint8_t inline_data[ERD_CACHE_INLINE_DATA_SIZE];
-    uint8_t* pool_data;
+    uint8_t* ext_data;  /* pool or heap pointer */
   };
   uint8_t data_size;
-  uint8_t pool_block_idx;  /* which pool block (0-3) or 255 if inline */
+  uint8_t pool_block_idx;  /* which pool block (0-1) or 255 if not pool */
   bool uses_pool;
+  bool uses_heap;
   bool update_required;
   bool valid;
 } erd_cache_entry_t;
@@ -53,7 +52,7 @@ typedef struct erd_cache_t {
   /* Fixed memory pool — pre-allocated blocks to eliminate new/delete churn.
    * Each pool tier has ERD_CACHE_CAPACITY slots so every cache entry can
    * hold a block from any tier without contention. */
-  uint8_t pool_blocks[ERD_CACHE_POOL_COUNT][ERD_CACHE_CAPACITY][ERD_CACHE_POOL_BLOCK_4];
+  uint8_t pool_blocks[ERD_CACHE_POOL_COUNT][ERD_CACHE_CAPACITY][ERD_CACHE_POOL_BLOCK_2];
   uint8_t pool_free[ERD_CACHE_POOL_COUNT][ERD_CACHE_CAPACITY];
 } erd_cache_t;
 
