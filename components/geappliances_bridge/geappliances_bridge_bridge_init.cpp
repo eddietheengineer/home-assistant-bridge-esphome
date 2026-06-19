@@ -88,11 +88,11 @@ void GeappliancesBridge::start_feature_bit_reading_()
   // PARSING/COMPLETE mean it's past the reading phase.
   // Note: the feature_bit_reading_started_ flag prevents re-init while the first read is in-flight.
   FeatureBitState state = this->feature_bit_manager_.get_state();
-  if (state != FEATURE_BIT_STATE_READING_0008) {
+  if (state != FEATURE_BIT_STATE_READING_0092) {
     return;
   }
   // Additional guard: if start() was already called and the first read
-  // is in-flight, the manager is still in READING_0008 but read_queued_
+  // is in-flight, the manager is still in READING_0092 but read_queued_
   // is true. We can't check read_queued_ directly (it's private), but
   // we track whether we've already kicked off feature bit reading via
   // the feature_bit_reading_started_ flag.
@@ -112,7 +112,7 @@ void GeappliancesBridge::start_feature_bit_reading_()
   // transient null-client on an earlier call does not permanently block retry.
   this->feature_bit_reading_started_ = true;
 
-  ESP_LOGI(TAG, "Reading device info ERDs for MQTT publish, then appliance API feature bits...");
+  ESP_LOGI(TAG, "Reading appliance API feature bits...");
   this->feature_bit_manager_.init(
       erd_client,
       this->autodiscovery_manager_.get_host_address(),
