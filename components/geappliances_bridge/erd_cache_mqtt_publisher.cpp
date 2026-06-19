@@ -12,6 +12,9 @@
 #include <string.h>
 
 static const char* const TAG = "erd_cache_mqtt_publisher";
+#ifdef USE_ESP_IDF
+#include "esp_task_wdt.h"
+#endif
 
 #ifdef USE_ESP_IDF
 static void mqtt_publisher_task(void* arg)
@@ -43,26 +46,25 @@ static void mqtt_publisher_task(void* arg)
         data = entry->inline_data;
       }
 
-      /* Build topic: geappliances/{device_id}/erd/0x{ERD:04x}/value */
-      char topic[128];
-      int topic_len = snprintf(topic, sizeof(topic),
+      /* Build topic using pre-allocated buffer. */
+      int topic_len = snprintf(self->task_topic, sizeof(self->task_topic),
           "geappliances/%s/erd/0x%04x/value", self->device_id, entry->erd);
-      if (topic_len < 0 || (unsigned)topic_len >= sizeof(topic)) {
+      if (topic_len < 0 || (unsigned)topic_len >= sizeof(self->task_topic)) {
         ESP_LOGW(TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
         break;
       }
 
-      /* Build hex payload. */
+      /* Build hex payload using pre-allocated buffer. */
       size_t data_len = entry->data_size;
-      char hex[512];
       for (size_t i = 0; i < data_len; i++) {
-        snprintf(hex + i * 2, 3, "%02x", data[i]);
+        snprintf(self->task_hex + i * 2, 3, "%02x", data[i]);
       }
-      hex[data_len * 2] = '\0';
+      self->task_hex[data_len * 2] = '\0';
 
       /* Publish through the interface. */
       uint32_t t_publish = self->get_time_ms();
-      mqtt_client_publish_raw(self->mqtt_client, topic, hex, data_len * 2, true);
+      mqtt_client_publish_raw(self->mqtt_client, self->task_topic,
+          self->task_hex, data_len * 2, true);
       uint32_t elapsed = self->get_time_ms() - t_publish;
 
       if (elapsed >= 50) {
@@ -157,7 +159,7 @@ void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
   self->task_handle = xTaskCreateStatic(
       mqtt_publisher_task,
       "erd_mqtt_pub",
-      1024,
+      2048,
       self,
       2,
       self->task_stack,
@@ -178,10 +180,15 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
   self->task_running = false;
   // Wake the task so it can exit.
   xSemaphoreGive(self->work_semaphore);
-  // Wait for task to finish (up to 1 second).
-  UBaseType_t ticks = pdMS_TO_TICKS(1000);
-  while (self->task_handle != NULL && ticks-- > 0) {
+  // Wait for the task to actually terminate before freeing resources.
+  // The main loop IS a FreeRTOS task on ESP-IDF, so vTaskDelay is safe.
+  uint32_t start = esphome::millis();
+  while (self->task_handle != NULL && esphome::millis() - start < 1000) {
+    esp_task_wdt_reset();
     vTaskDelay(pdMS_TO_TICKS(10));
+  }
+  if (self->task_handle != NULL) {
+    ESP_LOGW(TAG, "MQTT publisher task did not terminate within 1 s");
   }
   self->task_handle = NULL;
 #else

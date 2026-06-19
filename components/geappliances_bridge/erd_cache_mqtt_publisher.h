@@ -56,9 +56,12 @@ typedef struct {
 #ifdef USE_ESP_IDF
   TaskHandle_t    task_handle;
   StaticTask_t    task_tcb;
-  StackType_t     task_stack[1024 / sizeof(StackType_t)];
+  StackType_t     task_stack[2048 / sizeof(StackType_t)];
   SemaphoreHandle_t work_semaphore;
   bool task_running;
+  // Pre-allocated buffers for the background task to avoid stack overflow.
+  char task_topic[128];
+  char task_hex[512];
 #endif
 } erd_cache_mqtt_publisher_t;
 
