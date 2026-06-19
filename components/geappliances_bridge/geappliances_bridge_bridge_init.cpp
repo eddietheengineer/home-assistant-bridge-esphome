@@ -74,7 +74,8 @@ ErdPollListResult build_poll_list_(GeappliancesBridge* bridge)
   config.appliance_api_parsing = bridge->appliance_api_parsing_;
   config.feature_bit_valid_erds = bridge->feature_bit_manager_.get_valid_erd_count() ? bridge->feature_bit_manager_.valid_erds_ : nullptr;
   config.feature_bit_valid_erds_count = bridge->feature_bit_manager_.get_valid_erd_count();
-  config.custom_erds = &bridge->custom_erds_vec_;
+  config.custom_erds = bridge->custom_erds_vec_.empty() ? nullptr : bridge->custom_erds_vec_.data();
+  config.custom_erds_count = static_cast<uint16_t>(bridge->custom_erds_vec_.size());
   config.appliance_type = bridge->device_identity_manager_.get_appliance_type();
   return build_erd_poll_list(config);
 }
@@ -220,9 +221,8 @@ void GeappliancesBridge::initialize_erd_bridge_()
   // Initialize the appropriate bridge(s).
   if (use_polling) {
     auto result = build_poll_list_(this);
-    this->poll_probe_list_ = result.erds;
-    ESP_LOGI(TAG, "Poll list: %s (%zu ERDs)", result.description.c_str(),
-             this->poll_probe_list_.size());
+    this->poll_probe_list_.assign(result.erds, result.erds + result.erds_count);
+    ESP_LOGI(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
     erd_bridge_poll_init(
       &this->erd_bridge_poll_,
       &this->timer_group_,
@@ -305,10 +305,9 @@ void GeappliancesBridge::start_custom_erd_polling_()
   // Both bridges subscribe to the same ERD client activity event, but they
   // handle different event types (subscription vs read_completed).
 
-  auto result = build_poll_list_(this);
-  this->poll_probe_list_ = result.erds;
-  ESP_LOGI(TAG, "Custom ERD polling list: %s (%zu ERDs)", result.description.c_str(),
-           this->poll_probe_list_.size());
+    auto result = build_poll_list_(this);
+    this->poll_probe_list_.assign(result.erds, result.erds + result.erds_count);
+    ESP_LOGI(TAG, "Custom ERD polling list: %s (%u ERDs)", result.description, result.erds_count);
 
   // Wire the discovery-complete callback BEFORE initializing the bridge,
   // so the HSM cannot fire the callback before it's set.
@@ -405,10 +404,8 @@ void GeappliancesBridge::check_subscription_activity_()
   this->subscription_mode_active_ = false;
 
   auto result = build_poll_list_(this);
-  this->poll_probe_list_ = result.erds;
-  ESP_LOGI(TAG, "Poll list: %s (%zu ERDs)", result.description.c_str(),
-           this->poll_probe_list_.size());
-
+  this->poll_probe_list_.assign(result.erds, result.erds + result.erds_count);
+  ESP_LOGI(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
   erd_bridge_poll_init(
       &this->erd_bridge_poll_,
       &this->timer_group_,

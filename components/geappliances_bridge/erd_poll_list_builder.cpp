@@ -5,7 +5,8 @@
 
 #include "erd_poll_list_builder.h"
 #include "erd_lists.h"
-#include <set>
+#include <algorithm>
+#include <cstring>
 
 namespace esphome {
 namespace geappliances_bridge {
@@ -14,24 +15,26 @@ namespace geappliances_bridge {
 // Helpers
 // ---------------------------------------------------------------------------
 
-static void append_erds(std::vector<uint16_t>& out, const uint16_t* list, uint16_t count)
+static uint16_t append_erds(uint16_t* out, uint16_t count, const uint16_t* list, uint16_t list_count)
 {
-  for (uint16_t i = 0; i < count; i++) {
-    out.push_back(list[i]);
+  uint16_t n = (list_count > (ERD_POLL_LIST_MAX_SIZE - count)) ? (ERD_POLL_LIST_MAX_SIZE - count) : list_count;
+  if (list && n > 0) {
+    std::memcpy(out + count, list, n * sizeof(uint16_t));
   }
+  return count + n;
 }
 
-static void deduplicate(std::vector<uint16_t>& erds)
+static void deduplicate(uint16_t* erds, uint16_t& count)
 {
-  std::set<uint16_t> seen;
-  for (auto it = erds.begin(); it != erds.end(); ) {
-    if (seen.count(*it)) {
-      it = erds.erase(it);
-    } else {
-      seen.insert(*it);
-      ++it;
+  if (count <= 1) return;
+  std::sort(erds, erds + count);
+  uint16_t write = 1;
+  for (uint16_t read = 1; read < count; read++) {
+    if (erds[read] != erds[write - 1]) {
+      erds[write++] = erds[read];
     }
   }
+  count = write;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +44,9 @@ static void deduplicate(std::vector<uint16_t>& erds)
 ErdPollListResult build_erd_poll_list(const ErdPollListConfig& config)
 {
   ErdPollListResult result;
+  std::memset(result.erds, 0, sizeof(result.erds));
+  result.erds_count = 0;
+  result.description = "";
 
   bool is_subscribe_mode = (config.mode == BRIDGE_MODE_SUBSCRIBE) ||
                            (config.mode == BRIDGE_MODE_AUTO && config.subscription_active);
@@ -49,8 +55,7 @@ ErdPollListResult build_erd_poll_list(const ErdPollListConfig& config)
   // SUBSCRIBE mode (subscription confirmed): only custom ERDs
   // -----------------------------------------------------------------------
   if (is_subscribe_mode) {
-    append_erds(result.erds, config.custom_erds ? config.custom_erds->data() : nullptr,
-                config.custom_erds ? static_cast<uint16_t>(config.custom_erds->size()) : 0);
+    result.erds_count = append_erds(result.erds, 0, config.custom_erds, config.custom_erds_count);
     result.description = "subscription mode: custom ERDs only";
     return result;
   }
@@ -60,29 +65,27 @@ ErdPollListResult build_erd_poll_list(const ErdPollListConfig& config)
   // -----------------------------------------------------------------------
   if (config.appliance_api_parsing) {
     // Use feature-bit-validated ERDs + custom ERDs.
-    append_erds(result.erds, config.feature_bit_valid_erds, config.feature_bit_valid_erds_count);
-    append_erds(result.erds, config.custom_erds ? config.custom_erds->data() : nullptr,
-                config.custom_erds ? static_cast<uint16_t>(config.custom_erds->size()) : 0);
+    result.erds_count = append_erds(result.erds, 0, config.feature_bit_valid_erds, config.feature_bit_valid_erds_count);
+    result.erds_count = append_erds(result.erds, result.erds_count, config.custom_erds, config.custom_erds_count);
     result.description = "poll mode with API parsing: feature-bit ERDs + custom ERDs";
   } else {
     // Full discovery: common + energy + appliance API feature + appliance-specific + custom.
-    append_erds(result.erds, commonErds, commonErdCount);
-    append_erds(result.erds, energyErds, energyErdCount);
-    append_erds(result.erds, applianceApiFeatureErds, applianceApiFeatureErdCount);
+    result.erds_count = append_erds(result.erds, 0, commonErds, commonErdCount);
+    result.erds_count = append_erds(result.erds, result.erds_count, energyErds, energyErdCount);
+    result.erds_count = append_erds(result.erds, result.erds_count, applianceApiFeatureErds, applianceApiFeatureErdCount);
 
     // Appliance-specific ERDs (skip if type is out of range).
     if (config.appliance_type < maximumApplianceType) {
       const auto& group = applianceTypeToErdGroupTranslation[config.appliance_type];
-      append_erds(result.erds, group.erdList, group.erdCount);
+      result.erds_count = append_erds(result.erds, result.erds_count, group.erdList, group.erdCount);
     }
 
-    append_erds(result.erds, config.custom_erds ? config.custom_erds->data() : nullptr,
-                config.custom_erds ? static_cast<uint16_t>(config.custom_erds->size()) : 0);
+    result.erds_count = append_erds(result.erds, result.erds_count, config.custom_erds, config.custom_erds_count);
     result.description = "poll mode without API parsing: full ERD list";
   }
 
   // Deduplicate in place.
-  deduplicate(result.erds);
+  deduplicate(result.erds, result.erds_count);
 
   return result;
 }
