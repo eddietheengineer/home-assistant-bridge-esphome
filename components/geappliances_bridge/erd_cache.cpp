@@ -12,6 +12,17 @@
 static const char* const TAG = "erd_cache";
 
 static bool s_overflow_warned = false;
+/* Returns true if the new data differs from the existing entry's data.
+ * Compares size first (fast path), then does a full memcmp of the shared
+ * length when sizes are equal.  This avoids partial memcmp of mismatched
+ * lengths — the size check alone catches those cases. */
+static bool erd_data_changed(const erd_cache_entry_t* existing,
+                             const uint8_t* new_data, uint8_t new_size)
+{
+  if (existing->data_size != new_size) return true;
+  const uint8_t* old = existing->uses_heap ? existing->heap_data : existing->inline_data;
+  return memcmp(old, new_data, new_size) != 0;
+}
 
 void erd_cache_init(erd_cache_t* self)
 {
@@ -57,10 +68,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   if (existing) {
     self->update_count++;
     self->update_count_window++;
-    // Update existing entry
-    bool data_changed = (existing->data_size != data_size) ||
-                        (memcmp(existing->uses_heap ? existing->heap_data : existing->inline_data,
-                                data, (existing->data_size < data_size) ? existing->data_size : data_size) != 0);
+    bool data_changed = erd_data_changed(existing, data, data_size);
 
     bool needs_heap = data_size > ERD_CACHE_INLINE_DATA_SIZE;
 
@@ -78,15 +86,12 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
         uint8_t inline_size = (data_size < ERD_CACHE_INLINE_DATA_SIZE) ? data_size : ERD_CACHE_INLINE_DATA_SIZE;
         memcpy(existing->inline_data, data, inline_size);
         existing->data_size = inline_size;
-        // Recompute data_changed for the truncated inline data.
-        bool truncated_changed = (existing->data_size != data_size) ||
-                                 (memcmp(existing->inline_data, data, existing->data_size) != 0);
-        existing->update_required = !self->only_publish_onchange || truncated_changed;
-        if (existing->update_required) {
-          self->required_update_count++;
-          self->required_update_count_window++;
-        }
-        return existing->update_required;
+        /* Truncation always changes the effective data (size shrinks).
+         * The old memcmp was dead code — inline_data was just copied from data. */
+        existing->update_required = true;
+        self->required_update_count++;
+        self->required_update_count_window++;
+        return true;
       }
       memcpy(existing->heap_data, data, data_size);
     } else {
@@ -213,3 +218,4 @@ uint32_t erd_cache_get_required_update_rate(erd_cache_t* self)
   self->required_update_count_window = 0;
   return count;
 }
+
