@@ -67,7 +67,7 @@ static void mqtt_publisher_task(void* arg)
           self->task_hex, data_len * 2, true);
       uint32_t elapsed = self->get_time_ms() - t_publish;
 
-      if (elapsed >= 50) {
+      if (elapsed >= 1000) {
         ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
       }
 
@@ -263,7 +263,7 @@ uint16_t erd_cache_mqtt_publisher_loop(
     mqtt_client_publish_raw(self->mqtt_client, topic, hex, data_len * 2, true);
     uint32_t elapsed = self->get_time_ms() - t_publish;
 
-    if (elapsed >= 50) {
+    if (elapsed >= 1000) {
       ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
     }
 

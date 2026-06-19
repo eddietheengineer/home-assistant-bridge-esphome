@@ -180,21 +180,12 @@ void GeappliancesBridge::setup() {
 
 void GeappliancesBridge::loop() {
 
-  // Loop timing diagnostics — measure each phase.
-  uint32_t loop_start = esphome::millis();
-  uint32_t t_protocol = 0;
-  uint32_t t_hsm = 0;
-  uint32_t t_mqtt = 0;
-  uint32_t t_sensors = 0;
-
   // Drive the GEA2/GEA3 protocol stack FIRST so that UART bytes are
   // processed before any MQTT work.  The tight loop must run before
   // MQTT operations to avoid starving UART processing on single-core
   // ESP32 variants where a blocking MQTT call can delay response
   // processing past the appliance's timeout window.
-  uint32_t t0 = esphome::millis();
   this->run_protocol_stack_();
-  t_protocol = esphome::millis() - t0;
 #ifdef USE_ESP32
   // Feed the task watchdog after the protocol stack — the GEA2 tight loop
   // can run for 200 ms wall-clock time, exceeding the default TWDT timeout.
@@ -212,11 +203,11 @@ void GeappliancesBridge::loop() {
 
   // Send the run_loop signal to the current HSM state — this drives
   // the ongoing work for whatever phase we're in.
-  uint32_t t1 = esphome::millis();
+  uint32_t hsm_start = esphome::millis();
   tiny_hsm_send_signal(&this->startup_hsm_, signal_run_loop, nullptr);
-  t_hsm = esphome::millis() - t1;
-  if (t_hsm >= 1000) {
-    ESP_LOGW(TAG, "Long HSM run_loop: %ums", t_hsm);
+  uint32_t hsm_elapsed = esphome::millis() - hsm_start;
+  if (hsm_elapsed >= 1000) {
+    ESP_LOGW(TAG, "Long HSM run_loop: %ums", hsm_elapsed);
   }
 #ifdef USE_ESP32
   // Feed the task watchdog after the HSM run_loop signal — in steady-state
@@ -228,7 +219,6 @@ void GeappliancesBridge::loop() {
   // On ESP-IDF, signal the background MQTT publisher task instead of
   // blocking the main loop on the IDF MQTT mutex.  On non-ESP-IDF
   // platforms, fall back to the direct loop() call as before.
-  uint32_t t2 = esphome::millis();
   if (this->erd_cache_publisher_.cache != nullptr) {
 #ifdef USE_ESP_IDF
     erd_cache_mqtt_publisher_signal_work(&this->erd_cache_publisher_);
@@ -236,10 +226,8 @@ void GeappliancesBridge::loop() {
     erd_cache_mqtt_publisher_loop(&this->erd_cache_publisher_, 5, 20);
 #endif
   }
-  t_mqtt = esphome::millis() - t2;
 
   // Publish ERD/MQTT publish rate + cache stats sensors every ~60 seconds.
-  uint32_t t3 = esphome::millis();
   if (this->erd_publish_rate_sensor_ != nullptr || this->mqtt_publish_rate_sensor_ != nullptr) {
     uint32_t now = esphome::millis();
     if (now - this->last_erd_publish_rate_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
@@ -269,18 +257,6 @@ void GeappliancesBridge::loop() {
       }
       this->last_erd_cache_stats_publish_ = now;
     }
-  }
-  t_sensors = esphome::millis() - t3;
-
-  // Log loop timing breakdown every 60 seconds.
-  uint32_t loop_total = esphome::millis() - loop_start;
-  if (loop_start - this->last_loop_timing_log_ >= LOOP_TIMING_LOG_INTERVAL_MS) {
-    this->last_loop_timing_log_ = loop_start;
-    ESP_LOGI(TAG, "Loop timing: total=%ums protocol=%ums hsm=%ums mqtt=%ums sensors=%ums",
-             loop_total, t_protocol, t_hsm, t_mqtt, t_sensors);
-  } else {
-    // Suppress unused-variable warnings when ESP_LOGI is a no-op macro.
-    (void)loop_total; (void)t_protocol; (void)t_hsm; (void)t_mqtt; (void)t_sensors;
   }
 }
 
