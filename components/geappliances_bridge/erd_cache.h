@@ -49,6 +49,7 @@ typedef struct erd_cache_t {
   uint32_t required_update_count;     /* total updates setting update_required=true since reset */
   uint32_t required_update_count_window; /* updates setting update_required=true in last 60s */
   bool only_publish_onchange;         /* when true, only mark update_required on data change */
+  bool initialized;                   /* true after first successful erd_cache_init() */
 
   /* Fixed memory pool — pre-allocated blocks to eliminate new/delete churn.
    * Each pool tier has ERD_CACHE_CAPACITY slots so every cache entry can

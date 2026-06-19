@@ -74,15 +74,18 @@ static bool erd_data_changed(const erd_cache_entry_t* existing,
 void erd_cache_init(erd_cache_t* self)
 {
   /* Free any pool or heap data before resetting.
-   * Only scan entries that look valid (erd != 0) to avoid reading
-   * uninitialized stack memory on first init of a local erd_cache_t. */
-  for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
-    erd_cache_entry_t* e = &self->entries[i];
-    if (e->erd != 0 && e->uses_pool) {
-      pool_free(self, e->pool_block_idx, e->ext_data);
-    }
-    if (e->erd != 0 && e->uses_heap) {
-      delete[] e->ext_data;
+   * Only do this if the cache was previously initialized — on a fresh
+   * stack-allocated struct the flags are garbage and could trigger
+   * delete[] on a random pointer. */
+  if (self->initialized) {
+    for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
+      erd_cache_entry_t* e = &self->entries[i];
+      if (e->uses_pool) {
+        pool_free(self, e->pool_block_idx, e->ext_data);
+      }
+      if (e->uses_heap) {
+        delete[] e->ext_data;
+      }
     }
   }
   /* Zero entries explicitly to avoid UBSan issues with bool fields after memset. */
@@ -110,11 +113,14 @@ void erd_cache_init(erd_cache_t* self)
       self->pool_free[b][i] = 1;
     }
   }
+  self->initialized = true;
 }
 
 void erd_cache_destroy(erd_cache_t* self)
 {
+  if (!self->initialized) return;
   erd_cache_init(self);
+  self->initialized = false;
 }
 
 erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd)
