@@ -59,6 +59,7 @@ typedef struct {
   StackType_t     task_stack[2048 / sizeof(StackType_t)];
   SemaphoreHandle_t work_semaphore;
   SemaphoreHandle_t state_mutex;  // Protects shared state for dual-core safety
+  SemaphoreHandle_t done_semaphore; // Task gives this before exiting (dual-core safe shutdown)
   bool task_running;
   // Pre-allocated buffers for the background task to avoid stack overflow.
   char task_topic[128];

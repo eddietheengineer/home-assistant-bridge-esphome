@@ -106,6 +106,10 @@ static void mqtt_publisher_task(void* arg)
     }
   }
 
+  // Signal completion before deleting the task (dual-core safe shutdown).
+  if (self->done_semaphore) {
+    xSemaphoreGive(self->done_semaphore);
+  }
   vTaskDelete(NULL);
 }
 #endif
@@ -132,6 +136,10 @@ void erd_cache_mqtt_publisher_init(
   self->state_mutex = xSemaphoreCreateMutex();
   if (!self->state_mutex) {
     ESP_LOGE(TAG, "Failed to create state mutex");
+  }
+  self->done_semaphore = xSemaphoreCreateBinary();
+  if (!self->done_semaphore) {
+    ESP_LOGE(TAG, "Failed to create done semaphore");
   }
   self->task_running = false;
 #endif
@@ -187,6 +195,10 @@ void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self)
     vSemaphoreDelete(self->state_mutex);
     self->state_mutex = NULL;
   }
+  if (self->done_semaphore) {
+    vSemaphoreDelete(self->done_semaphore);
+    self->done_semaphore = NULL;
+  }
 #endif
 
   memset(self, 0, sizeof(*self));
@@ -224,15 +236,23 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
   if (self->work_semaphore != NULL) {
     xSemaphoreGive(self->work_semaphore);
   }
-  // Wait for the task to actually terminate before freeing resources.
-  // The main loop IS a FreeRTOS task on ESP-IDF, so vTaskDelay is safe.
-  uint32_t start = esphome::millis();
-  while (self->task_handle != NULL && esphome::millis() - start < 1000) {
-    esp_task_wdt_reset();
-    vTaskDelay(pdMS_TO_TICKS(10));
-  }
-  if (self->task_handle != NULL) {
-    ESP_LOGW(TAG, "MQTT publisher task did not terminate within 1 s");
+  // Wait for the task to signal completion via done_semaphore.
+  // This is a dual-core safe handshake: the task gives the semaphore
+  // before calling vTaskDelete, so we know it's truly gone.
+  if (self->done_semaphore != NULL) {
+    if (xSemaphoreTake(self->done_semaphore, pdMS_TO_TICKS(1000)) != pdTRUE) {
+      ESP_LOGW(TAG, "MQTT publisher task did not terminate within 1 s");
+    }
+  } else {
+    // Fallback: poll with delay when done_semaphore creation failed.
+    uint32_t start = esphome::millis();
+    while (self->task_handle != NULL && esphome::millis() - start < 1000) {
+      esp_task_wdt_reset();
+      vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    if (self->task_handle != NULL) {
+      ESP_LOGW(TAG, "MQTT publisher task did not terminate within 1 s");
+    }
   }
   self->task_handle = NULL;
 #else
