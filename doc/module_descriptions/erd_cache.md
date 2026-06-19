@@ -2,14 +2,14 @@
 
 ## Purpose
 
-Fixed-size ERD cache with hybrid inline/pool data storage. Stores the latest data for up to `ERD_CACHE_CAPACITY` (200) ERDs. ERDs ≤ 4 bytes are stored inline (zero heap); larger ERDs use a fixed memory pool of pre-allocated blocks to eliminate per-update heap fragmentation. Change detection is done at insert/update time, eliminating per-read `memcmp` overhead.
+Fixed-size ERD cache with inline/heap data storage. Stores the latest data for up to `ERD_CACHE_CAPACITY` (200) ERDs. ERDs ≤ 4 bytes are stored inline (zero heap); larger ERDs use heap allocation. ERD size is invariant after registration — updates are in-place `memcpy` with no alloc or free. Change detection is done at insert/update time, eliminating per-read `memcmp` overhead.
 
 ## Public API
 
 | Function | Description |
 |----------|-------------|
-| `erd_cache_init(self)` | Initialize the cache (zero all entries, reset counters, clear pool free lists). |
-| `erd_cache_destroy(self)` | Free any heap-allocated data for entries that couldn't fit in the pool. |
+| `erd_cache_init(self)` | Initialize the cache (zero all entries, reset counters, free any heap data). |
+| `erd_cache_destroy(self)` | Free any heap-allocated data, reset the cache. |
 | `erd_cache_update(self, erd, data, data_size)` | Update or insert ERD data. Returns `true` if `update_required` was set (or entry was new). Returns `false` if cache is full, data is unchanged with `only_publish_onchange`, or ERD size changed (appliance lost). |
 | `erd_cache_set_only_publish_onchange(self, only_publish_onchange)` | Set whether the cache should only mark ERDs as updated when data changes. Default is `false` (always mark updated). |
 | `erd_cache_get_next_updated(self, iterator)` | Returns the next entry with `update_required = true`, then clears the flag. Caller provides an iterator (`uint16_t`) initialized to 0. Returns `NULL` when no more updated entries remain. |
@@ -22,30 +22,17 @@ Fixed-size ERD cache with hybrid inline/pool data storage. Stores the latest dat
 
 ### Inline Storage (≤ 4 bytes)
 
-ERDs with `data_size ≤ ERD_CACHE_INLINE_DATA_SIZE` (4 bytes) are stored directly in the `inline_data` union member. Zero heap allocation, zero pool usage.
+ERDs with `data_size ≤ ERD_CACHE_INLINE_DATA_SIZE` (4 bytes) are stored directly in the `inline_data` union member. Zero heap allocation.
 
-### Pool Storage (5–32 bytes)
+### Heap Storage (> 4 bytes)
 
-ERDs with `data_size > 4` and `data_size ≤ 32` use the fixed memory pool. The pool has two tiers:
-
-| Tier | Block Size | Count |
-|------|-----------|-------|
-| 0 | 16 bytes | `ERD_CACHE_CAPACITY` (200) |
-| 1 | 32 bytes | `ERD_CACHE_CAPACITY` (200) |
-
-Each tier has `ERD_CACHE_CAPACITY` slots so every cache entry can hold a block from any tier without contention. Blocks are tracked via a free-list (`pool_free[tier][slot]`).
-
-### Heap Fallback (> 32 bytes)
-
-ERDs with `data_size > 32` fall back to `new uint8_t[data_size]`. This is rare — most ERDs are between 5 and 32 bytes.
+ERDs with `data_size > 4` are allocated on the heap via `new uint8_t[data_size]`. The pointer is stored in `ext_data` and `uses_heap` is set to `true`. If heap allocation fails, data is truncated to 4 bytes inline.
 
 ### Storage Selection
 
-`pool_block_for_size()` determines the storage strategy on **registration only**. ERD data size is invariant after registration — the storage tier is fixed for the lifetime of the entry:
-- `data_size ≤ 4` → inline (returns 255)
-- `5 ≤ data_size ≤ 16` → pool tier 0
-- `17 ≤ data_size ≤ 32` → pool tier 1
-- `data_size > 32` → heap (returns 255)
+Storage is determined on **registration only**. ERD data size is invariant after registration — the storage type is fixed for the lifetime of the entry:
+- `data_size ≤ 4` → inline
+- `data_size > 4` → heap
 
 If a size change is detected on an existing entry, `erd_cache_update()` logs an error and returns `false`, signaling the appliance firmware has changed and the bridge should reinitialize.
 
@@ -59,12 +46,12 @@ If a size change is detected on an existing entry, `erd_cache_update()` logs an 
    - Check if data has changed via `erd_data_changed()` (memcmp only — size is invariant)
    - If data unchanged and `only_publish_onchange` is true: return `false` (early exit, no storage churn)
    - If data size differs from existing: log error, return `false` (appliance lost)
-   - In-place `memcpy` into existing buffer (inline, pool, or heap — no free or alloc)
+   - In-place `memcpy` into existing buffer (inline or heap — no free or alloc)
    - Set `update_required = !only_publish_onchange || data_changed`
 3. **If not found:**
    - Scan `entries[]` for the first slot with `valid == false`
    - If no free slot: return `false` (cache full)
-   - Initialize entry, call `store_data()` to allocate storage (inline → pool → heap → truncate)
+   - Initialize entry, allocate storage (inline or heap, with truncation fallback)
    - Set `valid = true` and `update_required = true`
 
 ## Change Detection
@@ -78,13 +65,10 @@ typedef struct {
   tiny_erd_t erd;
   union {
     uint8_t inline_data[ERD_CACHE_INLINE_DATA_SIZE];  // 4 bytes
-    uint8_t* ext_data;  // pool or heap pointer
+    uint8_t* ext_data;  // heap pointer for data > 4 bytes
   };
   uint8_t data_size;
-  uint8_t ext_alloc_size;  // allocated size for pool/heap buffer
-  uint8_t pool_block_idx;  // which pool block (0-1) or 255 if not pool
-  bool uses_pool;
-  bool uses_heap;
+  bool uses_heap;       // true if ext_data is a heap allocation
   bool update_required;
   bool valid;
 } erd_cache_entry_t;
@@ -101,24 +85,23 @@ typedef struct erd_cache_t {
   uint32_t required_update_count_window; // such updates since last get_required_update_rate() call
   bool only_publish_onchange;         // when true, only mark update_required on data change
   bool initialized;                   // true after first successful erd_cache_init()
-  uint8_t pool_blocks[ERD_CACHE_POOL_COUNT][ERD_CACHE_CAPACITY][ERD_CACHE_POOL_BLOCK_2];
-  uint8_t pool_free[ERD_CACHE_POOL_COUNT][ERD_CACHE_CAPACITY];
 } erd_cache_t;
 ```
 
 ## Dependencies
 
 - `tiny_gea3_erd_client.h` — `tiny_erd_t` type definition
-- `<new>` — for heap allocation fallback
-- `<string.h>` — for `memcmp`, `memset`
+- `<new>` — for heap allocation
+- `<cstring>` — for `memcmp`
+- `esphome/core/log.h` — for `ESP_LOGD`, `ESP_LOGW`, `ESP_LOGE`
 
 ## Key Design Decisions
 
-- **Hybrid storage**: Inline for small ERDs (≤ 4 bytes), pool for medium (5–32 bytes), heap fallback for large (> 32 bytes). Storage tier is assigned on registration and fixed for the lifetime of the entry.
-- **In-place updates**: Existing entries are updated with a single `memcpy` into the existing buffer — no free, no alloc. This eliminates pool churn on every poll cycle.
+- **Inline for small ERDs**: ERDs ≤ 4 bytes are stored inline in the entry struct — zero heap allocation, zero indirection. This covers the majority of ERDs (flags, device state, single-byte values).
+- **Heap for larger ERDs**: ERDs > 4 bytes are allocated on the heap at registration. No pool is needed — with in-place updates there is no per-cycle alloc/free churn to avoid.
+- **In-place updates**: Existing entries are updated with a single `memcpy` into the existing buffer — no free, no alloc. This eliminates all storage churn on every poll cycle.
 - **Size invariance**: ERD data size never changes after registration. A size mismatch is treated as an appliance firmware change — `erd_cache_update()` logs an error and returns `false`, signaling the bridge should reinitialize.
 - **Early exit on unchanged data**: When `only_publish_onchange` is true and data hasn't changed, the update returns immediately without touching storage.
-- **Fixed pool capacity**: Each pool tier has `ERD_CACHE_CAPACITY` slots (200), so every cache entry can hold a block from any tier without contention. No dynamic resizing needed.
 - **Change detection at update time**: `update_required` is set during `erd_cache_update()`, not during iteration. This eliminates per-read `memcmp` overhead in the publisher loop.
 - **Two iterators**: `erd_cache_get_next_updated()` for the publisher (clears `update_required` flag) and `erd_cache_get_next_entry()` for read-only iteration (used by HA discovery).
 - **Rate counters**: `update_count_window` and `required_update_count_window` accumulate updates and are reset by `get_update_rate()` and `get_required_update_rate()`. The window is determined by the call interval of the consumer (e.g. ~60s if called once per minute).

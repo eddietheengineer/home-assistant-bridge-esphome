@@ -576,8 +576,8 @@ TEST(erd_cache_change_detection, heap_to_inline_shrink_change_detected)
   CHECK_FALSE(erd_cache_update(&cache, 0x1001, data_small, sizeof(data_small)));
 }
 
-/* #18: Pool path — new entry with data > 4 bytes and <= 32 bytes uses pool storage */
-TEST(erd_cache_change_detection, pool_path_new_entry_uses_pool)
+/* New entry with data > 4 bytes uses heap storage */
+TEST(erd_cache_change_detection, heap_path_new_entry_uses_heap)
 {
   uint8_t data[20];
   for (uint8_t i = 0; i < 20; i++) {
@@ -585,22 +585,20 @@ TEST(erd_cache_change_detection, pool_path_new_entry_uses_pool)
   }
   erd_cache_update(&cache, 0x1001, data, sizeof(data));
 
-  /* Verify the entry was created and is in the cache. */
   CHECK_EQUAL(1u, erd_cache_get_count(&cache));
 
-  /* Verify update_required is set (new entries always mark update_required). */
   uint16_t iterator = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iterator);
   CHECK(entry != NULL);
-  CHECK_TRUE(entry->uses_pool);
+  CHECK_TRUE(entry->uses_heap);
   CHECK_EQUAL(20u, entry->data_size);
   for (uint8_t i = 0; i < 20; i++) {
     CHECK_EQUAL(i, entry->ext_data[i]);
   }
 }
 
-/* #18: Pool path — update existing pool entry with different data */
-TEST(erd_cache_change_detection, pool_path_update_existing_entry)
+/* Update existing heap entry with different data */
+TEST(erd_cache_change_detection, heap_path_update_existing_entry)
 {
   uint8_t data1[20];
   for (uint8_t i = 0; i < 20; i++) {
@@ -615,13 +613,12 @@ TEST(erd_cache_change_detection, pool_path_update_existing_entry)
   erd_cache_set_only_publish_onchange(&cache, true);
   CHECK_TRUE(erd_cache_update(&cache, 0x1001, data2, sizeof(data2)));
 
-  /* Verify the update was detected and the entry is still in the cache. */
   CHECK_EQUAL(1u, erd_cache_get_count(&cache));
 
   uint16_t iterator = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iterator);
   CHECK(entry != NULL);
-  CHECK_TRUE(entry->uses_pool);
+  CHECK_TRUE(entry->uses_heap);
   CHECK_EQUAL(20u, entry->data_size);
   for (uint8_t i = 0; i < 20; i++) {
     CHECK_EQUAL(255 - i, entry->ext_data[i]);

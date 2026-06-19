@@ -61,7 +61,7 @@ static void mqtt_publisher_task(void* arg)
 
       /* Determine data pointer. */
       const uint8_t* data;
-      if ((entry->uses_heap || entry->uses_pool) && entry->ext_data != NULL) {
+      if (entry->uses_heap && entry->ext_data != NULL) {
         data = entry->ext_data;
       } else {
         data = entry->inline_data;
@@ -298,10 +298,10 @@ uint16_t erd_cache_mqtt_publisher_loop(
       break;
     }
     /* Determine data pointer.
-     * Defensive: if uses_pool or uses_heap is set but ext_data is NULL,
+     * Defensive: if uses_heap is set but ext_data is NULL,
      * fall back to inline data to avoid a null dereference. */
     const uint8_t* data;
-    if ((entry->uses_heap || entry->uses_pool) && entry->ext_data != NULL) {
+    if (entry->uses_heap && entry->ext_data != NULL) {
       data = entry->ext_data;
     } else {
       data = entry->inline_data;
