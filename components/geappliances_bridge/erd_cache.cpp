@@ -82,8 +82,7 @@ static bool store_data(erd_cache_t* self, erd_cache_entry_t* entry,
                        const uint8_t* data, uint8_t data_size, [[maybe_unused]] tiny_erd_t erd)
 {
   /* Clear stale pool/heap flags so that a failed pool or heap attempt
-   * does not leave a stale flag set with a different storage type,
-   * which would cause free_entry_storage() to free the wrong thing. */
+   * does not leave a stale flag set with a different storage type. */
   entry->uses_pool = false;
   entry->pool_block_idx = 255;
   entry->uses_heap = false;
@@ -127,30 +126,13 @@ static bool store_data(erd_cache_t* self, erd_cache_entry_t* entry,
   return false;
 }
 
-/* Free the current storage of an entry (pool, heap, or both). */
-static void free_entry_storage(erd_cache_t* self, erd_cache_entry_t* entry)
-{
-  if (entry->uses_pool) {
-    pool_free(self, entry->pool_block_idx, entry->ext_data);
-    entry->uses_pool = false;
-    entry->pool_block_idx = 255;
-  }
-  if (entry->uses_heap) {
-    delete[] entry->ext_data;
-    entry->uses_heap = false;
-    entry->ext_alloc_size = 0;
-  }
-  entry->ext_data = NULL;
-}
 /* Returns true if the new data differs from the existing entry's data.
- * Compares size first (fast path), then does a full memcmp of the shared
- * length when sizes are equal.  This avoids partial memcmp of mismatched
- * lengths — the size check alone catches those cases. */
+ * ERD size is invariant after registration, so size is always equal. */
 static bool erd_data_changed(const erd_cache_entry_t* existing,
                              const uint8_t* new_data, uint8_t new_size)
 {
-  if (existing->data_size != new_size) return true;
-  const uint8_t* old = (existing->uses_heap || existing->uses_pool) ? existing->ext_data : existing->inline_data;
+  const uint8_t* old = (existing->uses_heap || existing->uses_pool) ?
+      existing->ext_data : existing->inline_data;
   return memcmp(old, new_data, new_size) != 0;
 }
 
@@ -235,35 +217,19 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
       return false;
     }
 
-    /* Free old storage before assigning new.
-     * Exception: if we're staying on heap and the existing buffer is large
-     * enough, reuse it in place to avoid new/delete churn. */
-    bool can_reuse_heap = existing->uses_heap &&
-                          data_size <= existing->ext_alloc_size &&
-                          data_size > ERD_CACHE_INLINE_DATA_SIZE;
-
-    if (!can_reuse_heap) {
-      free_entry_storage(self, existing);
+    /* ERD size is invariant after registration.  A size mismatch means the
+     * appliance firmware has changed and the bridge should reinitialize. */
+    if (data_size != existing->data_size) {
+      ESP_LOGE(TAG, "ERD 0x%04X size changed %u -> %u, appliance lost",
+               erd, existing->data_size, data_size);
+      return false;
     }
 
-    if (can_reuse_heap) {
-      /* Reuse existing heap buffer — no allocation needed.
-       * Clear stale pool flags in case they were left set by a previous
-       * store_data() call where pool alloc failed and fell through to heap. */
-      existing->uses_pool = false;
-      existing->pool_block_idx = 255;
+    /* In-place memcpy — storage tier never changes. */
+    if (existing->uses_heap || existing->uses_pool) {
       memcpy(existing->ext_data, data, data_size);
-      existing->data_size = data_size;
     } else {
-      /* Assign new storage: inline → pool → heap → truncate. */
-      bool ok = store_data(self, existing, data, data_size, erd);
-      if (!ok) {
-        /* Truncation applied — always publish truncated data. */
-        existing->update_required = true;
-        self->required_update_count++;
-        self->required_update_count_window++;
-        return true;
-      }
+      memcpy(existing->inline_data, data, data_size);
     }
 
     existing->update_required = !self->only_publish_onchange || data_changed;
