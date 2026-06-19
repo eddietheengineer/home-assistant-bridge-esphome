@@ -25,7 +25,7 @@ void erd_cache_mqtt_publisher_init(
   self->mqtt_client = mqtt_client;
   self->device_id = device_id;
   self->publish_index = 0;
-  self->mqtt_connected = true;
+  self->mqtt_connected = false;
   self->get_time_ms = esphome::millis;
 
   if (!mqtt_client) return;

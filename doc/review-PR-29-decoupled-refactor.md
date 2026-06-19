@@ -57,15 +57,9 @@ The dead `memcmp` was removed and replaced with `existing->update_required = tru
 **Status:** ✅ Resolved on branch `review/PR-29-decoupled-refactor-review`
 
 Lowercase hex (`%02x`) is the correct output. Renamed the misleading test from `payload_uppercase_hex_no_separator` to `payload_lowercase_hex_no_separator`.
+### 6. **FIXED** `erd_cache_mqtt_publisher` defaults `mqtt_connected = false` (erd_cache_mqtt_publisher.cpp:28)
 
-### 6. `erd_cache_mqtt_publisher` defaults `mqtt_connected = true` (erd_cache_mqtt_publisher.cpp:28)
-
-```cpp
-self->mqtt_connected = true;
-```
-
-The publisher assumes MQTT is connected at init time, but the MQTT client adapter may not be connected yet. The adapter's `publish_raw` checks `is_connected()` and returns early, so this is a no-op — but it wastes loop iterations and gives a false sense of publishing.
-
+**Status:** ✅ Resolved. Changed default from `true` to `false`. The publisher now waits for the first `on_connected()` event before attempting publishes.
 ### 7. `erd_index` initialized to `(uint16_t)-1` (erd_bridge_poll.cpp:321)
 
 ```cpp
