@@ -9,9 +9,10 @@
 
 extern "C" {
 #include "erd_cache.h"
+}
+
 #include "erd_bridge_subscribe.h"
 #include "erd_bridge_poll.h"
-}
 
 #include "CppUTest/TestHarness.h"
 #include "CppUTestExt/MockSupport.h"

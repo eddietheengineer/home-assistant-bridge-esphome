@@ -8,8 +8,10 @@
  */
 
 extern "C" {
-#include "erd_bridge_poll.h"
+#include "erd_cache.h"
 }
+
+#include "erd_bridge_poll.h"
 
 #include "erd_lists.h"
 
@@ -127,7 +129,6 @@ TEST_GROUP(erd_bridge_poll)
 // Regression: the cache should NOT be cleared on re-probe after appliance lost.
 // In AUTO mode the cache is shared with the subscription bridge; clearing it
 // would destroy the subscription bridge's data.
-static const tiny_hsm_signal_t signal_appliance_lost = (tiny_hsm_signal_user_start + 9);
 
 TEST(erd_bridge_poll, should_preserve_cache_data_on_reprobe_after_appliance_lost)
 {

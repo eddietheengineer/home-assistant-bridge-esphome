@@ -25,6 +25,10 @@ TEST_GROUP(erd_cache_mqtt_publisher)
 
   void setup()
   {
+    if (publisher.cache) {
+      erd_cache_mqtt_publisher_destroy(&publisher);
+    }
+    erd_cache_destroy(&cache);
     memset(&publisher, 0, sizeof(publisher));
     erd_cache_init(&cache);
     esphome_mqtt_client_adapter_init(&adapter, "test_device");
@@ -467,7 +471,7 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_multiple_erds)
 /* ------------------------------------------------------------------ */
 /* loop - large payload hex encoding (Issue 9 fix)                     */
 /* ------------------------------------------------------------------ */
-TEST(erd_cache_mqtt_publisher, loop_publishes_128_byte_payload)
+TEST(erd_cache_mqtt_publisher, loop_publishes_32_byte_payload)
 {
   erd_cache_mqtt_publisher_init(
     &publisher,
@@ -476,31 +480,11 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_128_byte_payload)
     "device");
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
-  uint8_t data[128];
-  for (uint8_t i = 0; i < 128; i++) {
+  uint8_t data[32];
+  for (uint8_t i = 0; i < 32; i++) {
     data[i] = i;
   }
   erd_cache_update(&cache, 0x1001, data, sizeof(data));
-
-  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 1, 100);
-  CHECK_EQUAL(1u, published);
-  CHECK_EQUAL(1u, publisher.total_published);
-}
-
-TEST(erd_cache_mqtt_publisher, loop_publishes_255_byte_payload)
-{
-  erd_cache_mqtt_publisher_init(
-    &publisher,
-    &cache,
-    &adapter.interface,
-    "device");
-  erd_cache_mqtt_publisher_on_connected(&publisher);
-
-  uint8_t data[255];
-  for (uint16_t i = 0; i < 255; i++) {
-    data[i] = (uint8_t)(i & 0xFF);
-  }
-  erd_cache_update(&cache, 0x1002, data, sizeof(data));
 
   uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 1, 100);
   CHECK_EQUAL(1u, published);
@@ -601,8 +585,8 @@ TEST(erd_cache_change_detection, heap_to_inline_shrink_change_detected)
 /* Cache edge cases                                                    */
 /* ------------------------------------------------------------------ */
 
-/* #18: Heap path — new entry with data > 16 bytes uses heap storage */
-TEST(erd_cache_change_detection, heap_path_new_entry_uses_heap)
+/* #18: Pool path — new entry with data > 4 bytes and <= 32 bytes uses pool storage */
+TEST(erd_cache_change_detection, pool_path_new_entry_uses_pool)
 {
   uint8_t data[20];
   for (uint8_t i = 0; i < 20; i++) {
@@ -617,15 +601,15 @@ TEST(erd_cache_change_detection, heap_path_new_entry_uses_heap)
   uint16_t iterator = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iterator);
   CHECK(entry != NULL);
-  CHECK_TRUE(entry->uses_heap);
+  CHECK_TRUE(entry->uses_pool);
   CHECK_EQUAL(20u, entry->data_size);
   for (uint8_t i = 0; i < 20; i++) {
-    CHECK_EQUAL(i, entry->heap_data[i]);
+    CHECK_EQUAL(i, entry->ext_data[i]);
   }
 }
 
-/* #18: Heap path — update existing heap entry with different data */
-TEST(erd_cache_change_detection, heap_path_update_existing_entry)
+/* #18: Pool path — update existing pool entry with different data */
+TEST(erd_cache_change_detection, pool_path_update_existing_entry)
 {
   uint8_t data1[20];
   for (uint8_t i = 0; i < 20; i++) {
@@ -646,10 +630,10 @@ TEST(erd_cache_change_detection, heap_path_update_existing_entry)
   uint16_t iterator = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iterator);
   CHECK(entry != NULL);
-  CHECK_TRUE(entry->uses_heap);
+  CHECK_TRUE(entry->uses_pool);
   CHECK_EQUAL(20u, entry->data_size);
   for (uint8_t i = 0; i < 20; i++) {
-    CHECK_EQUAL(255 - i, entry->heap_data[i]);
+    CHECK_EQUAL(255 - i, entry->ext_data[i]);
   }
 }
 

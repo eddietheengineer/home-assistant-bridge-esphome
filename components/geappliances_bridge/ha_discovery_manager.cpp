@@ -34,36 +34,58 @@ namespace geappliances_bridge {
 
 static const char* const TAG __attribute__((unused)) = "ha_discovery";
 
+bool HaDiscoveryManager::contains_erd_(const tiny_erd_t* erds, uint16_t count, tiny_erd_t target) const
+{
+  for (uint16_t i = 0; i < count; i++) {
+    if (erds[i] == target) return true;
+  }
+  return false;
+}
+
 void HaDiscoveryManager::init(const std::string& base_url,
                               const std::string& device_id,
                               const std::string& model_number,
                               const std::string& serial_number,
-                              const std::set<tiny_erd_t>& registered_erds,
+                              const tiny_erd_t* registered_erds,
+                              uint16_t registered_erds_count,
                               bool generate_device_config)
 {
   this->base_url_               = base_url;
   this->device_id_              = device_id;
   this->model_number_           = model_number;
   this->serial_number_          = serial_number;
-  this->registered_erds_        = registered_erds;
-  this->registered_erds_snapshot_ = registered_erds;
+  uint16_t n = (registered_erds_count > HA_DISCOVERY_MAX_ERDS) ? HA_DISCOVERY_MAX_ERDS : registered_erds_count;
+  for (uint16_t i = 0; i < n; i++) {
+    this->registered_erds_[i] = registered_erds[i];
+    this->registered_erds_snapshot_[i] = registered_erds[i];
+  }
+  this->registered_erds_count_ = n;
+  this->registered_erds_snapshot_count_ = n;
+  this->seen_erds_count_ = 0;
   this->generate_device_config_ = generate_device_config;
   this->state_                  = HA_DISCOVERY_WAITING_FOR_READY;
   this->last_activity_          = millis();
   this->start_time_             = millis();
 }
 
-void HaDiscoveryManager::set_registered_erds(const std::set<tiny_erd_t>& erds)
+void HaDiscoveryManager::set_registered_erds(const tiny_erd_t* erds, uint16_t count)
 {
-  this->registered_erds_ = erds;
-  this->registered_erds_snapshot_ = erds;
+  uint16_t n = (count > HA_DISCOVERY_MAX_ERDS) ? HA_DISCOVERY_MAX_ERDS : count;
+  for (uint16_t i = 0; i < n; i++) {
+    this->registered_erds_[i] = erds[i];
+    this->registered_erds_snapshot_[i] = erds[i];
+  }
+  this->registered_erds_count_ = n;
+  this->registered_erds_snapshot_count_ = n;
 }
 
 void HaDiscoveryManager::on_erd_seen(tiny_erd_t erd)
 {
   if (this->state_ != HA_DISCOVERY_WAITING_FOR_READY) return;
-  if (this->seen_erds_.find(erd) == this->seen_erds_.end()) {
-    this->seen_erds_.insert(erd);
+  if (!contains_erd_(this->seen_erds_, this->seen_erds_count_, erd)) {
+    if (this->seen_erds_count_ < HA_DISCOVERY_MAX_ERDS) {
+      this->seen_erds_[this->seen_erds_count_++] = erd;
+    }
     this->last_activity_ = millis();
   }
 }
@@ -198,15 +220,50 @@ std::string HaDiscoveryManager::escape_json_str_(const std::string& s)
 
 std::string HaDiscoveryManager::build_device_json_()
 {
-  std::string j = "{\"identifiers\":[\"" + this->device_id_ + "\"]";
-  j += ",\"name\":\"" + this->escape_json_str_(this->device_id_) + "\"";
-  j += ",\"manufacturer\":\"GE Appliances\"";
-  if (!this->model_number_.empty())
-    j += ",\"model\":\"" + this->escape_json_str_(this->model_number_) + "\"";
-  if (!this->serial_number_.empty())
-    j += ",\"serial_number\":\"" + this->escape_json_str_(this->serial_number_) + "\"";
-  j += "}";
-  return j;
+  // Build JSON into a fixed buffer to avoid std::string concatenation
+  // creating temporary heap allocations.  Max device_id is ~64 chars,
+  // model/serial ~32 each; this buffer is more than enough.
+  char buf[512];
+  int pos = snprintf(buf, sizeof(buf),
+    "{\"identifiers\":[\"%s\"],\"name\":\"", this->device_id_.c_str());
+
+  // Escape and append name (device_id).
+  for (unsigned char c : this->device_id_) {
+    if (pos >= (int)sizeof(buf) - 8) break;
+    if      (c == '"')  { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\\""); }
+    else if (c == '\\') { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\\\"); }
+    else if (c < 0x20)  { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\u%04x", c); }
+    else                { buf[pos++] = (char)c; }
+  }
+  if (pos < (int)sizeof(buf) - 64) {
+    pos += snprintf(buf + pos, sizeof(buf) - pos,
+      "\",\"manufacturer\":\"GE Appliances\"");
+  }
+  if (!this->model_number_.empty() && pos < (int)sizeof(buf) - 128) {
+    pos += snprintf(buf + pos, sizeof(buf) - pos, ",\"model\":\"");
+    for (unsigned char c : this->model_number_) {
+      if (pos >= (int)sizeof(buf) - 8) break;
+      if      (c == '"')  { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\\""); }
+      else if (c == '\\') { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\\\"); }
+      else if (c < 0x20)  { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\u%04x", c); }
+      else                { buf[pos++] = (char)c; }
+    }
+    if (pos < (int)sizeof(buf) - 2) buf[pos++] = '"';
+  }
+  if (!this->serial_number_.empty() && pos < (int)sizeof(buf) - 128) {
+    pos += snprintf(buf + pos, sizeof(buf) - pos, ",\"serial_number\":\"");
+    for (unsigned char c : this->serial_number_) {
+      if (pos >= (int)sizeof(buf) - 8) break;
+      if      (c == '"')  { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\\""); }
+      else if (c == '\\') { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\\\"); }
+      else if (c < 0x20)  { pos += snprintf(buf + pos, sizeof(buf) - pos, "\\u%04x", c); }
+      else                { buf[pos++] = (char)c; }
+    }
+    if (pos < (int)sizeof(buf) - 2) buf[pos++] = '"';
+  }
+  if (pos < (int)sizeof(buf) - 2) buf[pos++] = '}';
+  buf[pos] = '\0';
+  return std::string(buf);
 }
 
 #ifdef USE_ESP_IDF
@@ -234,9 +291,10 @@ void HaDiscoveryManager::fetch_ha_definitions_()
   };
   bool need[10] = {};
   need[0] = true;
-  for (uint16_t erd : this->registered_erds_snapshot_) {
-    for (int i = 1; i < 10; ++i)
-      if (erd >= CATS[i].lo && erd <= CATS[i].hi) { need[i] = true; break; }
+  for (uint16_t i = 0; i < this->registered_erds_snapshot_count_; i++) {
+    uint16_t erd = this->registered_erds_snapshot_[i];
+    for (int j = 1; j < 10; ++j)
+      if (erd >= CATS[j].lo && erd <= CATS[j].hi) { need[j] = true; break; }
   }
   std::string device_json = this->build_device_json_();
   for (int i = 0; i < 10; ++i) {
@@ -299,102 +357,137 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
   const char* erd_hex = get_str("i");
   if (erd_hex[0] == '\0') { cJSON_Delete(root); return false; }
   uint16_t erd_id = static_cast<uint16_t>(strtol(erd_hex, nullptr, 16));
-  const char* domain = get_str("d");
-  const char* name   = get_str("n");
-  const char* role   = get_str("r");
+
+  const char* role = get_str("r");
   const char* paired = get_str("p");
-  if (!this->registered_erds_snapshot_.empty()) {
-    bool registered = this->registered_erds_snapshot_.count(erd_id) > 0;
+  if (!this->registered_erds_snapshot_count_) {
+    /* No registered ERD filter — accept all. */
+  } else {
+    bool registered = this->contains_erd_(this->registered_erds_snapshot_, this->registered_erds_snapshot_count_, erd_id);
     if (!registered && role[0] == 'r' && paired[0] != '\0') {
       uint16_t paired_id = static_cast<uint16_t>(strtol(paired, nullptr, 16));
-      if (paired_id) registered = this->registered_erds_snapshot_.count(paired_id) > 0 || this->registered_erds_snapshot_.count(erd_id) > 0;
+      if (paired_id) registered = this->contains_erd_(this->registered_erds_snapshot_, this->registered_erds_snapshot_count_, paired_id) ||
+                                  this->contains_erd_(this->registered_erds_snapshot_, this->registered_erds_snapshot_count_, erd_id);
     }
     if (!registered) { cJSON_Delete(root); return false; }
   }
-  char erd_id_str[5]; snprintf(erd_id_str, sizeof(erd_id_str), "%04x", erd_id);
-  bool is_request = (role[0] == 'r');
-  std::string state_topic, command_topic;
-  if (is_request && paired[0] != '\0') {
-    state_topic = "geappliances/" + device_id + "/erd/0x" + std::string(paired) + "/value";
-    command_topic = "geappliances/" + device_id + "/erd/0x" + erd_id_str + "/write";
-  } else {
-    state_topic = "geappliances/" + device_id + "/erd/0x" + erd_id_str + "/value";
-    command_topic = "geappliances/" + device_id + "/erd/0x" + erd_id_str + "/write";
+
+  /* Build the MQTT discovery payload. */
+  std::string payload = "{\"device\":" + device_json;
+  payload += ",\"name\":\"" + this->escape_json_str_(get_str("n")) + "\"";
+  payload += ",\"unique_id\":\"" + device_id + "_" + std::string(erd_hex) + "\"";
+  payload += ",\"object_id\":\"" + this->escape_json_str_(get_str("o")) + "\"";
+
+  const char* unit = get_str("u");
+  if (unit[0] != '\0') {
+    payload += ",\"unit_of_measurement\":\"" + this->escape_json_str_(unit) + "\"";
   }
-  const char* field_id = get_str("fi");
-  std::string unique_id = device_id + "_" + erd_id_str;
-  if (field_id[0] != '\0') { unique_id += "_"; unique_id += field_id; }
-  const char* vt = get_str("vt"); const char* ct = get_str("ct");
-  const char* opts = get_str("o"); const char* unit = get_str("u");
-  const char* dc = get_str("dc"); const char* sc = get_str("sc");
-  std::string payload;
-  auto add_field = [&](const char* key, const char* val) {
-    if (val && val[0] != '\0') payload += ",\"" + std::string(key) + "\":\"" + this->escape_json_str_(val) + "\"";
-  };
-  auto fmt_double = [](double v) -> std::string {
-    char buf[32];
-    if (v == static_cast<double>(static_cast<long long>(v))) snprintf(buf, sizeof(buf), "%.0f", v);
-    else { snprintf(buf, sizeof(buf), "%.6f", v); char* dot = strchr(buf, '.'); if (dot) { char* end = buf + strlen(buf) - 1; while (end > dot && *end == '0') *end-- = '\0'; if (*end == '.') *end = '\0'; } }
-    return std::string(buf);
-  };
-  if (strcmp(domain, "sensor") == 0) {
-    payload = "{\"name\":\"" + this->escape_json_str_(name) + "\"";
-    payload += ",\"state_topic\":\"" + state_topic + "\",\"unique_id\":\"" + unique_id + "\"";
-    add_field("value_template", vt); add_field("unit_of_measurement", unit);
-    add_field("device_class", dc); add_field("state_class", sc);
-    payload += ",\"device\":" + device_json + "}";
-  } else if (strcmp(domain, "binary_sensor") == 0) {
-    payload = "{\"name\":\"" + this->escape_json_str_(name) + "\"";
-    payload += ",\"state_topic\":\"" + state_topic + "\",\"unique_id\":\"" + unique_id + "\"";
-    add_field("value_template", vt); payload += ",\"payload_on\":\"01\",\"payload_off\":\"00\"";
-    add_field("device_class", dc); payload += ",\"device\":" + device_json + "}";
-  } else if (strcmp(domain, "switch") == 0) {
-    payload = "{\"name\":\"" + this->escape_json_str_(name) + "\"";
-    payload += ",\"state_topic\":\"" + state_topic + "\",\"command_topic\":\"" + command_topic + "\"";
-    payload += ",\"unique_id\":\"" + unique_id + "\""; add_field("value_template", vt);
-    payload += ",\"state_on\":\"01\",\"state_off\":\"00\",\"payload_on\":\"01\",\"payload_off\":\"00\"";
-    payload += ",\"device\":" + device_json + "}";
-  } else if (strcmp(domain, "select") == 0) {
-    payload = "{\"name\":\"" + this->escape_json_str_(name) + "\"";
-    payload += ",\"state_topic\":\"" + state_topic + "\",\"command_topic\":\"" + command_topic + "\"";
-    payload += ",\"unique_id\":\"" + unique_id + "\""; add_field("value_template", vt);
-    add_field("command_template", ct);
-    if (opts[0] != '\0') payload += ",\"options\":" + std::string(opts);
-    payload += ",\"device\":" + device_json + "}";
-  } else if (strcmp(domain, "number") == 0) {
-    cJSON* dt_item = cJSON_GetObjectItemCaseSensitive(root, "dt");
-    cJSON* sf_item = cJSON_GetObjectItemCaseSensitive(root, "sf");
-    const char* dtype = (dt_item && cJSON_IsString(dt_item)) ? dt_item->valuestring : "uint8";
-    int scale_factor = (sf_item && cJSON_IsNumber(sf_item)) ? static_cast<int>(sf_item->valuedouble) : 1;
-    if (scale_factor < 1) scale_factor = 1;
-    double type_min, type_max;
-    if (strcmp(dtype,"int8")==0){type_min=-128;type_max=127;}else if(strcmp(dtype,"int16")==0){type_min=-32768;type_max=32767;}
-    else if(strcmp(dtype,"int24")==0){type_min=-8388608;type_max=8388607;}else if(strcmp(dtype,"int32")==0){type_min=-2147483648.0;type_max=2147483647.0;}
-    else if(strcmp(dtype,"uint8")==0){type_min=0;type_max=255;}else if(strcmp(dtype,"uint16")==0){type_min=0;type_max=65535;}
-    else if(strcmp(dtype,"uint24")==0){type_min=0;type_max=16777215;}else{type_min=0;type_max=4294967295.0;}
-    double min_val=type_min/scale_factor,max_val=type_max/scale_factor,step_val=(scale_factor>1)?(1.0/scale_factor):1.0;
-    payload = "{\"name\":\"" + this->escape_json_str_(name) + "\"";
-    payload += ",\"state_topic\":\"" + state_topic + "\",\"command_topic\":\"" + command_topic + "\"";
-    payload += ",\"unique_id\":\"" + unique_id + "\""; add_field("value_template", vt);
-    add_field("command_template", ct); add_field("unit_of_measurement", unit); add_field("device_class", dc);
-    payload += ",\"mode\":\"box\",\"min\":" + fmt_double(min_val) + ",\"max\":" + fmt_double(max_val) + ",\"step\":" + fmt_double(step_val);
-    payload += ",\"device\":" + device_json + "}";
-  } else if (strcmp(domain, "button") == 0) {
-    payload = "{\"name\":\"" + this->escape_json_str_(name) + "\"";
-    payload += ",\"command_topic\":\"" + command_topic + "\",\"unique_id\":\"" + unique_id + "\"";
-    payload += ",\"payload_press\":\"01\""; add_field("device_class", dc);
-    payload += ",\"device\":" + device_json + "}";
-  } else { cJSON_Delete(root); return false; }
-  std::string topic_key = erd_id_str;
-  if (field_id[0] != '\0') { topic_key += "_"; topic_key += field_id; }
-  std::string topic = "homeassistant/" + std::string(domain) + "/" + device_id + "/" + topic_key + "/config";
+
+  const char* ic = get_str("ic");
+  if (ic[0] != '\0') {
+    payload += ",\"icon\":\"" + this->escape_json_str_(ic) + "\"";
+  }
+
+  const char* dev_cl = get_str("d");
+  if (dev_cl[0] != '\0') {
+    payload += ",\"device_class\":\"" + this->escape_json_str_(dev_cl) + "\"";
+  }
+
+  const char* ent_cat = get_str("e");
+  if (ent_cat[0] != '\0') {
+    payload += ",\"entity_category\":\"" + this->escape_json_str_(ent_cat) + "\"";
+  }
+
+  const char* state_topic = get_str("s");
+  if (state_topic[0] != '\0') {
+    payload += ",\"state_topic\":\"" + this->escape_json_str_(state_topic) + "\"";
+  }
+
+  const char* cmd_topic = get_str("c");
+  if (cmd_topic[0] != '\0') {
+    payload += ",\"command_topic\":\"" + this->escape_json_str_(cmd_topic) + "\"";
+  }
+
+  const char* payload_on = get_str("on");
+  if (payload_on[0] != '\0') {
+    payload += ",\"payload_on\":\"" + this->escape_json_str_(payload_on) + "\"";
+  }
+
+  const char* payload_off = get_str("of");
+  if (payload_off[0] != '\0') {
+    payload += ",\"payload_off\":\"" + this->escape_json_str_(payload_off) + "\"";
+  }
+
+  const char* avail_topic = get_str("a");
+  if (avail_topic[0] != '\0') {
+    payload += ",\"availability_topic\":\"" + this->escape_json_str_(avail_topic) + "\"";
+  }
+
+  const char* json_attr = get_str("j");
+  if (json_attr[0] != '\0') {
+    payload += ",\"json_attributes_topic\":\"" + this->escape_json_str_(json_attr) + "\"";
+  }
+
+  const char* val_tpl = get_str("v");
+  if (val_tpl[0] != '\0') {
+    payload += ",\"value_template\":\"" + this->escape_json_str_(val_tpl) + "\"";
+  }
+
+  const char* cmd_tpl = get_str("cm");
+  if (cmd_tpl[0] != '\0') {
+    payload += ",\"command_template\":\"" + this->escape_json_str_(cmd_tpl) + "\"";
+  }
+
+  const char* opt = get_str("opt");
+  if (opt[0] != '\0') {
+    payload += ",\"options\":[";
+    bool first = true;
+    for (const char* p = opt; *p; ) {
+      const char* comma = strchr(p, ',');
+      std::string val;
+      if (comma) {
+        val = std::string(p, comma - p);
+        p = comma + 1;
+      } else {
+        val = p;
+        p += val.size();
+      }
+      if (!first) payload += ",";
+      payload += "\"" + this->escape_json_str_(val) + "\"";
+      first = false;
+    }
+    payload += "]";
+  }
+
+  payload += "}";
+
+  const char* comp = get_str("t");
+  if (comp[0] == '\0') { cJSON_Delete(root); return false; }
+
+  std::string topic = "homeassistant/" + std::string(comp) + "/" + device_id + "/" + std::string(erd_hex) + "/config";
+
+  auto* item = new HaDiscoveryItem();
+  item->topic = std::move(topic);
+  item->payload = std::move(payload);
+
+  if (this->mqtt_adapter_) {
+    /* Publish synchronously through the adapter. */
+    esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, item->topic, item->payload, true);
+    delete item;
+  } else {
+    /* Queue for async publishing. */
+    if (this->queue_) {
+      xQueueSend(this->queue_, &item, 0);
+    } else {
+      delete item;
+    }
+  }
+
   cJSON_Delete(root);
-  auto* item = new (std::nothrow) HaDiscoveryItem{std::move(topic), std::move(payload)};
-  if (!item) return false;
-  return xQueueSend(this->queue_, &item, portMAX_DELAY) == pdTRUE;
+  return true;
 }
 
-#endif
+#endif  /* USE_ESP_IDF */
 
 }  // namespace geappliances_bridge
 }  // namespace esphome

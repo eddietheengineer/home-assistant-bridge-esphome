@@ -21,7 +21,6 @@
 
 #pragma once
 
-#include <set>
 #include <cstdint>
 
 extern "C" {
@@ -31,16 +30,18 @@ extern "C" {
 namespace esphome {
 namespace geappliances_bridge {
 
+/* Maximum number of valid ERDs the registry can track. */
+#define ERD_REGISTRY_MAX_VALID 645
+
 class ErdRegistry {
  public:
   // -------------------------------------------------------------------------
   // Setup methods (called during bridge initialization)
   // -------------------------------------------------------------------------
 
-
   /// Copy the valid-ERD set from FeatureBitManager and enable valid-ERD
   /// filtering. An empty set is ignored so filtering stays disabled.
-  void set_valid_erds(const std::set<tiny_erd_t>& erds);
+  void set_valid_erds(const tiny_erd_t* erds, uint16_t count);
 
   /// Reset the registered-ERD set. Call before bridge (re-)initialization.
   void clear_registered_erds();
@@ -68,12 +69,23 @@ class ErdRegistry {
   // Read-only accessors (HaDiscoveryManager, diagnostics)
   // -------------------------------------------------------------------------
 
-  const std::set<tiny_erd_t>& registered_erds() const { return registered_erds_; }
-  const std::set<tiny_erd_t>& valid_erds()       const { return valid_erds_; }
+  /// Returns the number of registered ERDs.
+  uint16_t registered_erd_count() const { return registered_erds_count_; }
+
+  /// Returns the number of valid ERDs (filter).
+  uint16_t valid_erd_count() const { return valid_erds_count_; }
+
+  /// Returns the registered ERD at the given index (0-based).
+  tiny_erd_t registered_erd(uint16_t idx) const;
+
+  /// Returns the valid ERD at the given index (0-based).
+  tiny_erd_t valid_erd(uint16_t idx) const;
 
  private:
-  std::set<tiny_erd_t> valid_erds_;
-  std::set<tiny_erd_t> registered_erds_;
+  tiny_erd_t valid_erds_[ERD_REGISTRY_MAX_VALID];
+  uint16_t valid_erds_count_{0};
+  tiny_erd_t registered_erds_[ERD_REGISTRY_MAX_VALID];
+  uint16_t registered_erds_count_{0};
   bool valid_erds_ready_{false};
 };
 

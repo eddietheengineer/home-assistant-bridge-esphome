@@ -30,15 +30,17 @@
  */
 
 #pragma once
-
 #include <cstdint>
 #include <string>
-#include <vector>
 
+#include "tiny_erd.h"
 #include "bridge_mode.h"
 
 namespace esphome {
 namespace geappliances_bridge {
+
+/* Maximum number of ERDs in a poll list.  Matches POLLING_LIST_MAX_SIZE. */
+#define ERD_POLL_LIST_MAX_SIZE 645
 
 /*
  * Configuration for building the ERD poll list.
@@ -60,11 +62,14 @@ struct ErdPollListConfig {
   bool appliance_api_parsing;
 
   /// The valid ERD set produced by the feature bit manager.
-  /// Empty if feature bits are not available or parsing is disabled.
-  const std::vector<uint16_t>* feature_bit_valid_erds;
+  /// Raw pointer into the manager's fixed array; NULL if not available.
+  const tiny_erd_t* feature_bit_valid_erds;
+  uint16_t feature_bit_valid_erds_count;
 
   /// User-configured custom ERDs to always poll.
-  const std::vector<uint16_t>* custom_erds;
+  /// Raw pointer and count into a fixed array; NULL/0 if none.
+  const uint16_t* custom_erds;
+  uint16_t custom_erds_count;
 
   /// The discovered appliance type (0-255).
   /// Used to look up appliance-specific ERDs from erd_lists.h.
@@ -73,13 +78,16 @@ struct ErdPollListConfig {
 
 /*
  * The result of building the poll list.
+ * Uses a fixed-capacity array to avoid heap allocation.
  */
 struct ErdPollListResult {
-  /// The list of ERDs to probe.
-  std::vector<uint16_t> erds;
+  /// The list of ERDs to probe (fixed capacity).
+  uint16_t erds[ERD_POLL_LIST_MAX_SIZE];
+  /// Number of ERDs in the list.
+  uint16_t erds_count;
 
   /// Human-readable description of how the list was built (for logging).
-  std::string description;
+  const char* description;
 };
 
 /*

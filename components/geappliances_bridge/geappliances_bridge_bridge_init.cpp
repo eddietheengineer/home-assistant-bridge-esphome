@@ -33,19 +33,19 @@
 #include "tiny_gea_constants.h"
 #include "erd_poll_list_builder.h"
 #include "erd_cache.h"
+#include <cstring>
 
 namespace esphome {
 namespace geappliances_bridge {
-static std::set<tiny_erd_t> erd_cache_to_set(erd_cache_t* cache)
+static void erd_cache_to_array(erd_cache_t* cache, tiny_erd_t* out, uint16_t* count)
 {
-  std::set<tiny_erd_t> erds;
+  *count = 0;
   uint16_t iterator = 0;
-  while (true) {
+  while (*count < ERD_CACHE_CAPACITY) {
     erd_cache_entry_t* entry = erd_cache_get_next_entry(cache, &iterator);
     if (!entry) break;
-    erds.insert(entry->erd);
+    out[(*count)++] = entry->erd;
   }
-  return erds;
 }
 // ---------------------------------------------------------------------------
 // Polling bridge discovery-complete callback (shared by all three init paths)
@@ -53,7 +53,10 @@ static std::set<tiny_erd_t> erd_cache_to_set(erd_cache_t* cache)
 
 void GeappliancesBridge::on_poll_discovery_complete_()
 {
-  this->ha_discovery_manager_.set_registered_erds(erd_cache_to_set(&this->erd_cache_));
+  tiny_erd_t erds[ERD_CACHE_CAPACITY];
+  uint16_t count = 0;
+  erd_cache_to_array(&this->erd_cache_, erds, &count);
+  this->ha_discovery_manager_.set_registered_erds(erds, count);
   erd_write_bridge_set_host_address(&this->erd_write_bridge_, this->autodiscovery_manager_.get_host_address());
   tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
 }
@@ -70,8 +73,10 @@ ErdPollListResult build_poll_list_(GeappliancesBridge* bridge)
   config.subscription_capable = !bridge->autodiscovery_manager_.is_gea2_protocol();
   config.subscription_active = bridge->subscription_mode_active_;
   config.appliance_api_parsing = bridge->appliance_api_parsing_;
-  config.feature_bit_valid_erds = &bridge->feature_bit_manager_.get_valid_erds_vec();
-  config.custom_erds = &bridge->custom_erds_vec_;
+  config.feature_bit_valid_erds = bridge->feature_bit_manager_.get_valid_erd_count() ? bridge->feature_bit_manager_.valid_erds_ : nullptr;
+  config.feature_bit_valid_erds_count = bridge->feature_bit_manager_.get_valid_erd_count();
+  config.custom_erds = bridge->custom_erds_count_ > 0 ? bridge->custom_erds_ : nullptr;
+  config.custom_erds_count = bridge->custom_erds_count_;
   config.appliance_type = bridge->device_identity_manager_.get_appliance_type();
   return build_erd_poll_list(config);
 }
@@ -174,10 +179,11 @@ void GeappliancesBridge::initialize_erd_bridge_()
   // continue to be published in that case.
   if (this->appliance_api_parsing_ &&
       this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE &&
-      !this->feature_bit_manager_.get_valid_erds().empty()) {
-    this->erd_registry_.set_valid_erds(this->feature_bit_manager_.get_valid_erds());
-    ESP_LOGI(TAG, "Appliance API parsing enabled: publishing filtered to %zu valid ERDs",
-             this->feature_bit_manager_.get_valid_erds().size());
+      this->feature_bit_manager_.get_valid_erd_count() > 0) {
+    this->erd_registry_.set_valid_erds(this->feature_bit_manager_.valid_erds_,
+                                       this->feature_bit_manager_.get_valid_erd_count());
+    ESP_LOGI(TAG, "Appliance API parsing enabled: publishing filtered to %u valid ERDs",
+             this->feature_bit_manager_.get_valid_erd_count());
   }
 
   // Select operating mode.
@@ -216,9 +222,9 @@ void GeappliancesBridge::initialize_erd_bridge_()
   // Initialize the appropriate bridge(s).
   if (use_polling) {
     auto result = build_poll_list_(this);
-    this->poll_probe_list_ = result.erds;
-    ESP_LOGI(TAG, "Poll list: %s (%zu ERDs)", result.description.c_str(),
-             this->poll_probe_list_.size());
+    this->poll_probe_list_count_ = result.erds_count;
+    std::memcpy(this->poll_probe_list_, result.erds, result.erds_count * sizeof(uint16_t));
+    ESP_LOGI(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
     erd_bridge_poll_init(
       &this->erd_bridge_poll_,
       &this->timer_group_,
@@ -226,8 +232,8 @@ void GeappliancesBridge::initialize_erd_bridge_()
       this->polling_interval_ms_,
       this->autodiscovery_manager_.get_host_address(),
       this->device_identity_manager_.get_appliance_type(),
-      this->poll_probe_list_.data(),
-      static_cast<uint16_t>(this->poll_probe_list_.size()),
+      this->poll_probe_list_,
+      this->poll_probe_list_count_,
       &this->erd_cache_);
     erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
   }
@@ -263,12 +269,15 @@ void GeappliancesBridge::initialize_erd_bridge_()
 
   // Defer HA device discovery until ERD registration has settled.
   if (this->generate_device_config_) {
+    tiny_erd_t erds[ERD_CACHE_CAPACITY];
+    uint16_t count = 0;
+    erd_cache_to_array(&this->erd_cache_, erds, &count);
     this->ha_discovery_manager_.init(
         this->ha_discovery_base_url_,
         this->device_identity_manager_.get_device_id(),
         this->device_identity_manager_.get_model_number(),
         this->device_identity_manager_.get_serial_number(),
-        erd_cache_to_set(&this->erd_cache_),
+        erds, count,
         true);
     this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
     ESP_LOGI(TAG, "HA discovery deferred: will publish after ERD discovery completes "
@@ -289,7 +298,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
 
 void GeappliancesBridge::start_custom_erd_polling_()
 {
-  if (this->custom_erds_vec_.empty()) {
+  if (this->custom_erds_count_ == 0) {
     return;
   }
   // Do NOT destroy the subscription bridge - it continues to handle all
@@ -299,9 +308,9 @@ void GeappliancesBridge::start_custom_erd_polling_()
   // handle different event types (subscription vs read_completed).
 
   auto result = build_poll_list_(this);
-  this->poll_probe_list_ = result.erds;
-  ESP_LOGI(TAG, "Custom ERD polling list: %s (%zu ERDs)", result.description.c_str(),
-           this->poll_probe_list_.size());
+  this->poll_probe_list_count_ = result.erds_count;
+  std::memcpy(this->poll_probe_list_, result.erds, result.erds_count * sizeof(uint16_t));
+  ESP_LOGI(TAG, "Custom ERD polling list: %s (%u ERDs)", result.description, result.erds_count);
 
   // Wire the discovery-complete callback BEFORE initializing the bridge,
   // so the HSM cannot fire the callback before it's set.
@@ -317,18 +326,16 @@ void GeappliancesBridge::start_custom_erd_polling_()
       this->polling_interval_ms_,
       this->autodiscovery_manager_.get_host_address(),
       this->device_identity_manager_.get_appliance_type(),
-      this->poll_probe_list_.data(),
-      static_cast<uint16_t>(this->poll_probe_list_.size()),
+      this->poll_probe_list_,
+      this->poll_probe_list_count_,
       &this->erd_cache_);
-  erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
   this->polling_bridge_initialized_ = true;
   this->custom_erd_polling_started_ = true;
 }
 
 void GeappliancesBridge::maybe_start_custom_erd_polling_()
 {
-  if (this->custom_erds_vec_.empty() ||
-      !this->erd_bridge_initialized_ ||
+  if (this->custom_erds_count_ == 0 ||
       this->custom_erd_polling_started_) {
     return;
   }
@@ -398,10 +405,9 @@ void GeappliancesBridge::check_subscription_activity_()
   this->subscription_mode_active_ = false;
 
   auto result = build_poll_list_(this);
-  this->poll_probe_list_ = result.erds;
-  ESP_LOGI(TAG, "Poll list: %s (%zu ERDs)", result.description.c_str(),
-           this->poll_probe_list_.size());
-
+  this->poll_probe_list_count_ = result.erds_count;
+  std::memcpy(this->poll_probe_list_, result.erds, result.erds_count * sizeof(uint16_t));
+  ESP_LOGI(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
   erd_bridge_poll_init(
       &this->erd_bridge_poll_,
       &this->timer_group_,
@@ -409,10 +415,9 @@ void GeappliancesBridge::check_subscription_activity_()
       this->polling_interval_ms_,
       this->autodiscovery_manager_.get_host_address(),
       this->device_identity_manager_.get_appliance_type(),
-      this->poll_probe_list_.data(),
-      static_cast<uint16_t>(this->poll_probe_list_.size()),
+      this->poll_probe_list_,
+      this->poll_probe_list_count_,
       &this->erd_cache_);
-  this->polling_bridge_initialized_ = true;
   erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
 
   // Signal the startup HSM that subscription fallback has occurred.

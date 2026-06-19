@@ -13,8 +13,10 @@ using namespace esphome::geappliances_bridge;
 TEST_GROUP(erd_poll_list_builder)
 {
   ErdPollListConfig config;
-  std::vector<uint16_t> feature_bits;
-  std::vector<uint16_t> custom_erds;
+  uint16_t feature_bits[32];
+  uint16_t feature_bits_count;
+  uint16_t custom_erds_arr[32];
+  uint16_t custom_erds_count;
 
   void setup()
   {
@@ -22,11 +24,13 @@ TEST_GROUP(erd_poll_list_builder)
     config.subscription_capable = true;
     config.subscription_active = false;
     config.appliance_api_parsing = false;
-    config.feature_bit_valid_erds = &feature_bits;
-    config.custom_erds = &custom_erds;
+    config.feature_bit_valid_erds = nullptr;
+    config.feature_bit_valid_erds_count = 0;
+    config.custom_erds = nullptr;
+    config.custom_erds_count = 0;
     config.appliance_type = 0;  // water heater
-    feature_bits.clear();
-    custom_erds.clear();
+    feature_bits_count = 0;
+    custom_erds_count = 0;
   }
 };
 
@@ -34,11 +38,15 @@ TEST(erd_poll_list_builder, subscribe_mode_returns_only_custom_erds)
 {
   config.mode = BRIDGE_MODE_SUBSCRIBE;
   config.subscription_active = true;
-  custom_erds = { 0xABCD, 0x1234 };
+  custom_erds_arr[0] = 0xABCD;
+  custom_erds_arr[1] = 0x1234;
+  custom_erds_count = 2;
+  config.custom_erds = custom_erds_arr;
+  config.custom_erds_count = custom_erds_count;
 
   auto result = build_erd_poll_list(config);
 
-  CHECK_EQUAL(2u, result.erds.size());
+  CHECK_EQUAL(2u, result.erds_count);
   CHECK_EQUAL(0xABCDu, result.erds[0]);
   CHECK_EQUAL(0x1234u, result.erds[1]);
 }
@@ -50,30 +58,36 @@ TEST(erd_poll_list_builder, subscribe_mode_no_custom_returns_empty)
 
   auto result = build_erd_poll_list(config);
 
-  CHECK_EQUAL(0u, result.erds.size());
+  CHECK_EQUAL(0u, result.erds_count);
 }
 
 TEST(erd_poll_list_builder, subscribe_mode_not_active_returns_full_list)
 {
   config.mode = BRIDGE_MODE_SUBSCRIBE;
   config.subscription_active = false;
-  custom_erds = { 0xABCD };
+  custom_erds_arr[0] = 0xABCD;
+  custom_erds_count = 1;
+  config.custom_erds = custom_erds_arr;
+  config.custom_erds_count = custom_erds_count;
 
   auto result = build_erd_poll_list(config);
 
   // Not active → treated as poll fallback, builds full list.
-  CHECK(result.erds.size() > 0);
+  CHECK(result.erds_count > 0);
 }
 
 TEST(erd_poll_list_builder, auto_mode_subscription_active_returns_only_custom)
 {
   config.mode = BRIDGE_MODE_AUTO;
   config.subscription_active = true;
-  custom_erds = { 0xDEAD };
+  custom_erds_arr[0] = 0xDEAD;
+  custom_erds_count = 1;
+  config.custom_erds = custom_erds_arr;
+  config.custom_erds_count = custom_erds_count;
 
   auto result = build_erd_poll_list(config);
 
-  CHECK_EQUAL(1u, result.erds.size());
+  CHECK_EQUAL(1u, result.erds_count);
   CHECK_EQUAL(0xDEADu, result.erds[0]);
 }
 
@@ -81,27 +95,38 @@ TEST(erd_poll_list_builder, poll_mode_with_api_parsing_returns_feature_bits_plus
 {
   config.mode = BRIDGE_MODE_POLL;
   config.appliance_api_parsing = true;
-  feature_bits = { 0x0001, 0x0002, 0x0003 };
-  custom_erds = { 0xABCD };
+  feature_bits[0] = 0x0001;
+  feature_bits[1] = 0x0002;
+  feature_bits[2] = 0x0003;
+  feature_bits_count = 3;
+  config.feature_bit_valid_erds = feature_bits;
+  config.feature_bit_valid_erds_count = feature_bits_count;
+  custom_erds_arr[0] = 0xABCD;
+  custom_erds_count = 1;
+  config.custom_erds = custom_erds_arr;
+  config.custom_erds_count = custom_erds_count;
 
   auto result = build_erd_poll_list(config);
 
-  CHECK_EQUAL(4u, result.erds.size());
+  CHECK_EQUAL(4u, result.erds_count);
   CHECK_EQUAL(0x0001u, result.erds[0]);
   CHECK_EQUAL(0x0002u, result.erds[1]);
   CHECK_EQUAL(0x0003u, result.erds[2]);
   CHECK_EQUAL(0xABCDu, result.erds[3]);
 }
-
 TEST(erd_poll_list_builder, poll_mode_with_api_parsing_no_custom)
 {
   config.mode = BRIDGE_MODE_POLL;
   config.appliance_api_parsing = true;
-  feature_bits = { 0x0001, 0x0002 };
+  feature_bits[0] = 0x0001;
+  feature_bits[1] = 0x0002;
+  feature_bits_count = 2;
+  config.feature_bit_valid_erds = feature_bits;
+  config.feature_bit_valid_erds_count = feature_bits_count;
 
   auto result = build_erd_poll_list(config);
 
-  CHECK_EQUAL(2u, result.erds.size());
+  CHECK_EQUAL(2u, result.erds_count);
   CHECK_EQUAL(0x0001u, result.erds[0]);
   CHECK_EQUAL(0x0002u, result.erds[1]);
 }
@@ -115,8 +140,8 @@ TEST(erd_poll_list_builder, poll_mode_without_api_parsing_returns_full_list)
   auto result = build_erd_poll_list(config);
 
   // Should contain common + energy + applianceApiFeature + waterHeater ERDs.
-  CHECK(result.erds.size() >= (commonErdCount + energyErdCount +
-                                applianceApiFeatureErdCount + waterHeaterErdCount));
+  CHECK(result.erds_count >= (commonErdCount + energyErdCount +
+                              applianceApiFeatureErdCount + waterHeaterErdCount));
 }
 
 TEST(erd_poll_list_builder, poll_mode_without_api_parsing_with_custom)
@@ -124,14 +149,17 @@ TEST(erd_poll_list_builder, poll_mode_without_api_parsing_with_custom)
   config.mode = BRIDGE_MODE_POLL;
   config.appliance_api_parsing = false;
   config.appliance_type = 0;  // water heater
-  custom_erds = { 0xBEEF };
+  custom_erds_arr[0] = 0xBEEF;
+  custom_erds_count = 1;
+  config.custom_erds = custom_erds_arr;
+  config.custom_erds_count = custom_erds_count;
 
   auto result = build_erd_poll_list(config);
 
   // Should contain full list + custom.
   bool found_custom = false;
-  for (auto erd : result.erds) {
-    if (erd == 0xBEEF) {
+  for (uint16_t i = 0; i < result.erds_count; i++) {
+    if (result.erds[i] == 0xBEEF) {
       found_custom = true;
     }
   }
@@ -143,24 +171,32 @@ TEST(erd_poll_list_builder, auto_mode_subscription_not_active_treats_as_poll)
   config.mode = BRIDGE_MODE_AUTO;
   config.subscription_active = false;
   config.appliance_api_parsing = true;
-  feature_bits = { 0x0001 };
-
+  feature_bits[0] = 0x0001;
+  feature_bits_count = 1;
+  config.feature_bit_valid_erds = feature_bits;
+  config.feature_bit_valid_erds_count = feature_bits_count;
   auto result = build_erd_poll_list(config);
 
-  CHECK_EQUAL(1u, result.erds.size());
+  CHECK_EQUAL(1u, result.erds_count);
   CHECK_EQUAL(0x0001u, result.erds[0]);
 }
 
 TEST(erd_poll_list_builder, deduplicates_custom_erd_already_in_feature_bits)
 {
-  config.mode = BRIDGE_MODE_POLL;
   config.appliance_api_parsing = true;
-  feature_bits = { 0x0001, 0x0002 };
-  custom_erds = { 0x0001 };  // duplicate of feature bit ERD
+  feature_bits[0] = 0x0001;
+  feature_bits[1] = 0x0002;
+  feature_bits_count = 2;
+  config.feature_bit_valid_erds = feature_bits;
+  config.feature_bit_valid_erds_count = feature_bits_count;
+  custom_erds_arr[0] = 0x0001;  // duplicate of feature bit ERD
+  custom_erds_count = 1;
+  config.custom_erds = custom_erds_arr;
+  config.custom_erds_count = custom_erds_count;
 
   auto result = build_erd_poll_list(config);
 
-  CHECK_EQUAL(2u, result.erds.size());
+  CHECK_EQUAL(2u, result.erds_count);
   CHECK_EQUAL(0x0001u, result.erds[0]);
   CHECK_EQUAL(0x0002u, result.erds[1]);
 }
@@ -174,18 +210,21 @@ TEST(erd_poll_list_builder, invalid_appliance_type_skips_appliance_specific_erds
   auto result = build_erd_poll_list(config);
 
   // Should contain common + energy + applianceApiFeature, but NOT appliance-specific.
-  CHECK(result.erds.size() >= (commonErdCount + energyErdCount + applianceApiFeatureErdCount));
+  CHECK(result.erds_count >= (commonErdCount + energyErdCount + applianceApiFeatureErdCount));
 }
 
 TEST(erd_poll_list_builder, empty_feature_bits_with_api_parsing_returns_only_custom)
 {
   config.mode = BRIDGE_MODE_POLL;
   config.appliance_api_parsing = true;
-  custom_erds = { 0xABCD };
+  custom_erds_arr[0] = 0xABCD;
+  custom_erds_count = 1;
+  config.custom_erds = custom_erds_arr;
+  config.custom_erds_count = custom_erds_count;
 
   auto result = build_erd_poll_list(config);
 
-  CHECK_EQUAL(1u, result.erds.size());
+  CHECK_EQUAL(1u, result.erds_count);
   CHECK_EQUAL(0xABCDu, result.erds[0]);
 }
 
@@ -199,8 +238,8 @@ TEST(erd_poll_list_builder, gea2_protocol_returns_full_list)
   auto result = build_erd_poll_list(config);
 
   // GEA2 always uses full list (no subscriptions, no API parsing).
-  CHECK(result.erds.size() >= (commonErdCount + energyErdCount +
-                                applianceApiFeatureErdCount + waterHeaterErdCount));
+  CHECK(result.erds_count >= (commonErdCount + energyErdCount +
+                              applianceApiFeatureErdCount + waterHeaterErdCount));
 }
 
 TEST(erd_poll_list_builder, description_is_non_empty)
@@ -210,7 +249,8 @@ TEST(erd_poll_list_builder, description_is_non_empty)
 
   auto result = build_erd_poll_list(config);
 
-  CHECK(!result.description.empty());
+  CHECK(result.description != nullptr);
+  CHECK(result.description[0] != '\0');
 }
 
 TEST(erd_poll_list_builder, subscribe_mode_description)
@@ -220,7 +260,8 @@ TEST(erd_poll_list_builder, subscribe_mode_description)
 
   auto result = build_erd_poll_list(config);
 
-  CHECK(!result.description.empty());
+  CHECK(result.description != nullptr);
+  CHECK(result.description[0] != '\0');
 }
 
 TEST(erd_poll_list_builder, poll_mode_api_parsing_description)
@@ -230,7 +271,8 @@ TEST(erd_poll_list_builder, poll_mode_api_parsing_description)
 
   auto result = build_erd_poll_list(config);
 
-  CHECK(!result.description.empty());
+  CHECK(result.description != nullptr);
+  CHECK(result.description[0] != '\0');
 }
 
 TEST(erd_poll_list_builder, null_feature_bits_pointer_with_api_parsing)
@@ -238,11 +280,15 @@ TEST(erd_poll_list_builder, null_feature_bits_pointer_with_api_parsing)
   config.mode = BRIDGE_MODE_POLL;
   config.appliance_api_parsing = true;
   config.feature_bit_valid_erds = nullptr;
-  custom_erds = { 0xABCD };
+  config.feature_bit_valid_erds_count = 0;
+  custom_erds_arr[0] = 0xABCD;
+  custom_erds_count = 1;
+  config.custom_erds = custom_erds_arr;
+  config.custom_erds_count = custom_erds_count;
 
   auto result = build_erd_poll_list(config);
 
-  CHECK_EQUAL(1u, result.erds.size());
+  CHECK_EQUAL(1u, result.erds_count);
   CHECK_EQUAL(0xABCDu, result.erds[0]);
 }
 
@@ -250,11 +296,15 @@ TEST(erd_poll_list_builder, null_custom_erds_pointer)
 {
   config.mode = BRIDGE_MODE_POLL;
   config.appliance_api_parsing = true;
-  feature_bits = { 0x0001 };
+  feature_bits[0] = 0x0001;
+  feature_bits_count = 1;
+  config.feature_bit_valid_erds = feature_bits;
+  config.feature_bit_valid_erds_count = feature_bits_count;
   config.custom_erds = nullptr;
+  config.custom_erds_count = 0;
 
   auto result = build_erd_poll_list(config);
 
-  CHECK_EQUAL(1u, result.erds.size());
+  CHECK_EQUAL(1u, result.erds_count);
   CHECK_EQUAL(0x0001u, result.erds[0]);
 }

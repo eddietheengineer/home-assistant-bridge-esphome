@@ -8,11 +8,9 @@
  * utility templates are in erd_bridge_common.h.
  */
 
-#include "erd_bridge_common.h"
+#include "erd_bridge_subscribe.h"
 #include "erd_cache.h"
 #include "esphome/core/log.h"
-
-using namespace std;
 
 static const char* const TAG __attribute__((unused)) = "erd_bridge_subscribe";
 
@@ -33,8 +31,8 @@ static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
       auto erd = args->subscription_publication_received.erd;
 
-      if(erd_set(self).find(erd) == erd_set(self).end()) {
-        erd_set(self).insert(erd);
+      if(!erd_set_contains(&self->erd_set, erd)) {
+        erd_set_insert(&self->erd_set, erd);
       }
 
       erd_cache_update(self->erd_cache, erd,
@@ -56,15 +54,15 @@ static tiny_hsm_result_t state_subscribing(tiny_hsm_t* hsm, tiny_hsm_signal_t si
 
   switch(signal) {
     case signal_subscription_host_came_online:
-      // The appliance host restarted — its ERD set may have changed, so clear
-      // the local tracking set so that all ERDs are re-registered when new
-      // subscription publications arrive.  The ERD cache is NOT cleared — it
-      // may be shared with the polling bridge, and stale entries are harmless
-      // (they occupy slots but are overwritten when new publications arrive).
-      erd_set(self).clear();
+      /* The appliance host restarted — its ERD set may have changed, so clear
+       * the local tracking set so that all ERDs are re-registered when new
+       * subscription publications arrive.  The ERD cache is NOT cleared — it
+       * may be shared with the polling bridge, and stale entries are harmless
+       * (they occupy slots but are overwritten when new publications arrive). */
+      erd_set_clear(&self->erd_set);
       __attribute__((fallthrough));
     case tiny_hsm_signal_entry:
-      // Intentionally fall through to the subscribe case below.
+      /* Intentionally fall through to the subscribe case below. */
       __attribute__((fallthrough));
     case signal_subscription_failed:
     case signal_timer_expired:
@@ -147,7 +145,7 @@ void erd_bridge_subscribe_init(
   self->erd_client = erd_client;
   self->erd_host_address = address;
   self->erd_cache = cache;
-  self->erd_set = reinterpret_cast<void*>(new set<tiny_erd_t>());
+  erd_set_init(&self->erd_set);
 
   tiny_event_subscription_init(
     &self->erd_client_activity_subscription, self, +[](void* context, const void* _args) {
@@ -186,29 +184,27 @@ void erd_bridge_subscribe_init(
 
 void erd_bridge_subscribe_destroy(erd_bridge_subscribe_t* self)
 {
-  // Guard against destroy() being called on a never-initialized struct (e.g.
-  // in test teardowns that always call both bridge and polling destroy).
+  /* Guard against destroy() being called on a never-initialized struct (e.g.
+   * in test teardowns that always call both bridge and polling destroy). */
   if (!self->timer_group) {
     return;
   }
 
-  // Stop the resubscribe timer so it cannot fire after the bridge is torn down.
-  // tiny_timer_stop() is idempotent: safe to call even if the timer is not active.
+  /* Stop the resubscribe timer so it cannot fire after the bridge is torn down.
+   * tiny_timer_stop() is idempotent: safe to call even if the timer is not active. */
   tiny_timer_stop(self->timer_group, &self->timer);
 
-  // Remove all event subscriptions before freeing heap state.
-  //
-  // erd_bridge_subscribe_init() subscribes one event callback that references
-  // this struct: erd_client_activity_subscription.  If it remains registered
-  // after destroy(), any subsequent event fires the HSM which dereferences
-  // self->erd_set (freed below) — a use-after-free that corrupts the heap.
+  /* Remove all event subscriptions before freeing heap state.
+   *
+   * erd_bridge_subscribe_init() subscribes one event callback that references
+   * this struct: erd_client_activity_subscription.  If it remains registered
+   * after destroy(), any subsequent event fires the HSM which dereferences
+   * self->erd_set — a use-after-free that corrupts the heap. */
   if (self->erd_client != nullptr) {
     tiny_event_unsubscribe(
       tiny_gea3_erd_client_on_activity(self->erd_client),
       &self->erd_client_activity_subscription);
   }
 
-  delete reinterpret_cast<set<tiny_erd_t>*>(self->erd_set);
-  self->erd_set = nullptr;
+  /* erd_set is a fixed array embedded in the struct — no heap cleanup needed. */
 }
-

@@ -37,7 +37,6 @@
 #pragma once
 
 #include <cstdint>
-#include <set>
 #include <string>
 
 // Include the adapter header for the typed pointer (lightweight — no heavy deps)
@@ -80,16 +79,20 @@ struct HaDiscoveryItem {
   std::string payload;
 };
 
+/* Maximum number of registered/seen ERDs for HA discovery. */
+#define HA_DISCOVERY_MAX_ERDS 645
+
 class HaDiscoveryManager {
  public:
   void init(const std::string& base_url,
             const std::string& device_id,
             const std::string& model_number,
             const std::string& serial_number,
-            const std::set<tiny_erd_t>& registered_erds,
+            const tiny_erd_t* registered_erds,
+            uint16_t registered_erds_count,
             bool generate_device_config);
 
-  void set_registered_erds(const std::set<tiny_erd_t>& erds);
+  void set_registered_erds(const tiny_erd_t* erds, uint16_t count);
 
   void on_erd_seen(tiny_erd_t erd);
 
@@ -129,14 +132,19 @@ class HaDiscoveryManager {
   std::string escape_json_str_(const std::string& s);
   std::string build_device_json_();
 
+  bool contains_erd_(const tiny_erd_t* erds, uint16_t count, tiny_erd_t target) const;
+
   HaDiscoveryState state_{HA_DISCOVERY_IDLE};
   std::string base_url_;
   std::string device_id_;
   std::string model_number_;
   std::string serial_number_;
-  std::set<tiny_erd_t> registered_erds_;
-  std::set<tiny_erd_t> registered_erds_snapshot_;
-  std::set<tiny_erd_t> seen_erds_;
+  tiny_erd_t registered_erds_[HA_DISCOVERY_MAX_ERDS];
+  uint16_t registered_erds_count_{0};
+  tiny_erd_t registered_erds_snapshot_[HA_DISCOVERY_MAX_ERDS];
+  uint16_t registered_erds_snapshot_count_{0};
+  tiny_erd_t seen_erds_[HA_DISCOVERY_MAX_ERDS];
+  uint16_t seen_erds_count_{0};
   bool generate_device_config_{false};
   uint32_t last_activity_{0};
   uint32_t last_publish_ms_{0};

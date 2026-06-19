@@ -96,8 +96,15 @@ uint16_t erd_cache_mqtt_publisher_loop(
     if (self->get_time_ms() - start_ms >= max_ms) {
       break;
     }
-    /* Determine data pointer */
-    const uint8_t* data = entry->uses_heap ? entry->heap_data : entry->inline_data;
+    /* Determine data pointer.
+     * Defensive: if uses_pool or uses_heap is set but ext_data is NULL,
+     * fall back to inline data to avoid a null dereference. */
+    const uint8_t* data;
+    if ((entry->uses_heap || entry->uses_pool) && entry->ext_data != NULL) {
+      data = entry->ext_data;
+    } else {
+      data = entry->inline_data;
+    }
 
     /* Build topic: geappliances/{device_id}/erd/0x{ERD:04x}/value */
     char topic[128];

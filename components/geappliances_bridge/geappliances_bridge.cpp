@@ -4,6 +4,7 @@
 #include "esphome/core/hal.h"
 #include "esphome_time_source.h"
 #include "erd_cache.h"
+#include <cstring>
 
 #ifdef USE_ESP32
 #include "esp_system.h"
@@ -13,6 +14,11 @@
 namespace esphome {
 namespace geappliances_bridge {
 
+void GeappliancesBridge::add_custom_erd(tiny_erd_t erd)
+{
+  if (this->custom_erds_count_ >= CUSTOM_ERDS_MAX) return;
+  this->custom_erds_[this->custom_erds_count_++] = erd;
+}
 
 static const tiny_gea3_erd_client_configuration_t client_configuration = {
   .request_timeout = 250,
@@ -56,6 +62,8 @@ void GeappliancesBridge::setup() {
 
   // Initialize the shared ERD cache before any component uses it.
   erd_cache_init(&this->erd_cache_);
+  // Initialize the fixed-capacity set for tracking seen subscription ERDs.
+  erd_set_init(&this->custom_erd_subscription_seen_erds_);
   // Initialize GEA3 components if GEA3 UART is configured
   if (this->uart_ != nullptr) {
     esphome_uart_adapter_init(&this->uart_adapter_, &this->timer_group_, this->uart_);
@@ -404,7 +412,7 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
       ESP_LOGI(TAG, "Subscription activity detected - subscription mode is working");
       this->subscription_activity_detected_ = true;
     }
-    if (this->custom_erd_subscription_seen_erds_.insert(args->subscription_publication_received.erd).second) {
+    if (erd_set_insert(&this->custom_erd_subscription_seen_erds_, args->subscription_publication_received.erd)) {
       this->custom_erd_subscription_last_activity_ = millis();
     }
     // Reset the HA discovery quiet window only for new ERD IDs. Repeated value
@@ -493,10 +501,10 @@ void GeappliancesBridge::dump_config() {
   }
   ESP_LOGCONFIG(TAG, "  Appliance API Parsing: %s", this->appliance_api_parsing_ ? "enabled" : "disabled");
   if (this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE) {
-    ESP_LOGCONFIG(TAG, "  Appliance API Valid ERDs: %zu", this->feature_bit_manager_.get_valid_erds().size());
+    ESP_LOGCONFIG(TAG, "  Appliance API Valid ERDs: %u", this->feature_bit_manager_.get_valid_erd_count());
   }
-  if (!this->custom_erds_vec_.empty()) {
-    ESP_LOGCONFIG(TAG, "  Custom ERDs: %zu configured", this->custom_erds_vec_.size());
+  if (this->custom_erds_count_ > 0) {
+    ESP_LOGCONFIG(TAG, "  Custom ERDs: %u configured", this->custom_erds_count_);
   }
 
   // Display current startup state for debugging

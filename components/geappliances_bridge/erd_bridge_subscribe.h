@@ -14,7 +14,7 @@
 //   - Forward ERD publications to erd_cache
 //
 // NOT responsible for:
-//   - Polling (see erd_bridge_poll.h)
+//   - Polling (see erd_bridge_subscribe.h)
 //   - Write requests or MQTT interaction
 //   - Bridge initialization or startup phase management
 //
@@ -27,16 +27,19 @@
 
 struct erd_cache_t;
 
+extern "C" {
 #include "i_tiny_gea3_erd_client.h"
 #include "tiny_hsm.h"
 #include "tiny_timer.h"
+}
+#include "erd_bridge_common.h"
 
 typedef struct {
   tiny_timer_group_t* timer_group;
   i_tiny_gea3_erd_client_t* erd_client;
   tiny_timer_t timer;
   tiny_event_subscription_t erd_client_activity_subscription;
-  void* erd_set;
+  erd_set_t erd_set;
   erd_cache_t* erd_cache;
   tiny_hsm_t hsm;
   uint8_t erd_host_address;

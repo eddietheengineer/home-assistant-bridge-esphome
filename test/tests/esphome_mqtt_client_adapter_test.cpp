@@ -81,12 +81,12 @@ TEST(esphome_mqtt_client_adapter, init_creates_device_id)
 
 TEST(esphome_mqtt_client_adapter, register_erd_tracks_in_output_set)
 {
-  std::set<tiny_erd_t> valid{0x0008};
-  erd_registry.set_valid_erds(valid);
+  tiny_erd_t valid[] = {0x0008};
+  erd_registry.set_valid_erds(valid, 1);
   init_adapter_with_registry();
   adapter.interface.api->register_erd(&adapter.interface, 0x0008);
-  CHECK_EQUAL(1u, erd_registry.registered_erds().size());
-  CHECK(erd_registry.registered_erds().count(0x0008) == 1);
+  CHECK_EQUAL(1u, erd_registry.registered_erd_count());
+  CHECK_EQUAL(0x0008u, erd_registry.registered_erd(0));
 }
 
 TEST(esphome_mqtt_client_adapter, register_erd_without_output_set)
