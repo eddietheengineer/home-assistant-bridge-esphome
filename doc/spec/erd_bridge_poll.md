@@ -9,7 +9,7 @@ The ERD polling bridge discovers the connected GE appliance, determines which ER
 ### 1.2 Responsibilities
 
 - Discover the appliance's host address via broadcast (or accept a pre-known address)
-- Determine which ERDs the appliance supports through sequential verification reads
+- Probe a pre-built list of ERDs to determine which the appliance supports
 - Maintain a dynamic polling list of verified ERDs
 - Execute steady-state polling cycles at a configured interval
 - Write ERD values to the shared ERD cache (change detection via `erd_cache_update`)
@@ -19,7 +19,7 @@ The ERD polling bridge discovers the connected GE appliance, determines which ER
 
 - Subscription-mode operation (see `erd_bridge_subscribe`)
 - Any MQTT behavior (publishing, write requests, disconnect handling)
-- Deciding which ERDs are valid (filtered upstream by the MQTT client adapter)
+- Building the probe list (see `erd_poll_list_builder`)
 - Bridge startup phase management (see `geappliances_bridge_startup_hsm`)
 
 ---
@@ -36,17 +36,22 @@ void erd_bridge_poll_init(
     uint32_t polling_interval_ms,
     uint8_t host_address,
     uint8_t appliance_type,
-    const tiny_erd_t* api_list,
-    uint16_t api_list_count,
+    const tiny_erd_t* probe_list,
+    uint16_t probe_list_count,
     erd_cache_t* cache);
 ```
 
 | Parameter | Description |
 |-----------|-------------|
-| `host_address` | The appliance's GEA bus address. If `tiny_gea_broadcast_address` (0xFF), the bridge performs broadcast discovery. Otherwise, it skips broadcast and proceeds directly to discovery/polling. |
-| `appliance_type` | The appliance type byte from ERD 0x0008. Used to select appliance-specific ERD lists. |
-| `api_list` / `api_list_count` | Optional pre-populated ERD list from appliance API feature bit parsing. When non-NULL, the bridge probes each ERD before polling (verifying support). When NULL, the bridge runs the full discovery chain. |
+| `timer_group` | Shared timer group for polling and appliance-lost timers. |
+| `erd_client` | GEA3 ERD client interface. |
+| `polling_interval_ms` | Interval between polling cycles (default 10000 ms). |
+| `host_address` | The appliance's GEA bus address. If `tiny_gea_broadcast_address` (0xFF), the bridge performs broadcast discovery. Otherwise, it skips broadcast and proceeds directly to probing. |
+| `appliance_type` | The appliance type byte from ERD 0x0008. Used for logging and health metrics. |
+| `probe_list` / `probe_list_count` | A pre-built array of ERDs to verify during the probe phase. Built by `erd_poll_list_builder` based on bridge mode and configuration. Each ERD is read once; successful reads are added to the polling list, failed reads are excluded. |
 | `cache` | Shared `erd_cache_t` for storing ERD values. |
+
+The probe list pointer must remain valid for the duration of the probe phase (typically the lifetime of the bridge instance). The caller is responsible for ensuring this — the bridge does not copy the probe list.
 
 ### 2.2 Destroy
 
@@ -56,17 +61,15 @@ void erd_bridge_poll_destroy(erd_bridge_poll_t* self);
 
 Stops timers, unsubscribes all event handlers, and frees heap-allocated state (`erd_set`, `erd_polling_list`). Guards against being called on a never-initialized struct or a partially-initialized one (e.g., if a `new` allocation failed during init).
 
-### 2.3 Custom ERD List
-
-After init, the caller may set `self->custom_erd_list` and `self->custom_erd_list_count` to configure user-defined ERDs. These are discovered after the standard ERD lists and appended to the polling list.
-
-### 2.4 Discovery-Complete Callback
+### 2.3 Discovery-Complete Callback
 
 After init, the caller may set `self->on_discovery_complete` and `self->on_discovery_complete_context`. This callback fires once when the HSM enters `state_polling` (discovery complete). The callback must not send signals back to the polling HSM. It should iterate the cache via `erd_cache_get_next_entry()` to build the ERD set for HA discovery.
 
+---
+
 ## 3. State Machine
 
-The polling bridge uses a hierarchical state machine (`tiny_hsm`) with a parent state (`poll_state_top`) and eight child states.
+The polling bridge uses a hierarchical state machine (`tiny_hsm`) with a parent state (`poll_state_top`) and three child states.
 
 ### 3.1 Parent State: `poll_state_top`
 
@@ -85,157 +88,97 @@ Determines the appliance's host address.
 **On entry:**
 - Sets `polling_list_complete = false`.
 - If `erd_host_address != tiny_gea_broadcast_address` (pre-known address):
-  - If this is a re-entry (`polling_list_count > 0` and `api_parsed_list != NULL`): clears `erd_set` and `polling_list_count` via `clear_discovery_state()` (does NOT clear the ERD cache — it may be shared with the subscription bridge).
-  - If `api_parsed_list != NULL`: transitions to `state_probe_api_parsed_erds` (first entry) or `state_polling` (re-entry).
-  - Otherwise: transitions to `state_add_common_erds`.
+  - If this is a re-entry (`polling_list_count > 0`): clears `erd_set` and `polling_list_count` via `clear_discovery_state()` (does NOT clear the ERD cache — it may be shared with the subscription bridge).
+  - Transitions to `state_probe_list`.
 - If `erd_host_address == tiny_gea_broadcast_address`: sends a broadcast read for ERD 0x0008 (appliance type).
 
 **On `signal_read_completed`:**
 - Ignores responses for ERDs other than 0x0008 (spurious reads from concurrent bus activity).
 - Extracts `erd_host_address` from the responding device's address and `appliance_type` from the data.
-- If `api_parsed_list != NULL`: transitions to `state_add_appliance_api_feature_erds`.
-- Otherwise: transitions to `state_add_common_erds`.
+- Transitions to `state_probe_list`.
 
 **On `signal_read_failed`:**
 - If the failed ERD is 0x0008: retries the broadcast read indefinitely.
 
-#### `state_add_common_erds`
+#### `state_probe_list`
 
-Probes the common ERD list (`commonErds` from `erd_lists.h`).
-
-**On entry:**
-- Calls `clear_discovery_state()` to reset `erd_set` and `polling_list_count` (does NOT clear the ERD cache — it may be shared with the subscription bridge; stale entries are overwritten when new data arrives).
-- Sets `appliance_erd_list` to `commonErds`, `erd_index` to 0, and `next_discovery_state` to `state_add_energy_erds`.
-- Sends the first read.
-
-**On read signals:** delegates to `handle_discovery_list_signals` (§4.1).
-
-#### `state_add_energy_erds`
-
-Probes the energy ERD list (`energyErds` from `erd_lists.h`).
-
-**On entry:** sets `appliance_erd_list` to `energyErds`, `erd_index` to 0, `next_discovery_state` to `state_add_appliance_api_feature_erds`, and sends the first read.
-
-**On read signals:** delegates to `handle_discovery_list_signals` (§4.1).
-
-#### `state_add_appliance_api_feature_erds`
-
-Probes the appliance API feature ERD list (`applianceApiFeatureErds` from `erd_lists.h`).
+Probes each ERD in the pre-built probe list to verify support before adding to the polling list.
 
 **On entry:**
-- Sets `next_discovery_state` to `state_probe_api_parsed_erds` if `api_parsed_list != NULL`, otherwise `state_add_appliance_erds`.
-- Sets `appliance_erd_list` to `applianceApiFeatureErds`, `erd_index` to 0, and sends the first read.
+- Sets `appliance_erd_list` to `probe_list` and `appliance_erd_list_count` to `probe_list_count`.
+- Sets `erd_index = (uint16_t)-1` (sentinel — `send_next_read_request` increments to 0 on first call).
+- If re-entry (`polling_list_count > 0`): clears `erd_set` and `polling_list_count` via `clear_discovery_state()` (does NOT clear the ERD cache).
+- If `probe_list_count > 0`: sends the first read via `send_next_read_request`.
+- If `probe_list_count == 0`: transitions directly to `state_polling`.
 
-**On read signals:** delegates to `handle_discovery_list_signals` (§4.1).
+**On `signal_read_completed`:**
+- Adds the ERD to the polling list via `add_erd_to_polling_list()` (deduped via `erd_set`).
+- Updates the ERD cache via `erd_cache_update()`.
+- Advances to the next ERD or transitions to `state_polling`.
 
-#### `state_add_appliance_erds`
-
-Probes the appliance-type-specific ERD list.
-
-**On entry:**
-- If `appliance_type >= maximumApplianceType`: logs a warning, sets `appliance_erd_list` to NULL and `appliance_erd_list_count` to 0 (skips appliance-specific discovery).
-- Otherwise: looks up the ERD list from `applianceTypeToErdGroupTranslation[appliance_type]`.
-- Sets `next_discovery_state` to `state_add_custom_erds` if custom ERDs are configured, otherwise `state_polling`.
-- If `appliance_erd_list_count > 0`: sends the first read. Otherwise: transitions to `next_discovery_state`.
-
-**On read signals:** delegates to `handle_discovery_list_signals` (§4.1).
-
-#### `state_probe_api_parsed_erds`
-
-Verifies each ERD in `api_parsed_list` with a read before adding it to the polling list.
-
-**On entry:**
-- Sets `next_discovery_state` to `state_add_custom_erds` if custom ERDs are configured, otherwise `state_polling`.
-- Sets `appliance_erd_list` to `api_parsed_list`, `erd_index` to 0.
-- If `api_parsed_list_count > 0`: sends the first read. Otherwise: transitions to `next_discovery_state`.
-
-**On `signal_read_failed`:** inserts the ERD into `erd_set` (as an exclusion), then advances to the next ERD or transitions to `next_discovery_state`.
-
-**On `signal_read_completed`:** delegates to `handle_discovery_list_signals` (§4.1).
-
-#### `state_add_custom_erds`
-
-Probes user-configured custom ERDs.
-
-**On entry:**
-- Rebuilds `erd_set` from the actual `erd_polling_list` (so custom ERDs are evaluated independently of failures in earlier discovery phases).
-- Sets `appliance_erd_list` to `custom_erd_list`, `erd_index` to 0, `next_discovery_state` to `state_polling`.
-- If `custom_erd_list_count > 0`: sends the first read. Otherwise: transitions to `state_polling`.
-
-**On read signals:** delegates to `handle_discovery_list_signals` (§4.1).
+**On `signal_read_failed`:**
+- Inserts the ERD into `erd_set` as an exclusion (prevents lazy registration in `state_polling`).
+- Advances to the next ERD or transitions to `state_polling`.
 
 #### `state_polling`
 
 Steady-state polling. See §5.
 
-### 3.3 Discovery Path Diagrams
+### 3.3 State Diagram
 
-**Full discovery (no `api_parsed_list`):**
 ```
-state_identify_appliance
-  → state_add_common_erds
-    → state_add_energy_erds
-      → state_add_appliance_api_feature_erds
-        → state_add_appliance_erds
-          → state_add_custom_erds (if custom ERDs configured)
-          → state_polling
-```
-
-**API-parsed list (broadcast discovery):**
-```
-state_identify_appliance
-  → state_add_appliance_api_feature_erds
-    → state_probe_api_parsed_erds
-      → state_add_custom_erds (if custom ERDs configured)
-      → state_polling
-```
-
-**API-parsed list (pre-known address, first entry):**
-```
-state_identify_appliance
-  → state_probe_api_parsed_erds
-    → state_add_custom_erds (if custom ERDs configured)
-    → state_polling
-```
-
-**API-parsed list (pre-known address, re-entry after appliance lost):**
-```
-state_identify_appliance
-  → state_polling
+poll_state_top (parent — handles appliance_lost globally)
+  ├─ state_identify_appliance (initial)
+  │    ├─ entry: if pre-known address → state_probe_list
+  │    │          else → broadcast read for ERD 0x0008
+  │    ├─ read_completed (0x0008): extract host address → state_probe_list
+  │    └─ read_failed (0x0008): retry broadcast
+  │
+  ├─ state_probe_list
+  │    ├─ entry: if probe_list empty → state_polling
+  │    │         else → read first ERD
+  │    ├─ read_completed: add to polling list + cache → next ERD or state_polling
+  │    └─ read_failed: exclude from polling list → next ERD or state_polling
+  │
+  └─ state_polling (steady state)
+       ├─ entry: arm polling timer, set polling_list_complete, fire callback
+       ├─ polling_timer_expired: start cycle (or set restart_pending)
+       ├─ read_completed: update cache, count completion, maybe restart cycle
+       ├─ read_failed: count completion, maybe restart cycle
+       └─ appliance_lost → state_identify_appliance
 ```
 
 ---
 
-## 4. Discovery Behavior
+## 4. Probe Phase Behavior
 
-### 4.1 Shared Discovery Handler (`handle_discovery_list_signals`)
+### 4.1 Sequential Probing
 
-All discovery states (except `state_probe_api_parsed_erds` for failures) delegate to this handler for `signal_read_completed` and `signal_read_failed`.
+During the probe phase, only one ERD read is outstanding at any time. The next read is issued only after receiving a definitive response (`signal_read_completed` or `signal_read_failed`). No timers are used to advance the probe index.
 
-**On `signal_read_completed`:**
-Calls `add_erd_to_polling_list()` — adds the ERD to `erd_polling_list` (deduped via `erd_set`).
-Calls `erd_cache_update()` to store the ERD data (new entries always mark `update_required = true`).
-Advances to the next ERD in the current list or transitions to `next_discovery_state`.
+### 4.2 Successful Probe
 
-**On `signal_read_failed`:**
-- Does NOT add the ERD to the polling list.
-- Does NOT insert into `erd_set` (failed ERDs are not excluded — they may be re-probed in a later discovery phase, e.g., as a custom ERD).
-- Advances to the next ERD in the current list or transitions to `next_discovery_state`.
+When a probe read completes successfully:
+- The ERD is added to `erd_polling_list` (deduped via `erd_set`).
+- The ERD data is written to the shared ERD cache via `erd_cache_update()`.
+- The next ERD in the probe list is read.
 
-### 4.2 `state_probe_api_parsed_erds` Failure Handling
+### 4.3 Failed Probe
 
-Unlike the shared handler, `state_probe_api_parsed_erds` inserts failed ERDs into `erd_set` as exclusions. This permanently excludes them from the polling list — the API-parsed list is authoritative, and a failed probe means the appliance does not support that ERD.
+When a probe read fails (either `not_supported` or `retries_exhausted`):
+- The ERD is **not** added to the polling list.
+- The ERD is inserted into `erd_set` as an exclusion — this prevents the ERD from being lazily registered in `state_polling` if a late response arrives.
+- The next ERD in the probe list is read.
 
-### 4.3 ERD Set Semantics
+### 4.4 Shared Discovery Handler
 
-`erd_set` is a `std::set<tiny_erd_t>` used for deduplication:
-- `add_erd_to_polling_list()` checks `erd_set` before adding — skips if already present.
-- `clear_discovery_state()` clears `erd_set` at the start of a new discovery phase.
-- `state_add_custom_erds` rebuilds `erd_set` from `erd_polling_list` so custom ERDs are evaluated independently of earlier failures.
+The `handle_discovery_list_signals()` function handles `signal_read_completed` and `signal_read_failed` for `state_probe_list`. It adds successful ERDs to the polling list and cache, then advances to the next ERD or transitions to `state_polling`.
 
-### 4.4 One ERD at a Time
+**Note:** `state_probe_list` handles `signal_read_failed` explicitly (inserting into `erd_set` for exclusion) before delegating to `handle_discovery_list_signals` for `signal_read_completed`. This ensures failed probe ERDs are excluded from lazy registration in the polling state.
 
-During discovery, only one ERD read is outstanding at any time. The next read is issued only after receiving a definitive response (`signal_read_completed` or `signal_read_failed`). No timers are used to advance the discovery index.
+### 4.5 Late Response Handling
+
+If a probe read response arrives while `state_polling` is active (e.g., the appliance responded slower than expected), the polling state handles it via `signal_read_completed`: the ERD is added to the polling list (if not already present) and the cache is updated.
 
 ---
 
@@ -244,7 +187,6 @@ During discovery, only one ERD read is outstanding at any time. The next read is
 ### 5.1 Entry
 
 On entering `state_polling`:
-- If `api_parsed_list != NULL`: iterates all entries through `add_erd_to_polling_list()` (deduped via `erd_set`).
 - Resets `erd_index = 0`, `cycle_completed_count = 0`, `restart_pending = false`.
 - Arms the polling timer for `polling_interval_ms`.
 - Sets `polling_list_complete = true`.
@@ -277,7 +219,7 @@ A polling cycle consists of sending reads for all ERDs in `erd_polling_list` and
 
 **On `signal_read_completed`:**
 - Resets the appliance-lost timer.
-- If the ERD is not in `erd_set`: adds it to the polling list via `add_erd_to_polling_list()` (handles late discovery responses that arrive during polling).
+- If the ERD is not in `erd_set`: adds it to the polling list via `add_erd_to_polling_list()` (handles late probe responses that arrive during polling).
 - Updates the ERD cache via `erd_cache_update()` (respects the cache's `only_publish_onchange` setting).
 - Increments `cycle_completed_count`; if cycle is complete, calls `on_polling_cycle_complete()`.
 
@@ -301,16 +243,21 @@ A polling cycle consists of sending reads for all ERDs in `erd_polling_list` and
 
 - `erd_set`: `std::set<tiny_erd_t>` stored as `void*` in the struct. Used for deduplication during discovery and polling list management.
 
-### 6.3 Cache Publish Behavior
+### 6.3 Probe List
+
+- `probe_list`: pointer to the pre-built array of ERDs to probe. Set by the caller before `erd_bridge_poll_init()`. The bridge reads from this array during the probe phase but does not own or modify it.
+- `probe_list_count`: number of ERDs in the probe list.
+
+### 6.4 Cache Publish Behavior
 
 The polling bridge does not own the publish-on-change setting — it is controlled by the shared ERD cache. The caller sets `erd_cache_set_only_publish_onchange()` after init to configure whether polled ERD reads should only publish on data change (`true`) or always publish (`false`, the default).
 
-### 6.4 Timers
+### 6.5 Timers
 
 - `polling_timer`: armed for `polling_interval_ms` after each cycle starts. Fires `signal_polling_timer_expired`.
 - `appliance_lost_timer`: armed for `appliance_lost_timeout` (60 s) on each successful read. Fires `signal_appliance_lost`.
 
-### 6.5 Health Metrics
+### 6.6 Health Metrics
 
 - `cycle_start_ms`: `millis()` when the current cycle's first read was sent.
 - `last_cycle_time_ms`: duration of the last completed cycle in milliseconds.
@@ -334,11 +281,11 @@ The polling bridge does not own the publish-on-change setting — it is controll
 ## 8. Invariants
 
 1. **No overlapping cycles:** A new cycle does not start until the previous one has completed (all ERDs have responded) and the timer has expired (or `restart_pending` is set).
-2. **One read at a time during discovery:** The next discovery read is issued only after the previous one has a definitive response.
-3. **No polling list growth on MQTT reconnect:** `erd_set` is not cleared on MQTT disconnect, preventing duplicate ERD additions on re-entry to `state_polling`.
-4. **Failed discovery ERDs are not excluded from later phases:** In `handle_discovery_list_signals`, failed ERDs are not inserted into `erd_set`, allowing them to be independently re-probed in later discovery phases (e.g., as custom ERDs).
-5. **Failed probe ERDs are excluded:** In `state_probe_api_parsed_erds`, failed ERDs are inserted into `erd_set` as exclusions, permanently preventing them from being added to the polling list.
-6. **Cache NOT cleared on discovery re-entry:** The ERD cache is not reset during `state_add_common_erds` or on appliance-loss re-discovery. The cache may be shared with the subscription bridge; stale entries are overwritten when new data arrives.
+2. **One read at a time during probe:** The next probe read is issued only after the previous one has a definitive response.
+3. **No polling list growth on re-entry:** `erd_set` and `polling_list_count` are cleared on re-entry to `state_identify_appliance` or `state_probe_list` after appliance loss, preventing duplicate ERD additions.
+4. **Failed probe ERDs are excluded:** In `state_probe_list`, failed ERDs are inserted into `erd_set` as exclusions, preventing them from being lazily registered in `state_polling`.
+5. **Cache NOT cleared on probe re-entry:** The ERD cache is not reset during `state_probe_list` entry or on appliance-loss re-discovery. The cache may be shared with the subscription bridge; stale entries are overwritten when new data arrives.
+6. **Known host address preserved:** When initialized with a non-broadcast `host_address`, the bridge stores it in `known_host_address`. On appliance loss, this address is restored instead of falling back to broadcast.
 
 ---
 
@@ -346,11 +293,11 @@ The polling bridge does not own the publish-on-change setting — it is controll
 
 | Dependency | Role |
 |------------|------|
-| `i_tiny_gea3_erd_client` | GEA3 ERD client interface (read, write, activity events) |
+| `i_tiny_gea3_erd_client` | GEA3 ERD client interface (read, activity events) |
 | `tiny_hsm` | Hierarchical state machine |
 | `tiny_timer` | Timer group and timer instances |
 | `erd_bridge_common.h` | Shared signals, timing constants, utility templates (`erd_set`, `arm_timer`) |
-| `erd_lists.h` | Static ERD lists (`commonErds`, `energyErds`, `applianceApiFeatureErds`, `applianceTypeToErdGroupTranslation`, `maximumApplianceType`, `POLLING_LIST_MAX_SIZE`) |
+| `erd_lists.h` | Static ERD lists (used by `erd_poll_list_builder`) |
 | `erd_cache.h` | ERD cache for change detection (`erd_cache_init`, `erd_cache_update`, `erd_cache_get_next_entry`) |
 
 ---
@@ -359,4 +306,4 @@ The polling bridge does not own the publish-on-change setting — it is controll
 
 1. **Single appliance assumption:** Broadcast identification reads the appliance type from the first response to ERD 0x0008. In multi-appliance environments, this may not be the intended target.
 2. **Failed ERDs never evicted:** An ERD that permanently fails during steady-state polling (e.g., removed by a firmware update) remains in the polling list indefinitely, consuming bus bandwidth and inflating cycle time.
-3. **Invalid appliance type skips discovery:** When `appliance_type >= maximumApplianceType`, appliance-specific ERD discovery is skipped entirely rather than falling back to a default set.
+3. **Probe list pointer lifetime:** The bridge does not copy the probe list — the caller must ensure the pointer remains valid for the duration of the probe phase (typically the bridge's lifetime).

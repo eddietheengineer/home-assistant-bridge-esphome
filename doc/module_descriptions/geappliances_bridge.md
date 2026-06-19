@@ -43,7 +43,6 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `check_subscription_activity_()` | Check if subscription mode is receiving data (AUTO mode fallback) |
 | `start_custom_erd_polling_()` | Initialize polling for user-configured custom ERDs |
 | `maybe_start_custom_erd_polling_()` | Guarded entry point for custom ERD polling (prevents re-initialization) |
-| `configure_polling_optional_lists_()` | Set up optional ERD lists for the polling bridge (appliance API filter, custom ERDs) |
 | `log_poll_state_transitions_()` | Debug: log polling HSM state changes |
 | `on_ha_discovery_erd_seen_(erd)` | Callback invoked when HA discovery publishes an ERD |
 
@@ -57,6 +56,19 @@ protocol_stack → autodiscovery → device_id → mqtt_client_init
              → ha_discovery → running
 ```
 
+## Bridge Initialization Flow
+
+During `startup_state_bridge_init`, `initialize_erd_bridge_()` runs:
+
+1. **Apply ERD filter**: If appliance API parsing is enabled and complete, sets the valid-ERD filter on the registry.
+2. **Select mode**: Determines polling vs. subscription based on mode setting and GEA2/GEA3 protocol.
+3. **Build probe list**: Calls `build_poll_list_()` (which delegates to `erd_poll_list_builder`) to build the list of ERDs to probe.
+4. **Initialize bridges**:
+   - **Polling mode**: Initializes `erd_bridge_poll_` with the probe list, known host address, and appliance type.
+   - **Subscription mode**: Initializes `erd_bridge_subscribe_` with the known host address.
+   - **Write bridge**: Always initialized with the broadcast address (updated after appliance identification).
+5. **Defer HA discovery**: If enabled, initializes `ha_discovery_manager_` — it starts when the bridge signals readiness.
+
 ## Dependencies
 
 - ESPHome `Component` base class
@@ -66,16 +78,21 @@ protocol_stack → autodiscovery → device_id → mqtt_client_init
 - `tiny_gea2_interface`, `tiny_gea2_erd_client` — GEA2 protocol stack
 - All sub-managers: `AutodiscoveryManager`, `DeviceIdentityManager`, `FeatureBitManager`, `HaDiscoveryManager`
 - Adapters: `esphome_uart_adapter`, `esphome_mqtt_client_adapter`, `gea2_erd_client_adapter`
-- Bridges: `erd_bridge_subscribe`, `erd_bridge_poll`
+- Bridges: `erd_bridge_subscribe`, `erd_bridge_poll`, `erd_write_bridge`
+- `erd_poll_list_builder` — builds the probe list for the polling bridge
+- `erd_registry` — single owner of valid-ERD filter, string-type set, and registered-ERD tracking
+- `erd_cache_mqtt_publisher` — drains ERD cache updates to MQTT each loop()
 - `erd_bridge_common.h` — shared signals, timing constants, and utility templates
 - `tiny_hsm`, `tiny_timer` — state machine and timer infrastructure
 
 ## Key Design Decisions
 
 - **GEA2 tight loop**: When GEA2 is active, a 200 ms wall-clock busy loop ensures the full TX→RX cycle at 19200 baud completes within a single `loop()` call. A manual millisecond counter drives the GEA2 interface's internal timers without starving the shared timer group.
-- **Bridge modes**: Three modes — POLL (always poll), SUBSCRIBE (always subscribe), AUTO (try subscribe, fall back to polling after 30 s if no activity).
+- **Bridge modes**: Three modes — POLL (always poll), SUBSCRIBE (always subscribe), AUTO (try subscribe, fall back to polling after 10 s if no activity).
 - **IBridgeServices interface**: `GeappliancesBridge` implements `IBridgeServices`, the abstract contract consumed by the startup HSM. This eliminates `friend` declarations and lets the HSM be unit-tested with a mock.
 - **Phase timeouts**: Device ID phase has a 30 s timeout, feature bits phase has a 60 s timeout — both prevent the startup HSM from stalling indefinitely.
+- **Probe list ownership**: The `poll_probe_list_` member stores the built probe list so the pointer passed to `erd_bridge_poll_init()` remains valid across the probe phase.
+- **ERD cache publisher**: The `erd_cache_mqtt_publisher_` drains `update_required` entries from the shared cache and publishes them to MQTT each `loop()`, decoupling the bridges from direct MQTT interaction.
 
 ## Testing
 
