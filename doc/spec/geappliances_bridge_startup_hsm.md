@@ -1,0 +1,305 @@
+# Geappliances Bridge Startup HSM — Specification
+
+## 1. Overview
+
+### 1.1 Purpose
+
+The startup HSM drives the ordered startup sequence of the GE Appliances bridge from protocol initialization through HA discovery to steady-state running. It uses `tiny_hsm` to manage a flat hierarchy of phase states, each of which waits for specific signals or gate conditions before transitioning to the next phase.
+
+### 1.2 Responsibilities
+
+- Own the `tiny_hsm` state machine for all startup phases
+- Transition between phases when each manager signals completion
+- Enforce per-phase timeout guards (device ID, feature bits)
+- Call `IBridgeServices` to trigger bridge actions at phase boundaries
+- Gate transitions on combined conditions (e.g., feature bits complete AND MQTT connected)
+
+### 1.3 Not Responsible For
+
+- Implementing any phase's work (delegates to managers via `IBridgeServices`)
+- Owning component instances or configuration state
+- Any steady-state work beyond the `running` phase entry
+
+---
+
+## 2. Public API
+
+### 2.1 Set Bridge Services
+
+```cpp
+void set_bridge_services(IBridgeServices* services);
+```
+
+Sets the back-pointer to the `IBridgeServices` instance used by all HSM state functions. Called once during bridge initialization before the HSM is started. Stores the pointer in a static global (`g_bridge_services`) because the bridge is a non-POD C++ class (virtual methods, inheritance), making `offsetof` conditionally-supported.
+
+### 2.2 Retrieve Services from HSM
+
+```cpp
+IBridgeServices* services_from_hsm(tiny_hsm_t* hsm);
+```
+
+Returns the `IBridgeServices` pointer stored via `set_bridge_services()`. The `hsm` parameter is accepted for API symmetry with other HSM helpers but is unused — the pointer is global.
+
+### 2.3 HSM Configuration
+
+```cpp
+extern const tiny_hsm_configuration_t startup_hsm_configuration;
+```
+
+Defines the state descriptors and parent hierarchy for the startup HSM. All states have `startup_state_top` as their parent.
+
+---
+
+## 3. Signals
+
+| Signal | Description |
+|--------|-------------|
+| `signal_run_loop` | Sent every `loop()` call to drive ongoing work in the current state. The primary mechanism for polling completion flags and advancing phases. |
+| `signal_autodiscovery_complete` | Fired when the AutodiscoveryManager finds (or gives up on) an appliance. |
+| `signal_device_id_complete` | Fired when the DeviceIdentityManager has read or pre-configured the device ID. |
+| `signal_mqtt_connected` | Fired when the MQTT broker connection is established. |
+| `signal_feature_bits_complete` | Fired when all feature bit ERDs are read and parsed. |
+| `signal_bridge_ready` | Fired when the ERD bridge (poll/subscribe) finishes initialization. |
+| `signal_subscription_fallback` | Fired in AUTO mode when the subscription watchdog times out and falls back to polling. |
+
+---
+
+## 4. State Machine
+
+Flat hierarchy — all states are children of `startup_state_top`. Any signal not consumed by a child state bubbles to the top and is deferred (ignored).
+
+### 4.1 Parent State: `startup_state_top`
+
+Handles `entry` and `exit` signals with no action. All other signals return `tiny_hsm_result_signal_deferred`, effectively ignoring them. This is the root of the hierarchy — unhandled signals from any child state end here.
+
+### 4.2 Phase States
+
+#### `startup_state_protocol_stack` (initial)
+
+Entry point of the HSM. The protocol stack (GEA2/GEA3 hardware driver) is already running by the time this state is entered.
+
+- **On entry:** Immediately transitions to `startup_state_startup_delay`.
+- **On exit:** No action.
+
+#### `startup_state_startup_delay`
+
+Waits for the appliance board to stabilize before starting autodiscovery. Duration is `AUTODISCOVERY_STARTUP_DELAY_MS` (5 seconds).
+
+- **On entry:** Calls `svc->record_startup_delay_start()` to record the start time.
+- **On `signal_run_loop`:** Checks `svc->is_startup_delay_elapsed()`. If elapsed, transitions to `startup_state_autodiscovery`.
+- **On exit:** No action.
+
+#### `startup_state_autodiscovery`
+
+Runs the AutodiscoveryManager, which is fully self-driving (owns its own timers and event subscriptions). The HSM only checks for completion.
+
+- **On entry:** Logs phase entry. Calls `svc->run_autodiscovery()` to start the manager.
+- **On `signal_run_loop`:** Checks `svc->is_autodiscovery_complete()`. If true, logs the discovered host address and protocol, transitions to `startup_state_device_id`.
+- **On `signal_autodiscovery_complete`:** Checks `svc->is_autodiscovery_complete()` and transitions to `startup_state_device_id` if true. This provides an immediate transition path without waiting for the next loop iteration.
+- **On exit:** No action.
+
+**Note:** The AutodiscoveryManager retries indefinitely if no board responds. This state will not transition until a valid board address is found.
+
+#### `startup_state_device_id`
+
+Runs the DeviceIdentityManager to read the appliance identity ERDs. Supports both runtime reading and pre-configured device IDs.
+
+- **On entry:** Calls `svc->init_device_id_reading()`. If a device ID is pre-configured and the manager completes synchronously during init, transitions immediately to `startup_state_mqtt_client_init`.
+- **On `signal_run_loop`:** Checks `svc->is_device_id_complete()`. If true, transitions to `startup_state_mqtt_client_init`.
+- **On `signal_device_id_complete`:** Transitions to `startup_state_mqtt_client_init`.
+- **On exit:** No action.
+
+#### `startup_state_mqtt_client_init`
+
+Initializes the MQTT client adapter with the device ID and starts feature bit reading. This phase is fast — it does not wait for MQTT connection.
+
+- **On entry:**
+  - If MQTT client is not initialized, calls `svc->initialize_mqtt_client()`.
+  - If ERD cache publisher is not initialized, calls `svc->initialize_erd_cache_publisher()`.
+  - Calls `svc->start_feature_bit_reading()`.
+  - Transitions to `startup_state_feature_bits`.
+- **On exit:** No action.
+
+#### `startup_state_feature_bits`
+
+Waits for feature bit ERDs to be read and parsed. Uses a dual-gate: both feature bits completion and MQTT connection are checked, but either signal alone can trigger the transition check.
+
+- **On entry:** Logs phase entry.
+- **On `signal_run_loop`:** Checks `svc->is_feature_bits_complete()`. If true, transitions to `startup_state_bridge_init`.
+- **On `signal_mqtt_connected`:** Checks `svc->is_feature_bits_complete()`. If true, transitions to `startup_state_bridge_init`.
+- **On `signal_feature_bits_complete`:** Transitions to `startup_state_bridge_init`.
+- **On exit:** No action.
+
+**Note:** The implementation transitions as soon as feature bits are complete, regardless of MQTT connection status. The `signal_mqtt_connected` handler provides an additional transition path if MQTT connects before feature bits finish.
+
+#### `startup_state_bridge_init`
+
+Initializes the ERD bridge (poll or subscribe). Waits for autodiscovery to be complete before starting bridge initialization.
+
+- **On entry:** Logs phase entry.
+- **On `signal_run_loop`:** If the bridge is not initialized and autodiscovery is complete, calls `svc->initialize_erd_bridge()`. Does NOT transition — waits for `signal_bridge_ready` from the polling bridge when ERD discovery is complete.
+- **On `signal_bridge_ready`:** Transitions to `startup_state_subscription_watch`.
+- **On exit:** No action.
+
+#### `startup_state_subscription_watch`
+
+In AUTO mode, monitors subscription activity and falls back to polling if no activity is detected. In poll/subscribe modes, this is a pass-through phase.
+
+- **On entry:** If the mode is not `BRIDGE_MODE_AUTO`, calls `svc->maybe_start_custom_erd_polling()` and transitions immediately to `startup_state_ha_discovery`.
+- **On `signal_run_loop`:**
+  - If AUTO mode and subscription is active, calls `svc->check_subscription_activity()`.
+  - Calls `svc->maybe_start_custom_erd_polling()` and `svc->log_poll_state_transitions()`.
+  - If not AUTO mode or subscription is no longer active, transitions to `startup_state_ha_discovery`.
+- **On `signal_subscription_fallback`:** Transitions to `startup_state_ha_discovery`.
+- **On exit:** No action.
+
+#### `startup_state_ha_discovery`
+
+Runs the HaDiscoveryManager to publish Home Assistant entity configurations.
+
+- **On entry:** Logs phase entry.
+- **On `signal_run_loop`:** Calls `svc->run_ha_discovery()` and transitions to `startup_state_running`.
+- **On exit:** No action.
+
+**Note:** HA discovery runs on the first loop iteration and immediately transitions to the running state. Subsequent HA discovery work continues in the running state.
+
+#### `startup_state_running` (terminal)
+
+Steady-state operation. All recurring tasks run every loop iteration.
+
+- **On entry:** Logs that the bridge is in steady-state operation.
+- **On `signal_run_loop`:**
+  - Calls `svc->run_all_managers()` to run all managers (autodiscovery, device identity, feature bits, HA discovery).
+  - If AUTO mode and subscription is active, calls `svc->check_subscription_activity()`.
+  - Calls `svc->maybe_start_custom_erd_polling()`.
+  - Calls `svc->log_poll_state_transitions()`.
+  - Calls `svc->run_ha_discovery()`.
+- **On exit:** No action.
+
+### 4.3 State Diagram
+
+```
+startup_state_top (root — defers all unhandled signals)
+  │
+  ├─ startup_state_protocol_stack (initial)
+  │    └─ entry → startup_state_startup_delay
+  │
+  ├─ startup_state_startup_delay
+  │    ├─ entry: record_startup_delay_start()
+  │    ├─ run_loop: if delay elapsed → startup_state_autodiscovery
+  │    └─ exit: —
+  │
+  ├─ startup_state_autodiscovery
+  │    ├─ entry: run_autodiscovery()
+  │    ├─ run_loop: if autodiscovery complete → startup_state_device_id
+  │    ├─ autodiscovery_complete: if complete → startup_state_device_id
+  │    └─ exit: —
+  │
+  ├─ startup_state_device_id
+  │    ├─ entry: init_device_id_reading(); if complete → startup_state_mqtt_client_init
+  │    ├─ run_loop: if device ID complete → startup_state_mqtt_client_init
+  │    ├─ device_id_complete: → startup_state_mqtt_client_init
+  │    └─ exit: —
+  │
+  ├─ startup_state_mqtt_client_init
+  │    ├─ entry: initialize_mqtt_client(); initialize_erd_cache_publisher();
+  │    │         start_feature_bit_reading() → startup_state_feature_bits
+  │    └─ exit: —
+  │
+  ├─ startup_state_feature_bits
+  │    ├─ entry: —
+  │    ├─ run_loop: if feature bits complete → startup_state_bridge_init
+  │    ├─ mqtt_connected: if feature bits complete → startup_state_bridge_init
+  │    ├─ feature_bits_complete: → startup_state_bridge_init
+  │    └─ exit: —
+  │
+  ├─ startup_state_bridge_init
+  │    ├─ entry: —
+  │    ├─ run_loop: if not initialized + autodiscovery complete → initialize_erd_bridge()
+  │    ├─ bridge_ready: → startup_state_subscription_watch
+  │    └─ exit: —
+  │
+  ├─ startup_state_subscription_watch
+  │    ├─ entry: if not AUTO → maybe_start_custom_erd_polling(), → startup_state_ha_discovery
+  │    ├─ run_loop: check_subscription_activity() (AUTO),
+  │    │            maybe_start_custom_erd_polling(), log_poll_state_transitions();
+  │    │            if not active → startup_state_ha_discovery
+  │    ├─ subscription_fallback: → startup_state_ha_discovery
+  │    └─ exit: —
+  │
+  ├─ startup_state_ha_discovery
+  │    ├─ entry: —
+  │    ├─ run_loop: run_ha_discovery() → startup_state_running
+  │    └─ exit: —
+  │
+  └─ startup_state_running (terminal)
+       ├─ entry: —
+       ├─ run_loop: run_all_managers(), check_subscription_activity() (AUTO),
+       │             maybe_start_custom_erd_polling(), log_poll_state_transitions(),
+       │             run_ha_discovery()
+       └─ exit: —
+```
+
+---
+
+## 5. Phase Timeouts
+
+| Phase | Timeout | Behavior on Timeout |
+|-------|---------|---------------------|
+| `startup_state_device_id` | 30 s | Bridge continues without device ID reading; transitions to `startup_state_mqtt_client_init` with fallback values. |
+| `startup_state_feature_bits` | 60 s | Bridge continues without feature filtering; transitions to `startup_state_bridge_init`. |
+
+Timeouts prevent indefinite stalls when the appliance is unresponsive during these phases. The bridge proceeds with fallback or default values.
+
+---
+
+## 6. Data Structures
+
+The startup HSM has no dedicated struct. State is managed through:
+
+- **`g_bridge_services`**: Static global pointer to `IBridgeServices`, set via `set_bridge_services()`.
+- **`startup_hsm_configuration`**: Static configuration struct with state descriptors and parent hierarchy.
+- **`startup_hsm_state_descriptors[]`**: Array of 11 `tiny_hsm_state_descriptor_t` entries, each mapping a state function to its parent (`startup_state_top`).
+
+Each state function receives `tiny_hsm_t* hsm`, `tiny_hsm_signal_t signal`, and `const void* data`. The `hsm` pointer is used for transitions (`tiny_hsm_transition()`) and for retrieving services (`services_from_hsm()`).
+
+---
+
+## 7. Invariants
+
+1. **Flat hierarchy:** All states are direct children of `startup_state_top`. No intermediate parent states exist. This simplifies signal routing — any unhandled signal bubbles to the top and is deferred.
+
+2. **Signal-driven transitions:** Each state handles specific signals for transition triggers. The `signal_run_loop` signal drives ongoing work and polls completion flags. Manager-specific signals (`signal_autodiscovery_complete`, `signal_device_id_complete`, etc.) provide immediate transition paths without waiting for the next loop iteration.
+
+3. **Back-pointer for IBridgeServices:** The HSM accesses bridge operations through a global back-pointer (`g_bridge_services`) set via `set_bridge_services()`. This decouples the HSM from the concrete `GeappliancesBridge` class at compile time. The `hsm` parameter in `services_from_hsm()` is unused.
+
+4. **Feature bits + MQTT gate:** The `feature_bits` state accepts three transition triggers — `signal_run_loop` (polls feature bits completion), `signal_mqtt_connected` (checks feature bits completion), and `signal_feature_bits_complete` (unconditional transition). The design allows either signal to independently trigger the transition check.
+
+5. **Linear progression:** States transition forward only. There is no mechanism to go back to a previous phase. Once a phase completes, it cannot be re-entered.
+
+6. **Terminal state:** `startup_state_running` is the terminal state. Once entered, the HSM remains there for the lifetime of the bridge.
+
+---
+
+## 8. Dependencies
+
+| Dependency | Role |
+|------------|------|
+| `tiny_hsm` | Hierarchical state machine framework (state transitions, signal dispatch, parent hierarchy) |
+| `IBridgeServices` | Abstract contract implemented by `GeappliancesBridge`; the HSM invokes bridge operations through this interface without compile-time dependency on the concrete class |
+| ESPHome `mqtt::global_mqtt_client` | MQTT connection state check (used by `IBridgeServices` implementations in feature_bits / bridge_init states) |
+| `geappliances_bridge_constants.h` | Timing constants (`AUTODISCOVERY_STARTUP_DELAY_MS`) and bridge mode enum (`BRIDGE_MODE_AUTO`) |
+
+---
+
+## 9. Known Limitations
+
+1. **Linear sequence with no rollback:** Once a phase transitions to the next, there is no mechanism to go back. If a later phase discovers an issue (e.g., MQTT disconnects after bridge init), the HSM does not re-enter earlier phases. Recovery is handled by individual managers within the running state.
+
+2. **Global back-pointer:** `g_bridge_services` is a static global pointer. This means only one bridge instance can use the startup HSM at a time. Supporting multiple concurrent bridges would require per-instance service pointers.
+
+3. **No phase timeout for autodiscovery:** The autodiscovery phase has no timeout — it retries indefinitely until a board is found. This is intentional (the bridge cannot function without an identified appliance), but it means the HSM will stall here if no appliance is present.
+
+4. **No timeout for startup delay:** The 5-second startup delay is fixed and not configurable. If the appliance board needs more or less time, this value must be changed at compile time.
+
+5. **HA discovery is a single-shot transition:** The HA discovery phase runs once and immediately transitions to running. Ongoing HA discovery work (e.g., dynamic entity updates) is handled in the running state via `svc->run_ha_discovery()`.
