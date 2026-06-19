@@ -287,10 +287,10 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   slot->pool_block_idx = 255;
   slot->valid = true;
   slot->update_required = true;
-  ESP_LOGD(TAG, "ERD 0x%04X added to cache (%u bytes)", erd, data_size);
   if (data_size <= ERD_CACHE_INLINE_DATA_SIZE) {
     memcpy(slot->inline_data, data, data_size);
     slot->data_size = data_size;
+    ESP_LOGD(TAG, "ERD 0x%04X added to cache (%u bytes, inline)", erd, data_size);
   } else {
     uint8_t block_idx = pool_block_for_size(data_size);
     if (block_idx != 255) {
@@ -302,6 +302,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
         slot->pool_block_idx = block_idx;
         slot->ext_alloc_size = pool_block_sizes[block_idx];
         slot->data_size = data_size;
+        ESP_LOGD(TAG, "ERD 0x%04X added to cache (%u bytes, pool)", erd, data_size);
       } else {
         /* Pool exhausted — fall back to heap. */
         slot->ext_data = new (std::nothrow) uint8_t[data_size];
@@ -309,6 +310,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
           memcpy(slot->ext_data, data, data_size);
           slot->ext_alloc_size = data_size;
           slot->data_size = data_size;
+          ESP_LOGD(TAG, "ERD 0x%04X added to cache (%u bytes, heap)", erd, data_size);
         } else {
           /* Heap also failed — truncate to inline. */
           ESP_LOGW(TAG, "Pool and heap exhausted for ERD 0x%04X (%u bytes), truncating to %u bytes",
@@ -324,6 +326,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
       if (slot->ext_data) {
         memcpy(slot->ext_data, data, data_size);
         slot->data_size = data_size;
+        ESP_LOGD(TAG, "ERD 0x%04X added to cache (%u bytes, heap)", erd, data_size);
       } else {
         /* Heap failed — truncate to inline. */
         ESP_LOGW(TAG, "Heap allocation failed for ERD 0x%04X (%u bytes), truncating to %u bytes",
