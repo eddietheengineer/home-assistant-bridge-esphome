@@ -34,6 +34,7 @@ typedef struct {
     uint8_t* ext_data;  /* pool or heap pointer */
   };
   uint8_t data_size;
+  uint8_t ext_alloc_size;  /* allocated size for pool/heap buffer */
   uint8_t pool_block_idx;  /* which pool block (0-1) or 255 if not pool */
   bool uses_pool;
   bool uses_heap;
