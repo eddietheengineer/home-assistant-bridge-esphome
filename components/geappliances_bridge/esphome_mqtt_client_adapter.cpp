@@ -99,6 +99,24 @@ extern "C" void esphome_mqtt_client_adapter_init(
   tiny_event_init(&self->on_write_request_event);
   tiny_event_init(&self->on_mqtt_disconnect_event);
   tiny_event_init(&self->on_mqtt_connect_event);
+
+  // Wire ESPHome MQTT client connect/disconnect callbacks to our tiny events.
+  // Without this, mqtt_connected stays false forever and the publisher never publishes.
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client != nullptr) {
+    mqtt_client->set_on_connect([self](bool) {
+      esphome_mqtt_client_adapter_notify_connected(self);
+    });
+    mqtt_client->set_on_disconnect([self](esphome::mqtt::MQTTClientDisconnectReason) {
+      esphome_mqtt_client_adapter_notify_disconnected(self);
+    });
+
+    // If already connected when we register, fire the event immediately so the
+    // publisher's mqtt_connected flag is set correctly on first loop().
+    if (mqtt_client->is_connected()) {
+      esphome_mqtt_client_adapter_notify_connected(self);
+    }
+  }
 }
 
 extern "C" void esphome_mqtt_client_adapter_set_erd_registry(
