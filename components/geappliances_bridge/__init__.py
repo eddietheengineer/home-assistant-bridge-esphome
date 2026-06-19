@@ -179,7 +179,7 @@ def load_appliance_types() -> dict[int, str]:
     
     # If local paths failed, try fetching from GitHub as fallback
     if data is None:
-        url = "https://raw.githubusercontent.com/joshualongenecker/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
+        url = "https://raw.githubusercontent.com/geappliances/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
         _LOGGER.info("Fetching ERD definitions from GitHub: %s", url)
         
         try:
@@ -332,7 +332,7 @@ async def to_code(config: dict[str, Any]) -> None:
     # Add library dependencies
     cg.add_library("https://github.com/ryanplusplus/tiny", None)
     cg.add_library("https://github.com/geappliances/tiny-gea-api#develop", None)
-    cg.add_library("https://github.com/joshualongenecker/public-appliance-api-documentation", None)
+    cg.add_library("https://github.com/geappliances/public-appliance-api-documentation", None)
     # NOTE: Library versions are NOT pinned — Git URLs may reference moving branches
     # (e.g. "#develop") or the repo default branch. Builds may change over time.
     # To pin to a specific commit, append #<sha> to the URL (PlatformIO git ref).
