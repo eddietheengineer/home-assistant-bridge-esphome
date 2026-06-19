@@ -13,22 +13,32 @@ static const char* const TAG = "erd_cache";
 static bool s_overflow_warned = false;
 
 /* Returns true if the new data differs from the existing entry's data.
- * ERD size is invariant after registration, so only memcmp is needed. */
+ * ERD size is invariant after registration, so only memcmp is needed.
+ * Uses existing->data_size (not new_size) for the memcmp length to guard
+ * against OOB reads if this function is ever called without the size check. */
 static bool erd_data_changed(const erd_cache_entry_t* existing,
                              const uint8_t* new_data, uint8_t new_size)
 {
+  (void)new_size; /* Size is invariant; use existing->data_size for safety. */
   const uint8_t* old = existing->uses_heap ?
       existing->ext_data : existing->inline_data;
-  return memcmp(old, new_data, new_size) != 0;
+  return memcmp(old, new_data, existing->data_size) != 0;
 }
 
 void erd_cache_init(erd_cache_t* self)
 {
-  /* Free any heap data before resetting.
-   * Only do this if the cache was previously initialized — on a fresh
-   * stack-allocated struct the flags are garbage and could trigger
-   * delete[] on a random pointer. */
+  /* Set initialized=false first so that if this function is called on a
+   * non-zeroed struct (stack garbage), the free loop below is skipped.
+   * This makes the function safe against callers that forget memset. */
+  bool was_initialized = false;
   if (self->initialized) {
+    was_initialized = true;
+    self->initialized = false;
+  }
+
+  /* Free heap data from a previous init.  Only runs if the cache was
+   * legitimately initialized before — stack garbage is skipped above. */
+  if (was_initialized) {
     for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
       erd_cache_entry_t* e = &self->entries[i];
       if (e->uses_heap) {
