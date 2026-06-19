@@ -323,12 +323,9 @@ static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_sign
       self->current_state_name = "identify_appliance";
       // If the caller pre-initialized the host address (via
       // erd_bridge_poll_init with a non-broadcast address), skip the broadcast
-      // and transition directly to probing.  On re-entry after appliance lost,
-      // clear discovery state so ERDs are re-probed from scratch.
+      // and transition directly to probing.  state_probe_list entry handles
+      // clearing discovery state on re-entry after appliance lost.
       if (self->erd_host_address != tiny_gea_broadcast_address) {
-        if (self->polling_list_count > 0) {
-          clear_discovery_state(self);
-        }
         tiny_hsm_transition(hsm, state_probe_list);
         break;
       }

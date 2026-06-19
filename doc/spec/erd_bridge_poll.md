@@ -88,22 +88,8 @@ Determines the appliance's host address.
 **On entry:**
 - Sets `polling_list_complete = false`.
 - If `erd_host_address != tiny_gea_broadcast_address` (pre-known address):
-  - If this is a re-entry (`polling_list_count > 0`): clears `erd_set` and `polling_list_count` via `clear_discovery_state()` (does NOT clear the ERD cache — it may be shared with the subscription bridge).
-  - Transitions to `state_probe_list`.
+  - Transitions to `state_probe_list` (clearing is handled there).
 - If `erd_host_address == tiny_gea_broadcast_address`: sends a broadcast read for ERD 0x0008 (appliance type).
-
-**On `signal_read_completed`:**
-- Ignores responses for ERDs other than 0x0008 (spurious reads from concurrent bus activity).
-- Extracts `erd_host_address` from the responding device's address and `appliance_type` from the data.
-- Transitions to `state_probe_list`.
-
-**On `signal_read_failed`:**
-- If the failed ERD is 0x0008: retries the broadcast read indefinitely.
-
-#### `state_probe_list`
-
-Probes each ERD in the pre-built probe list to verify support before adding to the polling list.
-
 **On entry:**
 - Sets `appliance_erd_list` to `probe_list` and `appliance_erd_list_count` to `probe_list_count`.
 - Sets `erd_index = (uint16_t)-1` (sentinel — `send_next_read_request` increments to 0 on first call).

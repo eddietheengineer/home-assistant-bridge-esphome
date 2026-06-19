@@ -19,8 +19,6 @@ poll_state_top (parent — handles appliance loss globally)
   │    ├─ if pre-known address → skip broadcast, → state_probe_list
   │    └─ else → read ERD 0x0008 from broadcast
   │       → extract host address and appliance type → state_probe_list
-  │       (on re-entry with known address: clear erd_set and polling list
-  │        before transitioning; does NOT clear the ERD cache)
   │
   ├─ state_probe_list
   │    ├─ entry: if probe_list empty → state_polling
