@@ -24,42 +24,41 @@ static void register_erd(i_mqtt_client_t* _self, tiny_erd_t erd)
   ESP_LOGD(TAG, "Registered ERD 0x%04X", erd);
 }
 
-static void update_erd(i_mqtt_client_t* _self, tiny_erd_t erd, const void* value, uint8_t size)
+
+
+static const char* write_failure_reason_to_string(tiny_gea3_erd_client_write_failure_reason_t reason)
 {
-  auto self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(_self);
-
-  if (self->erd_registry != nullptr && !self->erd_registry->is_valid(erd)) {
-    return;
+  switch (reason) {
+    case tiny_gea3_erd_client_write_failure_reason_retries_exhausted: return "retries_exhausted";
+    case tiny_gea3_erd_client_write_failure_reason_not_supported: return "not_supported";
+    case tiny_gea3_erd_client_write_failure_reason_incorrect_size: return "incorrect_size";
+    default: return "unknown";
   }
-
-  if (value == nullptr || size == 0) {
-    ESP_LOGW(TAG, "Invalid ERD update: null value or zero size for ERD 0x%04X", erd);
-    return;
-  }
-
-  const uint8_t* bytes = reinterpret_cast<const uint8_t*>(value);
-
-  /* Build hex string on the stack for verbose logging only.
-   * Cap at 64 bytes (128 hex chars) to avoid huge log lines. */
-  size_t log_bytes = size < 64 ? size : 64;
-  char hex[130];
-  for (size_t i = 0; i < log_bytes; i++) {
-    snprintf(hex + i * 2, 3, "%02X", bytes[i]);
-  }
-  hex[log_bytes * 2] = '\0';
-
-  ESP_LOGV(TAG, "ERD 0x%04X: %s", erd, hex);
-  self->erd_publish_count_++;
 }
 
 static void update_erd_write_result(
   i_mqtt_client_t* _self,
   tiny_erd_t erd,
   bool success,
-  tiny_gea3_erd_client_write_failure_reason_t /*failure_reason*/)
+  tiny_gea3_erd_client_write_failure_reason_t failure_reason)
 {
-  ESP_LOGD(TAG, "Write result for ERD 0x%04X: %s", erd, success ? "success" : "failure");
-  (void)_self; (void)erd; (void)success;
+  auto self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(_self);
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client == nullptr || !mqtt_client->is_connected()) return;
+
+  char topic[128];
+  snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/write_result",
+           self->device_id->c_str(), erd);
+
+  std::string payload;
+  if (success) {
+    payload = "ok";
+  } else {
+    payload = "{\"error\":\"" + std::string(write_failure_reason_to_string(failure_reason)) + "\"}";
+  }
+
+  ESP_LOGD(TAG, "Write result for ERD 0x%04X: %s", erd, payload.c_str());
+  mqtt_client->publish(topic, payload, 0, true);
 }
 
 static i_tiny_event_t* on_write_request(i_mqtt_client_t* _self)
@@ -82,7 +81,6 @@ static i_tiny_event_t* on_mqtt_connect(i_mqtt_client_t* _self)
 
 static const i_mqtt_client_api_t api = {
   register_erd,
-  update_erd,
   update_erd_write_result,
   on_write_request,
   on_mqtt_disconnect,
@@ -97,8 +95,6 @@ extern "C" void esphome_mqtt_client_adapter_init(
   self->interface.api = &api;
   self->device_id = new std::string(device_id);
   self->erd_registry = nullptr;
-  self->erd_publish_count_ = 0;
-  self->mqtt_publish_count_ = 0;
 
   tiny_event_init(&self->on_write_request_event);
   tiny_event_init(&self->on_mqtt_disconnect_event);
@@ -151,13 +147,12 @@ extern "C" void esphome_mqtt_client_adapter_publish(
   const std::string& payload,
   bool retain)
 {
+  (void)self;
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client != nullptr && mqtt_client->is_connected()) {
-    self->mqtt_publish_count_++;
     mqtt_client->publish(topic, payload, 0, retain);
   }
 }
-
 extern "C" void esphome_mqtt_client_adapter_publish_raw(
   i_mqtt_client_t* _self,
   const char* topic,
@@ -165,10 +160,9 @@ extern "C" void esphome_mqtt_client_adapter_publish_raw(
   size_t payload_len,
   bool retain)
 {
-  auto self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(_self);
+  (void)_self;
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client != nullptr && mqtt_client->is_connected()) {
-    self->mqtt_publish_count_++;
     mqtt_client->publish(topic, std::string(payload, payload_len), 0, retain);
   }
 }
@@ -178,19 +172,4 @@ extern "C" size_t esphome_mqtt_client_adapter_get_pending_update_count(
 {
   (void)self;
   return 0;
-}
-extern "C" uint32_t esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(
-  esphome_mqtt_client_adapter_t* self)
-{
-  uint32_t count = self->erd_publish_count_;
-  self->erd_publish_count_ = 0;
-  return count;
-}
-
-extern "C" uint32_t esphome_mqtt_client_adapter_get_and_reset_mqtt_publish_count(
-  esphome_mqtt_client_adapter_t* self)
-{
-  uint32_t count = self->mqtt_publish_count_;
-  self->mqtt_publish_count_ = 0;
-  return count;
 }

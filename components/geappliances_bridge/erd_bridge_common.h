@@ -7,11 +7,12 @@
 // Responsibilities:
 //   - Declare signal enum values shared by both bridge implementations
 //   - Define timing constants (retry_delay, resubscribe_delay, etc.)
-//   - Provide arm_timer / disarm_timer / erd_set / handle_write_result helpers
+//   - Provide arm_timer / disarm_timer / erd_set helpers
 //
 // NOT responsible for:
 //   - Any bridge state or lifecycle logic
 //   - Anything not shared between both bridge implementations
+//   - Any MQTT interaction (bridges write to erd_cache only)
 //
 // Dependencies:
 //   - erd_bridge_subscribe.h, erd_bridge_poll.h, tiny_utils.h, tiny_gea_constants.h
@@ -52,7 +53,6 @@ enum {
 // ============================================================================
 // Shared signal identifiers
 // ============================================================================
-
 enum {
   signal_start = tiny_hsm_signal_user_start,
   signal_timer_expired,
@@ -63,9 +63,7 @@ enum {
   signal_subscription_publication_received,
   signal_read_failed,
   signal_read_completed,
-  signal_mqtt_disconnected,
-  signal_appliance_lost,
-  signal_write_requested
+  signal_appliance_lost
 };
 
 // ============================================================================
@@ -93,45 +91,3 @@ static std::set<tiny_erd_t>& erd_set(T* self)
   return *reinterpret_cast<std::set<tiny_erd_t>*>(self->erd_set);
 }
 
-static inline void handle_write_result(
-  i_mqtt_client_t* mqtt_client,
-  const tiny_gea3_erd_client_on_activity_args_t* args)
-{
-  if (args->type == tiny_gea3_erd_client_activity_type_write_completed) {
-    mqtt_client_update_erd_write_result(mqtt_client, args->write_completed.erd, true, 0);
-  } else if (args->type == tiny_gea3_erd_client_activity_type_write_failed) {
-    mqtt_client_update_erd_write_result(mqtt_client, args->write_failed.erd, false, args->write_failed.reason);
-  }
-}
-
-template<typename T>
-static void setup_write_request_subscription(T* self, i_mqtt_client_t* mqtt_client)
-{
-  tiny_event_subscription_init(
-    &self->mqtt_write_request_subscription, self, +[](void* context, const void* _args) {
-      auto self = reinterpret_cast<T*>(context);
-      auto args = reinterpret_cast<const mqtt_client_on_write_request_args_t*>(_args);
-      tiny_hsm_send_signal(&self->hsm, signal_write_requested, args);
-    });
-  tiny_event_subscribe(mqtt_client_on_write_request(mqtt_client), &self->mqtt_write_request_subscription);
-}
-
-template<typename T>
-static void setup_disconnect_subscription(T* self, i_mqtt_client_t* mqtt_client)
-{
-  tiny_event_subscription_init(
-    &self->mqtt_disconnect_subscription, self, +[](void* context, const void*) {
-      auto self = reinterpret_cast<T*>(context);
-      // Do NOT clear erd_set here. Clearing it on every transient MQTT
-      // reconnect causes two problems:
-      //   1. Heap fragmentation: N std::set tree nodes freed and reallocated
-      //      per reconnect cycle.
-      //   2. Growing polling list (api_parsed mode): state_polling re-adds
-      //      all N api_parsed ERDs on each reconnect (since erd_set is empty),
-      //      growing polling_list_count by N every time.
-      // erd_set is cleared in state_add_common_erds (full-discovery path only),
-      // which is the correct time to reset the polling list.
-      tiny_hsm_send_signal(&self->hsm, signal_mqtt_disconnected, nullptr);
-    });
-  tiny_event_subscribe(mqtt_client_on_mqtt_disconnect(mqtt_client), &self->mqtt_disconnect_subscription);
-}

@@ -38,6 +38,7 @@ extern "C" {
 #include "erd_cache.h"
 #include "erd_bridge_subscribe.h"
 #include "erd_bridge_poll.h"
+#include "erd_write_bridge.h"
 #include "tiny_gea3_erd_client.h"
 #include "tiny_gea3_interface.h"
 #include "tiny_gea2_erd_client.h"
@@ -59,6 +60,7 @@ extern "C" {
 #include "autodiscovery_manager.h"
 #include "ha_discovery_manager.h"
 #include "geappliances_bridge_startup_hsm.h"
+#include "erd_poll_list_builder.h"
 
 // Forward declaration of the generated function
 std::string appliance_type_to_string(uint8_t appliance_type);
@@ -68,7 +70,9 @@ namespace geappliances_bridge {
 
 // BridgeMode is now defined in bridge_mode.h (included via i_bridge_services.h).
 
+
 class GeappliancesBridge : public Component, public IBridgeServices {
+  friend ErdPollListResult build_poll_list_(GeappliancesBridge* bridge);
 
  public:
   static constexpr unsigned long baud = 230400;
@@ -135,12 +139,12 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void initialize_erd_bridge_();
   void start_custom_erd_polling_();
   void maybe_start_custom_erd_polling_();
-  void configure_polling_optional_lists_();
   void check_subscription_activity_();
   void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
   void start_feature_bit_reading_();
   void init_erd_cache_publisher_();
+  void on_poll_discovery_complete_();
   void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 
@@ -173,6 +177,10 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   uint32_t subscription_start_time_{0};
   uint32_t custom_erd_subscription_last_activity_{0};
   std::set<tiny_erd_t> custom_erd_subscription_seen_erds_;
+  // Pre-built ERD probe list for the polling bridge.
+  // Owned by the bridge so the pointer passed to erd_bridge_poll_init
+  // remains valid across the probe phase.
+  std::vector<uint16_t> poll_probe_list_;
   bool custom_erd_polling_started_{false};  // Guard to prevent re-initialization
   static constexpr uint32_t SUBSCRIPTION_TIMEOUT_MS = 10000; // 10 seconds
 
@@ -281,6 +289,10 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   erd_bridge_subscribe_t erd_bridge_subscribe_;
   erd_bridge_poll_t erd_bridge_poll_;
+
+  // Write bridge: relays MQTT write requests to the ERD client
+  erd_write_bridge_t erd_write_bridge_;
+  bool write_bridge_initialized_{false};
 
   // Track which bridge(s) were actually initialized so teardown is unambiguous.
   // A subscription bridge (erd_bridge_subscribe_) is created when use_polling is false.

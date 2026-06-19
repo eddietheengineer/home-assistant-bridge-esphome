@@ -131,7 +131,7 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_updated_erd)
     "my_device");
 
   uint8_t data = 0x42;
-  erd_cache_update(&cache, 0x0008, &data, sizeof(data), true);
+  erd_cache_update(&cache, 0x0008, &data, sizeof(data));
 
   uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
   CHECK_EQUAL(1u, published);
@@ -161,7 +161,7 @@ TEST(erd_cache_mqtt_publisher, loop_respects_max_publishes)
   // Insert 20 ERDs with update_required=true
   for (uint16_t i = 0; i < 20; i++) {
     uint8_t data = (uint8_t)i;
-    erd_cache_update(&cache, (tiny_erd_t)(0x1000 + i), &data, sizeof(data), true);
+    erd_cache_update(&cache, (tiny_erd_t)(0x1000 + i), &data, sizeof(data));
   }
 
   uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 5, 100);
@@ -178,7 +178,7 @@ TEST(erd_cache_mqtt_publisher, loop_skips_when_mqtt_disconnected)
     "device");
 
   uint8_t data = 0x01;
-  erd_cache_update(&cache, 0x0008, &data, sizeof(data), true);
+  erd_cache_update(&cache, 0x0008, &data, sizeof(data));
 
   // Simulate disconnect
   publisher.mqtt_connected = false;
@@ -197,7 +197,7 @@ TEST(erd_cache_mqtt_publisher, loop_resumes_after_reconnect)
     "device");
 
   uint8_t data = 0x01;
-  erd_cache_update(&cache, 0x0008, &data, sizeof(data), true);
+  erd_cache_update(&cache, 0x0008, &data, sizeof(data));
 
   // Disconnect — should not publish
   publisher.mqtt_connected = false;
@@ -223,7 +223,7 @@ TEST(erd_cache_mqtt_publisher, topic_format_correct)
     "my_device");
 
   uint8_t data = 0x01;
-  erd_cache_update(&cache, 0x0008, &data, sizeof(data), true);
+  erd_cache_update(&cache, 0x0008, &data, sizeof(data));
 
   // The publisher will call esphome_mqtt_client_adapter_publish with the topic.
   // We verify it doesn't crash and the topic is constructed correctly.
@@ -244,7 +244,7 @@ TEST(erd_cache_mqtt_publisher, payload_uppercase_hex_no_separator)
     "device");
 
   uint8_t data[] = {0x01, 0xAB, 0xFF};
-  erd_cache_update(&cache, 0x1001, data, sizeof(data), true);
+  erd_cache_update(&cache, 0x1001, data, sizeof(data));
 
   uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 1, 100);
   CHECK_EQUAL(1u, published);
@@ -263,7 +263,7 @@ TEST(erd_cache_mqtt_publisher, retain_flag_true)
     "device");
 
   uint8_t data = 0x01;
-  erd_cache_update(&cache, 0x0008, &data, sizeof(data), true);
+  erd_cache_update(&cache, 0x0008, &data, sizeof(data));
 
   // The publisher always passes retain=true to esphome_mqtt_client_adapter_publish.
   // We verify the call completes without crashing.
@@ -352,7 +352,7 @@ TEST(erd_cache_mqtt_publisher, loop_advances_publish_index)
   // Insert 10 ERDs
   for (uint16_t i = 0; i < 10; i++) {
     uint8_t data = (uint8_t)i;
-    erd_cache_update(&cache, (tiny_erd_t)(0x2000 + i), &data, sizeof(data), true);
+    erd_cache_update(&cache, (tiny_erd_t)(0x2000 + i), &data, sizeof(data));
   }
 
   // Publish 3
@@ -362,7 +362,7 @@ TEST(erd_cache_mqtt_publisher, loop_advances_publish_index)
   // Mark remaining as updated for next batch
   for (uint16_t i = 0; i < 10; i++) {
     uint8_t data = (uint8_t)(i + 10);
-    erd_cache_update(&cache, (tiny_erd_t)(0x2000 + i), &data, sizeof(data), true);
+    erd_cache_update(&cache, (tiny_erd_t)(0x2000 + i), &data, sizeof(data));
   }
 
   // Publish next batch — should pick up from where it left off
@@ -385,7 +385,7 @@ TEST(erd_cache_mqtt_publisher, loop_respects_time_budget)
   // Insert many ERDs
   for (uint16_t i = 0; i < 50; i++) {
     uint8_t data = (uint8_t)i;
-    erd_cache_update(&cache, (tiny_erd_t)(0x3000 + i), &data, sizeof(data), true);
+    erd_cache_update(&cache, (tiny_erd_t)(0x3000 + i), &data, sizeof(data));
   }
 
   // Set initial time
@@ -446,9 +446,9 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_multiple_erds)
   uint8_t data_a = 0x01;
   uint8_t data_b = 0x02;
   uint8_t data_c = 0x03;
-  erd_cache_update(&cache, 0x4001, &data_a, sizeof(data_a), true);
-  erd_cache_update(&cache, 0x4002, &data_b, sizeof(data_b), true);
-  erd_cache_update(&cache, 0x4003, &data_c, sizeof(data_c), true);
+  erd_cache_update(&cache, 0x4001, &data_a, sizeof(data_a));
+  erd_cache_update(&cache, 0x4002, &data_b, sizeof(data_b));
+  erd_cache_update(&cache, 0x4003, &data_c, sizeof(data_c));
 
   uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
   CHECK_EQUAL(3u, published);
@@ -471,7 +471,7 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_128_byte_payload)
   for (uint8_t i = 0; i < 128; i++) {
     data[i] = i;
   }
-  erd_cache_update(&cache, 0x1001, data, sizeof(data), true);
+  erd_cache_update(&cache, 0x1001, data, sizeof(data));
 
   uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 1, 100);
   CHECK_EQUAL(1u, published);
@@ -490,7 +490,7 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_255_byte_payload)
   for (uint16_t i = 0; i < 255; i++) {
     data[i] = (uint8_t)(i & 0xFF);
   }
-  erd_cache_update(&cache, 0x1002, data, sizeof(data), true);
+  erd_cache_update(&cache, 0x1002, data, sizeof(data));
 
   uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 1, 100);
   CHECK_EQUAL(1u, published);

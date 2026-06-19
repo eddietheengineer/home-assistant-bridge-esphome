@@ -53,7 +53,7 @@ class ErdRegistry {
   void register_erd(tiny_erd_t erd);
 
   // -------------------------------------------------------------------------
-  // Queries (used by MQTT adapter during update_erd / register_erd)
+  // Queries (used by MQTT adapter during register_erd)
   // -------------------------------------------------------------------------
 
   /// Returns true if valid-ERD filtering is active.

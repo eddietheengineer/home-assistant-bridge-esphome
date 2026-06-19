@@ -24,8 +24,10 @@ SRC_FILES := \
   components/geappliances_bridge/erd_cache.cpp \
   components/geappliances_bridge/erd_bridge_subscribe.cpp \
   components/geappliances_bridge/erd_bridge_poll.cpp \
+  components/geappliances_bridge/erd_write_bridge.cpp \
   components/geappliances_bridge/gea2_erd_client_adapter.cpp \
   components/geappliances_bridge/device_identity_manager.cpp \
+  components/geappliances_bridge/erd_poll_list_builder.cpp \
   components/geappliances_bridge/feature_bit_manager.cpp \
   components/geappliances_bridge/autodiscovery_manager.cpp \
   components/geappliances_bridge/esphome_mqtt_client_adapter.cpp \

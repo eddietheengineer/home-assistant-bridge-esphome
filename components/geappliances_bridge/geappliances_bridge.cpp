@@ -15,7 +15,7 @@ namespace geappliances_bridge {
 
 
 static const tiny_gea3_erd_client_configuration_t client_configuration = {
-  .request_timeout = 500,
+  .request_timeout = 250,
   .request_retries = 10
 };
 
@@ -24,7 +24,7 @@ static const tiny_gea3_erd_client_configuration_t client_configuration = {
 // between attempts, giving appliances time to service slow first-access
 // NVRAM lookups.
 static const tiny_gea2_erd_client_configuration_t gea2_client_configuration = {
-  .request_timeout = 500,
+  .request_timeout = 250,
   .request_retries = 0
 };
 
@@ -221,13 +221,11 @@ void GeappliancesBridge::loop() {
     uint32_t now = esphome::millis();
     if (now - this->last_erd_publish_rate_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
       if (this->erd_publish_rate_sensor_ != nullptr) {
-        uint32_t count = esphome_mqtt_client_adapter_get_and_reset_erd_publish_count(
-          &this->mqtt_client_adapter_);
+        uint32_t count = erd_cache_get_update_rate(&this->erd_cache_);
         this->erd_publish_rate_sensor_->publish_state(static_cast<float>(count));
       }
       if (this->mqtt_publish_rate_sensor_ != nullptr) {
-        uint32_t count = esphome_mqtt_client_adapter_get_and_reset_mqtt_publish_count(
-          &this->mqtt_client_adapter_);
+        uint32_t count = erd_cache_mqtt_publisher_get_publish_rate(&this->erd_cache_publisher_);
         this->mqtt_publish_rate_sensor_->publish_state(static_cast<float>(count));
       }
       this->last_erd_publish_rate_publish_ = now;
@@ -244,7 +242,7 @@ void GeappliancesBridge::loop() {
       }
       if (this->erd_cache_updates_sensor_ != nullptr) {
         this->erd_cache_updates_sensor_->publish_state(
-          static_cast<float>(erd_cache_get_update_rate(&this->erd_cache_)));
+          static_cast<float>(erd_cache_get_required_update_rate(&this->erd_cache_)));
       }
       this->last_erd_cache_stats_publish_ = now;
     }
@@ -389,8 +387,8 @@ void GeappliancesBridge::log_poll_state_transitions_()
   }
   const char* new_state = this->erd_bridge_poll_.current_state_name;
   if (new_state != nullptr && new_state != this->last_logged_poll_state_) {
-    ESP_LOGD(TAG, "Polling bridge state: %s (ERDs registered: %zu)",
-             new_state, this->erd_registry_.registered_erds().size());
+    ESP_LOGD(TAG, "Polling bridge state: %s (ERDs cached: %u)",
+             new_state, erd_cache_get_count(&this->erd_cache_));
     this->last_logged_poll_state_ = new_state;
   }
 }
@@ -543,6 +541,9 @@ bool GeappliancesBridge::teardown() {
   }
   if (this->polling_bridge_initialized_) {
     erd_bridge_poll_destroy(&this->erd_bridge_poll_);
+  }
+  if (this->write_bridge_initialized_) {
+    erd_write_bridge_destroy(&this->erd_write_bridge_);
   }
 
   // Destroy the shared ERD cache after bridges are torn down.

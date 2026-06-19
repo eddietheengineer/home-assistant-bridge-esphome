@@ -1,56 +1,56 @@
 # Polling Bridge Behavior Specification
 
-This document defines the requirements for the GE Appliances polling bridge, covering ERD discovery, steady-state polling, and Home Assistant discovery timing.
+This document defines the requirements for the GE Appliances polling bridge, covering ERD probe discovery, steady-state polling, and Home Assistant discovery timing.
 
-## 1. Polling ERD Discovery
+## 1. Probe ERD Discovery
 
 ### Requirement 1.1: Definitive Response Per ERD
 
-Each ERD read during discovery MUST receive a definitive response from the GEA client before the next ERD read is issued. The discovery logic MUST NOT use timers to advance to the next ERD; all retry and timeout behavior is handled by the lower-level GEA2/GEA3 client.
+Each ERD read during the probe phase MUST receive a definitive response from the GEA client before the next ERD read is issued. The probe logic MUST NOT use timers to advance to the next ERD; all retry and timeout behavior is handled by the lower-level GEA2/GEA3 client.
 
 ### Requirement 1.2: Successful Read
 
 If an ERD read completes successfully with data:
 - The ERD is added to the polling list.
-- The ERD data is published to MQTT.
-- The next ERD in the discovery list is read.
+- The ERD data is published to the shared ERD cache.
+- The next ERD in the probe list is read.
 
 ### Requirement 1.3: Not Supported Response
 
 If an ERD read returns a "not supported" response:
 - The ERD is NOT added to the polling list.
 - The ERD is permanently excluded from future polling (added to the exclusion set).
-- The next ERD in the discovery list is read.
+- The next ERD in the probe list is read.
 
 ### Requirement 1.4: Timeout / No Response
 
 If an ERD read times out (all GEA client retries exhausted):
 - The ERD is NOT added to the polling list.
 - The ERD is permanently excluded from future polling (added to the exclusion set).
-- The next ERD in the discovery list is read.
+- The next ERD in the probe list is read.
 
 ### Requirement 1.5: One ERD at a Time
 
-During discovery, only ONE ERD read shall be outstanding in the GEA client read buffer at any time. The next ERD read is issued only after the previous read has received a definitive response (success, not supported, or timeout).
+During the probe phase, only ONE ERD read shall be outstanding in the GEA client read buffer at any time. The next ERD read is issued only after the previous read has received a definitive response (success, not supported, or timeout).
 
 ### Implementation
 
-The discovery states (`state_add_common_erds`, `state_add_energy_erds`, `state_add_appliance_api_feature_erds`, `state_probe_api_parsed_erds`, `state_add_appliance_erds`) each:
-- Send one read request on entry.
-- Delegate signal handling to `handle_discovery_list_signals`, which processes `signal_read_completed` and `signal_read_failed` only.
-- Call `send_next_read_request` after each response, which increments `erd_index` and sends the next read.
-- Transition to the next discovery state when all ERDs in the current list are processed.
+The `state_probe_list` state:
+- Sends one read request on entry (via `send_next_read_request`).
+- Handles `signal_read_completed` via `handle_discovery_list_signals`, which adds the ERD to the polling list and cache.
+- Handles `signal_read_failed` explicitly, inserting the ERD into `erd_set` as an exclusion before advancing.
+- Transitions to `state_polling` when all ERDs in the probe list are processed.
 
 ### Prohibited
 
-- Using `signal_timer_expired` to advance discovery ERD index.
-- Arming retry timers in discovery states.
-- Sending multiple ERD reads concurrently during discovery.
+- Using `signal_timer_expired` to advance the probe ERD index.
+- Arming retry timers in the probe state.
+- Sending multiple ERD reads concurrently during probing.
 - Adding ERDs to the polling list without a definitive response.
 
 ### Verification
 
-Tests must verify that discovery progresses only through `signal_read_completed` and `signal_read_failed` callbacks, never through timer expiration.
+Tests must verify that probing progresses only through `signal_read_completed` and `signal_read_failed` callbacks, never through timer expiration.
 
 ---
 
@@ -78,7 +78,7 @@ If the polling timer fires while a cycle is still in progress (reads outstanding
 
 ### Implementation
 
-- `signal_polling_timer_expired` sends all reads via `send_poll_read_requests_bounded`.
+- `signal_polling_timer_expired` sends all reads via `send_cycle_reads()`.
 - `cycle_completed_count` increments on each `signal_read_completed` and `signal_read_failed`.
 - When `cycle_completed_count >= polling_list_count`, the cycle is complete.
 - If `restart_pending` is true (timer fired mid-cycle), the next cycle starts immediately.
@@ -106,7 +106,7 @@ Tests must verify that:
 
 ### Requirement 3.1: Poll Mode
 
-In poll mode, HA discovery MUST NOT initiate until the polling bridge has completed ERD discovery (all discovery lists processed, `polling_list_complete` is true).
+In poll mode, HA discovery MUST NOT initiate until the polling bridge has completed the probe phase (all probe list ERDs processed, `polling_list_complete` is true).
 
 ### Requirement 3.2: Subscription Mode
 
@@ -116,7 +116,7 @@ In subscription mode, HA discovery MUST NOT initiate until the subscription has 
 
 In auto mode, HA discovery MUST NOT initiate until BOTH conditions are met:
 1. The subscription quiet window has elapsed (same as subscription mode).
-2. If the polling bridge is active (e.g., for custom ERDs), the polling discovery list has been completed.
+2. If the polling bridge is active (e.g., for custom ERDs), the polling probe phase has been completed.
 
 ### Implementation
 
@@ -130,7 +130,7 @@ The `on_discovery_complete` callback of the polling bridge updates the HA discov
 ### Prohibited
 
 - Initiating HA discovery before ERD registration has settled.
-- In auto mode, initiating HA discovery before both subscription quiet window and polling discovery are complete.
+- In auto mode, initiating HA discovery before both subscription quiet window and polling probe are complete.
 
 ### Verification
 
@@ -140,9 +140,9 @@ Tests must verify that HA discovery does not start prematurely in any mode, and 
 
 ## 4. Startup HSM Gating
 
-### Requirement 4.1: Wait for Discovery Completion
+### Requirement 4.1: Wait for Probe Completion
 
-The startup HSM MUST NOT transition to steady-state operation (`startup_state_subscription_watch`) until the polling bridge has completed ERD discovery and sent `signal_bridge_ready`.
+The startup HSM MUST NOT transition to steady-state operation (`startup_state_subscription_watch`) until the polling bridge has completed the probe phase and sent `signal_bridge_ready`.
 
 ### Requirement 4.2: Bridge Ready Signal
 
@@ -168,35 +168,58 @@ When custom ERDs are defined in subscription or auto mode (with subscription act
 
 Custom ERDs are polled by a **separate** polling bridge instance running alongside the subscription bridge. The subscription bridge continues to handle all standard ERD publications; the polling bridge handles only the custom ERDs that may not be covered by subscription.
 
-### Requirement 5.2: Poll Mode — Discovered Alongside Standard ERDs
+### Requirement 5.2: Poll Mode — Included in Probe List
 
-When custom ERDs are defined in poll mode (or auto mode that falls back to poll), custom ERDs MUST be appended to the end of the polling discovery list and go through the same discovery/probe phase as standard ERDs. A single polling instance handles both standard and custom ERDs.
+When custom ERDs are defined in poll mode (or auto mode that falls back to poll), custom ERDs MUST be included in the probe list built by `erd_poll_list_builder` and go through the same probe phase as standard ERDs. A single polling instance handles both standard and custom ERDs.
 
-Custom ERDs that respond successfully during discovery are added to the polling list and registered. Custom ERDs that do not respond (not supported or timeout) are excluded from the polling list, just like any other ERD.
+Custom ERDs that respond successfully during probing are added to the polling list. Custom ERDs that do not respond (not supported or timeout) are excluded from the polling list, just like any other ERD.
 
 ### Requirement 5.3: Auto Mode Fallback
 
-When auto mode falls back from subscription to poll mode, custom ERDs are handled per Requirement 5.2 (discovered alongside standard ERDs).
+When auto mode falls back from subscription to poll mode, custom ERDs are handled per Requirement 5.2 (included in the probe list built by `erd_poll_list_builder`).
 
 ### Implementation
 
 **Subscription mode:**
 - `maybe_start_custom_erd_polling_()` gates on three conditions: in subscription mode, subscription activity confirmed, and `custom_erd_subscription_last_activity_` older than `HA_DISCOVERY_QUIET_MS` (10s).
-- `start_custom_erd_polling_()` initializes a separate polling bridge via `erd_bridge_poll_init_at_address()` with the custom ERDs as the `api_parsed_list`, which goes through the probe phase.
+- `start_custom_erd_polling_()` builds the probe list via `build_poll_list_()` (which calls `erd_poll_list_builder`), then initializes a separate polling bridge with the probe list.
 - The subscription bridge is NOT destroyed; both bridges share the same ERD client.
 
 **Poll mode:**
-- `configure_polling_optional_lists_()` sets `erd_bridge_poll_.custom_erd_list` and `custom_erd_list_count` before any events fire.
-- `state_add_appliance_erds` transitions to `state_add_custom_erds` (instead of `state_polling`) when custom ERDs are configured.
-- `state_add_custom_erds` discovers each custom ERD through `handle_discovery_list_signals`, adding successful ones to the polling list and excluding failures.
+- `build_poll_list_()` calls `erd_poll_list_builder` with the current mode and configuration. The builder includes custom ERDs in the probe list based on the mode and `appliance_api_parsing` setting.
 
 ### Prohibited
 
 - Starting custom ERD polling before the subscription quiet window has elapsed in subscription mode.
 - Using multiple polling bridge instances in poll mode.
-- Adding custom ERDs to the polling list without going through the discovery/probe phase.
 - Starting custom ERD polling when no custom ERDs are defined.
 
 ### Verification
 
-Tests must verify that custom ERD polling in subscription mode does not start until the quiet window elapses, and that in poll mode, custom ERDs go through the same discovery phase as standard ERDs — successful ones are polled, failed ones are excluded.
+Tests must verify that custom ERD polling in subscription mode does not start until the quiet window elapses, and that in poll mode, custom ERDs go through the same probe phase as standard ERDs — successful ones are polled, failed ones are excluded.
+
+---
+
+## 6. Probe List Building
+
+### Requirement 6.1: Pure Function
+
+The probe list is built by `erd_poll_list_builder`, a pure function with no side effects. It takes the current bridge mode, subscription state, feature-bit results, custom ERDs, and appliance type, and returns a deduplicated list of ERDs to probe.
+
+### Requirement 6.2: Decision Logic
+
+| Mode | Condition | Probe List Contents |
+|------|-----------|---------------------|
+| SUBSCRIBE | subscription confirmed | custom ERDs only |
+| POLL | appliance_api_parsing = true | feature-bit valid ERDs + custom ERDs |
+| POLL | appliance_api_parsing = false | common + energy + appliance API feature + appliance-specific + custom ERDs |
+| AUTO | subscription active | custom ERDs only |
+| AUTO | subscription not active (fallback) | same as POLL with current appliance_api_parsing |
+
+### Requirement 6.3: Deduplication
+
+The returned list is deduplicated. Order is: standard ERDs first (in their original group order), then custom ERDs.
+
+### Implementation
+
+The `build_poll_list_()` helper in `geappliances_bridge_bridge_init.cpp` constructs an `ErdPollListConfig` from the bridge's current state and calls `build_erd_poll_list()`. The result is stored in `poll_probe_list_` and passed to `erd_bridge_poll_init()`.

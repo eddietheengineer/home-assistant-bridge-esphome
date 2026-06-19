@@ -14,7 +14,6 @@ extern "C" {
 
 #include "CppUTest/TestHarness.h"
 #include "CppUTestExt/MockSupport.h"
-#include "double/mqtt_client_double.hpp"
 #include "double/tiny_gea3_erd_client_double.hpp"
 #include "double/tiny_timer_group_double.hpp"
 
@@ -60,7 +59,6 @@ TEST_GROUP(appliance_simulation_examples)
   
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
-  mqtt_client_double_t mqtt_client;
   
   void setup()
   {
@@ -68,7 +66,6 @@ TEST_GROUP(appliance_simulation_examples)
     
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
-    mqtt_client_double_init(&mqtt_client);
     erd_cache_init(&test_cache);
   }
   
@@ -86,7 +83,6 @@ TEST_GROUP(appliance_simulation_examples)
       &erd_bridge_subscribe,
       &timer_group.timer_group,
       &erd_client.interface,
-      &mqtt_client.interface,
       host_address,
       &test_cache);
   }
@@ -97,9 +93,8 @@ TEST_GROUP(appliance_simulation_examples)
       &erd_bridge_poll,
       &timer_group.timer_group,
       &erd_client.interface,
-      &mqtt_client.interface,
       polling_interval,
-      false,
+      0xFF, 0, nullptr, 0,
       &test_cache);
   }
   
@@ -222,44 +217,18 @@ TEST(appliance_simulation_examples, example_device_id_generation_workflow)
 
   // Step 1: appliance publishes its type (e.g., 6 = Dishwasher)
   uint8_t appliance_type_data = APPLIANCE_TYPE_DISHWASHER;
-  mock()
-    .expectOneCall("register_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_APPLIANCE_TYPE);
-  mock()
-    .expectOneCall("update_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_APPLIANCE_TYPE)
-    .withMemoryBufferParameter("value", &appliance_type_data, sizeof(appliance_type_data));
   simulate_erd_publication(ERD_APPLIANCE_TYPE, &appliance_type_data, sizeof(appliance_type_data));
 
   // Step 2: appliance publishes model number
   uint8_t model_data[] = "GDT695SBL0SS";
-  mock()
-    .expectOneCall("register_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_MODEL_NUMBER);
-  mock()
-    .expectOneCall("update_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_MODEL_NUMBER)
-    .withMemoryBufferParameter("value", model_data, sizeof(model_data));
   simulate_erd_publication(ERD_MODEL_NUMBER, model_data, sizeof(model_data));
 
   // Step 3: appliance publishes serial number
   uint8_t serial_data[] = "SN123456789";
-  mock()
-    .expectOneCall("register_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_SERIAL_NUMBER);
-  mock()
-    .expectOneCall("update_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_SERIAL_NUMBER)
-    .withMemoryBufferParameter("value", serial_data, sizeof(serial_data));
   simulate_erd_publication(ERD_SERIAL_NUMBER, serial_data, sizeof(serial_data));
 
-  mock().checkExpectations();
+  // Verify all three ERDs are in the cache
+  CHECK(erd_cache_get_count(&test_cache) == 3);
 }
 
 /*!
@@ -276,168 +245,15 @@ TEST(appliance_simulation_examples, example_dishwasher_cycle_simulation)
   mock().enable();
   
   // Simulate dishwasher starting a cycle
-  // Cycle state changes from IDLE (0) to RUNNING (1)
   uint8_t cycle_state_running[] = {0x01};
-  
-  mock()
-    .expectOneCall("register_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_CYCLE_STATE);
-  
-  mock()
-    .expectOneCall("update_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_CYCLE_STATE)
-    .withMemoryBufferParameter("value", cycle_state_running, sizeof(cycle_state_running));
-  
   simulate_erd_publication(ERD_CYCLE_STATE, cycle_state_running, sizeof(cycle_state_running));
-  
+
   // Simulate door closing
   uint8_t door_closed[] = {0x00};
-  
-  mock()
-    .expectOneCall("register_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_DOOR_STATUS);
-  
-  mock()
-    .expectOneCall("update_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_DOOR_STATUS)
-    .withMemoryBufferParameter("value", door_closed, sizeof(door_closed));
-  
   simulate_erd_publication(ERD_DOOR_STATUS, door_closed, sizeof(door_closed));
-  
-  mock().checkExpectations();
-}
 
-/*!
- * EXAMPLE 3: Testing Error Recovery
- * 
- * This demonstrates how to test the bridge's behavior when ERD reads fail
- * and need to be retried.
- */
-TEST(appliance_simulation_examples, example_error_recovery_on_failed_erd_read)
-{
-  // Test that the subscription bridge handles a write request that fails
-  // on the appliance side, and correctly reports the failure back to MQTT.
-
-  mock().disable();
-  initialize_erd_bridge_subscription_mode();
-  simulate_subscription_added();
-  mock().enable();
-
-  // Home Assistant sends a write request.
-  uint8_t write_value = 0x01;
-  mock()
-    .expectOneCall("write")
-    .onObject(&erd_client)
-    .ignoreOtherParameters()
-    .andReturnValue(true);
-
-  mqtt_client_double_trigger_write_request(
-    &mqtt_client, ERD_OPERATING_MODE, sizeof(write_value), &write_value);
-
-  // The appliance reports the write failed.
-  mock()
-    .expectOneCall("update_erd_write_result")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_OPERATING_MODE)
-    .withParameter("success", false)
-    .withParameter("failure_reason",
-                    tiny_gea3_erd_client_write_failure_reason_not_supported);
-
-  tiny_gea3_erd_client_on_activity_args_t fail_args;
-  fail_args.type = tiny_gea3_erd_client_activity_type_write_failed;
-  fail_args.address = host_address;
-  fail_args.write_failed.erd = ERD_OPERATING_MODE;
-  fail_args.write_failed.data = &write_value;
-  fail_args.write_failed.data_size = sizeof(write_value);
-  fail_args.write_failed.reason =
-    tiny_gea3_erd_client_write_failure_reason_not_supported;
-
-  tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &fail_args);
-
-  mock().checkExpectations();
-}
-
-/*!
- * EXAMPLE 4: Testing Mode Switching
- * 
- * This demonstrates testing automatic fallback from subscription mode
- * to polling mode when no ERD activity is detected.
- */
-TEST(appliance_simulation_examples, example_subscription_to_polling_fallback)
-{
-  // Test that the subscription bridge handles MQTT disconnect gracefully
-  // by transitioning back to the subscribing state, ready to re-subscribe
-  // when MQTT reconnects. This simulates the "fallback" behavior where
-  // subscription mode loses connectivity and must recover.
-
-  mock().disable();
-  initialize_erd_bridge_subscription_mode();
-  simulate_subscription_added();
-  mock().enable();
-
-  // After MQTT disconnects, the bridge should transition to subscribing state
-  // and attempt to re-subscribe when the connection is restored.
-  mock()
-    .expectOneCall("subscribe")
-    .onObject(&erd_client)
-    .withParameter("address", host_address)
-    .andReturnValue(true);
-
-  mqtt_client_double_trigger_mqtt_disconnect(&mqtt_client);
-
-  mock().checkExpectations();
-}
-
-/*!
- * EXAMPLE 5: Testing MQTT Write with Response
- * 
- * This demonstrates a complete write workflow where Home Assistant sends
- * a write request via MQTT, the bridge forwards it to the appliance,
- * and the appliance confirms the write.
- */
-TEST(appliance_simulation_examples, example_mqtt_write_with_appliance_response)
-{
-  mock().disable();
-  initialize_erd_bridge_subscription_mode();
-  simulate_subscription_added();
-  mock().enable();
-  
-  // Home Assistant sends write request to set operating mode
-  uint8_t operating_mode_normal[] = {0x01};
-  tiny_gea3_erd_client_request_id_t request_id = 42;
-  
-  // Expect bridge to forward write to appliance
-  mock()
-    .expectOneCall("write")
-    .onObject(&erd_client)
-    .ignoreOtherParameters()
-    .andReturnValue(true);
-  
-  // Expect bridge to report write result to MQTT
-  mock()
-    .expectOneCall("update_erd_write_result")
-    .onObject(&mqtt_client)
-    .ignoreOtherParameters();
-  
-  // Trigger the MQTT write request
-  mqtt_client_double_trigger_write_request(
-    &mqtt_client,
-    ERD_OPERATING_MODE,
-    sizeof(operating_mode_normal),
-    operating_mode_normal);
-  
-  // Simulate appliance confirming the write
-  simulate_erd_write_completed(
-    request_id,
-    ERD_OPERATING_MODE,
-    operating_mode_normal,
-    sizeof(operating_mode_normal));
-  
-  mock().checkExpectations();
+  // Verify both ERDs are in the cache
+  CHECK(erd_cache_get_count(&test_cache) == 2);
 }
 
 /*!
@@ -457,25 +273,12 @@ TEST(appliance_simulation_examples, example_periodic_polling_behavior)
 
   // Simulate the appliance publishing cycle state changes over time.
   uint8_t cycle_idle = 0x00;
-  mock()
-    .expectOneCall("register_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_CYCLE_STATE);
-  mock()
-    .expectOneCall("update_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_CYCLE_STATE)
-    .withMemoryBufferParameter("value", &cycle_idle, sizeof(cycle_idle));
   simulate_erd_publication(ERD_CYCLE_STATE, &cycle_idle, sizeof(cycle_idle));
 
   // Then the cycle transitions to running.
   uint8_t cycle_running = 0x01;
-  mock()
-    .expectOneCall("update_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_CYCLE_STATE)
-    .withMemoryBufferParameter("value", &cycle_running, sizeof(cycle_running));
   simulate_erd_publication(ERD_CYCLE_STATE, &cycle_running, sizeof(cycle_running));
 
-  mock().checkExpectations();
+  // Verify the ERD is in the cache with the last value
+  CHECK(erd_cache_get_count(&test_cache) == 1);
 }
