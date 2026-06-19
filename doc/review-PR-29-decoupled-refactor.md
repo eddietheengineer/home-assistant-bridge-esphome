@@ -87,17 +87,9 @@ Once the cache overflows, this flag suppresses all future overflow warnings perm
 
 The comment says "for future use" but the function is actively used by `erd_cache_mqtt_publisher_loop()`.
 
-### 12. `publish_ha_discovery_()` is a no-op in non-ESP-IDF builds (ha_discovery_manager.cpp:168-170)
+### 12. **FIXED** `publish_ha_discovery_()` is a no-op in non-ESP-IDF builds (ha_discovery_manager.cpp:168-170)
 
-```cpp
-void HaDiscoveryManager::publish_ha_discovery_()
-{
-  ESP_LOGD(TAG, "HA discovery triggered (no MQTT broker — skipping entity publish)");
-  this->state_ = HA_DISCOVERY_COMPLETE;
-}
-```
-
-HA discovery is completely non-functional in test/simulation builds. The test suite doesn't catch this because simulation tests don't assert on discovery output.
+**Status:** ✅ Resolved. Added ESP-IDF stub headers (`test/include/esp-idf/`) for FreeRTOS, esp_http_client, cJSON, esp_crt_bundle, esp_heap_caps, esp_task_wdt, and esp_log. The Makefile now defines `USE_ESP_IDF` and `USE_ESP_IDF_STUBS`, so test builds exercise the real ESP-IDF code path with stubbed system calls instead of the no-op fallback.
 
 ---
 

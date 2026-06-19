@@ -48,9 +48,13 @@ extern "C" {
 }
 
 #ifdef USE_ESP_IDF
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
+#  ifdef USE_ESP_IDF_STUBS
+#    include "esp-idf/freertos_stub.h"
+#  else
+#    include "freertos/FreeRTOS.h"
+#    include "freertos/task.h"
+#    include "freertos/queue.h"
+#  endif
 #endif
 
 namespace esphome {

@@ -72,7 +72,7 @@ CPPUTEST_INC := -I$(CPPUTEST_PREFIX)/include
 CPPUTEST_LIB := -L$(CPPUTEST_PREFIX)/lib
 
 CFLAGS += -std=c11 -pedantic
-CPPFLAGS += $(SANITIZE_FLAGS) -fno-omit-frame-pointer
+CPPFLAGS += $(SANITIZE_FLAGS) -fno-omit-frame-pointer -DUSE_ESP_IDF -DUSE_ESP_IDF_STUBS
 CPPFLAGS += $(INC_FLAGS) $(CPPUTEST_INC) -MMD -MP -g -Wall -Wextra -Wcast-qual -Werror
 CXXFLAGS += -std=c++17
 LDFLAGS := $(SANITIZE_FLAGS) $(CPPUTEST_LIB)

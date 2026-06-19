@@ -10,14 +10,23 @@
 #include <cstring>
 
 #ifdef USE_ESP_IDF
-#  include "esp_http_client.h"
-#  include "esp_crt_bundle.h"
-#  include "cJSON.h"
-#  include "freertos/FreeRTOS.h"
-#  include "freertos/task.h"
-#  include "freertos/queue.h"
-#  include "esp_heap_caps.h"
-#  include "esp_task_wdt.h"
+#  ifdef USE_ESP_IDF_STUBS
+#    include "esp-idf/esp_http_client.h"
+#    include "esp-idf/esp_crt_bundle.h"
+#    include "esp-idf/cJSON.h"
+#    include "esp-idf/freertos_stub.h"
+#    include "esp-idf/esp_heap_caps.h"
+#    include "esp-idf/esp_task_wdt.h"
+#  else
+#    include "esp_http_client.h"
+#    include "esp_crt_bundle.h"
+#    include "cJSON.h"
+#    include "freertos/FreeRTOS.h"
+#    include "freertos/task.h"
+#    include "freertos/queue.h"
+#    include "esp_heap_caps.h"
+#    include "esp_task_wdt.h"
+#  endif
 #endif
 
 namespace esphome {
@@ -207,6 +216,7 @@ std::string HaDiscoveryManager::build_device_json_()
   auto* self = static_cast<HaDiscoveryManager*>(param);
   self->fetch_ha_definitions_();
   UBaseType_t hwm = uxTaskGetStackHighWaterMark(nullptr);
+  (void)hwm;  /* Suppress unused-variable warning in non-ESP-IDF stub builds. */
   ESP_LOGI(TAG, "ha_fetch: done — stack HWM %u B", static_cast<unsigned>(hwm));
   HaDiscoveryItem* sentinel = nullptr;
   xQueueSend(self->queue_, &sentinel, portMAX_DELAY);

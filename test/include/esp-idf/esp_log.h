@@ -1,0 +1,19 @@
+/*!
+ * @file
+ * @brief ESP-IDF esp_log stubs for test/simulation builds.
+ *
+ * Maps ESP_LOG* macros to the existing esphome log stubs.
+ */
+
+#ifndef ESP_LOG_STUB_H
+#define ESP_LOG_STUB_H
+
+#include "esphome/core/log.h"
+
+#define ESP_LOGE(tag, ...) ESP_LOGE(tag, __VA_ARGS__)
+#define ESP_LOGW(tag, ...) ESP_LOGW(tag, __VA_ARGS__)
+#define ESP_LOGI(tag, ...) ESP_LOGI(tag, __VA_ARGS__)
+#define ESP_LOGD(tag, ...) ESP_LOGD(tag, __VA_ARGS__)
+#define ESP_LOGV(tag, ...) ESP_LOGV(tag, __VA_ARGS__)
+
+#endif /* ESP_LOG_STUB_H */
