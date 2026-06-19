@@ -61,7 +61,7 @@ geappliances_bridge:
   # device_id: "YourDeviceId"             # Optional: Uncomment to use a custom device ID
   # mode: auto                            # Default: auto   Options: auto, subscribe, poll
   # polling_interval: 10000               # Default: 10000 ms (10 seconds), used when in polling mode
-  # polling_onlypublish_onchange: true    # Default: true, only publish if value changed
+  # polling_onlypublish_onchange: true   # Default: true, only publish if value changed
   # appliance_api_parsing: true           # Default: true, restricts polling to appliance-supported ERDs
   # generate_device_config: false         # Default: false, set to true to enable automatic HA MQTT discovery
   # custom_erds: [0x0003, 0x0004]         # Optional: Additional ERDs to poll
@@ -74,7 +74,7 @@ geappliances_bridge:
 
 The `mode` parameter is **optional**. 
 
-1. **Auto Mode (Default)** - The adapter starts with subscription mode and automatically falls back to polling mode if no ERD responses are received within 30 seconds. This provides the best of both worlds: real-time updates when possible, with automatic fallback for compatibility.
+1. **Auto Mode (Default)** - The adapter starts with subscription mode and automatically falls back to polling mode if no ERD responses are received within 10 seconds. This provides the best of both worlds: real-time updates when possible, with automatic fallback for compatibility.
 
 2. **Subscribe Mode** - The adapter subscribes to ERD updates from the appliance. The appliance pushes changes as they occur.
 
