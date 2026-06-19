@@ -1,11 +1,11 @@
 /*!
  * @file
- * @brief Fixed-size ERD cache with hybrid inline/pool data storage.
+ * @brief Fixed-size ERD cache with inline/heap data storage.
  *
- * Stores the latest data for up to ERD_CACHE_CAPACITY ERDs.  ERDs <= 16 bytes
- * are stored inline (zero heap); larger ERDs use a fixed memory pool of
- * pre-allocated blocks to eliminate per-update heap fragmentation.
- * Change detection is done at insert/update time, eliminating per-read
+ * Stores the latest data for up to ERD_CACHE_CAPACITY ERDs.  ERDs <= 4 bytes
+ * are stored inline (zero heap); larger ERDs use heap allocation.  ERD size
+ * is invariant after registration — updates are in-place memcpy with no alloc
+ * or free.  Change detection is done at insert/update time, eliminating per-read
  * memcmp overhead.
  */
 
@@ -20,42 +20,26 @@
 #define ERD_CACHE_INLINE_DATA_SIZE 4
 #define ERD_CACHE_CAPACITY 200
 
-/* Memory pool block sizes — covers the most common ERD data sizes.
- * Most ERDs are between 5 and 32 bytes.  The pool pre-allocates
- * blocks in these sizes to eliminate per-update new/delete churn.
- * ERDs larger than the largest pool block fall back to heap storage. */
-#define ERD_CACHE_POOL_BLOCK_1  16
-#define ERD_CACHE_POOL_BLOCK_2  32
-#define ERD_CACHE_POOL_COUNT    2
 typedef struct {
   tiny_erd_t erd;
   union {
     uint8_t inline_data[ERD_CACHE_INLINE_DATA_SIZE];
-    uint8_t* ext_data;  /* pool or heap pointer */
+    uint8_t* ext_data;  /* heap pointer for data > 4 bytes */
   };
   uint8_t data_size;
-  uint8_t ext_alloc_size;  /* allocated size for pool/heap buffer */
-  uint8_t pool_block_idx;  /* which pool block (0-1) or 255 if not pool */
-  bool uses_pool;
-  bool uses_heap;
+  bool uses_heap;       /* true if ext_data is a heap allocation */
   bool update_required;
   bool valid;
 } erd_cache_entry_t;
 
 typedef struct erd_cache_t {
   erd_cache_entry_t entries[ERD_CACHE_CAPACITY];
-  uint32_t update_count;              /* total cache updates since last window reset */
-  uint32_t update_count_window;       /* total cache updates in the last 60s window */
-  uint32_t required_update_count;     /* total updates setting update_required=true since reset */
-  uint32_t required_update_count_window; /* updates setting update_required=true in last 60s */
+  uint32_t update_count;              /* total cache updates since init */
+  uint32_t update_count_window;       /* updates since last get_update_rate() call */
+  uint32_t required_update_count;     /* total updates setting update_required=true since init */
+  uint32_t required_update_count_window; /* such updates since last get_required_update_rate() call */
   bool only_publish_onchange;         /* when true, only mark update_required on data change */
   bool initialized;                   /* true after first successful erd_cache_init() */
-
-  /* Fixed memory pool — pre-allocated blocks to eliminate new/delete churn.
-   * Each pool tier has ERD_CACHE_CAPACITY slots so every cache entry can
-   * hold a block from any tier without contention. */
-  uint8_t pool_blocks[ERD_CACHE_POOL_COUNT][ERD_CACHE_CAPACITY][ERD_CACHE_POOL_BLOCK_2];
-  uint8_t pool_free[ERD_CACHE_POOL_COUNT][ERD_CACHE_CAPACITY];
 } erd_cache_t;
 
 #ifdef __cplusplus
@@ -70,7 +54,8 @@ void erd_cache_destroy(erd_cache_t* self);
  * If only_publish_onchange is false: always marks update_required=true.
  * New entries always mark update_required=true regardless of the setting.
  * Returns true if update_required was set (or entry was new).
- * Returns false if cache is full and the ERD is not already cached. */
+ * Returns false if cache is full, data is unchanged with only_publish_onchange,
+ * or ERD size changed (appliance lost). */
 bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size);
 
 /* Set whether the cache should only mark ERDs as updated when data changes.
@@ -93,12 +78,10 @@ uint16_t erd_cache_get_count(erd_cache_t* self);
  * and does NOT clear any flags — it is a read-only iteration. */
 erd_cache_entry_t* erd_cache_get_next_entry(erd_cache_t* self, uint16_t* iterator);
 
-/* Returns the number of cache updates that occurred in the last 60 seconds,
- * then resets the window counter. */
+/* Returns the number of cache updates since the last call, then resets the window counter. */
 uint32_t erd_cache_get_update_rate(erd_cache_t* self);
 
-/* Returns the number of cache updates that set update_required=true in the last 60 seconds,
- * then resets the window counter. */
+/* Returns the number of updates that set update_required=true since the last call, then resets the window counter. */
 uint32_t erd_cache_get_required_update_rate(erd_cache_t* self);
 
 #ifdef __cplusplus

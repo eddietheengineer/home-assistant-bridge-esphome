@@ -529,64 +529,55 @@ TEST(erd_cache_change_detection, same_size_different_data_change_detected)
   CHECK_TRUE(erd_cache_update(&cache, 0x1001, data2, sizeof(data2)));
 }
 
-/* size shrink with same prefix → change detected (size differs) */
+/* Size shrink is treated as appliance lost — returns false. */
 TEST(erd_cache_change_detection, size_shrink_same_prefix_change_detected)
 {
   erd_cache_set_only_publish_onchange(&cache, true);
   uint8_t data1[] = { 0x01, 0x02, 0x03, 0x04 };
   uint8_t data2[] = { 0x01, 0x02 };
   erd_cache_update(&cache, 0x1001, data1, sizeof(data1));
-  CHECK_TRUE(erd_cache_update(&cache, 0x1001, data2, sizeof(data2)));
+  CHECK_FALSE(erd_cache_update(&cache, 0x1001, data2, sizeof(data2)));
 }
 
-/* size grow with same prefix → change detected (size differs) */
+/* Size grow is treated as appliance lost — returns false. */
 TEST(erd_cache_change_detection, size_grow_same_prefix_change_detected)
 {
   erd_cache_set_only_publish_onchange(&cache, true);
   uint8_t data1[] = { 0x01, 0x02 };
   uint8_t data2[] = { 0x01, 0x02, 0x03, 0x04 };
   erd_cache_update(&cache, 0x1001, data1, sizeof(data1));
-  CHECK_TRUE(erd_cache_update(&cache, 0x1001, data2, sizeof(data2)));
+  CHECK_FALSE(erd_cache_update(&cache, 0x1001, data2, sizeof(data2)));
 }
 
-/* inline-to-heap promotion with different size → change detected */
+/* Inline-to-heap promotion is treated as appliance lost — returns false. */
 TEST(erd_cache_change_detection, inline_to_heap_promotion_change_detected)
 {
   erd_cache_set_only_publish_onchange(&cache, true);
-  /* insert inline data (≤16 bytes) */
   uint8_t data_small[8];
   memset(data_small, 0xAA, sizeof(data_small));
   erd_cache_update(&cache, 0x1001, data_small, sizeof(data_small));
 
-  /* update with larger data (>16 bytes) that starts with same bytes */
   uint8_t data_large[20];
   memcpy(data_large, data_small, sizeof(data_small));
   memset(data_large + sizeof(data_small), 0xBB, sizeof(data_large) - sizeof(data_small));
-  /* size differs, so change is detected */
-  CHECK_TRUE(erd_cache_update(&cache, 0x1001, data_large, sizeof(data_large)));
+  CHECK_FALSE(erd_cache_update(&cache, 0x1001, data_large, sizeof(data_large)));
 }
 
-/* heap-to-inline shrink with same data prefix → change detected (size differs) */
+/* Heap-to-inline shrink is treated as appliance lost — returns false. */
 TEST(erd_cache_change_detection, heap_to_inline_shrink_change_detected)
 {
   erd_cache_set_only_publish_onchange(&cache, true);
-  /* insert heap data (>16 bytes) */
   uint8_t data_large[20];
   memset(data_large, 0xAA, sizeof(data_large));
   erd_cache_update(&cache, 0x1001, data_large, sizeof(data_large));
 
-  /* shrink to inline data with same prefix */
   uint8_t data_small[8];
   memset(data_small, 0xAA, sizeof(data_small));
-  /* size differs, so change is detected */
-  CHECK_TRUE(erd_cache_update(&cache, 0x1001, data_small, sizeof(data_small)));
+  CHECK_FALSE(erd_cache_update(&cache, 0x1001, data_small, sizeof(data_small)));
 }
-/* ------------------------------------------------------------------ */
-/* Cache edge cases                                                    */
-/* ------------------------------------------------------------------ */
 
-/* #18: Pool path — new entry with data > 4 bytes and <= 32 bytes uses pool storage */
-TEST(erd_cache_change_detection, pool_path_new_entry_uses_pool)
+/* New entry with data > 4 bytes uses heap storage */
+TEST(erd_cache_change_detection, heap_path_new_entry_uses_heap)
 {
   uint8_t data[20];
   for (uint8_t i = 0; i < 20; i++) {
@@ -594,22 +585,20 @@ TEST(erd_cache_change_detection, pool_path_new_entry_uses_pool)
   }
   erd_cache_update(&cache, 0x1001, data, sizeof(data));
 
-  /* Verify the entry was created and is in the cache. */
   CHECK_EQUAL(1u, erd_cache_get_count(&cache));
 
-  /* Verify update_required is set (new entries always mark update_required). */
   uint16_t iterator = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iterator);
   CHECK(entry != NULL);
-  CHECK_TRUE(entry->uses_pool);
+  CHECK_TRUE(entry->uses_heap);
   CHECK_EQUAL(20u, entry->data_size);
   for (uint8_t i = 0; i < 20; i++) {
     CHECK_EQUAL(i, entry->ext_data[i]);
   }
 }
 
-/* #18: Pool path — update existing pool entry with different data */
-TEST(erd_cache_change_detection, pool_path_update_existing_entry)
+/* Update existing heap entry with different data */
+TEST(erd_cache_change_detection, heap_path_update_existing_entry)
 {
   uint8_t data1[20];
   for (uint8_t i = 0; i < 20; i++) {
@@ -624,13 +613,12 @@ TEST(erd_cache_change_detection, pool_path_update_existing_entry)
   erd_cache_set_only_publish_onchange(&cache, true);
   CHECK_TRUE(erd_cache_update(&cache, 0x1001, data2, sizeof(data2)));
 
-  /* Verify the update was detected and the entry is still in the cache. */
   CHECK_EQUAL(1u, erd_cache_get_count(&cache));
 
   uint16_t iterator = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iterator);
   CHECK(entry != NULL);
-  CHECK_TRUE(entry->uses_pool);
+  CHECK_TRUE(entry->uses_heap);
   CHECK_EQUAL(20u, entry->data_size);
   for (uint8_t i = 0; i < 20; i++) {
     CHECK_EQUAL(255 - i, entry->ext_data[i]);

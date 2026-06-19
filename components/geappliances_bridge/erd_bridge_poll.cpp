@@ -236,7 +236,8 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
     case signal_read_completed:
       add_erd_to_polling_list(self, args->read_completed.erd);
       erd_cache_update(self->erd_cache, args->read_completed.erd,
-        reinterpret_cast<const uint8_t*>(args->read_completed.data), args->read_completed.data_size);
+              reinterpret_cast<const uint8_t*>(args->read_completed.data),
+              args->read_completed.data_size);
       if (!send_next_read_request(self)) {
         tiny_hsm_transition(hsm, state_polling);
       }
