@@ -1,12 +1,11 @@
 // =============================================================================
 // MODULE GOAL
 // =============================================================================
-// Goal: Be the single authoritative source for which ERDs are valid,
-//       which are string-typed, and which are registered at runtime.
+// Goal: Be the single authoritative source for which ERDs are valid
+//       and which are registered at runtime.
 //
 // Responsibilities:
 //   - Own the valid-ERD set (populated by FeatureBitManager at startup)
-//   - Own the string-ERD set (populated from generated ha_string_erd_ids[])
 //   - Own the registered-ERD set (appended by the MQTT adapter at runtime)
 //   - Expose query methods used by the MQTT adapter during publish
 //   - Expose read-only accessors used by HaDiscoveryManager and diagnostics
@@ -38,12 +37,6 @@ class ErdRegistry {
   // Setup methods (called during bridge initialization)
   // -------------------------------------------------------------------------
 
-  /// Populate string-type ERDs from the generated ha_string_erd_ids[] array.
-  /// Must be called before the registry is passed to the MQTT adapter.
-  void init_string_erds(const uint16_t* ids, uint16_t count);
-
-  /// Set string-type ERDs directly from a set (used in tests and custom paths).
-  void set_string_erds(const std::set<tiny_erd_t>& erds);
 
   /// Copy the valid-ERD set from FeatureBitManager and enable valid-ERD
   /// filtering. An empty set is ignored so filtering stays disabled.
@@ -60,7 +53,7 @@ class ErdRegistry {
   void register_erd(tiny_erd_t erd);
 
   // -------------------------------------------------------------------------
-  // Queries (used by MQTT adapter during update_erd / register_erd)
+  // Queries (used by MQTT adapter during register_erd)
   // -------------------------------------------------------------------------
 
   /// Returns true if valid-ERD filtering is active.
@@ -70,8 +63,6 @@ class ErdRegistry {
   /// Returns true if the ERD passes the valid-ERD filter (or no filter active).
   bool is_valid(tiny_erd_t erd) const;
 
-  /// Returns true if the ERD value should be published as ASCII text.
-  bool is_string_type(tiny_erd_t erd) const;
 
   // -------------------------------------------------------------------------
   // Read-only accessors (HaDiscoveryManager, diagnostics)
@@ -79,11 +70,9 @@ class ErdRegistry {
 
   const std::set<tiny_erd_t>& registered_erds() const { return registered_erds_; }
   const std::set<tiny_erd_t>& valid_erds()       const { return valid_erds_; }
-  const std::set<tiny_erd_t>& string_erds()      const { return string_erds_; }
 
  private:
   std::set<tiny_erd_t> valid_erds_;
-  std::set<tiny_erd_t> string_erds_;
   std::set<tiny_erd_t> registered_erds_;
   bool valid_erds_ready_{false};
 };

@@ -16,7 +16,6 @@
 #include "geappliances_bridge_startup_hsm.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
-#include "esphome/components/mqtt/mqtt_client.h"
 
 extern "C" {
 #include "tiny_utils.h"  // element_count macro
@@ -25,7 +24,6 @@ extern "C" {
 namespace esphome {
 namespace geappliances_bridge {
 
-static const char* const TAG __attribute__((unused)) = "geappliances_bridge";
 
 // Back-pointer to the bridge services, set during HSM init.
 // This allows HSM state functions to invoke bridge operations through a
@@ -244,6 +242,9 @@ tiny_hsm_result_t startup_state_mqtt_client_init(tiny_hsm_t* hsm, tiny_hsm_signa
       if (!svc->is_mqtt_client_initialized()) {
         svc->initialize_mqtt_client();
       }
+      if (!svc->is_erd_cache_publisher_initialized()) {
+        svc->initialize_erd_cache_publisher();
+      }
       svc->start_feature_bit_reading();
       tiny_hsm_transition(hsm, startup_state_feature_bits);
       break;
@@ -279,10 +280,7 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
     case signal_run_loop:
       {
       bool feature_bits_done = svc->is_feature_bits_complete();
-      bool mqtt_connected = (mqtt::global_mqtt_client != nullptr &&
-                             mqtt::global_mqtt_client->is_connected());
-
-      if (feature_bits_done && mqtt_connected) {
+      if (feature_bits_done) {
         tiny_hsm_transition(hsm, startup_state_bridge_init);
       }
       }
@@ -296,11 +294,7 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
 
     case signal_feature_bits_complete:
       {
-        bool mqtt_connected = (mqtt::global_mqtt_client != nullptr &&
-                               mqtt::global_mqtt_client->is_connected());
-        if (mqtt_connected) {
-          tiny_hsm_transition(hsm, startup_state_bridge_init);
-        }
+        tiny_hsm_transition(hsm, startup_state_bridge_init);
       }
       break;
 
@@ -315,7 +309,7 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
 }
 
 // ============================================================================
-// Phase 6: Bridge Init — initialize the MQTT bridge (poll or subscribe)
+// Phase 6: Bridge Init — initialize the ERD bridge (poll or subscribe)
 //
 // Waits for MQTT connection, then initializes the appropriate bridge.
 // Transitions to subscription_watch on completion.
@@ -333,20 +327,11 @@ tiny_hsm_result_t startup_state_bridge_init(tiny_hsm_t* hsm, tiny_hsm_signal_t s
 
     case signal_run_loop:
       if (!svc->is_bridge_initialized() &&
-          svc->is_autodiscovery_complete() &&
-          mqtt::global_mqtt_client != nullptr &&
-          mqtt::global_mqtt_client->is_connected()) {
-        ESP_LOGI(TAG, "Device ID ready and MQTT connected, initializing MQTT bridge");
-        svc->initialize_mqtt_bridge();
-        tiny_hsm_transition(hsm, startup_state_subscription_watch);
-      }
-      break;
-
-    case signal_mqtt_connected:
-      if (!svc->is_bridge_initialized() && svc->is_autodiscovery_complete()) {
-        ESP_LOGI(TAG, "MQTT connected, initializing MQTT bridge");
-        svc->initialize_mqtt_bridge();
-        tiny_hsm_transition(hsm, startup_state_subscription_watch);
+          svc->is_autodiscovery_complete()) {
+        ESP_LOGI(TAG, "Device ID ready, initializing ERD bridge");
+        svc->initialize_erd_bridge();
+        // Do NOT transition here — wait for signal_bridge_ready from the
+        // polling bridge when ERD discovery is complete.
       }
       break;
 

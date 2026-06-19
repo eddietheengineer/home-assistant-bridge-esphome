@@ -14,15 +14,6 @@ static void register_erd(i_mqtt_client_t* self, tiny_erd_t erd)
     .withParameter("erd", erd);
 }
 
-static void update_erd(i_mqtt_client_t* self, tiny_erd_t erd, const void* value, uint8_t size)
-{
-  mock()
-    .actualCall("update_erd")
-    .onObject(self)
-    .withParameter("erd", erd)
-    .withMemoryBufferParameter("value", reinterpret_cast<const uint8_t*>(value), size);
-}
-
 static void update_erd_write_result(i_mqtt_client_t* self, tiny_erd_t erd, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason)
 {
   mock()
@@ -45,12 +36,19 @@ static i_tiny_event_t* on_mqtt_disconnect(i_mqtt_client_t* _self)
   return &self->on_mqtt_disconnect.interface;
 }
 
+static i_tiny_event_t* on_mqtt_connect(i_mqtt_client_t* _self)
+{
+  auto self = reinterpret_cast<mqtt_client_double_t*>(_self);
+  return &self->on_mqtt_connect.interface;
+}
+
 static const i_mqtt_client_api_t api = {
   register_erd,
-  update_erd,
   update_erd_write_result,
   on_write_request,
-  on_mqtt_disconnect
+  on_mqtt_disconnect,
+  on_mqtt_connect,
+  mqtt_client_double_publish_raw
 };
 
 void mqtt_client_double_init(mqtt_client_double_t* self)
@@ -58,6 +56,7 @@ void mqtt_client_double_init(mqtt_client_double_t* self)
   self->interface.api = &api;
   tiny_event_init(&self->on_write_request);
   tiny_event_init(&self->on_mqtt_disconnect);
+  tiny_event_init(&self->on_mqtt_connect);
 }
 
 void mqtt_client_double_trigger_write_request(
@@ -74,4 +73,26 @@ void mqtt_client_double_trigger_mqtt_disconnect(
   mqtt_client_double_t* self)
 {
   tiny_event_publish(&self->on_mqtt_disconnect, nullptr);
+}
+
+void mqtt_client_double_trigger_mqtt_connect(
+  mqtt_client_double_t* self)
+{
+  tiny_event_publish(&self->on_mqtt_connect, nullptr);
+}
+
+void mqtt_client_double_publish_raw(
+  i_mqtt_client_t* _self,
+  const char* topic,
+  const char* payload,
+  size_t payload_len,
+  bool retain)
+{
+  (void)_self;
+  mock()
+    .actualCall("publish_raw")
+    .withParameter("topic", topic)
+    .withParameterOfType("const char*", "payload", payload)
+    .withParameter("payload_len", payload_len)
+    .withParameter("retain", retain);
 }

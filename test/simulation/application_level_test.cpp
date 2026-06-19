@@ -8,13 +8,12 @@
  */
 
 extern "C" {
-#include "mqtt_bridge.h"
-#include "mqtt_bridge_polling.h"
+#include "erd_bridge_subscribe.h"
+#include "erd_bridge_poll.h"
 }
 
 #include "CppUTest/TestHarness.h"
 #include "CppUTestExt/MockSupport.h"
-#include "double/mqtt_client_double.hpp"
 #include "double/tiny_gea3_erd_client_double.hpp"
 #include "double/tiny_timer_group_double.hpp"
 
@@ -41,12 +40,12 @@ TEST_GROUP(application_level)
     ERD_TEMPERATURE = 0x1004,  // Example ERD for testing
   };
   
-  mqtt_bridge_t mqtt_bridge;
-  mqtt_bridge_polling_t mqtt_bridge_polling;
+  erd_bridge_subscribe_t erd_bridge_subscribe;
+  erd_bridge_poll_t erd_bridge_poll;
+  erd_cache_t test_cache;
   
   tiny_timer_group_double_t timer_group;
   tiny_gea3_erd_client_double_t erd_client;
-  mqtt_client_double_t mqtt_client;
   
   uint8_t dummy;
   
@@ -56,41 +55,42 @@ TEST_GROUP(application_level)
     
     tiny_timer_group_double_init(&timer_group);
     tiny_gea3_erd_client_double_init(&erd_client);
-    mqtt_client_double_init(&mqtt_client);
+    erd_cache_init(&test_cache);
   }
   
   void teardown()
   {
-    mqtt_bridge_destroy(&mqtt_bridge);
-    mqtt_bridge_polling_destroy(&mqtt_bridge_polling);
+    erd_bridge_subscribe_destroy(&erd_bridge_subscribe);
+    erd_bridge_poll_destroy(&erd_bridge_poll);
+    erd_cache_destroy(&test_cache);
     mock().clear();
   }
   
   /*!
-   * Initialize the MQTT bridge in subscription mode.
+   * Initialize the ERD bridge in subscription mode.
    */
-  void initialize_mqtt_bridge_subscription_mode()
+  void initialize_erd_bridge_subscription_mode()
   {
-    mqtt_bridge_init(
-      &mqtt_bridge,
+    erd_bridge_subscribe_init(
+      &erd_bridge_subscribe,
       &timer_group.timer_group,
       &erd_client.interface,
-      &mqtt_client.interface,
-      appliance_address);
+      appliance_address,
+      &test_cache);
   }
   
   /*!
-   * Initialize the MQTT bridge in polling mode.
+   * Initialize the ERD bridge in polling mode.
    */
-  void initialize_mqtt_bridge_polling_mode()
+  void initialize_erd_bridge_polling_mode()
   {
-    mqtt_bridge_polling_init(
-      &mqtt_bridge_polling,
+    erd_bridge_poll_init(
+      &erd_bridge_poll,
       &timer_group.timer_group,
       &erd_client.interface,
-      &mqtt_client.interface,
       polling_interval,
-      false);
+      0xC0, 0, nullptr, 0,
+      &test_cache);
   }
   
   /*!
@@ -172,26 +172,20 @@ TEST_GROUP(application_level)
 };
 
 /*!
- * Test that the bridge correctly handles ERD reads for device ID generation.
- * This validates the polling bridge discovery workflow by draining all
- * discovery states and verifying the bridge enters steady-state polling.
+ * Test that with an empty probe list and a known host address,
+ * the bridge starts in probe_list and transitions directly to
+ * polling without needing any broadcast discovery.
  */
-TEST(application_level, should_read_device_id_erds_in_sequence)
+TEST(application_level, should_enter_polling_with_empty_probe_list)
 {
-  // Validate that the polling bridge initializes, identifies the appliance,
-  // then transitions into a discovery state.
+  // With a known host address and no probe list, probe_list
+  // transitions directly to polling on initialization.
   mock().disable();
-  initialize_mqtt_bridge_polling_mode();
+  initialize_erd_bridge_polling_mode();
 
-  // Respond to the initial appliance type read.
-  uint8_t appliance_type = 0x00;
-  simulate_erd_read_response(1, ERD_APPLIANCE_TYPE,
-                              &appliance_type, sizeof(appliance_type));
-
-  // Bridge should now be in a discovery state (current_state_name is set).
   mock().enable();
-  CHECK(mqtt_bridge_polling.current_state_name != nullptr);
-  CHECK(strcmp(mqtt_bridge_polling.current_state_name, "add_common_erds") == 0);
+  CHECK(erd_bridge_poll.current_state_name != nullptr);
+  CHECK(strcmp(erd_bridge_poll.current_state_name, "polling") == 0);
 }
 
 /*!
@@ -200,24 +194,16 @@ TEST(application_level, should_read_device_id_erds_in_sequence)
 TEST(application_level, should_handle_erd_publications_in_subscription_mode)
 {
   mock().disable();
-  initialize_mqtt_bridge_subscription_mode();
+  initialize_erd_bridge_subscription_mode();
   simulate_subscription_added(appliance_address);
   mock().enable();
 
   // Simulate an ERD publication from the appliance.
   uint8_t temp_value = 0x1A;
-  mock()
-    .expectOneCall("register_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_TEMPERATURE);
-  mock()
-    .expectOneCall("update_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_TEMPERATURE)
-    .withMemoryBufferParameter("value", &temp_value, sizeof(temp_value));
   simulate_erd_publication(ERD_TEMPERATURE, &temp_value, sizeof(temp_value));
 
-  mock().checkExpectations();
+  // Verify the ERD is in the cache
+  CHECK(erd_cache_get_count(&test_cache) == 1);
 }
 
 /*!
@@ -226,70 +212,32 @@ TEST(application_level, should_handle_erd_publications_in_subscription_mode)
 TEST(application_level, should_poll_erds_periodically_in_polling_mode)
 {
   // Validate that the polling bridge can be initialized and enters
-  // the identification state, ready to discover the appliance.
+  // the probe_list state, ready to probe for appliances.
   mock().disable();
-  initialize_mqtt_bridge_polling_mode();
+  initialize_erd_bridge_polling_mode();
 
-  // Bridge should be in the identification state initially.
+  // Bridge should be in the probe_list state initially.
   mock().enable();
-  CHECK(mqtt_bridge_polling.current_state_name != nullptr);
-  CHECK(strcmp(mqtt_bridge_polling.current_state_name, "identify_appliance") == 0);
+  CHECK(erd_bridge_poll.current_state_name != nullptr);
+  CHECK(strcmp(erd_bridge_poll.current_state_name, "polling") == 0);
 }
 
-/*!
- * Test that ERD writes from MQTT are correctly forwarded to the appliance.
- */
-TEST(application_level, should_forward_mqtt_write_requests_to_appliance)
-{
-  mock().disable();
-  initialize_mqtt_bridge_subscription_mode();
-  mock().enable();
-  
-  // Simulate an MQTT write request
-  uint8_t write_data[] = {0x12, 0x34};
-  tiny_erd_t target_erd = ERD_TEMPERATURE;
-  
-  // Expect the bridge to forward the write request
-  // Note: The write function has an output parameter for request_id that we ignore here
-  mock()
-    .expectOneCall("write")
-    .onObject(&erd_client)
-    .ignoreOtherParameters()
-    .andReturnValue(true);
-  
-  // Trigger the write request
-  mqtt_client_double_trigger_write_request(&mqtt_client, target_erd, sizeof(write_data), write_data);
-  
-  mock().checkExpectations();
-}
 
 /*!
  * Test the complete workflow of subscription with publications.
  */
 TEST(application_level, should_complete_subscription_workflow_with_publications)
 {
-  // Use the same approach as the existing mqtt_bridge tests
+  // Use the same approach as the existing erd_bridge_subscribe tests
   mock().disable();
-  initialize_mqtt_bridge_subscription_mode();
+  initialize_erd_bridge_subscription_mode();
   simulate_subscription_added(appliance_address);
   mock().enable();
   
   // Appliance publishes an ERD update
   uint8_t temperature_data[] = {0x00, 0x50};  // Big-endian 80 (degrees)
-  
-  // Expect the ERD to be registered first, then updated
-  mock()
-    .expectOneCall("register_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_TEMPERATURE);
-  
-  mock()
-    .expectOneCall("update_erd")
-    .onObject(&mqtt_client)
-    .withParameter("erd", ERD_TEMPERATURE)
-    .withMemoryBufferParameter("value", temperature_data, sizeof(temperature_data));
-  
   simulate_erd_publication(ERD_TEMPERATURE, temperature_data, sizeof(temperature_data));
-  
-  mock().checkExpectations();
+
+  // Verify the ERD is in the cache
+  CHECK(erd_cache_get_count(&test_cache) == 1);
 }

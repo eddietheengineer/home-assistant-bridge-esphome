@@ -18,4 +18,13 @@ inline uint32_t millis() {
   return esphome_hal_double_get_millis();
 }
 
+/* Stub delay(0) for tests — yields to main loop in real ESPHome. */
+inline void delay(uint32_t ms) {
+  (void)ms;
+}
+
+namespace esphome {
+using ::delay;
+}  // namespace esphome
+
 #endif  // esphome_core_hal_h

@@ -10,7 +10,6 @@ Adapts ESPHome's MQTT client to the `i_mqtt_client` interface expected by the ti
 |----------|-------------|
 | `esphome_mqtt_client_adapter_init(self, device_id)` | Initialize adapter with device ID string |
 | `esphome_mqtt_client_adapter_set_valid_erds_filter(self, filter)` | Set optional ERD filter for appliance API parsing mode |
-| `esphome_mqtt_client_adapter_set_string_erds_filter(self, filter)` | Set optional set of ERDs to publish as ASCII strings instead of hex |
 | `esphome_mqtt_client_adapter_set_registered_erds_out(self, out)` | Set output set to track which ERDs are registered |
 | `esphome_mqtt_client_adapter_notify_disconnected(self)` | Reset connect timestamp, publish disconnect event to bridge HSMs |
 | `esphome_mqtt_client_adapter_notify_connected(self)` | Subscribe wildcard write topic (once), flush pending updates |
@@ -42,7 +41,7 @@ The adapter implements the `i_mqtt_client_api_t` interface:
   - A 3-second stall on MQTT reconnect from synchronous re-subscriptions
 - **Pending update queue**: When MQTT is disconnected, ERD updates are queued (keyed by ERD, so repeated updates overwrite rather than append). Max 200 pending updates, flushed at 5 per `notify_connected()` call to avoid stalling the main loop.
 - **Settle delay**: After reconnect, pending updates are not flushed immediately — the `mqtt_connected_at_ms` timestamp gates the flush to give the IDF MQTT task time to process the broker's reconnect backlog.
-- **String vs hex payloads**: ERDs in the `string_erds_filter` set are published as null-terminated ASCII strings instead of hex, for human-readable display in Home Assistant.
+- **Hex payloads**: All ERD values are published as uppercase hex strings. String conversion is handled at the HA discovery level, not in the MQTT adapter.
 
 ## Testing
 

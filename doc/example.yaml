@@ -27,7 +27,7 @@ improv_serial:
 
 esp32:
   board: seeed_xiao_esp32c3
-  framework: 
+  framework:
     type: esp-idf
 
 # External component configuration

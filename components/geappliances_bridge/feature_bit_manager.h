@@ -57,9 +57,6 @@ namespace esphome {
 namespace geappliances_bridge {
 
 enum FeatureBitState {
-  FEATURE_BIT_STATE_READING_0008,
-  FEATURE_BIT_STATE_READING_0001,
-  FEATURE_BIT_STATE_READING_0002,
   FEATURE_BIT_STATE_READING_0092,
   FEATURE_BIT_STATE_READING_0093,
   FEATURE_BIT_STATE_READING_0094,
@@ -95,6 +92,9 @@ class FeatureBitManager {
   void init(i_tiny_gea3_erd_client_t* erd_client,
             uint8_t host_address,
             tiny_timer_group_t* timer_group);
+
+  /// Unsubscribe from events and stop timers. Safe to call multiple times.
+  void cleanup();
 
   /// Start the feature-bit reading sequence.  Idempotent if already past the first state.
   void start();
@@ -135,7 +135,7 @@ class FeatureBitManager {
   /// Retry queue_erd_read_ after a queue-full delay.
   void queue_retry_();
 
-  FeatureBitState state_{FEATURE_BIT_STATE_READING_0008};
+  FeatureBitState state_{FEATURE_BIT_STATE_READING_0092};
   bool read_queued_{false};  // true while a read is in-flight (guards idempotent start/queue)
 
   i_tiny_gea3_erd_client_t* erd_client_{nullptr};

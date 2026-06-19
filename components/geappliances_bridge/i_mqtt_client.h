@@ -6,8 +6,8 @@
 // =============================================================================
 // MODULE GOAL
 // =============================================================================
-// Goal: Define the abstract interface through which mqtt_bridge and
-//       mqtt_bridge_polling report ERD values and receive write commands,
+// Goal: Define the abstract interface through which erd_bridge_subscribe and
+//       erd_bridge_poll report ERD values and receive write commands,
 //       keeping the bridge implementations independent of ESPHome.
 //
 // Responsibilities:
@@ -24,6 +24,8 @@
 
 #ifndef i_mqtt_client_h
 #define i_mqtt_client_h
+
+#include <cstddef>
 
 #include "i_tiny_event.h"
 #include "i_tiny_gea3_erd_client.h"
@@ -44,13 +46,15 @@ typedef struct {
 typedef struct i_mqtt_client_api_t {
   void (*register_erd)(i_mqtt_client_t* self, tiny_erd_t erd);
 
-  void (*update_erd)(i_mqtt_client_t* self, tiny_erd_t erd, const void* value, uint8_t size);
-
   void (*update_erd_write_result)(i_mqtt_client_t* self, tiny_erd_t erd, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason);
 
   i_tiny_event_t* (*on_write_request)(i_mqtt_client_t* self);
 
   i_tiny_event_t* (*on_mqtt_disconnect)(i_mqtt_client_t* self);
+
+  i_tiny_event_t* (*on_mqtt_connect)(i_mqtt_client_t* self);
+
+  void (*publish_raw)(i_mqtt_client_t* self, const char* topic, const char* payload, size_t payload_len, bool retain);
 } i_mqtt_client_api_t;
 
 /*!
@@ -61,13 +65,6 @@ static inline void mqtt_client_register_erd(i_mqtt_client_t* self, tiny_erd_t er
   self->api->register_erd(self, erd);
 }
 
-/*!
- * Provide an updated value for a previously registered ERD.
- */
-static inline void mqtt_client_update_erd(i_mqtt_client_t* self, tiny_erd_t erd, const void* value, uint8_t size)
-{
-  self->api->update_erd(self, erd, value, size);
-}
 
 /*!
  * Provide the result for the most recently completed write request to an ERD.
@@ -91,6 +88,22 @@ static inline i_tiny_event_t* mqtt_client_on_write_request(i_mqtt_client_t* self
 static inline i_tiny_event_t* mqtt_client_on_mqtt_disconnect(i_mqtt_client_t* self)
 {
   return self->api->on_mqtt_disconnect(self);
+}
+
+/*!
+ * Event raised when the client connects to the MQTT broker.
+ */
+static inline i_tiny_event_t* mqtt_client_on_mqtt_connect(i_mqtt_client_t* self)
+{
+  return self->api->on_mqtt_connect(self);
+}
+
+/*!
+ * Publish a raw MQTT message (C-string topic and payload).
+ */
+static inline void mqtt_client_publish_raw(i_mqtt_client_t* self, const char* topic, const char* payload, size_t payload_len, bool retain)
+{
+  self->api->publish_raw(self, topic, payload, payload_len, retain);
 }
 
 #endif

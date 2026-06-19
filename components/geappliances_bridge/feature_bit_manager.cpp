@@ -25,6 +25,17 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
                               uint8_t host_address,
                               tiny_timer_group_t* timer_group)
 {
+  // Unsubscribe from any previous init() to avoid dangling subscriptions on re-init.
+  if (this->erd_client_) {
+    tiny_event_unsubscribe(
+      tiny_gea3_erd_client_on_activity(this->erd_client_),
+      &this->erd_activity_subscription_);
+  }
+  if (this->timer_group_) {
+    tiny_timer_stop(this->timer_group_, &this->parse_timer_);
+    tiny_timer_stop(this->timer_group_, &this->queue_retry_timer_);
+  }
+
   if (erd_client == nullptr) {
     ESP_LOGE(TAG, "init() called with null erd_client");
     return;
@@ -33,11 +44,10 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
     ESP_LOGE(TAG, "init() called with null timer_group");
     return;
   }
-
   this->erd_client_    = erd_client;
   this->host_address_  = host_address;
   this->timer_group_   = timer_group;
-  this->state_         = FEATURE_BIT_STATE_READING_0008;
+  this->state_         = FEATURE_BIT_STATE_READING_0092;
   this->read_queued_   = false;
   this->parse_erd_idx_ = 0;
   this->common_parse_idx_ = 0;
@@ -62,6 +72,29 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
     &this->erd_activity_subscription_);
 }
 
+void FeatureBitManager::cleanup()
+{
+  // Unsubscribe from ERD client activity events.
+  if (this->erd_client_) {
+    tiny_event_unsubscribe(
+      tiny_gea3_erd_client_on_activity(this->erd_client_),
+      &this->erd_activity_subscription_);
+  }
+
+  // Stop any active timers.
+  if (this->timer_group_) {
+    tiny_timer_stop(this->timer_group_, &this->parse_timer_);
+    tiny_timer_stop(this->timer_group_, &this->queue_retry_timer_);
+  }
+
+  // Reset state so a subsequent init() starts fresh.
+  this->erd_client_ = nullptr;
+  this->timer_group_ = nullptr;
+  this->host_address_ = 0;
+  this->state_ = FEATURE_BIT_STATE_READING_0092;
+  this->read_queued_ = false;
+}
+
 void FeatureBitManager::start()
 {
   // Defensive: don't dereference null erd_client_
@@ -69,7 +102,7 @@ void FeatureBitManager::start()
     return;
   }
   // Idempotent: only queue the first read if we're at the start and haven't queued yet.
-  if (this->state_ != FEATURE_BIT_STATE_READING_0008 || this->read_queued_) {
+  if (this->state_ != FEATURE_BIT_STATE_READING_0092 || this->read_queued_) {
     return;
   }
   this->queue_erd_read_();
@@ -145,21 +178,13 @@ void FeatureBitManager::handle_read_completed_(tiny_erd_t erd, const void* data,
   }
 
   uint8_t copy_size = (size <= 8u) ? size : 8u;
+  if (copy_size < size) {
+    ESP_LOGW(TAG, "Feature bit ERD 0x%04X: data truncated from %u to %u bytes",
+             erd, size, copy_size);
+  }
 
   // Store the ERD data and advance to the next state
-  if      (erd == ERD_APPLIANCE_TYPE)        {
-    ESP_LOGD(TAG, "Re-read appliance type (0x0008): %u bytes", copy_size);
-    this->state_ = FEATURE_BIT_STATE_READING_0001;
-  }
-  else if (erd == ERD_MODEL_NUMBER)          {
-    ESP_LOGD(TAG, "Re-read model number (0x0001): %u bytes", copy_size);
-    this->state_ = FEATURE_BIT_STATE_READING_0002;
-  }
-  else if (erd == ERD_SERIAL_NUMBER)         {
-    ESP_LOGD(TAG, "Re-read serial number (0x0002): %u bytes", copy_size);
-    this->state_ = FEATURE_BIT_STATE_READING_0092;
-  }
-  else if (erd == ERD_COMMON_FEATURE_API)    {
+  if (erd == ERD_COMMON_FEATURE_API)    {
     memcpy(this->erd_data_.erd_0092, data, copy_size);
     this->erd_data_.erd_0092_size = copy_size;
     ESP_LOGD(TAG, "Read common feature API (0x0092): %u bytes", copy_size);
@@ -244,24 +269,9 @@ void FeatureBitManager::handle_read_completed_(tiny_erd_t erd, const void* data,
 void FeatureBitManager::queue_erd_read_()
 {
   tiny_erd_t feature_erd = 0;
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-but-set-variable"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-#endif
-  const char* feature_name = nullptr;
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
+  [[maybe_unused]] const char* feature_name = nullptr;
 
   switch (this->state_) {
-    case FEATURE_BIT_STATE_READING_0008: feature_erd = ERD_APPLIANCE_TYPE;        feature_name = "appliance type (0x0008)";              break;
-    case FEATURE_BIT_STATE_READING_0001: feature_erd = ERD_MODEL_NUMBER;          feature_name = "model number (0x0001)";                break;
-    case FEATURE_BIT_STATE_READING_0002: feature_erd = ERD_SERIAL_NUMBER;         feature_name = "serial number (0x0002)";               break;
     case FEATURE_BIT_STATE_READING_0092: feature_erd = ERD_COMMON_FEATURE_API;    feature_name = "common feature API (0x0092)";          break;
     case FEATURE_BIT_STATE_READING_0093: feature_erd = ERD_APPLIANCE_FEATURE_API_0; feature_name = "appliance feature API 0 (0x0093)";       break;
     case FEATURE_BIT_STATE_READING_0094: feature_erd = ERD_APPLIANCE_FEATURE_API_1; feature_name = "appliance feature API 1 (0x0094)";       break;
@@ -302,9 +312,6 @@ void FeatureBitManager::queue_erd_read_()
 tiny_erd_t FeatureBitManager::get_expected_erd_() const
 {
   switch (this->state_) {
-    case FEATURE_BIT_STATE_READING_0008: return ERD_APPLIANCE_TYPE;
-    case FEATURE_BIT_STATE_READING_0001: return ERD_MODEL_NUMBER;
-    case FEATURE_BIT_STATE_READING_0002: return ERD_SERIAL_NUMBER;
     case FEATURE_BIT_STATE_READING_0092: return ERD_COMMON_FEATURE_API;
     case FEATURE_BIT_STATE_READING_0093: return ERD_APPLIANCE_FEATURE_API_0;
     case FEATURE_BIT_STATE_READING_0094: return ERD_APPLIANCE_FEATURE_API_1;
@@ -354,9 +361,6 @@ void FeatureBitManager::skip_to_next_erd_(tiny_erd_t failed_erd)
   ESP_LOGD(TAG, "Feature bit ERD 0x%04X failed or not supported, skipping", failed_erd);
 
   switch (failed_erd) {
-    case ERD_APPLIANCE_TYPE:          this->state_ = FEATURE_BIT_STATE_READING_0001; break;
-    case ERD_MODEL_NUMBER:            this->state_ = FEATURE_BIT_STATE_READING_0002; break;
-    case ERD_SERIAL_NUMBER:           this->state_ = FEATURE_BIT_STATE_READING_0092; break;
     case ERD_COMMON_FEATURE_API:      this->state_ = FEATURE_BIT_STATE_READING_0093; break;
     case ERD_APPLIANCE_FEATURE_API_0: this->state_ = FEATURE_BIT_STATE_READING_0094; break;
     case ERD_APPLIANCE_FEATURE_API_1: this->state_ = FEATURE_BIT_STATE_READING_0095; break;
@@ -446,22 +450,10 @@ void FeatureBitManager::parse_next_step_()
   }
 
   // Static tables for appliance ERDs (indexed 0-9).
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-variable"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#endif
-  static const char* const erd_names[10] = {
+  [[maybe_unused]] static const char* const erd_names[10] = {
     "0x0093", "0x0094", "0x0095", "0x0096", "0x0097",
     "0x0109", "0x010A", "0x010B", "0x010C", "0x010D"
   };
-#ifdef __clang__
-#pragma clang diagnostic pop
-#elif defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
   // Process one appliance ERD per tick to avoid blocking the timer for too long.
   if (this->parse_erd_idx_ < 10) {

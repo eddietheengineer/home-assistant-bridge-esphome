@@ -11,15 +11,15 @@ from typing import Any
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import esp32, mqtt, uart
+from esphome.components import esp32, sensor, uart
 from esphome.const import CONF_ID
 from esphome.core import CORE
 
 _LOGGER = logging.getLogger(__name__)
 
 CODEOWNERS = ["@joshualongenecker"]
-DEPENDENCIES = ["uart", "mqtt"]
-AUTO_LOAD = []
+DEPENDENCIES = ["uart"]
+AUTO_LOAD = ["sensor"]
 
 # UART configuration keys
 CONF_GEA3_UART_ID = "gea3_uart_id"
@@ -35,6 +35,10 @@ CONF_APPLIANCE_API_PARSING = "appliance_api_parsing"
 CONF_CUSTOM_ERDS = "custom_erds"
 CONF_GENERATE_DEVICE_CONFIG = "generate_device_config"
 CONF_HA_DISCOVERY_BASE_URL = "ha_discovery_base_url"
+CONF_ERD_PUBLISH_RATE_SENSOR = "erd_publish_rate_sensor"
+CONF_ERD_CACHE_ENTRIES_SENSOR = "erd_cache_entries_sensor"
+CONF_ERD_CACHE_UPDATES_SENSOR = "erd_cache_updates_sensor"
+CONF_MQTT_PUBLISH_RATE_SENSOR = "mqtt_publish_rate_sensor"
 
 
 
@@ -175,11 +179,11 @@ def load_appliance_types() -> dict[int, str]:
     
     # If local paths failed, try fetching from GitHub as fallback
     if data is None:
-        url = "https://raw.githubusercontent.com/joshualongenecker/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
+        url = "https://raw.githubusercontent.com/geappliances/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
         _LOGGER.info("Fetching ERD definitions from GitHub: %s", url)
         
         try:
-            with urllib.request.urlopen(url, timeout=10) as response:
+            with urllib.request.urlopen(url, timeout=5) as response:
                 data = json.loads(response.read().decode('utf-8'))
             _LOGGER.info("Successfully fetched appliance types from GitHub (fallback)")
         except urllib.error.HTTPError as e:
@@ -302,6 +306,18 @@ CONFIG_SCHEMA = cv.Schema(
         ),
         cv.Optional(CONF_HA_DISCOVERY_BASE_URL,
                     default=HA_DISCOVERY_DEFAULT_BASE_URL): cv.string,
+        cv.Optional(CONF_ERD_PUBLISH_RATE_SENSOR): cv.Schema({
+            cv.Optional("name", default="ERD Publish Rate"): cv.string,
+        }).extend(sensor.sensor_schema(state_class="measurement")),
+        cv.Optional(CONF_ERD_CACHE_ENTRIES_SENSOR): cv.Schema({
+            cv.Optional("name", default="ERD Cache Entries"): cv.string,
+        }).extend(sensor.sensor_schema()),
+        cv.Optional(CONF_ERD_CACHE_UPDATES_SENSOR): cv.Schema({
+            cv.Optional("name", default="ERD Cache Updates/60s"): cv.string,
+        }).extend(sensor.sensor_schema(state_class="measurement")),
+        cv.Optional(CONF_MQTT_PUBLISH_RATE_SENSOR): cv.Schema({
+            cv.Optional("name", default="MQTT Publish Rate"): cv.string,
+        }).extend(sensor.sensor_schema(state_class="measurement")),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
@@ -316,9 +332,11 @@ async def to_code(config: dict[str, Any]) -> None:
     # Add library dependencies
     cg.add_library("https://github.com/ryanplusplus/tiny", None)
     cg.add_library("https://github.com/geappliances/tiny-gea-api#develop", None)
-    # Add public-appliance-api-documentation as a library dependency
-    # This allows users to control the version by updating the library reference
-    cg.add_library("https://github.com/joshualongenecker/public-appliance-api-documentation", None)
+    cg.add_library("https://github.com/geappliances/public-appliance-api-documentation", None)
+    # NOTE: Library versions are NOT pinned — Git URLs may reference moving branches
+    # (e.g. "#develop") or the repo default branch. Builds may change over time.
+    # To pin to a specific commit, append #<sha> to the URL (PlatformIO git ref).
+    # Example: https://github.com/ryanplusplus/tiny#abc1234
     
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
@@ -357,6 +375,26 @@ async def to_code(config: dict[str, Any]) -> None:
 
     # Set the base URL for runtime HA-discovery JSONL download
     cg.add(var.set_ha_discovery_base_url(config[CONF_HA_DISCOVERY_BASE_URL]))
+
+    # Optionally create the ERD publish rate sensor
+    if CONF_ERD_PUBLISH_RATE_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_ERD_PUBLISH_RATE_SENSOR])
+        cg.add(var.set_erd_publish_rate_sensor(sens))
+
+    # Optionally create the ERD cache entries sensor
+    if CONF_ERD_CACHE_ENTRIES_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_ERD_CACHE_ENTRIES_SENSOR])
+        cg.add(var.set_erd_cache_entries_sensor(sens))
+
+    # Optionally create the ERD cache updates sensor
+    if CONF_ERD_CACHE_UPDATES_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_ERD_CACHE_UPDATES_SENSOR])
+        cg.add(var.set_erd_cache_updates_sensor(sens))
+
+    # Optionally create the MQTT publish rate sensor
+    if CONF_MQTT_PUBLISH_RATE_SENSOR in config:
+        sens = await sensor.new_sensor(config[CONF_MQTT_PUBLISH_RATE_SENSOR])
+        cg.add(var.set_mqtt_publish_rate_sensor(sens))
 
     # Register any user-configured custom ERDs
     for erd in config[CONF_CUSTOM_ERDS]:

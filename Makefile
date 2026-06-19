@@ -21,13 +21,17 @@ SRC_DIRS := \
   test/simulation \
 
 SRC_FILES := \
-  components/geappliances_bridge/mqtt_bridge.cpp \
-  components/geappliances_bridge/mqtt_bridge_polling.cpp \
+  components/geappliances_bridge/erd_cache.cpp \
+  components/geappliances_bridge/erd_bridge_subscribe.cpp \
+  components/geappliances_bridge/erd_bridge_poll.cpp \
+  components/geappliances_bridge/erd_write_bridge.cpp \
   components/geappliances_bridge/gea2_erd_client_adapter.cpp \
   components/geappliances_bridge/device_identity_manager.cpp \
+  components/geappliances_bridge/erd_poll_list_builder.cpp \
   components/geappliances_bridge/feature_bit_manager.cpp \
   components/geappliances_bridge/autodiscovery_manager.cpp \
   components/geappliances_bridge/esphome_mqtt_client_adapter.cpp \
+  components/geappliances_bridge/erd_cache_mqtt_publisher.cpp \
   components/geappliances_bridge/erd_registry.cpp \
   components/geappliances_bridge/esphome_time_source.cpp \
   components/geappliances_bridge/esphome_uart_adapter.cpp \
@@ -68,7 +72,7 @@ CPPUTEST_INC := -I$(CPPUTEST_PREFIX)/include
 CPPUTEST_LIB := -L$(CPPUTEST_PREFIX)/lib
 
 CFLAGS += -std=c11 -pedantic
-CPPFLAGS += $(SANITIZE_FLAGS) -fno-omit-frame-pointer
+CPPFLAGS += $(SANITIZE_FLAGS) -fno-omit-frame-pointer -DUSE_ESP_IDF -DUSE_ESP_IDF_STUBS
 CPPFLAGS += $(INC_FLAGS) $(CPPUTEST_INC) -MMD -MP -g -Wall -Wextra -Wcast-qual -Werror
 CXXFLAGS += -std=c++17
 LDFLAGS := $(SANITIZE_FLAGS) $(CPPUTEST_LIB)

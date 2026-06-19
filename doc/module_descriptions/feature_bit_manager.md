@@ -17,15 +17,12 @@ Reads and parses appliance API feature bit ERDs (0x0092 through 0x010D), buildin
 ## State Machine
 
 ```
-FEATURE_BIT_STATE_READING_0008  (appliance type, re-read)
-  → FEATURE_BIT_STATE_READING_0001  (model number, re-read)
-    → FEATURE_BIT_STATE_READING_0002  (serial number, re-read)
-      → FEATURE_BIT_STATE_READING_0092  (common feature API)
-        → FEATURE_BIT_STATE_READING_0093  (appliance feature API 0)
-          → ... (0094, 0095, 0096, 0097, 0109, 010A, 010B, 010C, 010D)
-            → FEATURE_BIT_STATE_PARSING
-                  → FEATURE_BIT_STATE_COMPLETE
-                      → valid_list_ready_ = true
+FEATURE_BIT_STATE_READING_0092  (common feature API)
+  → FEATURE_BIT_STATE_READING_0093  (appliance feature API 0)
+    → ... (0094, 0095, 0096, 0097, 0109, 010A, 010B, 010C, 010D)
+      → FEATURE_BIT_STATE_PARSING
+            → FEATURE_BIT_STATE_COMPLETE
+                → valid_list_ready_ = true
 
 Any read failure → skip to next ERD in sequence
 ```

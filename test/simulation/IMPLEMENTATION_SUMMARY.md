@@ -75,8 +75,8 @@ Test Doubles (Mocks)
     └── tiny_timer_group_double (simulates timing)
     ↓
 Bridge Components Under Test
-    ├── mqtt_bridge (subscription mode)
-    └── mqtt_bridge_polling (polling mode)
+    ├── erd_bridge_subscribe (subscription mode)
+    └── erd_bridge_poll (polling mode)
 ```
 
 ### Key Testing Patterns
@@ -90,7 +90,7 @@ Bridge Components Under Test
 
 ```cpp
 // Initialize bridge
-initialize_mqtt_bridge_subscription_mode();
+initialize_erd_bridge_subscription_mode();
 
 // Simulate subscription established
 simulate_subscription_added();
@@ -99,9 +99,8 @@ simulate_subscription_added();
 uint8_t data[] = {0x00, 0x50};
 simulate_erd_publication(ERD_TEMPERATURE, data, sizeof(data));
 
-// Verify MQTT was updated
-mock().expectOneCall("update_erd")
-    .withParameter("erd", ERD_TEMPERATURE);
+// Verify the ERD was cached (bridges write to erd_cache directly)
+POINTERS_TRUE(erd_cache_find(&cache, ERD_TEMPERATURE) != nullptr);
 ```
 
 ## Benefits Achieved
@@ -194,7 +193,7 @@ test/
 │   ├── application_level_test.cpp         # Basic integration tests
 │   └── appliance_simulation_examples.cpp  # Advanced examples
 ├── tests/
-│   ├── mqtt_bridge_test.cpp               # Original unit tests
+│   ├── erd_bridge_subscribe_test.cpp        # Original unit tests
 │   └── uptime_monitor_test.cpp            # Original unit tests
 └── test_runner.cpp                         # CppUTest main
 ```
