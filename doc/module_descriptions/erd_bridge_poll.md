@@ -15,12 +15,7 @@ Discovers the connected appliance by reading ERD 0x0008 (appliance type) on the 
 
 ```
 poll_state_top (parent — handles appliance loss globally)
-  ├─ state_identify_appliance
-  │    ├─ if pre-known address → skip broadcast, → state_probe_list
-  │    └─ else → read ERD 0x0008 from broadcast
-  │       → extract host address and appliance type → state_probe_list
-  │
-  ├─ state_probe_list
+  ├─ state_probe_list (initial)
   │    ├─ entry: if probe_list empty → state_polling
   │    │         else → read first ERD sequentially
   │    ├─ read_completed: add to polling list + cache → next ERD or state_polling
@@ -33,7 +28,7 @@ poll_state_top (parent — handles appliance loss globally)
        ├─ read_completed: update cache, count completion, maybe restart cycle
        ├─ read_failed: count completion, maybe restart cycle
        ├─ cycle resume (budget exceeded): resume sending reads via resume timer
-       └─ appliance_lost (60 s timeout) → state_identify_appliance
+       └─ appliance_lost (60 s timeout) → state_probe_list
 ```
 
 The `polling_timer_armed` flag gates cycle restarts: when the polling timer is armed,

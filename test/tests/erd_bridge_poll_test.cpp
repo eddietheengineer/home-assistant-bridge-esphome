@@ -4,7 +4,7 @@
  *
  * The polling bridge now receives a pre-built probe list from the
  * erd_poll_list_builder module. Tests drive the HSM through:
- *   state_identify_appliance → state_probe_list → state_polling
+ *   state_probe_list → state_polling
  */
 
 extern "C" {
@@ -475,123 +475,6 @@ TEST(erd_bridge_poll_probe_list, should_restart_poll_cycle_on_polling_timer)
 
   when_a_poll_read_completes(0xC0, probe_erd_1, uint8_t(0xAA));
   when_a_poll_read_completes(0xC0, probe_erd_2, uint8_t(0xBB));
-}
-
-// ============================================================================
-// Tests for broadcast discovery with probe list
-// ============================================================================
-
-TEST_GROUP(erd_bridge_poll_broadcast)
-{
-  enum {
-    polling_interval = 1000,
-    probe_erd = 0x1000
-  };
-
-  erd_bridge_poll_t self;
-  erd_cache_t test_cache;
-
-  tiny_timer_group_double_t timer_group;
-  tiny_gea3_erd_client_double_t erd_client;
-
-  const tiny_erd_t probe_list[1] = {probe_erd};
-
-  void setup()
-  {
-    mock().strictOrder();
-    tiny_timer_group_double_init(&timer_group);
-    tiny_gea3_erd_client_double_init(&erd_client);
-    erd_cache_init(&test_cache);
-  }
-
-  void teardown()
-  {
-    mock().disable();
-    erd_bridge_poll_destroy(&self);
-    erd_cache_destroy(&test_cache);
-    mock().enable();
-  }
-
-  void when_the_bridge_is_initialized_broadcast()
-  {
-    erd_bridge_poll_init(
-      &self,
-      &timer_group.timer_group,
-      &erd_client.interface,
-      polling_interval,
-      0xFF, 0, probe_list, 1,
-      &test_cache);
-  }
-
-  void after(tiny_timer_ticks_t ticks)
-  {
-    tiny_timer_group_double_elapse_time(&timer_group, ticks);
-  }
-
-  void trigger_read_completed(uint8_t address, tiny_erd_t erd, const void* data, uint8_t data_size)
-  {
-    tiny_gea3_erd_client_on_activity_args_t args;
-    args.type = tiny_gea3_erd_client_activity_type_read_completed;
-    args.address = address;
-    args.read_completed.erd = erd;
-    args.read_completed.data = data;
-    args.read_completed.data_size = data_size;
-    tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
-  }
-
-  void trigger_read_failed(tiny_erd_t erd)
-  {
-    tiny_gea3_erd_client_on_activity_args_t args;
-    args.type = tiny_gea3_erd_client_activity_type_read_failed;
-    args.address = 0xC0;
-    args.read_failed.request_id = 0;
-    args.read_failed.erd = erd;
-    args.read_failed.reason = tiny_gea3_erd_client_read_failure_reason_retries_exhausted;
-    tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
-  }
-
-  void should_request_read(uint8_t address, tiny_erd_t erd)
-  {
-    mock()
-      .expectOneCall("read")
-      .onObject(&erd_client)
-      .withParameter("address", address)
-      .withParameter("erd", erd)
-      .ignoreOtherParameters()
-      .andReturnValue(true);
-  }
-
-
-  template <typename T>
-  void when_a_poll_read_completes(uint8_t address, tiny_erd_t erd, T value)
-  {
-    static T _value;
-    _value = value;
-    trigger_read_completed(address, erd, &_value, sizeof(_value));
-  }
-};
-
-// When initialized with broadcast address, the bridge sends a broadcast
-// for ERD 0x0008, then probes the list at the discovered address.
-TEST(erd_bridge_poll_broadcast, should_broadcast_then_probe_list)
-{
-  should_request_read(0xFF, 0x0008);
-  when_the_bridge_is_initialized_broadcast();
-
-  mock().disable();
-  uint8_t appliance_type = 0x00;
-  trigger_read_completed(0xC0, 0x0008, &appliance_type, sizeof(appliance_type));
-
-  // Probe phase: ERD responds at discovered address.
-  uint8_t probe_val = 0x01;
-  trigger_read_completed(0xC0, probe_erd, &probe_val, sizeof(probe_val));
-  mock().enable();
-
-  // Polling timer fires: ERD read at discovered address.
-  should_request_read(0xC0, probe_erd);
-  after(polling_interval);
-
-  when_a_poll_read_completes(0xC0, probe_erd, uint8_t(0xAA));
 }
 
 // ============================================================================

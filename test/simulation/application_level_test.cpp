@@ -89,7 +89,7 @@ TEST_GROUP(application_level)
       &timer_group.timer_group,
       &erd_client.interface,
       polling_interval,
-      0xFF, 0, nullptr, 0,
+      0xC0, 0, nullptr, 0,
       &test_cache);
   }
   
@@ -172,22 +172,16 @@ TEST_GROUP(application_level)
 };
 
 /*!
- * Test that the bridge correctly handles ERD reads for device ID generation.
- * This validates the polling bridge discovery workflow by draining all
- * discovery states and verifying the bridge enters steady-state polling.
+ * Test that with an empty probe list and a known host address,
+ * the bridge starts in probe_list and transitions directly to
+ * polling without needing any broadcast discovery.
  */
-TEST(application_level, should_read_device_id_erds_in_sequence)
+TEST(application_level, should_enter_polling_with_empty_probe_list)
 {
-  // Validate that the polling bridge initializes, identifies the appliance,
-  // then transitions to polling (probe list was empty, so probe_list
-  // transitions directly to polling).
+  // With a known host address and no probe list, probe_list
+  // transitions directly to polling on initialization.
   mock().disable();
   initialize_erd_bridge_polling_mode();
-
-  // Respond to the initial appliance type read.
-  uint8_t appliance_type = 0x00;
-  simulate_erd_read_response(1, ERD_APPLIANCE_TYPE,
-                              &appliance_type, sizeof(appliance_type));
 
   mock().enable();
   CHECK(erd_bridge_poll.current_state_name != nullptr);
@@ -218,14 +212,14 @@ TEST(application_level, should_handle_erd_publications_in_subscription_mode)
 TEST(application_level, should_poll_erds_periodically_in_polling_mode)
 {
   // Validate that the polling bridge can be initialized and enters
-  // the identification state, ready to discover the appliance.
+  // the probe_list state, ready to probe for appliances.
   mock().disable();
   initialize_erd_bridge_polling_mode();
 
-  // Bridge should be in the identification state initially.
+  // Bridge should be in the probe_list state initially.
   mock().enable();
   CHECK(erd_bridge_poll.current_state_name != nullptr);
-  CHECK(strcmp(erd_bridge_poll.current_state_name, "identify_appliance") == 0);
+  CHECK(strcmp(erd_bridge_poll.current_state_name, "polling") == 0);
 }
 
 

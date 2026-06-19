@@ -2,14 +2,14 @@
  * @file
  * @brief ERD polling bridge implementation.
  *
- * The polling bridge discovers the connected appliance by reading ERD 0x0008
- * (appliance type) on the broadcast address, then probes a pre-built list
- * of ERDs before settling into steady-state polling.
+ * The polling bridge probes a pre-built list of ERDs at a known host
+ * address, then settles into steady-state polling.  It does not perform
+ * broadcast discovery — that is the responsibility of
+ * DeviceIdentityManager/AutodiscoveryManager.
  *
  * State machine:
- *   state_identify_appliance
- *     → state_probe_list  (reads each probe_list ERD; only successful reads added)
- *       → state_polling
+ *   state_probe_list  (reads each probe_list ERD; only successful reads added)
+ *     → state_polling
  */
 
 #include "erd_bridge_common.h"
@@ -29,7 +29,6 @@ static const char* const TAG __attribute__((unused)) = "erd_bridge_poll";
 // ============================================================================
 
 static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static void send_poll_read_requests_bounded(erd_bridge_poll_t* self, uint32_t budget_ms);
@@ -91,9 +90,8 @@ static void ensure_polling_list_capacity(erd_bridge_poll_t* self, uint16_t neede
 }
 
 /* Reset the polling bridge's discovery state (erd_set and polling list).
- * Called from state_identify_appliance and state_probe_list on re-entry
- * after appliance lost so that a new discovery phase always starts from
- * a clean slate.
+ * Called from state_probe_list on re-entry after appliance lost so that
+ * a new discovery phase always starts from a clean slate.
  *
  * Does NOT clear the shared erd_cache — that cache may be shared with the
  * subscription bridge.  Clearing it here would destroy subscription data
@@ -294,74 +292,12 @@ static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
 
   switch (signal) {
     case signal_appliance_lost:
-      // When a pre-known host address was supplied at init (custom ERD bridge
-      // alongside a subscription bridge), preserve it on re-identification so
-      // that state_identify_appliance skips the 0xFF broadcast and resumes
-      // polling directly at the correct address.  For a normal polling bridge
-      // (known_host_address == 0) fall back to broadcast discovery as usual.
-      self->erd_host_address = (self->known_host_address != 0)
-        ? self->known_host_address
-        : static_cast<uint8_t>(tiny_gea_broadcast_address);
-      tiny_hsm_transition(hsm, state_identify_appliance);
-      break;
-
-    default:
-      return tiny_hsm_result_signal_deferred;
-  }
-
-  return tiny_hsm_result_signal_consumed;
-}
-
-static tiny_hsm_result_t state_identify_appliance(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
-{
-  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
-  auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
-
-  switch (signal) {
-    case tiny_hsm_signal_entry:
-      self->polling_list_complete = false;
-      self->current_state_name = "identify_appliance";
-      // If the caller pre-initialized the host address (via
-      // erd_bridge_poll_init with a non-broadcast address), skip the broadcast
-      // and transition directly to probing.  state_probe_list entry handles
-      // clearing discovery state on re-entry after appliance lost.
-      if (self->erd_host_address != tiny_gea_broadcast_address) {
-        tiny_hsm_transition(hsm, state_probe_list);
-        break;
-      }
-      // Broadcast read for appliance type ERD (0x0008).
-      self->request_id++;
-      tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, 0x0008);
-      break;
-
-    case signal_read_completed:
-      // Ignore reads for ERDs other than the appliance type ERD (0x0008); they
-      // are from concurrent activity on the shared bus and must not trigger a
-      // premature transition out of identification with erd_host_address still
-      // set to the broadcast address (0xFF).
-      if (args->read_completed.erd != 0x0008) {
-        break;
-      }
-      reset_lost_appliance_timer(self);
-      // NOTE: The appliance type is read from the first response to the
-      // broadcast.  In multi-appliance environments, this may not be the
-      // intended target; the bridge assumes a single appliance on the bus.
-      if (args->read_completed.data_size >= 1) {
-        self->erd_host_address = args->address;
-        self->appliance_type = *reinterpret_cast<const uint8_t*>(args->read_completed.data);
-      }
+      // Restore the known host address and re-probe from scratch.
+      // The caller always initializes the bridge with a real host address
+      // (from autodiscovery); broadcast discovery is the responsibility of
+      // DeviceIdentityManager/AutodiscoveryManager, not the polling bridge.
+      self->erd_host_address = self->known_host_address;
       tiny_hsm_transition(hsm, state_probe_list);
-      break;
-
-    case signal_read_failed:
-      // Broadcast read for 0x0008 timed out — retry.
-      if (args->read_failed.erd == 0x0008) {
-        self->request_id++;
-        tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, 0x0008);
-      }
-      break;
-
-    case tiny_hsm_signal_exit:
       break;
 
     default:
@@ -388,6 +324,7 @@ static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
     if (self->probe_list_count > 0) {
       send_next_read_request(self);
     } else {
+      self->polling_list_complete = true;
       tiny_hsm_transition(hsm, state_polling);
     }
     return tiny_hsm_result_signal_consumed;
@@ -513,13 +450,10 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
 
 // ============================================================================
 // Polling bridge — HSM configuration
-// ============================================================================
-
 static const tiny_hsm_state_descriptor_t poll_hsm_state_descriptors[] = {
-  { .state = poll_state_top,                      .parent = nullptr         },
-  { .state = state_identify_appliance,            .parent = poll_state_top  },
-  { .state = state_probe_list,                    .parent = poll_state_top  },
-  { .state = state_polling,                       .parent = poll_state_top  }
+  { .state = poll_state_top,              .parent = nullptr         },
+  { .state = state_probe_list,            .parent = poll_state_top  },
+  { .state = state_polling,               .parent = poll_state_top  }
 };
 static const tiny_hsm_configuration_t poll_hsm_configuration = {
   .states      = poll_hsm_state_descriptors,
@@ -531,8 +465,7 @@ static const tiny_hsm_configuration_t poll_hsm_configuration = {
 // ============================================================================
 // Shared initialization helper.  Sets self->erd_host_address and
 // self->probe_list BEFORE calling tiny_hsm_init(), so that
-// state_identify_appliance's entry signal can inspect them and skip the
-// broadcast when the host is already known.
+// state_probe_list entry can probe at the correct address.
 static void erd_bridge_poll_init_impl(
   erd_bridge_poll_t*    self,
   tiny_timer_group_t*       timer_group,
@@ -547,15 +480,13 @@ static void erd_bridge_poll_init_impl(
   self->timer_group            = timer_group;
   self->erd_client             = erd_client;
   self->polling_interval_ms    = polling_interval_ms;
-  // Must be set before tiny_hsm_init() so state_identify_appliance entry
-  // can decide whether to broadcast or skip straight to probing.
+  // Must be set before tiny_hsm_init() so state_probe_list entry
+  // can probe at the correct address.
   self->erd_host_address       = initial_host_address;
   self->appliance_type         = initial_appliance_type;
   // Store the pre-known address so that signal_appliance_lost can restore it
-  // after a transient read failure instead of falling back to 0xFF broadcast.
-  // Zero means "unknown — use broadcast" (set by erd_bridge_poll_init()).
-  self->known_host_address     = (initial_host_address != tiny_gea_broadcast_address)
-    ? initial_host_address : 0;
+  // after a transient read failure.
+  self->known_host_address     = initial_host_address;
   self->probe_list             = probe_list;
   self->probe_list_count       = probe_list_count;
   self->erd_polling_list       = nullptr;
@@ -593,7 +524,7 @@ static void erd_bridge_poll_init_impl(
     });
   tiny_event_subscribe(tiny_gea3_erd_client_on_activity(erd_client), &self->erd_client_activity_subscription);
 
-  tiny_hsm_init(&self->hsm, &poll_hsm_configuration, state_identify_appliance);
+  tiny_hsm_init(&self->hsm, &poll_hsm_configuration, state_probe_list);
 }
 
 void erd_bridge_poll_init(

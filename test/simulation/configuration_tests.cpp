@@ -113,7 +113,7 @@ TEST_GROUP(configuration_based_tests)
       &timer_group.timer_group,
       &erd_client.interface,
       polling_interval,
-      0xFF, 0, nullptr, 0,
+      0xC0, 0, nullptr, 0,
       &test_cache);
   }
   
@@ -238,10 +238,10 @@ TEST(configuration_based_tests, config_polling_mode_default_interval)
   mock().disable();
   configure_polling_mode(default_polling_interval);
 
-  // Bridge should be in identification state after init.
+  // Bridge should be in probe state after init.
   mock().enable();
   CHECK(erd_bridge_poll.current_state_name != nullptr);
-  CHECK(strcmp(erd_bridge_poll.current_state_name, "identify_appliance") == 0);
+  CHECK(strcmp(erd_bridge_poll.current_state_name, "polling") == 0);
 }
 
 // ============================================================================
@@ -259,10 +259,10 @@ TEST(configuration_based_tests, config_polling_mode_fast_interval)
   mock().disable();
   configure_polling_mode(fast_polling_interval);
 
-  // Bridge should be in identification state after init.
+  // Bridge should be in probe state after init.
   mock().enable();
   CHECK(erd_bridge_poll.current_state_name != nullptr);
-  CHECK(strcmp(erd_bridge_poll.current_state_name, "identify_appliance") == 0);
+  CHECK(strcmp(erd_bridge_poll.current_state_name, "polling") == 0);
 }
 
 // ============================================================================
@@ -280,10 +280,10 @@ TEST(configuration_based_tests, config_polling_mode_slow_interval)
   mock().disable();
   configure_polling_mode(slow_polling_interval);
 
-  // Bridge should be in identification state after init.
+  // Bridge should be in probe state after init.
   mock().enable();
   CHECK(erd_bridge_poll.current_state_name != nullptr);
-  CHECK(strcmp(erd_bridge_poll.current_state_name, "identify_appliance") == 0);
+  CHECK(strcmp(erd_bridge_poll.current_state_name, "polling") == 0);
 }
 
 // ============================================================================
@@ -568,7 +568,7 @@ TEST_GROUP(only_publish_on_change_config)
       &timer_group.timer_group,
       &erd_client.interface,
       polling_interval,
-      0xFF, 0, nullptr, 0,
+      0xC0, 0, nullptr, 0,
       &test_cache);
   }
 
@@ -579,7 +579,7 @@ TEST_GROUP(only_publish_on_change_config)
       &timer_group.timer_group,
       &erd_client.interface,
       polling_interval,
-      0xFF, 0, nullptr, 0,
+      0xC0, 0, nullptr, 0,
       &test_cache);
   }
 
@@ -613,13 +613,13 @@ TEST_GROUP(only_publish_on_change_config)
 TEST(only_publish_on_change_config, config_polling_always_publish_is_default)
 {
   // Without only_publish_on_change, the polling bridge initializes in
-  // identification state (verifying default behavior builds and runs).
+  // probe state (verifying default behavior builds and runs).
   mock().disable();
   configure_always_publish();
   mock().enable();
 
   CHECK(bridge.current_state_name != nullptr);
-  CHECK(strcmp(bridge.current_state_name, "identify_appliance") == 0);
+  CHECK(strcmp(bridge.current_state_name, "polling") == 0);
 }
 
 // ============================================================================
@@ -635,11 +635,11 @@ TEST(only_publish_on_change_config, config_polling_always_publish_is_default)
 TEST(only_publish_on_change_config, config_polling_with_only_publish_on_change)
 {
   // With only_publish_on_change=true, the bridge initializes in
-  // identification state (verifying the option builds and runs).
+  // probe state (verifying the option builds and runs).
   mock().disable();
   configure_only_publish_on_change();
   mock().enable();
 
   CHECK(bridge.current_state_name != nullptr);
-  CHECK(strcmp(bridge.current_state_name, "identify_appliance") == 0);
+  CHECK(strcmp(bridge.current_state_name, "polling") == 0);
 }

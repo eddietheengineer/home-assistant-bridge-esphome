@@ -11,7 +11,7 @@
 //
 // Responsibilities:
 //   - Maintain and iterate a dynamic polling list
-//   - Drive a tiny_hsm for ERD discovery, polling, and appliance-lost recovery
+//   - Drive a tiny_hsm for probe discovery, polling, and appliance-lost recovery
 //   - Accept a pre-built probe list to verify ERDs before polling
 //   - Report polling health metrics (cycle count, last cycle time)
 //
@@ -102,11 +102,8 @@ typedef struct {
   // successfully-probed ERDs into erd_polling_list during the probe phase.
   const tiny_erd_t* probe_list;
   uint16_t probe_list_count;
-  // When erd_bridge_poll_init() is called with a non-zero host_address
-  // this stores the pre-known appliance address so that the bridge never broadcasts to 0xFF
-  // on re-identification (e.g. after appliance_lost_timer fires).  Zero means
-  // "no pre-known address — use broadcast discovery" (the default from
-  // erd_bridge_poll_init() with host_address = 0).
+  // Stores the pre-known appliance address so that on appliance loss
+  // the bridge can re-probe at the correct address.
   uint8_t known_host_address;
   // Health metrics: updated by the polling bridge as cycles complete.
   // cycle_start_ms: millis() when the current cycle's first read was sent.

@@ -69,7 +69,7 @@ After init, the caller may set `self->on_discovery_complete` and `self->on_disco
 
 ## 3. State Machine
 
-The polling bridge uses a hierarchical state machine (`tiny_hsm`) with a parent state (`poll_state_top`) and three child states.
+The polling bridge uses a hierarchical state machine (`tiny_hsm`) with a parent state (`poll_state_top`) and two child states.
 
 ### 3.1 Parent State: `poll_state_top`
 
@@ -77,25 +77,20 @@ Handles signals that apply regardless of the current child state:
 
 | Signal | Behavior |
 |--------|----------|
-| `signal_appliance_lost` | Fires after `appliance_lost_timeout` (60 s) with no successful reads. Restores `erd_host_address` to `known_host_address` if set, or to broadcast. Transitions to `state_identify_appliance`. |
+| `signal_appliance_lost` | Fires after `appliance_lost_timeout` (60 s) with no successful reads. Restores `erd_host_address` to `known_host_address` and transitions to `state_probe_list` for re-probing. |
 
 ### 3.2 Child States
 
-#### `state_identify_appliance`
+#### `state_probe_list` (initial)
 
-Determines the appliance's host address.
+Probes each ERD in the pre-built probe list to verify support before adding to the polling list. This is the initial state — the bridge is always initialized with a known host address from autodiscovery.
 
-**On entry:**
-- Sets `polling_list_complete = false`.
-- If `erd_host_address != tiny_gea_broadcast_address` (pre-known address):
-  - Transitions to `state_probe_list` (clearing is handled there).
-- If `erd_host_address == tiny_gea_broadcast_address`: sends a broadcast read for ERD 0x0008 (appliance type).
 **On entry:**
 - Sets `appliance_erd_list` to `probe_list` and `appliance_erd_list_count` to `probe_list_count`.
 - Sets `erd_index = (uint16_t)-1` (sentinel — `send_next_read_request` increments to 0 on first call).
 - If re-entry (`polling_list_count > 0`): clears `erd_set` and `polling_list_count` via `clear_discovery_state()` (does NOT clear the ERD cache).
 - If `probe_list_count > 0`: sends the first read via `send_next_read_request`.
-- If `probe_list_count == 0`: transitions directly to `state_polling`.
+- If `probe_list_count == 0`: sets `polling_list_complete = true` and transitions directly to `state_polling`.
 
 **On `signal_read_completed`:**
 - Adds the ERD to the polling list via `add_erd_to_polling_list()` (deduped via `erd_set`).
@@ -114,13 +109,7 @@ Steady-state polling. See §5.
 
 ```
 poll_state_top (parent — handles appliance_lost globally)
-  ├─ state_identify_appliance (initial)
-  │    ├─ entry: if pre-known address → state_probe_list
-  │    │          else → broadcast read for ERD 0x0008
-  │    ├─ read_completed (0x0008): extract host address → state_probe_list
-  │    └─ read_failed (0x0008): retry broadcast
-  │
-  ├─ state_probe_list
+  ├─ state_probe_list (initial)
   │    ├─ entry: if probe_list empty → state_polling
   │    │         else → read first ERD
   │    ├─ read_completed: add to polling list + cache → next ERD or state_polling
@@ -131,7 +120,7 @@ poll_state_top (parent — handles appliance_lost globally)
        ├─ polling_timer_expired: start cycle (or set restart_pending)
        ├─ read_completed: update cache, count completion, maybe restart cycle
        ├─ read_failed: count completion, maybe restart cycle
-       └─ appliance_lost → state_identify_appliance
+       └─ appliance_lost → state_probe_list
 ```
 
 ---
@@ -268,10 +257,10 @@ The polling bridge does not own the publish-on-change setting — it is controll
 
 1. **No overlapping cycles:** A new cycle does not start until the previous one has completed (all ERDs have responded) and the timer has expired (or `restart_pending` is set).
 2. **One read at a time during probe:** The next probe read is issued only after the previous one has a definitive response.
-3. **No polling list growth on re-entry:** `erd_set` and `polling_list_count` are cleared on re-entry to `state_identify_appliance` or `state_probe_list` after appliance loss, preventing duplicate ERD additions.
+3. **No polling list growth on re-entry:** `erd_set` and `polling_list_count` are cleared on re-entry to `state_probe_list` after appliance loss, preventing duplicate ERD additions.
 4. **Failed probe ERDs are excluded:** In `state_probe_list`, failed ERDs are inserted into `erd_set` as exclusions, preventing them from being lazily registered in `state_polling`.
 5. **Cache NOT cleared on probe re-entry:** The ERD cache is not reset during `state_probe_list` entry or on appliance-loss re-discovery. The cache may be shared with the subscription bridge; stale entries are overwritten when new data arrives.
-6. **Known host address preserved:** When initialized with a non-broadcast `host_address`, the bridge stores it in `known_host_address`. On appliance loss, this address is restored instead of falling back to broadcast.
+6. **Known host address preserved:** The bridge stores the host address in `known_host_address`. On appliance loss, this address is restored and re-probing begins at the same address.
 
 ---
 
@@ -290,6 +279,5 @@ The polling bridge does not own the publish-on-change setting — it is controll
 
 ## 10. Known Limitations
 
-1. **Single appliance assumption:** Broadcast identification reads the appliance type from the first response to ERD 0x0008. In multi-appliance environments, this may not be the intended target.
-2. **Failed ERDs never evicted:** An ERD that permanently fails during steady-state polling (e.g., removed by a firmware update) remains in the polling list indefinitely, consuming bus bandwidth and inflating cycle time.
-3. **Probe list pointer lifetime:** The bridge does not copy the probe list — the caller must ensure the pointer remains valid for the duration of the probe phase (typically the bridge's lifetime).
+1. **Failed ERDs never evicted:** An ERD that permanently fails during steady-state polling (e.g., removed by a firmware update) remains in the polling list indefinitely, consuming bus bandwidth and inflating cycle time.
+2. **Probe list pointer lifetime:** The bridge does not copy the probe list — the caller must ensure the pointer remains valid for the duration of the probe phase (typically the bridge's lifetime).
