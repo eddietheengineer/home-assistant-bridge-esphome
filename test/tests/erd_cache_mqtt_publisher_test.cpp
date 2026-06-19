@@ -235,7 +235,7 @@ TEST(erd_cache_mqtt_publisher, topic_format_correct)
 /* loop - payload format                                                */
 /* ------------------------------------------------------------------ */
 
-TEST(erd_cache_mqtt_publisher, payload_uppercase_hex_no_separator)
+TEST(erd_cache_mqtt_publisher, payload_lowercase_hex_no_separator)
 {
   erd_cache_mqtt_publisher_init(
     &publisher,

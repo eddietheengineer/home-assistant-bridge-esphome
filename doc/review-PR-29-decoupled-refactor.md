@@ -55,13 +55,11 @@ This is a singleton assumption baked into the startup HSM. The `services_from_hs
 
 ## Significant Issues
 
-### 5. Hex encoding is lowercase; test name says "uppercase" (erd_cache_mqtt_publisher.cpp:113)
+### 5. **FIXED** Hex encoding is lowercase; test name corrected (erd_cache_mqtt_publisher.cpp:113)
 
-```cpp
-snprintf(hex + i * 2, 3, "%02x", data[i]);  // lowercase hex
-```
+**Status:** ✅ Resolved on branch `review/PR-29-decoupled-refactor-review`
 
-The test is named `payload_uppercase_hex_no_separator` but the code produces lowercase. The test doesn't verify the actual payload content — it only checks the publish count. If any downstream consumer (Home Assistant automation, scripts) expects uppercase hex, this will silently break.
+Lowercase hex (`%02x`) is the correct output. Renamed the misleading test from `payload_uppercase_hex_no_separator` to `payload_lowercase_hex_no_separator`.
 
 ### 6. `erd_cache_mqtt_publisher` defaults `mqtt_connected = true` (erd_cache_mqtt_publisher.cpp:28)
 
@@ -157,6 +155,6 @@ The `void*` cast obscures the type and makes static analysis harder.
 
 ## Recommendation
 
-**Do not merge until issues #3, #4, #5, #9, and #10 are addressed.** The remaining issues should be tracked as follow-up tasks.
+**Do not merge until issues #3, #4, #9, and #10 are addressed.** The remaining issues should be tracked as follow-up tasks.
 
-Issues #3 (no re-publish after reconnect) and #4 (global singleton) are architectural — they affect correctness and extensibility. Issues #5 (hex case mismatch), #9 (breaking default change), and #10 (stale PR description) affect users directly.
+Issues #3 (no re-publish after reconnect) and #4 (global singleton) are architectural — they affect correctness and extensibility. Issues #9 (breaking default change) and #10 (stale PR description) affect users directly.
