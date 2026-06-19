@@ -75,6 +75,13 @@ static void pool_free(erd_cache_t* self, uint8_t block_idx, uint8_t* ptr)
 static bool store_data(erd_cache_t* self, erd_cache_entry_t* entry,
                        const uint8_t* data, uint8_t data_size, [[maybe_unused]] tiny_erd_t erd)
 {
+  /* Clear stale pool/heap flags so that a failed pool or heap attempt
+   * does not leave a stale flag set with a different storage type,
+   * which would cause free_entry_storage() to free the wrong thing. */
+  entry->uses_pool = false;
+  entry->pool_block_idx = 255;
+  entry->uses_heap = false;
+
   if (data_size <= ERD_CACHE_INLINE_DATA_SIZE) {
     memcpy(entry->inline_data, data, data_size);
     entry->data_size = data_size;
@@ -150,7 +157,10 @@ void erd_cache_init(erd_cache_t* self)
   if (self->initialized) {
     for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
       erd_cache_entry_t* e = &self->entries[i];
-      if (e->uses_pool) {
+      /* If both pool and heap flags are set (stale pool from a failed
+       * pool alloc that fell through to heap), ext_data points to heap.
+       * Only free the heap to avoid pool_free() on a heap pointer. */
+      if (e->uses_pool && !e->uses_heap) {
         pool_free(self, e->pool_block_idx, e->ext_data);
       }
       if (e->uses_heap) {
@@ -225,7 +235,11 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
     }
 
     if (can_reuse_heap) {
-      /* Reuse existing heap buffer — no allocation needed. */
+      /* Reuse existing heap buffer — no allocation needed.
+       * Clear stale pool flags in case they were left set by a previous
+       * store_data() call where pool alloc failed and fell through to heap. */
+      existing->uses_pool = false;
+      existing->pool_block_idx = 255;
       memcpy(existing->ext_data, data, data_size);
       existing->data_size = data_size;
     } else {
