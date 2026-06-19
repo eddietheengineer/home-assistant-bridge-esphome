@@ -50,8 +50,18 @@ static uint8_t* pool_alloc(erd_cache_t* self, uint8_t block_idx)
 static void pool_free(erd_cache_t* self, uint8_t block_idx, uint8_t* ptr)
 {
   if (!ptr) return;
-  /* Find the slot by pointer arithmetic. */
+  /* Validate that the pointer actually points into the pool.
+   * Compute bounds using byte arithmetic to avoid UBSan out-of-bounds
+   * access on the one-past-the-end pointer. */
   uint8_t* base = &self->pool_blocks[block_idx][0][0];
+  size_t pool_bytes = (size_t)ERD_CACHE_CAPACITY * pool_block_sizes[block_idx];
+  if (ptr < base || (size_t)(ptr - base) >= pool_bytes) {
+    ESP_LOGE(TAG, "pool_free: pointer 0x%08X outside pool bounds [0x%08X, 0x%08X)",
+             (unsigned)(uintptr_t)ptr, (unsigned)(uintptr_t)base,
+             (unsigned)(uintptr_t)(base + pool_bytes));
+    return;
+  }
+  /* Find the slot by pointer arithmetic. */
   ptrdiff_t offset = ptr - base;
   uint16_t slot = (uint16_t)(offset / pool_block_sizes[block_idx]);
   if (slot < ERD_CACHE_CAPACITY) {
