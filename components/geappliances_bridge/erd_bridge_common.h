@@ -88,26 +88,43 @@ static inline void erd_set_init(erd_set_t* self)
 
 static inline bool erd_set_contains(erd_set_t* self, tiny_erd_t erd)
 {
-  for (uint16_t i = 0; i < self->count; i++) {
-    if (self->data[i] == erd) return true;
-    if (self->data[i] > erd) return false;  /* sorted, so not present */
+  uint16_t lo = 0;
+  uint16_t hi = self->count;
+  while (lo < hi) {
+    uint16_t mid = lo + (hi - lo) / 2;
+    if (self->data[mid] < erd) {
+      lo = mid + 1;
+    } else if (self->data[mid] > erd) {
+      hi = mid;
+    } else {
+      return true;
+    }
   }
   return false;
 }
 
 static inline bool erd_set_insert(erd_set_t* self, tiny_erd_t erd)
 {
-  if (erd_set_contains(self, erd)) return false;
-  if (self->count >= ERD_SET_CAPACITY) return false;
-  self->data[self->count++] = erd;
-  /* Insertion-sort to keep the array ordered. */
-  int j = (int)self->count - 1;
-  while (j > 0 && self->data[j - 1] > self->data[j]) {
-    tiny_erd_t tmp = self->data[j];
-    self->data[j] = self->data[j - 1];
-    self->data[j - 1] = tmp;
-    j--;
+  /* Binary search for insertion position. */
+  uint16_t lo = 0;
+  uint16_t hi = self->count;
+  while (lo < hi) {
+    uint16_t mid = lo + (hi - lo) / 2;
+    if (self->data[mid] < erd) {
+      lo = mid + 1;
+    } else if (self->data[mid] > erd) {
+      hi = mid;
+    } else {
+      return false;  /* already present */
+    }
   }
+  if (self->count >= ERD_SET_CAPACITY) return false;
+  /* Shift elements to make room at position lo. */
+  for (int i = (int)self->count; i > (int)lo; i--) {
+    self->data[i] = self->data[i - 1];
+  }
+  self->data[lo] = erd;
+  self->count++;
   return true;
 }
 
