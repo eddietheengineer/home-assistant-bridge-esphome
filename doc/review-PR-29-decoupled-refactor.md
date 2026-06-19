@@ -39,9 +39,9 @@ Added 6 new tests covering: same-size same data, same-size different data, size 
 **Status:** ✅ Resolved on branch `review/PR-29-decoupled-refactor-review`
 
 The dead `memcmp` was removed and replaced with `existing->update_required = true` — truncation always changes the effective data (size shrinks). The OOM path now returns `true` directly, simplifying the logic.
-### 3. No re-publish of retained messages after MQTT reconnect (erd_cache_mqtt_publisher.cpp:128-132)
+### 3. **DOCUMENTED** No re-publish of retained messages after MQTT reconnect (erd_cache_mqtt_publisher.cpp:128-132)
 
-After disconnect/reconnect, the publisher resumes only entries with `update_required=true`. But retained MQTT messages on the broker are lost when the broker restarts or the client reconnects with a new client ID. There is no mechanism to force a full re-publish of all cached ERDs after reconnect. Home Assistant entities can show stale data after a broker restart.
+**Status:** ✅ Accepted as-is. Documented as a design decision in `doc/spec/mqtt_data_publishing.md` (Specification 2). Retained messages persist on broker reconnect; full re-publish only needed on broker restart, which is rare.
 
 ### 4. `g_bridge_services` is a file-scope global pointer (geappliances_bridge_startup_hsm.cpp:31)
 
@@ -150,6 +150,6 @@ The `void*` cast obscures the type and makes static analysis harder.
 
 ## Recommendation
 
-**Do not merge until issues #3 and #4 are addressed.** The remaining issues should be tracked as follow-up tasks.
+**Do not merge until issue #4 is addressed.** The remaining issues should be tracked as follow-up tasks.
 
-Issues #3 (no re-publish after reconnect) and #4 (global singleton) are architectural — they affect correctness and extensibility.
+Issue #4 (global singleton) is architectural — it prevents multiple bridge instances (e.g., dual UART setups).
