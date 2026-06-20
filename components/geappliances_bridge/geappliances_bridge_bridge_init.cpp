@@ -264,6 +264,10 @@ void GeappliancesBridge::initialize_erd_bridge_()
     tiny_gea_broadcast_address);
   this->write_bridge_initialized_ = true;
 
+  // Subscribe to the wildcard write topic so incoming write commands from
+  // Home Assistant are routed to the write bridge via on_write_request_event.
+  esphome_mqtt_client_adapter_subscribe_write_topic(&this->mqtt_client_adapter_);
+
   this->erd_bridge_initialized_ = true;
   ESP_LOGI(TAG, "ERD bridge initialized successfully");
 

@@ -134,8 +134,30 @@ extern "C" void esphome_mqtt_client_adapter_notify_disconnected(
 extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
   esphome_mqtt_client_adapter_t* self)
 {
-  (void)self;
-  // No MQTT broker — write command subscriptions are not available.
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client == nullptr) return;
+
+  char topic[128];
+  snprintf(topic, sizeof(topic), "geappliances/%s/erd/+/write",
+           self->device_id->c_str());
+
+  mqtt_client->subscribe(topic, [self](const std::string& topic, const std::string& payload) {
+    // Parse ERD from topic: geappliances/{device_id}/erd/0x{ERD}/write
+    auto pos = topic.find("/erd/0x");
+    if (pos == std::string::npos) return;
+
+    const char* erd_str = topic.c_str() + pos + 5; // skip "erd/"
+
+    unsigned erd = 0;
+    sscanf(erd_str, "%x", &erd);
+
+    mqtt_client_on_write_request_args_t args;
+    args.erd = static_cast<tiny_erd_t>(erd);
+    args.size = payload.size();
+    args.value = reinterpret_cast<const void*>(payload.c_str());
+
+    tiny_event_publish(&self->on_write_request_event, &args);
+  }, 0);
 }
 
 extern "C" size_t esphome_mqtt_client_adapter_drain_pending_updates(
