@@ -299,6 +299,82 @@ void HaDiscoveryManager::publish_next_entity_()
 }
 #else  /* !USE_ESP_IDF_STUBS — real ESP-IDF implementation */
 
+/*static*/ void HaDiscoveryManager::ha_fetch_task_fn_(void* param)
+{
+  auto* self = static_cast<HaDiscoveryManager*>(param);
+  self->fetch_ha_definitions_();
+  UBaseType_t hwm = uxTaskGetStackHighWaterMark(nullptr);
+  (void)hwm;
+  ESP_LOGI(TAG, "ha_fetch: done — stack HWM %u B", static_cast<unsigned>(hwm));
+  HaDiscoveryItem* sentinel = nullptr;
+  xQueueSend(self->queue_, &sentinel, portMAX_DELAY);
+  vTaskDelete(nullptr);
+}
+
+void HaDiscoveryManager::fetch_ha_definitions_()
+{
+  struct Category { const char* name; uint16_t lo; uint16_t hi; };
+  static const Category CATS[] = {
+    {"common",0x0000,0x0FFF},{"refrigeration",0x1000,0x1FFF},{"laundry",0x2000,0x2FFF},
+    {"dishwasher",0x3000,0x3FFF},{"waterheater",0x4000,0x4FFF},{"range",0x5000,0x5FFF},
+    {"airconditioning",0x7000,0x7FFF},{"waterfilter",0x8000,0x8FFF},
+    {"smallappliance",0x9000,0x9FFF},{"energy",0xD000,0xDFFF},
+  };
+  bool need[10] = {};
+  need[0] = true;
+  for (uint16_t i = 0; i < this->registered_erds_snapshot_count_; i++) {
+    uint16_t erd = this->registered_erds_snapshot_[i];
+    for (int j = 1; j < 10; ++j)
+      if (erd >= CATS[j].lo && erd <= CATS[j].hi) { need[j] = true; break; }
+  }
+  std::string device_json = this->build_device_json_();
+  for (int i = 0; i < 10; ++i) {
+    if (!need[i]) continue;
+    std::string url = this->base_url_ + "/" + CATS[i].name + ".jsonl";
+    this->fetch_category_(url, this->device_id_, device_json);
+    vTaskDelay(pdMS_TO_TICKS(50));
+  }
+}
+
+bool HaDiscoveryManager::fetch_category_(const std::string& url,
+                                          const std::string& device_id,
+                                          const std::string& device_json)
+{
+  esp_http_client_config_t cfg = {};
+  cfg.url = url.c_str();
+  cfg.crt_bundle_attach = esp_crt_bundle_attach;
+  cfg.timeout_ms = 20000;
+  cfg.max_redirection_count = 5;
+  esp_http_client_handle_t client = esp_http_client_init(&cfg);
+  if (!client) return false;
+  if (esp_http_client_open(client, 0) != ESP_OK) { esp_http_client_cleanup(client); return false; }
+  esp_http_client_fetch_headers(client);
+  int status = esp_http_client_get_status_code(client);
+  if (status == 404) { esp_http_client_cleanup(client); return true; }
+  if (status != 200) { esp_http_client_cleanup(client); return false; }
+
+  static constexpr int READ_BUF = 512;
+  static constexpr int LINE_BUF = 8192;
+  char* read_buf = static_cast<char*>(malloc(READ_BUF));
+  char* line_buf = static_cast<char*>(malloc(LINE_BUF));
+  if (!read_buf || !line_buf) { free(read_buf); free(line_buf); esp_http_client_cleanup(client); return false; }
+
+  int line_pos = 0; int entities = 0; int read_len;
+  while ((read_len = esp_http_client_read(client, read_buf, READ_BUF - 1)) > 0) {
+    for (int i = 0; i < read_len; ++i) {
+      char c = read_buf[i];
+      if (c == '\n' || c == '\r') {
+        if (line_pos > 2) { line_buf[line_pos] = '\0'; if (this->process_jsonl_line_(line_buf, device_id, device_json)) ++entities; }
+        line_pos = 0;
+      } else if (line_pos < LINE_BUF - 1) { line_buf[line_pos++] = c; }
+    }
+  }
+  if (line_pos > 2) { line_buf[line_pos] = '\0'; if (this->process_jsonl_line_(line_buf, device_id, device_json)) ++entities; }
+  free(read_buf); free(line_buf); esp_http_client_cleanup(client);
+  ESP_LOGI(TAG, "HA fetch: %s -> %d entities", url.c_str(), entities);
+  return true;
+}
+
 void HaDiscoveryManager::publish_ha_discovery_()
 {
   // Spawn a FreeRTOS task to fetch JSONL definitions and queue entities.
