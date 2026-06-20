@@ -43,10 +43,16 @@ namespace geappliances_bridge {
 
 void GeappliancesBridge::on_poll_discovery_complete_()
 {
-  tiny_erd_t erds[ERD_CACHE_CAPACITY];
-  uint16_t count = 0;
-  GeappliancesBridge::erd_cache_to_array(&this->erd_cache_, erds, &count);
-  this->ha_discovery_manager_.set_registered_erds(erds, count);
+  // Only update the registered ERDs if HA discovery hasn't been initialized yet.
+  // Once init_ha_discovery() runs, it takes a snapshot of the full ERD cache
+  // (including subscription ERDs) and set_registered_erds() would overwrite it
+  // with only the polling bridge's custom ERDs — losing the subscription data.
+  if (this->ha_discovery_manager_.get_state() == HA_DISCOVERY_IDLE) {
+    tiny_erd_t erds[ERD_CACHE_CAPACITY];
+    uint16_t count = 0;
+    GeappliancesBridge::erd_cache_to_array(&this->erd_cache_, erds, &count);
+    this->ha_discovery_manager_.set_registered_erds(erds, count);
+  }
   tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
 }
 
