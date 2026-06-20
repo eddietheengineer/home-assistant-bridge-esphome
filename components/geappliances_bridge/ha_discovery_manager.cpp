@@ -23,7 +23,7 @@
 #  include "freertos/queue.h"
 #  include "esp_heap_caps.h"
 #  include "esp_task_wdt.h"
-#  include "esp_zlib.h"
+#  include "miniz.h"
 #endif
 
 namespace esphome {
@@ -348,11 +348,23 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
     return false;
   }
 
-  uint32_t actual_size = out_size;
-  esp_err_t err = esp_zlib_inflate(cat->data, cat->compressed_size,
-                                   decompressed_buf, &actual_size);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "HA fetch: failed to decompress %s (err %d)", cat->name, err);
+#ifdef USE_ESP_IDF_STUBS
+  // Stub: decompression always fails in test builds.
+  ESP_LOGE(TAG, "HA fetch: decompression not available in stub build");
+  free(decompressed_buf);
+  return false;
+#else
+  // Use miniz tinfl_decompress_mem_to_mem for gzip decompression.
+  // Gzip format: 10-byte header + deflate stream + 8-byte trailer.
+  // tinfl expects raw deflate, so skip the 10-byte gzip header.
+  mz_uint32 src_len = static_cast<mz_uint32>(cat->compressed_size - 10);
+  mz_uint32 dst_len = static_cast<mz_uint32>(out_size);
+  size_t actual = tinfl_decompress_mem_to_mem(
+      decompressed_buf, out_size,
+      cat->data + 10, src_len,
+      TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF | TINFL_FLAG_PARSE_ZLIB_HEADER);
+  if (actual == 0) {
+    ESP_LOGE(TAG, "HA fetch: failed to decompress %s", cat->name);
     free(decompressed_buf);
     return false;
   }
@@ -360,7 +372,7 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
   // Process line by line from decompressed data.
   int entities = 0;
   const char* p = reinterpret_cast<const char*>(decompressed_buf);
-  const char* end = p + actual_size;
+  const char* end = p + actual;
   while (p < end) {
     const char* nl = strchr(p, '\n');
     if (!nl) nl = end;
@@ -377,6 +389,7 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
   free(decompressed_buf);
   ESP_LOGI(TAG, "HA fetch: %s -> %d entities", cat->name, entities);
   return true;
+#endif
 }
 
 void HaDiscoveryManager::publish_ha_discovery_()

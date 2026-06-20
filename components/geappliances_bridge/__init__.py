@@ -341,10 +341,8 @@ async def to_code(config: dict[str, Any]) -> None:
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    # The HA-discovery fetch uses esp_zlib to decompress embedded JSONL data.
-    # Re-enable it here for ESP32 targets.
-    if CORE.is_esp32:
-        esp32.include_builtin_idf_component("esp_zlib")
+    # HA discovery uses a local copy of the ESP-IDF ROM miniz library
+    # for gzip decompression (self-contained, no additional IDF deps).
 
     # Get optional GEA3 UART component reference
     if CONF_GEA3_UART_ID in config:

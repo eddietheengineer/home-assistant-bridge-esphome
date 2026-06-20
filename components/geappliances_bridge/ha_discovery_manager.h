@@ -137,6 +137,9 @@ class HaDiscoveryManager {
   bool process_category_(const HaDiscoveryCategory* cat,
                          const std::string& device_id,
                          const std::string& device_json);
+  bool process_jsonl_line_(const std::string& line,
+                           const std::string& device_id,
+                           const std::string& device_json);
 
   std::string escape_json_str_(const std::string& s);
   std::string build_device_json_();
