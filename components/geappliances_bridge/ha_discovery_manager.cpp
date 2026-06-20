@@ -332,7 +332,7 @@ void HaDiscoveryManager::publish_ha_discovery_()
     this->state_ = HA_DISCOVERY_FAILED;
     return;
   }
-  this->state_ = HA_DISCOVERY_DOWNLOADING;
+  this->state_ = HA_DISCOVERY_PUBLISHING;
 }
 
 void HaDiscoveryManager::publish_next_entity_()
