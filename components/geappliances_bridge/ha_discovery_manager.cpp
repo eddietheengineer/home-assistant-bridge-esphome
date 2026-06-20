@@ -598,8 +598,11 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
   item->payload = payload_buf;
 
   if (this->queue_) {
-    if (xQueueSend(this->queue_, &item, pdMS_TO_TICKS(500)) != pdTRUE) {
-      ESP_LOGW(TAG, "HA fetch: queue full, dropping entity for ERD %s", erd_hex);
+    // Wait up to 2s for queue space — the main loop drains at 50ms/entity.
+    // With 64 slots that's 3.2s to fully drain, but we don't want to block
+    // the fetch task indefinitely if the main loop is stalled.
+    if (xQueueSend(this->queue_, &item, pdMS_TO_TICKS(2000)) != pdTRUE) {
+      ESP_LOGW(TAG, "HA fetch: queue full after 2s, dropping entity for ERD %s", erd_hex);
       delete item;
     }
   } else {
