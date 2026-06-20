@@ -155,36 +155,10 @@ void HaDiscoveryManager::cleanup()
 #endif
 }
 
-void HaDiscoveryManager::run(bool is_poll_mode,
-                             bool polling_bridge_initialized,
-                             bool polling_list_complete,
-                             bool subscription_activity_detected,
-                             bool is_steady_state)
+void HaDiscoveryManager::run(bool device_steady_state)
 {
   if (this->state_ == HA_DISCOVERY_WAITING_FOR_READY) {
-    bool ready = false;
-    if (is_poll_mode) {
-      ready = polling_list_complete;
-    } else {
-      bool quiet = false;
-      // If the bridge reports steady state, skip the quiet-window check.
-      if (is_steady_state) {
-        quiet = true;
-      } else if (subscription_activity_detected) {
-        if (millis() - this->last_activity_ >= HA_DISCOVERY_QUIET_MS) {
-          quiet = true;
-        }
-      }
-      if (millis() - this->start_time_ >= HA_DISCOVERY_MAX_WAIT_MS) {
-        quiet = true;
-      }
-      if (quiet && polling_bridge_initialized) {
-        ready = polling_list_complete;
-      } else if (quiet) {
-        ready = true;
-      }
-    }
-    if (ready) {
+    if (device_steady_state) {
       this->publish_ha_discovery_();
     }
   }

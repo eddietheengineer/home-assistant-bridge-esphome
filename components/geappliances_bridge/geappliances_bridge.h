@@ -123,7 +123,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   BridgeMode get_mode() const override;
   bool is_subscription_mode_active() const override;
-  bool is_steady_state() const override;
+  bool is_subscription_steady_state() const override;
+  bool is_polling_steady_state() const override;
+  bool is_device_steady_state() const override;
 
   void check_subscription_activity() override;
   void maybe_start_custom_erd_polling() override;

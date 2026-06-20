@@ -377,8 +377,7 @@ tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_sig
       svc->maybe_start_custom_erd_polling();
       svc->log_poll_state_transitions();
 
-      if (svc->get_mode() != BRIDGE_MODE_AUTO || !svc->is_subscription_mode_active() ||
-          svc->is_steady_state()) {
+      if (svc->is_device_steady_state()) {
         tiny_hsm_transition(hsm, startup_state_ha_discovery);
       }
       break;

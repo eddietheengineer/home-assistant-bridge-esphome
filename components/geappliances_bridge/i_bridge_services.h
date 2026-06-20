@@ -76,9 +76,14 @@ class IBridgeServices {
 
   virtual BridgeMode get_mode() const = 0;
   virtual bool is_subscription_mode_active() const = 0;
-  /// Returns true when the bridge is in steady-state operation
-  /// (subscription settled and any polling probe phase complete).
-  virtual bool is_steady_state() const = 0;
+  /// True when subscription has had a quiet window (no new ERDs for 10s).
+  /// Vacuously true when subscription is not active.
+  virtual bool is_subscription_steady_state() const = 0;
+  /// True when polling bridge has completed its probe phase.
+  /// Vacuously true when polling bridge is not active.
+  virtual bool is_polling_steady_state() const = 0;
+  /// True when both active bridges are in steady state.
+  virtual bool is_device_steady_state() const = 0;
 
   // -- Startup delay ---------------------------------------------------------
 

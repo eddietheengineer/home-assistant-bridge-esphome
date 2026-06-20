@@ -98,11 +98,9 @@ class HaDiscoveryManager {
 
   void on_erd_seen(tiny_erd_t erd);
 
-  void run(bool is_poll_mode,
-           bool polling_bridge_initialized,
-           bool polling_list_complete,
-           bool subscription_activity_detected,
-           bool is_steady_state);
+  /// Drive the state machine. Called every loop iteration.
+  /// \param device_steady_state true when all active bridges are settled.
+  void run(bool device_steady_state);
 
   /// Set the MQTT adapter for async publishing (typed pointer, nullptr = sync fallback)
   void set_mqtt_adapter(esphome_mqtt_client_adapter_t* mqtt_adapter);
