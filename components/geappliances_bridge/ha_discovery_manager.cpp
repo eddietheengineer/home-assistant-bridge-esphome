@@ -448,9 +448,38 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
 
   const char* role = get_str("r");
   const char* paired = get_str("p");
-  // Accept all JSONL entries — entities will show as unavailable in HA
-  // until the appliance reports data for that ERD.
 
+  // Check if this ERD exists in the cache.
+  if (this->erd_cache_ != nullptr) {
+    bool found = false;
+    uint16_t iterator = 0;
+    uint16_t cache_entries_scanned = 0;
+    while (true) {
+      erd_cache_entry_t* entry = erd_cache_get_next_entry(this->erd_cache_, &iterator);
+      if (!entry) break;
+      cache_entries_scanned++;
+      if (entry->erd == erd_id) { found = true; break; }
+    }
+    // Check paired ERD if not found and this is a request role with a paired ERD.
+    if (!found && role[0] == 'r' && paired[0] != '\0') {
+      uint16_t paired_id = static_cast<uint16_t>(strtol(paired, nullptr, 16));
+      if (paired_id) {
+        iterator = 0;
+        while (!found) {
+          erd_cache_entry_t* entry = erd_cache_get_next_entry(this->erd_cache_, &iterator);
+          if (!entry) break;
+          if (entry->erd == paired_id || entry->erd == erd_id) { found = true; break; }
+        }
+      }
+    }
+    // Debug: log first few mismatches and first match
+    static uint32_t debug_count = 0;
+    if (debug_count++ < 10) {
+      ESP_LOGD(TAG, "HA match: ERD 0x%04X (from '%s') %s (scanned %u cache entries, cache ptr %p)",
+               erd_id, erd_hex, found ? "FOUND" : "NOT FOUND", cache_entries_scanned, this->erd_cache_);
+    }
+    if (!found) { cJSON_Delete(root); return false; }
+  }
   /* Build the MQTT discovery payload. */
   std::string payload = "{\"device\":" + device_json;
   payload += ",\"name\":\"" + this->escape_json_str_(get_str("n")) + "\"";
