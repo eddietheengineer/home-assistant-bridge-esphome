@@ -1,18 +1,10 @@
 // Auto-generated - do not edit.
 // Compressed JSONL data for HA discovery, embedded in flash.
-#pragma once
 
-#include <stdint.h>
+#include "ha_discovery_data.h"
 
 namespace esphome {
 namespace geappliances_bridge {
-
-struct HaDiscoveryCategory {
-  const char* name;
-  const uint8_t* data;
-  uint32_t compressed_size;
-  uint32_t decompressed_size;
-};
 
 static const uint8_t ha_discovery_common_data[] __attribute__((section(".rodata"))) = {
   0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xd5, 0x5d, 0xeb, 0x6e, 0xe3, 0x3a,
@@ -10553,16 +10545,16 @@ static const uint8_t ha_discovery_waterheater_data[] __attribute__((section(".ro
 };
 
 const HaDiscoveryCategory ha_discovery_categories[] = {
-  {{"common", ha_discovery_common_data, 5121, 44222}},
-  {{"airconditioning", ha_discovery_airconditioning_data, 12894, 127021}},
-  {{"dishwasher", ha_discovery_dishwasher_data, 11695, 155253}},
-  {{"energy", ha_discovery_energy_data, 5139, 116608}},
-  {{"laundry", ha_discovery_laundry_data, 47032, 689284}},
-  {{"range", ha_discovery_range_data, 44401, 746678}},
-  {{"refrigeration", ha_discovery_refrigeration_data, 23576, 335649}},
-  {{"smallappliance", ha_discovery_smallappliance_data, 14520, 218882}},
-  {{"waterfilter", ha_discovery_waterfilter_data, 533, 1418}},
-  {{"waterheater", ha_discovery_waterheater_data, 3131, 24588}},
+  {"common", ha_discovery_common_data, 5121, 44222},
+  {"airconditioning", ha_discovery_airconditioning_data, 12894, 127021},
+  {"dishwasher", ha_discovery_dishwasher_data, 11695, 155253},
+  {"energy", ha_discovery_energy_data, 5139, 116608},
+  {"laundry", ha_discovery_laundry_data, 47032, 689284},
+  {"range", ha_discovery_range_data, 44401, 746678},
+  {"refrigeration", ha_discovery_refrigeration_data, 23576, 335649},
+  {"smallappliance", ha_discovery_smallappliance_data, 14520, 218882},
+  {"waterfilter", ha_discovery_waterfilter_data, 533, 1418},
+  {"waterheater", ha_discovery_waterheater_data, 3131, 24588},
 };
 
 const uint16_t ha_discovery_category_count = 10;

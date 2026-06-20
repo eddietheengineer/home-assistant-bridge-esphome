@@ -17,7 +17,7 @@
 #  include "esp-idf/esp_task_wdt.h"
 #  include "esp-idf/esp_zlib_stub.h"
 #else
-#  include "esp-idf/cJSON.h"
+#  include "cJSON.h"
 #  include "freertos/FreeRTOS.h"
 #  include "freertos/task.h"
 #  include "freertos/queue.h"
