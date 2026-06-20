@@ -9,24 +9,22 @@
 #include "esphome/core/application.h"
 #include <cstring>
 
-#ifdef USE_ESP_IDF
-#  ifdef USE_ESP_IDF_STUBS
-#    include "esp-idf/esp_http_client.h"
-#    include "esp-idf/esp_crt_bundle.h"
-#    include "esp-idf/cJSON.h"
-#    include "esp-idf/freertos_stub.h"
-#    include "esp-idf/esp_heap_caps.h"
-#    include "esp-idf/esp_task_wdt.h"
-#  else
-#    include "esp_http_client.h"
-#    include "esp_crt_bundle.h"
-#    include "cJSON.h"
-#    include "freertos/FreeRTOS.h"
-#    include "freertos/task.h"
-#    include "freertos/queue.h"
-#    include "esp_heap_caps.h"
-#    include "esp_task_wdt.h"
-#  endif
+#ifdef USE_ESP_IDF_STUBS
+#  include "esp-idf/esp_http_client.h"
+#  include "esp-idf/esp_crt_bundle.h"
+#  include "esp-idf/cJSON.h"
+#  include "esp-idf/freertos_stub.h"
+#  include "esp-idf/esp_heap_caps.h"
+#  include "esp-idf/esp_task_wdt.h"
+#else
+#  include "esp_http_client.h"
+#  include "esp_crt_bundle.h"
+#  include "cJSON.h"
+#  include "freertos/FreeRTOS.h"
+#  include "freertos/task.h"
+#  include "freertos/queue.h"
+#  include "esp_heap_caps.h"
+#  include "esp_task_wdt.h"
 #endif
 
 namespace esphome {
@@ -97,7 +95,6 @@ void HaDiscoveryManager::set_mqtt_adapter(esphome_mqtt_client_adapter_t* mqtt_ad
 
 void HaDiscoveryManager::cleanup()
 {
-#ifdef USE_ESP_IDF
   // If a fetch task is still running, signal it to stop via the sentinel.
   if (this->queue_ != nullptr) {
     HaDiscoveryItem* sentinel = nullptr;
@@ -152,7 +149,6 @@ void HaDiscoveryManager::cleanup()
     this->queue_ = nullptr;
   }
   this->task_handle_ = nullptr;
-#endif
 }
 
 void HaDiscoveryManager::run(bool device_steady_state)
@@ -286,18 +282,8 @@ std::string HaDiscoveryManager::build_device_json_()
 }
 
 #ifndef USE_ESP_IDF
-// Non-ESP-IDF stubs: no MQTT broker available in test builds.
-void HaDiscoveryManager::publish_ha_discovery_()
-{
-  ESP_LOGD(TAG, "HA discovery triggered (no MQTT broker — skipping entity publish)");
-  this->state_ = HA_DISCOVERY_COMPLETE;
-}
-
-void HaDiscoveryManager::publish_next_entity_()
-{
-  // No MQTT broker — no-op.
-}
-#else  /* USE_ESP_IDF */
+#error "generate_device_config requires the ESP-IDF framework. Please set framework: type: esp-idf or set generate_device_config: false"
+#endif
 
 #ifdef USE_ESP_IDF_STUBS
 // ESP-IDF stubs: no real FreeRTOS or HTTP client in test builds.
@@ -526,7 +512,6 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
 }
 
 #endif  /* USE_ESP_IDF_STUBS */
-#endif  /* USE_ESP_IDF */
 
 }  // namespace geappliances_bridge
 }  // namespace esphome

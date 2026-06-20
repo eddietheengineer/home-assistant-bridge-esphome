@@ -46,14 +46,16 @@ extern "C" {
 #include "tiny_gea3_erd_client.h"
 }
 
-#ifdef USE_ESP_IDF
-#  ifdef USE_ESP_IDF_STUBS
-#    include "esp-idf/freertos_stub.h"
-#  else
-#    include "freertos/FreeRTOS.h"
-#    include "freertos/task.h"
-#    include "freertos/queue.h"
-#  endif
+#ifndef USE_ESP_IDF
+#error "generate_device_config requires the ESP-IDF framework. Please set framework: type: esp-idf or set generate_device_config: false"
+#endif
+
+#ifdef USE_ESP_IDF_STUBS
+#  include "esp-idf/freertos_stub.h"
+#else
+#  include "freertos/FreeRTOS.h"
+#  include "freertos/task.h"
+#  include "freertos/queue.h"
 #endif
 
 namespace esphome {
@@ -129,7 +131,6 @@ class HaDiscoveryManager {
   void publish_next_entity_();
   void publish_next_clear_();
 
-#ifdef USE_ESP_IDF
   static void ha_fetch_task_fn_(void* param);
   void fetch_ha_definitions_();
   bool fetch_category_(const std::string& url,
@@ -138,7 +139,6 @@ class HaDiscoveryManager {
   bool process_jsonl_line_(const std::string& line,
                            const std::string& device_id,
                            const std::string& device_json);
-#endif
 
   std::string escape_json_str_(const std::string& s);
   std::string build_device_json_();
@@ -174,12 +174,10 @@ class HaDiscoveryManager {
   // Pointer to the MQTT adapter for async publishing (typed, set via set_mqtt_adapter)
   esphome_mqtt_client_adapter_t* mqtt_adapter_{nullptr};
 
-#ifdef USE_ESP_IDF
   QueueHandle_t queue_{nullptr};
   TaskHandle_t  task_handle_{nullptr};
   StackType_t*  task_stack_{nullptr};
   StaticTask_t* task_tcb_{nullptr};
-#endif
 };
 
 }  // namespace geappliances_bridge
