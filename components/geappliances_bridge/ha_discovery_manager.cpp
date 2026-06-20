@@ -453,11 +453,9 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
   if (this->erd_cache_ != nullptr) {
     bool found = false;
     uint16_t iterator = 0;
-    uint16_t cache_entries_scanned = 0;
     while (true) {
       erd_cache_entry_t* entry = erd_cache_get_next_entry(this->erd_cache_, &iterator);
       if (!entry) break;
-      cache_entries_scanned++;
       if (entry->erd == erd_id) { found = true; break; }
     }
     // Check paired ERD if not found and this is a request role with a paired ERD.
@@ -472,18 +470,16 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
         }
       }
     }
-    // Debug: log first few mismatches and first match
-    static uint32_t debug_count = 0;
-    if (debug_count++ < 10) {
-      ESP_LOGD(TAG, "HA match: ERD 0x%04X (from '%s') %s (scanned %u cache entries, cache ptr %p)",
-               erd_id, erd_hex, found ? "FOUND" : "NOT FOUND", cache_entries_scanned, this->erd_cache_);
-    }
     if (!found) { cJSON_Delete(root); return false; }
   }
   /* Build the MQTT discovery payload. */
+  const char* fi = get_str("fi");
+  std::string unique_suffix = std::string(erd_hex);
+  if (fi[0] != '\0') unique_suffix += "_" + std::string(fi);
+
   std::string payload = "{\"device\":" + device_json;
   payload += ",\"name\":\"" + this->escape_json_str_(get_str("n")) + "\"";
-  payload += ",\"unique_id\":\"" + device_id + "_" + std::string(erd_hex) + "\"";
+  payload += ",\"unique_id\":\"" + device_id + "_" + unique_suffix + "\"";
   payload += ",\"object_id\":\"" + this->escape_json_str_(get_str("o")) + "\"";
 
   const char* unit = get_str("u");
@@ -496,11 +492,13 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
     payload += ",\"icon\":\"" + this->escape_json_str_(ic) + "\"";
   }
 
-  const char* dev_cl = get_str("d");
+  const char* comp = get_str("d");
+  if (comp[0] == '\0') { cJSON_Delete(root); return false; }
+
+  const char* dev_cl = get_str("dc");
   if (dev_cl[0] != '\0') {
     payload += ",\"device_class\":\"" + this->escape_json_str_(dev_cl) + "\"";
   }
-
   const char* ent_cat = get_str("e");
   if (ent_cat[0] != '\0') {
     payload += ",\"entity_category\":\"" + this->escape_json_str_(ent_cat) + "\"";
@@ -569,17 +567,14 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
 
   payload += "}";
 
-  const char* comp = get_str("t");
-  if (comp[0] == '\0') { cJSON_Delete(root); return false; }
-
   // Track this topic for later clearing
   if (this->published_topics_count_ < HA_DISCOVERY_MAX_PUBLISHED_TOPICS) {
     this->published_topics_[this->published_topics_count_].component = std::string(comp);
-    this->published_topics_[this->published_topics_count_].erd_hex = std::string(erd_hex);
+    this->published_topics_[this->published_topics_count_].erd_hex = unique_suffix;
     this->published_topics_count_++;
   }
 
-  std::string topic = "homeassistant/" + std::string(comp) + "/" + device_id + "/" + std::string(erd_hex) + "/config";
+  std::string topic = "homeassistant/" + std::string(comp) + "/" + device_id + "/" + unique_suffix + "/config";
 
   auto* item = new HaDiscoveryItem();
   item->topic = std::move(topic);
