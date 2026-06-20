@@ -344,16 +344,52 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
   ESP_LOGE(TAG, "HA fetch: decompression not available in stub build");
   return false;
 #else
-  // Streaming decompression context — passed to the tinfl callback.
+  // Use tinfl_decompress directly for streaming decompression.
+  // Gzip format: 10-byte header + raw deflate stream + 8-byte trailer.
+  // We skip the header and trailer, feeding only the raw deflate data.
+  const uint8_t* src = cat->data + 10;
+  size_t src_remaining = cat->compressed_size - 18;  // skip header + trailer
+
+  tinfl_decompressor decomp;
+  tinfl_init(&decomp);
+
+  // Small output buffer — tinfl produces chunks we parse for lines.
+  uint8_t out_buf[4096];
   DecompressCtx ctx = { this, &device_id, &device_json, 0, {}, 0 };
 
-  // Skip gzip header (10 bytes), feed raw deflate to tinfl via callback.
-  // The callback parses lines and calls process_jsonl_line_ for each.
-  mz_uint32 src_len = static_cast<mz_uint32>(cat->compressed_size - 10);
-  int status = tinfl_decompress_mem_to_callback(
-      cat->data + 10, &src_len,
-      tinfl_callback_, &ctx,
-      TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF | TINFL_FLAG_PARSE_ZLIB_HEADER);
+  while (true) {
+    size_t in_buf_size = src_remaining;
+    size_t out_buf_size = sizeof(out_buf);
+    tinfl_status status = tinfl_decompress(
+        &decomp, src, &in_buf_size,
+        out_buf, out_buf, &out_buf_size,
+        TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
+    src += in_buf_size;
+    src_remaining -= in_buf_size;
+
+    // Process output bytes as lines.
+    for (size_t i = 0; i < out_buf_size; i++) {
+      char ch = static_cast<char>(out_buf[i]);
+      if (ch == '\n' || ch == '\r') {
+        if (ctx.line_pos > 2) {
+          ctx.line_buf[ctx.line_pos] = '\0';
+          if (ctx.self->process_jsonl_line_(ctx.line_buf, *ctx.device_id, *ctx.device_json)) {
+            ctx.entities++;
+          }
+        }
+        ctx.line_pos = 0;
+      } else if (ctx.line_pos < (int)sizeof(ctx.line_buf) - 1) {
+        ctx.line_buf[ctx.line_pos++] = ch;
+      }
+    }
+
+    if (status == TINFL_STATUS_DONE) break;
+    if (status < 0) {
+      ESP_LOGE(TAG, "HA fetch: decompression failed for %s (status %d)", cat->name, status);
+      return false;
+    }
+    // TINFL_STATUS_NEEDS_MORE_INPUT or TINFL_STATUS_HAS_MORE_OUTPUT — continue.
+  }
 
   // Process any remaining data in line buffer.
   if (ctx.line_pos > 2) {
@@ -363,36 +399,9 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
     }
   }
 
-  if (status != TINFL_STATUS_DONE) {
-    ESP_LOGE(TAG, "HA fetch: decompression failed for %s (status %d)", cat->name, status);
-    return false;
-  }
-
   ESP_LOGI(TAG, "HA fetch: %s -> %d entities", cat->name, ctx.entities);
   return true;
 #endif
-}
-
-// tinfl callback: called with chunks of decompressed data.
-// Accumulates bytes into line_buf, processes complete lines.
-int HaDiscoveryManager::tinfl_callback_(const void* buf, int len, void* user)
-{
-  auto* ctx = static_cast<DecompressCtx*>(user);
-  for (int i = 0; i < len; i++) {
-    char ch = static_cast<const char*>(buf)[i];
-    if (ch == '\n' || ch == '\r') {
-      if (ctx->line_pos > 2) {
-        ctx->line_buf[ctx->line_pos] = '\0';
-        if (ctx->self->process_jsonl_line_(ctx->line_buf, *ctx->device_id, *ctx->device_json)) {
-          ctx->entities++;
-        }
-      }
-      ctx->line_pos = 0;
-    } else if (ctx->line_pos < (int)sizeof(ctx->line_buf) - 1) {
-      ctx->line_buf[ctx->line_pos++] = ch;
-    }
-  }
-  return len;
 }
 
 void HaDiscoveryManager::publish_ha_discovery_()

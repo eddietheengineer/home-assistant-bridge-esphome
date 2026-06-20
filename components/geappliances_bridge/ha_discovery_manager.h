@@ -142,8 +142,6 @@ class HaDiscoveryManager {
     int line_pos;
   };
 
-  // tinfl callback for streaming decompression.
-  static int tinfl_callback_(const void* buf, int len, void* user);
   static void ha_fetch_task_fn_(void* param);
   void fetch_ha_definitions_();
   bool process_category_(const HaDiscoveryCategory* cat,
