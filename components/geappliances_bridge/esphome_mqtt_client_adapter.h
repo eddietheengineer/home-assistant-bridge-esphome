@@ -43,6 +43,10 @@ typedef struct {
   // string-ERD type detection, and registered-ERD tracking in one place.
   // Set via esphome_mqtt_client_adapter_set_erd_registry().
   esphome::geappliances_bridge::ErdRegistry* erd_registry;
+  // Buffer for decoded hex payload from write topic.
+  // Max ERD write payload is 32 bytes (64 hex chars).
+  uint8_t write_payload_buffer_[32];
+  uint8_t write_payload_size_;
 } esphome_mqtt_client_adapter_t;
 
 #ifdef __cplusplus

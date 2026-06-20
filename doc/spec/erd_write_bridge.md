@@ -177,12 +177,13 @@ Only one write is processed at a time. If a write request arrives while a previo
 
 ```cpp
 // In GeappliancesBridge::initialize_erd_bridge_() or similar:
+// Autodiscovery completes before bridge init, so the real host address is available.
 erd_write_bridge_init(
     &this->erd_write_bridge_,
     &this->timer_group_,
     this->autodiscovery_manager_.get_active_erd_client(),
     &this->mqtt_client_adapter_.interface,
-    tiny_gea_broadcast_address);  // Initially unknown
+    this->autodiscovery_manager_.get_host_address());
 ```
 
 ### 8.2 Host Address Update
