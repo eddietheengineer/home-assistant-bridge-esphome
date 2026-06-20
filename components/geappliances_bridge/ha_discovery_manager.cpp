@@ -344,22 +344,14 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
   ESP_LOGE(TAG, "HA fetch: decompression not available in stub build");
   return false;
 #else
-  // Data is zlib-compressed (2-byte header + deflate + 4-byte adler32).
-  // tinfl handles the zlib wrapper when TINFL_FLAG_PARSE_ZLIB_HEADER is set.
-  const uint8_t* src = cat->data;
-  size_t src_remaining = cat->compressed_size;
-
-  tinfl_decompressor decomp;
-  tinfl_init(&decomp);
-
-  // tinfl requires a buffer >= dictionary size (32KB) when not using
-  // TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF. Allocate from heap to avoid
-  // blowing the task stack.
-  static constexpr size_t OUT_BUF_SIZE = 32 * 1024;
-  uint8_t* out_buf = static_cast<uint8_t*>(malloc(OUT_BUF_SIZE));
+  // Each category is split into independently-compressible chunks.
+  // Decompress each chunk into a single small buffer, process lines,
+  // then move to the next chunk — same buffer reused throughout.
+  // Buffer size = max decompressed chunk size (typically 2048 bytes).
+  uint8_t* out_buf = static_cast<uint8_t*>(malloc(cat->max_decompressed_chunk));
   if (!out_buf) {
     ESP_LOGE(TAG, "HA fetch: failed to allocate %u bytes for decompression buffer",
-             static_cast<unsigned>(OUT_BUF_SIZE));
+             static_cast<unsigned>(cat->max_decompressed_chunk));
     return false;
   }
 
@@ -367,23 +359,28 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
   int line_pos = 0;
   int entities = 0;
 
-  while (true) {
-    size_t in_buf_size = src_remaining;
-    size_t out_buf_size = OUT_BUF_SIZE;
-    int flags = TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_HAS_MORE_INPUT;
-    if (src_remaining == 0) {
-      // No more input — clear HAS_MORE_INPUT so tinfl finalizes.
-      flags = TINFL_FLAG_PARSE_ZLIB_HEADER;
-    }
-    tinfl_status status = tinfl_decompress(
-        &decomp, src, &in_buf_size,
-        out_buf, out_buf, &out_buf_size,
-        flags);
-    src += in_buf_size;
-    src_remaining -= in_buf_size;
+  for (uint16_t ci = 0; ci < cat->num_chunks; ci++) {
+    const HaDiscoveryChunk* chunk = &cat->chunks[ci];
+    const uint8_t* src = cat->data + chunk->offset;
+    size_t src_size = chunk->size;
+    size_t dst_size = cat->max_decompressed_chunk;
 
-    // Process output bytes as lines.
-    for (size_t i = 0; i < out_buf_size; i++) {
+    tinfl_decompressor decomp;
+    tinfl_init(&decomp);
+
+    tinfl_status status = tinfl_decompress(
+        &decomp, src, &src_size,
+        out_buf, out_buf, &dst_size,
+        TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
+
+    if (status != TINFL_STATUS_DONE) {
+      ESP_LOGE(TAG, "HA fetch: chunk %u of %s failed (status %d)", ci, cat->name, status);
+      free(out_buf);
+      return false;
+    }
+
+    // Process decompressed bytes as lines.
+    for (size_t i = 0; i < dst_size; i++) {
       char ch = static_cast<char>(out_buf[i]);
       if (ch == '\n' || ch == '\r') {
         if (line_pos > 2) {
@@ -397,14 +394,6 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
         line_buf[line_pos++] = ch;
       }
     }
-
-    if (status == TINFL_STATUS_DONE) break;
-    if (status < 0) {
-      ESP_LOGE(TAG, "HA fetch: decompression failed for %s (status %d)", cat->name, status);
-      free(out_buf);
-      return false;
-    }
-    // TINFL_STATUS_NEEDS_MORE_INPUT or TINFL_STATUS_HAS_MORE_OUTPUT — continue.
   }
 
   // Process any remaining data in line buffer.
