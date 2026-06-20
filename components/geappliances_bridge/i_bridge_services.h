@@ -57,6 +57,8 @@ class IBridgeServices {
   virtual bool is_mqtt_client_initialized() const = 0;
   /// Initialize the MQTT client adapter (idempotent).
   virtual void initialize_mqtt_client() = 0;
+  /// Returns true if the MQTT broker is currently connected.
+  virtual bool is_mqtt_connected() const = 0;
 
   // -- Feature bits ----------------------------------------------------------
 
@@ -102,6 +104,9 @@ class IBridgeServices {
   virtual void log_poll_state_transitions() = 0;
   /// Run one tick of the HA discovery manager.
   virtual void run_ha_discovery() = 0;
+  /// Initialize the HA discovery manager with the current ERD cache snapshot.
+  /// Called at the start of the HA discovery phase, after steady state is confirmed.
+  virtual void init_ha_discovery() = 0;
   /// Run one tick of all managers (autodiscovery, device-ID, feature bits).
   virtual void run_all_managers() = 0;
 

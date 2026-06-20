@@ -111,6 +111,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   bool is_mqtt_client_initialized() const override;
   void initialize_mqtt_client() override;
+  bool is_mqtt_connected() const override;
 
   void start_feature_bit_reading() override;
   bool is_feature_bits_complete() const override;
@@ -131,6 +132,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void maybe_start_custom_erd_polling() override;
   void log_poll_state_transitions() override;
   void run_ha_discovery() override;
+  void init_ha_discovery() override;
   void initialize_erd_cache_publisher() override;
   bool is_erd_cache_publisher_initialized() const override;
   void run_all_managers() override;
@@ -141,6 +143,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void start_custom_erd_polling_();
   void maybe_start_custom_erd_polling_();
   void check_subscription_activity_();
+  static void erd_cache_to_array(erd_cache_t* cache, tiny_erd_t* out, uint16_t* count);
   void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
   void start_feature_bit_reading_();

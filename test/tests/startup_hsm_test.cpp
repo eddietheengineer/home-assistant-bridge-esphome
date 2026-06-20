@@ -59,6 +59,10 @@ class MockBridgeServices : public IBridgeServices {
   void initialize_mqtt_client() override {
     mock().actualCall("initialize_mqtt_client").onObject(this);
   }
+  bool is_mqtt_connected() const override {
+    return mock().actualCall("is_mqtt_connected").onObject(this)
+               .returnBoolValueOrDefault(true);
+  }
 
   // -- Feature bits -----------------------------------------------------------
   void start_feature_bit_reading() override {
@@ -112,6 +116,9 @@ class MockBridgeServices : public IBridgeServices {
   }
   void run_ha_discovery() override {
     mock().actualCall("run_ha_discovery").onObject(this);
+  }
+  void init_ha_discovery() override {
+    mock().actualCall("init_ha_discovery").onObject(this);
   }
   void log_poll_state_transitions() override {}
   void run_all_managers() override {}
@@ -290,7 +297,9 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   /* Phase 6: subscription_watch entry → ha_discovery */
   mock().expectOneCall("get_mode").onObject(&svc).andReturnValue(BRIDGE_MODE_POLL);
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
-  /* Phase 7: ha_discovery run_loop → running */
+  /* Phase 7: ha_discovery entry calls init_ha_discovery, then run_loop checks MQTT */
+  mock().expectOneCall("init_ha_discovery").onObject(&svc);
+  mock().expectOneCall("is_mqtt_connected").onObject(&svc).andReturnValue(true);
   mock().expectOneCall("run_ha_discovery").onObject(&svc);
 
   /* Drive the HSM through all phases. */

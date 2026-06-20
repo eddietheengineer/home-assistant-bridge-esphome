@@ -411,9 +411,19 @@ tiny_hsm_result_t startup_state_ha_discovery(tiny_hsm_t* hsm, tiny_hsm_signal_t 
   switch (signal) {
     case tiny_hsm_signal_entry:
       ESP_LOGI(TAG, "Startup: HA discovery phase");
+      // Initialize HA discovery now that both subscription and polling are
+      // in steady state. The ERD cache snapshot will include all ERDs
+      // discovered during the subscription burst.
+      svc->init_ha_discovery();
       break;
 
     case signal_run_loop:
+      // If MQTT isn't connected yet, defer until it is. The run_loop signal
+      // will be sent again on the next loop() iteration.
+      if (!svc->is_mqtt_connected()) {
+        ESP_LOGD(TAG, "HA discovery deferred: MQTT not connected yet");
+        break;
+      }
       svc->run_ha_discovery();
       tiny_hsm_transition(hsm, startup_state_running);
       break;

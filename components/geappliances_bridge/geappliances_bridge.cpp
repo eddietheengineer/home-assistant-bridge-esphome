@@ -20,6 +20,17 @@ void GeappliancesBridge::add_custom_erd(tiny_erd_t erd)
   this->custom_erds_[this->custom_erds_count_++] = erd;
 }
 
+void GeappliancesBridge::erd_cache_to_array(erd_cache_t* cache, tiny_erd_t* out, uint16_t* count)
+{
+  *count = 0;
+  uint16_t iterator = 0;
+  while (*count < ERD_CACHE_CAPACITY) {
+    erd_cache_entry_t* entry = erd_cache_get_next_entry(cache, &iterator);
+    if (!entry) break;
+    out[(*count)++] = entry->erd;
+  }
+}
+
 
 static const tiny_gea3_erd_client_configuration_t client_configuration = {
   .request_timeout = 250,
@@ -627,6 +638,11 @@ void GeappliancesBridge::initialize_mqtt_client()
   initialize_mqtt_client_();
 }
 
+bool GeappliancesBridge::is_mqtt_connected() const
+{
+  return esphome_mqtt_client_adapter_is_connected(&this->mqtt_client_adapter_);
+}
+
 // -- Feature bits -------------------------------------------------------------
 
 void GeappliancesBridge::start_feature_bit_reading()
@@ -720,6 +736,31 @@ void GeappliancesBridge::log_poll_state_transitions()
 void GeappliancesBridge::run_ha_discovery()
 {
   ha_discovery_manager_.run(is_device_steady_state());
+}
+
+void GeappliancesBridge::init_ha_discovery()
+{
+  if (!this->generate_device_config_) return;
+
+  // Clear any previously-published HA discovery topics before generating new ones.
+  this->ha_discovery_manager_.clear_ha_discovery_sync();
+
+  // Snapshot the ERD cache now that both subscription and polling are in
+  // steady state — this captures all ERDs discovered during the subscription
+  // burst, not just the feature-bit ERDs available at bridge init time.
+  tiny_erd_t erds[ERD_CACHE_CAPACITY];
+  uint16_t count = 0;
+  GeappliancesBridge::erd_cache_to_array(&this->erd_cache_, erds, &count);
+  this->ha_discovery_manager_.init(
+      this->ha_discovery_base_url_,
+      this->device_identity_manager_.get_device_id(),
+      this->device_identity_manager_.get_model_number(),
+      this->device_identity_manager_.get_serial_number(),
+      erds, count,
+      true);
+  this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
+  ESP_LOGI(TAG, "HA discovery initialized with %u ERDs from cache",
+           static_cast<unsigned>(count));
 }
 
 void GeappliancesBridge::run_all_managers()

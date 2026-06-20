@@ -37,16 +37,6 @@
 
 namespace esphome {
 namespace geappliances_bridge {
-static void erd_cache_to_array(erd_cache_t* cache, tiny_erd_t* out, uint16_t* count)
-{
-  *count = 0;
-  uint16_t iterator = 0;
-  while (*count < ERD_CACHE_CAPACITY) {
-    erd_cache_entry_t* entry = erd_cache_get_next_entry(cache, &iterator);
-    if (!entry) break;
-    out[(*count)++] = entry->erd;
-  }
-}
 // ---------------------------------------------------------------------------
 // Polling bridge discovery-complete callback (shared by all three init paths)
 // ---------------------------------------------------------------------------
@@ -55,7 +45,7 @@ void GeappliancesBridge::on_poll_discovery_complete_()
 {
   tiny_erd_t erds[ERD_CACHE_CAPACITY];
   uint16_t count = 0;
-  erd_cache_to_array(&this->erd_cache_, erds, &count);
+  GeappliancesBridge::erd_cache_to_array(&this->erd_cache_, erds, &count);
   this->ha_discovery_manager_.set_registered_erds(erds, count);
   tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
 }
@@ -271,25 +261,9 @@ void GeappliancesBridge::initialize_erd_bridge_()
   this->erd_bridge_initialized_ = true;
   ESP_LOGI(TAG, "ERD bridge initialized successfully");
 
-  // Defer HA device discovery until ERD registration has settled.
-  if (this->generate_device_config_) {
-    // Clear any previously-published HA discovery topics before generating new ones.
-    this->ha_discovery_manager_.clear_ha_discovery_sync();
-    tiny_erd_t erds[ERD_CACHE_CAPACITY];
-    uint16_t count = 0;
-    erd_cache_to_array(&this->erd_cache_, erds, &count);
-    this->ha_discovery_manager_.init(
-        this->ha_discovery_base_url_,
-        this->device_identity_manager_.get_device_id(),
-        this->device_identity_manager_.get_model_number(),
-        this->device_identity_manager_.get_serial_number(),
-        erds, count,
-        true);
-    this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
-    ESP_LOGI(TAG, "HA discovery deferred: will publish after ERD discovery completes "
-                  "(polling mode) or %u s quiet window (subscription mode)",
-             HA_DISCOVERY_QUIET_MS / 1000);
-  }
+  // HA discovery is initialized later, in the HA discovery phase,
+  // after both subscription and polling are in steady state, so the
+  // ERD cache snapshot includes all ERDs discovered during the burst.
 }
 
 // ---------------------------------------------------------------------------

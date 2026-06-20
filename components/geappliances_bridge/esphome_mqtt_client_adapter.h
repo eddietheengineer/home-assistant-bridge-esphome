@@ -84,6 +84,11 @@ void esphome_mqtt_client_adapter_destroy(
 
 size_t esphome_mqtt_client_adapter_get_pending_update_count(
   const esphome_mqtt_client_adapter_t* self);
+/*!
+ * Returns true if the MQTT broker is currently connected.
+ */
+bool esphome_mqtt_client_adapter_is_connected(
+  const esphome_mqtt_client_adapter_t* self);
 
 /*!
  * Publish an MQTT message.  Used by HA discovery manager.

@@ -225,3 +225,11 @@ extern "C" size_t esphome_mqtt_client_adapter_get_pending_update_count(
   (void)self;
   return 0;
 }
+
+extern "C" bool esphome_mqtt_client_adapter_is_connected(
+  const esphome_mqtt_client_adapter_t* self)
+{
+  (void)self;
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  return mqtt_client != nullptr && mqtt_client->is_connected();
+}
