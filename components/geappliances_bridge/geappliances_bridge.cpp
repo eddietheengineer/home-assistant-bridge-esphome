@@ -695,11 +695,14 @@ bool GeappliancesBridge::is_subscription_steady_state() const
   if (!this->subscription_mode_active_) {
     return true;
   }
-  // True after 10s quiet window with no new ERD registrations from subscription.
-  if (this->custom_erd_subscription_last_activity_ == 0) {
-    return true;
+  // If we've seen subscription activity, check the quiet window.
+  if (this->custom_erd_subscription_last_activity_ != 0) {
+    return (millis() - this->custom_erd_subscription_last_activity_) >= HA_DISCOVERY_QUIET_MS;
   }
-  return (millis() - this->custom_erd_subscription_last_activity_) >= HA_DISCOVERY_QUIET_MS;
+  // No subscription activity seen yet. Wait for the quiet window from the
+  // subscription start time — the initial burst of subscription publications
+  // typically arrives within the first few seconds after subscribing.
+  return (millis() - this->subscription_start_time_) >= HA_DISCOVERY_QUIET_MS;
 }
 
 bool GeappliancesBridge::is_polling_steady_state() const
