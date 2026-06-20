@@ -57,7 +57,6 @@ void GeappliancesBridge::on_poll_discovery_complete_()
   uint16_t count = 0;
   erd_cache_to_array(&this->erd_cache_, erds, &count);
   this->ha_discovery_manager_.set_registered_erds(erds, count);
-  erd_write_bridge_set_host_address(&this->erd_write_bridge_, this->autodiscovery_manager_.get_host_address());
   tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
 }
 
@@ -254,15 +253,20 @@ void GeappliancesBridge::initialize_erd_bridge_()
     // immediately so it can transition to subscription_watch.
     tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
   }
-  // Initialize the write bridge. It starts with the broadcast address so that
-  // write requests are dropped until the appliance is identified.
+  // Initialize the write bridge. Autodiscovery is complete by this point,
+  // so we have the real host address from the broadcast FF 0x0008 response.
+  uint8_t host_addr = this->autodiscovery_manager_.get_host_address();
   erd_write_bridge_init(
     &this->erd_write_bridge_,
     &this->timer_group_,
     this->autodiscovery_manager_.get_active_erd_client(),
     &this->mqtt_client_adapter_.interface,
-    tiny_gea_broadcast_address);
+    host_addr);
   this->write_bridge_initialized_ = true;
+
+  // Subscribe to the wildcard write topic so incoming write commands from
+  // Home Assistant are routed to the write bridge via on_write_request_event.
+  esphome_mqtt_client_adapter_subscribe_write_topic(&this->mqtt_client_adapter_);
 
   this->erd_bridge_initialized_ = true;
   ESP_LOGI(TAG, "ERD bridge initialized successfully");
