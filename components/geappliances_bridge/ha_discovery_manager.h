@@ -79,8 +79,8 @@ enum HaDiscoveryState {
  * A (topic, payload) pair ready to be published via MQTT.
  */
 struct HaDiscoveryItem {
-  std::string topic;
-  std::string payload;
+  char topic[128];
+  char payload[1024];
 };
 
 /* Maximum number of registered/seen ERDs for HA discovery. */
@@ -150,8 +150,8 @@ class HaDiscoveryManager {
   // Track published discovery topics for clearing later.
   // Each entry stores the component type and ERD hex string.
   struct PublishedTopic {
-    std::string component;  // e.g. "sensor", "switch", "binary_sensor"
-    std::string erd_hex;    // e.g. "0002", "2001"
+    char component[32];  // e.g. "sensor", "switch", "binary_sensor"
+    char erd_hex[32];    // e.g. "0002", "2001"
   };
   PublishedTopic published_topics_[HA_DISCOVERY_MAX_PUBLISHED_TOPICS];
   uint16_t published_topics_count_{0};

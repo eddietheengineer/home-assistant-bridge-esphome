@@ -171,9 +171,11 @@ void HaDiscoveryManager::clear_ha_discovery_sync()
   ESP_LOGI(TAG, "Clearing %u HA discovery topics (sync)", this->published_topics_count_);
   for (uint16_t i = 0; i < this->published_topics_count_; i++) {
     const auto& t = this->published_topics_[i];
-    std::string topic = "homeassistant/" + t.component + "/" + this->device_id_ + "/" + t.erd_hex + "/config";
+    char topic_buf[128];
+    snprintf(topic_buf, sizeof(topic_buf),
+        "homeassistant/%s/%s/%s/config", t.component, this->device_id_.c_str(), t.erd_hex);
     if (this->mqtt_adapter_) {
-      esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, topic, "", true);
+      esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, topic_buf, "", true);
     }
   }
   this->published_topics_count_ = 0;
@@ -201,9 +203,11 @@ void HaDiscoveryManager::publish_next_clear_()
     return;
   }
   const auto& t = this->published_topics_[this->clear_index_++];
-  std::string topic = "homeassistant/" + t.component + "/" + this->device_id_ + "/" + t.erd_hex + "/config";
+  char topic_buf[128];
+  snprintf(topic_buf, sizeof(topic_buf),
+      "homeassistant/%s/%s/%s/config", t.component, this->device_id_.c_str(), t.erd_hex);
   if (this->mqtt_adapter_) {
-    esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, topic, "", true);
+    esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, topic_buf, "", true);
   }
 }
 
@@ -703,16 +707,21 @@ bool HaDiscoveryManager::process_jsonl_line_(const char* line,
 
   // Track this topic for later clearing
   if (this->published_topics_count_ < HA_DISCOVERY_MAX_PUBLISHED_TOPICS) {
-    this->published_topics_[this->published_topics_count_].component = std::string(comp);
-    this->published_topics_[this->published_topics_count_].erd_hex = std::string(unique_suffix);
+    auto& t = this->published_topics_[this->published_topics_count_];
+    strncpy(t.component, comp, sizeof(t.component) - 1);
+    t.component[sizeof(t.component) - 1] = '\0';
+    strncpy(t.erd_hex, unique_suffix, sizeof(t.erd_hex) - 1);
+    t.erd_hex[sizeof(t.erd_hex) - 1] = '\0';
     this->published_topics_count_++;
   }
 
   // Queue the item for the main loop to publish.
   // Blocks if queue is full — backpressures the fetch task.
   auto* item = new HaDiscoveryItem();
-  item->topic = topic_buf;
-  item->payload = payload_buf;
+  strncpy(item->topic, topic_buf, sizeof(item->topic) - 1);
+  item->topic[sizeof(item->topic) - 1] = '\0';
+  strncpy(item->payload, payload_buf, sizeof(item->payload) - 1);
+  item->payload[sizeof(item->payload) - 1] = '\0';
 
   if (this->queue_) {
     if (xQueueSend(this->queue_, &item, pdMS_TO_TICKS(2000)) != pdTRUE) {
