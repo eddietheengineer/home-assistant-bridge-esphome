@@ -1,6 +1,6 @@
 // Auto-generated — do not edit.
 // Compressed JSONL data for HA discovery, embedded in flash.
-// Each category is gzip-compressed; decompress at runtime into a static buffer.
+// Each category is zlib-compressed; decompress at runtime into a static buffer.
 #pragma once
 
 #include <stdint.h>
@@ -18,7 +18,7 @@ struct HaDiscoveryCategory {
 
 #ifdef USE_ESP_IDF_STUBS
 // Test builds: no embedded data, empty arrays.
-static const HaDiscoveryCategory ha_discovery_categories[] = {};
+static const HaDiscoveryCategory ha_discovery_categories[] = { {nullptr, nullptr, 0, 0} };
 static const uint16_t ha_discovery_category_count = 0;
 #else
 // All categories - generated from ha_discovery/*.jsonl at build time.
