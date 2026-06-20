@@ -293,9 +293,7 @@ void HaDiscoveryManager::publish_next_entity_()
 {
   auto* self = static_cast<HaDiscoveryManager*>(param);
   self->fetch_ha_definitions_();
-  UBaseType_t hwm = uxTaskGetStackHighWaterMark(nullptr);
-  (void)hwm;
-  ESP_LOGI(TAG, "ha_fetch: done — stack HWM %u B", static_cast<unsigned>(hwm));
+  // Send sentinel to signal completion to the main loop.
   HaDiscoveryItem* sentinel = nullptr;
   xQueueSend(self->queue_, &sentinel, portMAX_DELAY);
   vTaskDelete(nullptr);
@@ -410,25 +408,22 @@ void HaDiscoveryManager::publish_next_entity_()
 {
   HaDiscoveryItem* item = nullptr;
   if (xQueueReceive(this->queue_, &item, 0) == pdTRUE) {
+    if (item == nullptr) {
+      // Sentinel — fetch task is done.
+      vQueueDelete(this->queue_); this->queue_ = nullptr;
+      // Clean up task resources.
+      free(this->task_stack_); free(this->task_tcb_);
+      this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
+      this->task_handle_ = nullptr;
+      ESP_LOGI(TAG, "HA discovery complete — %u entities published",
+               static_cast<unsigned>(this->published_topics_count_));
+      this->state_ = HA_DISCOVERY_COMPLETE;
+      return;
+    }
     if (this->mqtt_adapter_) {
       esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, item->topic, item->payload, true);
     }
     delete item;
-  } else {
-    // Queue empty — fetch task is done or not yet produced items.
-    // Check if the fetch task has terminated.
-    if (this->task_handle_ == nullptr) {
-      // Fetch task completed. Check for any remaining items.
-      while (xQueueReceive(this->queue_, &item, 0) == pdTRUE) {
-        if (this->mqtt_adapter_) {
-          esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, item->topic, item->payload, true);
-        }
-        delete item;
-      }
-      vQueueDelete(this->queue_); this->queue_ = nullptr;
-      ESP_LOGI(TAG, "HA discovery complete — all entities published");
-      this->state_ = HA_DISCOVERY_COMPLETE;
-    }
   }
 }
 
@@ -472,81 +467,93 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
     }
     if (!found) { cJSON_Delete(root); return false; }
   }
-  /* Build the MQTT discovery payload. */
+
   const char* fi = get_str("fi");
-  std::string unique_suffix = std::string(erd_hex);
-  if (fi[0] != '\0') unique_suffix += "_" + std::string(fi);
-
-  std::string payload = "{\"device\":" + device_json;
-  payload += ",\"name\":\"" + this->escape_json_str_(get_str("n")) + "\"";
-  payload += ",\"unique_id\":\"" + device_id + "_" + unique_suffix + "\"";
-  payload += ",\"object_id\":\"" + this->escape_json_str_(get_str("o")) + "\"";
-
-  const char* unit = get_str("u");
-  if (unit[0] != '\0') {
-    payload += ",\"unit_of_measurement\":\"" + this->escape_json_str_(unit) + "\"";
-  }
-
-  const char* ic = get_str("ic");
-  if (ic[0] != '\0') {
-    payload += ",\"icon\":\"" + this->escape_json_str_(ic) + "\"";
+  char unique_suffix[64];
+  if (fi[0] != '\0') {
+    snprintf(unique_suffix, sizeof(unique_suffix), "%s_%s", erd_hex, fi);
+  } else {
+    snprintf(unique_suffix, sizeof(unique_suffix), "%s", erd_hex);
   }
 
   const char* comp = get_str("d");
   if (comp[0] == '\0') { cJSON_Delete(root); return false; }
 
+  // Build payload on a stack buffer — no heap allocation.
+  char payload_buf[1024];
+  int pos = 0;
+  pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+      "{\"device\":%s", device_json.c_str());
+  pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+      ",\"name\":\"%s\"", this->escape_json_str_(get_str("n")).c_str());
+  pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+      ",\"unique_id\":\"%s_%s\"", device_id.c_str(), unique_suffix);
+  pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+      ",\"object_id\":\"%s\"", this->escape_json_str_(get_str("o")).c_str());
+
+  const char* unit = get_str("u");
+  if (unit[0] != '\0') {
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+        ",\"unit_of_measurement\":\"%s\"", this->escape_json_str_(unit).c_str());
+  }
+  const char* ic = get_str("ic");
+  if (ic[0] != '\0') {
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+        ",\"icon\":\"%s\"", this->escape_json_str_(ic).c_str());
+  }
   const char* dev_cl = get_str("dc");
   if (dev_cl[0] != '\0') {
-    payload += ",\"device_class\":\"" + this->escape_json_str_(dev_cl) + "\"";
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+        ",\"device_class\":\"%s\"", this->escape_json_str_(dev_cl).c_str());
   }
   const char* ent_cat = get_str("e");
   if (ent_cat[0] != '\0') {
-    payload += ",\"entity_category\":\"" + this->escape_json_str_(ent_cat) + "\"";
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+        ",\"entity_category\":\"%s\"", this->escape_json_str_(ent_cat).c_str());
   }
-
   const char* state_topic = get_str("s");
   if (state_topic[0] != '\0') {
-    payload += ",\"state_topic\":\"" + this->escape_json_str_(state_topic) + "\"";
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+        ",\"state_topic\":\"%s\"", this->escape_json_str_(state_topic).c_str());
   }
-
   const char* cmd_topic = get_str("c");
   if (cmd_topic[0] != '\0') {
-    payload += ",\"command_topic\":\"" + this->escape_json_str_(cmd_topic) + "\"";
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+        ",\"command_topic\":\"%s\"", this->escape_json_str_(cmd_topic).c_str());
   }
-
   const char* payload_on = get_str("on");
   if (payload_on[0] != '\0') {
-    payload += ",\"payload_on\":\"" + this->escape_json_str_(payload_on) + "\"";
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+        ",\"payload_on\":\"%s\"", this->escape_json_str_(payload_on).c_str());
   }
-
   const char* payload_off = get_str("of");
   if (payload_off[0] != '\0') {
-    payload += ",\"payload_off\":\"" + this->escape_json_str_(payload_off) + "\"";
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+        ",\"payload_off\":\"%s\"", this->escape_json_str_(payload_off).c_str());
   }
-
   const char* avail_topic = get_str("a");
   if (avail_topic[0] != '\0') {
-    payload += ",\"availability_topic\":\"" + this->escape_json_str_(avail_topic) + "\"";
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+        ",\"availability_topic\":\"%s\"", this->escape_json_str_(avail_topic).c_str());
   }
-
   const char* json_attr = get_str("j");
   if (json_attr[0] != '\0') {
-    payload += ",\"json_attributes_topic\":\"" + this->escape_json_str_(json_attr) + "\"";
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+        ",\"json_attributes_topic\":\"%s\"", this->escape_json_str_(json_attr).c_str());
   }
-
   const char* val_tpl = get_str("v");
   if (val_tpl[0] != '\0') {
-    payload += ",\"value_template\":\"" + this->escape_json_str_(val_tpl) + "\"";
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+        ",\"value_template\":\"%s\"", this->escape_json_str_(val_tpl).c_str());
   }
-
   const char* cmd_tpl = get_str("cm");
   if (cmd_tpl[0] != '\0') {
-    payload += ",\"command_template\":\"" + this->escape_json_str_(cmd_tpl) + "\"";
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+        ",\"command_template\":\"%s\"", this->escape_json_str_(cmd_tpl).c_str());
   }
-
   const char* opt = get_str("opt");
   if (opt[0] != '\0') {
-    payload += ",\"options\":[";
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, ",\"options\":[");
     bool first = true;
     for (const char* p = opt; *p; ) {
       const char* comma = strchr(p, ',');
@@ -558,39 +565,48 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
         val = p;
         p += val.size();
       }
-      if (!first) payload += ",";
-      payload += "\"" + this->escape_json_str_(val) + "\"";
+      if (!first) pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, ",");
+      pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, "\"%s\"", this->escape_json_str_(val).c_str());
       first = false;
     }
-    payload += "]";
+    pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, "]");
   }
+  pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, "}");
 
-  payload += "}";
-
-  // Track this topic for later clearing
-  if (this->published_topics_count_ < HA_DISCOVERY_MAX_PUBLISHED_TOPICS) {
-    this->published_topics_[this->published_topics_count_].component = std::string(comp);
-    this->published_topics_[this->published_topics_count_].erd_hex = unique_suffix;
-    this->published_topics_count_++;
-  }
-
-  // Build the topic as a C string to avoid std::string heap allocation.
-  char topic_buf[128];
-  int topic_len = snprintf(topic_buf, sizeof(topic_buf),
-      "homeassistant/%s/%s/%s/config", comp, device_id.c_str(), unique_suffix.c_str());
-  if (topic_len < 0 || topic_len >= (int)sizeof(topic_buf)) {
-    ESP_LOGW(TAG, "HA fetch: topic too long for ERD %s", erd_hex);
+  if (pos >= (int)sizeof(payload_buf)) {
+    ESP_LOGW(TAG, "HA fetch: payload too large for ERD %s", erd_hex);
     cJSON_Delete(root);
     return false;
   }
 
-  // Publish directly via raw C strings to avoid std::string heap churn.
-  if (this->mqtt_adapter_) {
-    esphome_mqtt_client_adapter_publish_raw(&this->mqtt_adapter_->interface,
-        topic_buf, payload.c_str(), payload.size(), true);
+  // Build topic on stack.
+  char topic_buf[128];
+  snprintf(topic_buf, sizeof(topic_buf),
+      "homeassistant/%s/%s/%s/config", comp, device_id.c_str(), unique_suffix);
+
+  // Track this topic for later clearing
+  if (this->published_topics_count_ < HA_DISCOVERY_MAX_PUBLISHED_TOPICS) {
+    this->published_topics_[this->published_topics_count_].component = std::string(comp);
+    this->published_topics_[this->published_topics_count_].erd_hex = std::string(unique_suffix);
+    this->published_topics_count_++;
   }
-  // Yield to let the main loop drain the MQTT outgoing queue.
-  vTaskDelay(pdMS_TO_TICKS(1));
+
+  // Queue the item for the main loop to publish.
+  // Blocks if queue is full — backpressures the fetch task.
+  auto* item = new HaDiscoveryItem();
+  item->topic = topic_buf;
+  item->payload = payload_buf;
+
+  if (this->queue_) {
+    if (xQueueSend(this->queue_, &item, pdMS_TO_TICKS(500)) != pdTRUE) {
+      ESP_LOGW(TAG, "HA fetch: queue full, dropping entity for ERD %s", erd_hex);
+      delete item;
+    }
+  } else {
+    delete item;
+  }
+
+  cJSON_Delete(root);
   return true;
 }
 
