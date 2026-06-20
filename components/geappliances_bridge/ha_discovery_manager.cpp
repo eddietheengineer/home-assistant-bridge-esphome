@@ -207,6 +207,7 @@ void HaDiscoveryManager::publish_next_clear_()
   }
 }
 
+
 int HaDiscoveryManager::escape_json_str_(const char* s, char* buf, int buf_size)
 {
   int pos = 0;
@@ -294,6 +295,27 @@ void HaDiscoveryManager::publish_next_entity_()
   // No MQTT broker — no-op.
 }
 #else  /* !USE_ESP_IDF_STUBS — real ESP-IDF implementation */
+
+// Zero-allocation JSON string extractor for flat JSON objects.
+// Finds "key":"value" in JSON and returns a pointer into the source string.
+// Returns "" if key not found or value is not a string.
+static const char* json_get_str(const char* json, const char* key)
+{
+  char pattern[32];
+  int plen = (int)snprintf(pattern, sizeof(pattern), "\"%s\":", key);
+  if (plen <= 0 || plen >= (int)sizeof(pattern) - 1) return "";
+
+  const char* p = json;
+  while ((p = strstr(p, pattern)) != nullptr) {
+    p += plen;
+    while (*p == ' ' || *p == '\t') p++;
+    if (*p == '"') {
+      return p + 1;
+    }
+    p++;
+  }
+  return "";
+}
 
 /*static*/ void HaDiscoveryManager::ha_fetch_task_fn_(void* param)
 {
@@ -495,23 +517,33 @@ void HaDiscoveryManager::publish_next_entity_()
     delete item;
   }
 }
-
-bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
+bool HaDiscoveryManager::process_jsonl_line_(const char* line,
                                               const std::string& device_id,
                                               const std::string& device_json)
 {
-  cJSON* root = cJSON_Parse(line.c_str());
-  if (!root) return false;
-  auto get_str = [&](const char* key) -> const char* {
-    cJSON* item = cJSON_GetObjectItemCaseSensitive(root, key);
-    return (item && cJSON_IsString(item) && item->valuestring) ? item->valuestring : "";
+  // Extract a JSON string value, terminating at the closing quote.
+  // Result is written into 'out' (caller must provide buffer).
+  auto get_str = [&](const char* key, char* out, int out_size) {
+    const char* val = json_get_str(line, key);
+    if (val[0] == '\0') { out[0] = '\0'; return; }
+    int i = 0;
+    while (val[i] != '\0' && val[i] != '"') {
+      if (i < out_size - 1) out[i] = val[i];
+      i++;
+    }
+    out[i] = '\0';
   };
-  const char* erd_hex = get_str("i");
-  if (erd_hex[0] == '\0') { cJSON_Delete(root); return false; }
+
+  char val_buf[128];
+  get_str("i", val_buf, sizeof(val_buf));
+  const char* erd_hex = val_buf;
+  if (erd_hex[0] == '\0') return false;
   uint16_t erd_id = static_cast<uint16_t>(strtol(erd_hex, nullptr, 16));
 
-  const char* role = get_str("r");
-  const char* paired = get_str("p");
+  get_str("r", val_buf, sizeof(val_buf));
+  const char* role = val_buf;
+  get_str("p", val_buf, sizeof(val_buf));
+  const char* paired = val_buf;
 
   // Check if this ERD exists in the cache.
   if (this->erd_cache_ != nullptr) {
@@ -534,19 +566,22 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
         }
       }
     }
-    if (!found) { cJSON_Delete(root); return false; }
+    if (!found) return false;
   }
 
-  const char* fi = get_str("fi");
+  char fi_buf[128];
+  get_str("fi", fi_buf, sizeof(fi_buf));
   char unique_suffix[64];
-  if (fi[0] != '\0') {
-    snprintf(unique_suffix, sizeof(unique_suffix), "%s_%s", erd_hex, fi);
+  if (fi_buf[0] != '\0') {
+    snprintf(unique_suffix, sizeof(unique_suffix), "%s_%s", erd_hex, fi_buf);
   } else {
     snprintf(unique_suffix, sizeof(unique_suffix), "%s", erd_hex);
   }
 
-  const char* comp = get_str("d");
-  if (comp[0] == '\0') { cJSON_Delete(root); return false; }
+  char comp_buf[128];
+  get_str("d", comp_buf, sizeof(comp_buf));
+  const char* comp = comp_buf;
+  if (comp[0] == '\0') return false;
 
   // Build payload on a stack buffer — no heap allocation.
   char payload_buf[1024];
@@ -558,94 +593,98 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
   };
   pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
       "{\"device\":%s", device_json.c_str());
+
+  get_str("n", val_buf, sizeof(val_buf));
   pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-      ",\"name\":\"%s\"", esc(get_str("n")));
+      ",\"name\":\"%s\"", esc(val_buf));
   pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
       ",\"unique_id\":\"%s_%s\"", device_id.c_str(), unique_suffix);
-  pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-      ",\"object_id\":\"%s\"", esc(get_str("o")));
 
-  const char* unit = get_str("u");
-  if (unit[0] != '\0') {
+  get_str("o", val_buf, sizeof(val_buf));
+  pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
+      ",\"object_id\":\"%s\"", esc(val_buf));
+
+  get_str("u", val_buf, sizeof(val_buf));
+  if (val_buf[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"unit_of_measurement\":\"%s\"", esc(unit));
+        ",\"unit_of_measurement\":\"%s\"", esc(val_buf));
   }
-  const char* ic = get_str("ic");
-  if (ic[0] != '\0') {
+  get_str("ic", val_buf, sizeof(val_buf));
+  if (val_buf[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"icon\":\"%s\"", esc(ic));
+        ",\"icon\":\"%s\"", esc(val_buf));
   }
-  const char* dev_cl = get_str("dc");
-  if (dev_cl[0] != '\0') {
+  get_str("dc", val_buf, sizeof(val_buf));
+  if (val_buf[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"device_class\":\"%s\"", esc(dev_cl));
+        ",\"device_class\":\"%s\"", esc(val_buf));
   }
-  const char* ent_cat = get_str("e");
-  if (ent_cat[0] != '\0') {
+  get_str("e", val_buf, sizeof(val_buf));
+  if (val_buf[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"entity_category\":\"%s\"", esc(ent_cat));
+        ",\"entity_category\":\"%s\"", esc(val_buf));
   }
-  const char* state_topic = get_str("s");
-  if (state_topic[0] != '\0') {
+  get_str("s", val_buf, sizeof(val_buf));
+  if (val_buf[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"state_topic\":\"%s\"", esc(state_topic));
+        ",\"state_topic\":\"%s\"", esc(val_buf));
   }
-  const char* cmd_topic = get_str("c");
-  if (cmd_topic[0] != '\0') {
+  get_str("c", val_buf, sizeof(val_buf));
+  if (val_buf[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"command_topic\":\"%s\"", esc(cmd_topic));
+        ",\"command_topic\":\"%s\"", esc(val_buf));
   }
-  const char* payload_on = get_str("on");
-  if (payload_on[0] != '\0') {
+  get_str("on", val_buf, sizeof(val_buf));
+  if (val_buf[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"payload_on\":\"%s\"", esc(payload_on));
+        ",\"payload_on\":\"%s\"", esc(val_buf));
   }
-  const char* payload_off = get_str("of");
-  if (payload_off[0] != '\0') {
+  get_str("of", val_buf, sizeof(val_buf));
+  if (val_buf[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"payload_off\":\"%s\"", esc(payload_off));
+        ",\"payload_off\":\"%s\"", esc(val_buf));
   }
-  const char* avail_topic = get_str("a");
-  if (avail_topic[0] != '\0') {
+  get_str("a", val_buf, sizeof(val_buf));
+  if (val_buf[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"availability_topic\":\"%s\"", esc(avail_topic));
+        ",\"availability_topic\":\"%s\"", esc(val_buf));
   }
-  const char* json_attr = get_str("j");
-  if (json_attr[0] != '\0') {
+  get_str("j", val_buf, sizeof(val_buf));
+  if (val_buf[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"json_attributes_topic\":\"%s\"", esc(json_attr));
+        ",\"json_attributes_topic\":\"%s\"", esc(val_buf));
   }
-  const char* val_tpl = get_str("v");
-  if (val_tpl[0] != '\0') {
+  get_str("v", val_buf, sizeof(val_buf));
+  if (val_buf[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"value_template\":\"%s\"", esc(val_tpl));
+        ",\"value_template\":\"%s\"", esc(val_buf));
   }
-  const char* cmd_tpl = get_str("cm");
-  if (cmd_tpl[0] != '\0') {
+  get_str("cm", val_buf, sizeof(val_buf));
+  if (val_buf[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"command_template\":\"%s\"", esc(cmd_tpl));
+        ",\"command_template\":\"%s\"", esc(val_buf));
   }
-  const char* opt = get_str("opt");
-  if (opt[0] != '\0') {
+  get_str("opt", val_buf, sizeof(val_buf));
+  if (val_buf[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, ",\"options\":[");
     bool first = true;
-    for (const char* p = opt; *p; ) {
+    for (const char* p = val_buf; *p; ) {
       const char* comma = strchr(p, ',');
-      char val_buf[64];
+      char opt_val[64];
       int vlen;
       if (comma) {
         vlen = (int)(comma - p);
-        if (vlen >= (int)sizeof(val_buf)) vlen = (int)sizeof(val_buf) - 1;
+        if (vlen >= (int)sizeof(opt_val)) vlen = (int)sizeof(opt_val) - 1;
       } else {
         vlen = (int)strlen(p);
-        if (vlen >= (int)sizeof(val_buf)) vlen = (int)sizeof(val_buf) - 1;
+        if (vlen >= (int)sizeof(opt_val)) vlen = (int)sizeof(opt_val) - 1;
         p += vlen;
       }
-      memcpy(val_buf, p, vlen);
-      val_buf[vlen] = '\0';
+      memcpy(opt_val, p, vlen);
+      opt_val[vlen] = '\0';
       p = comma ? comma + 1 : p + vlen;
       if (!first) pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, ",");
-      pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, "\"%s\"", esc(val_buf));
+      pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, "\"%s\"", esc(opt_val));
       first = false;
     }
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, "]");
@@ -654,7 +693,6 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
 
   if (pos >= (int)sizeof(payload_buf)) {
     ESP_LOGW(TAG, "HA fetch: payload too large for ERD %s", erd_hex);
-    cJSON_Delete(root);
     return false;
   }
 
@@ -677,9 +715,6 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
   item->payload = payload_buf;
 
   if (this->queue_) {
-    // Wait up to 2s for queue space — the main loop drains at 50ms/entity.
-    // With 64 slots that's 3.2s to fully drain, but we don't want to block
-    // the fetch task indefinitely if the main loop is stalled.
     if (xQueueSend(this->queue_, &item, pdMS_TO_TICKS(2000)) != pdTRUE) {
       ESP_LOGW(TAG, "HA fetch: queue full after 2s, dropping entity for ERD %s", erd_hex);
       delete item;
@@ -688,7 +723,6 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
     delete item;
   }
 
-  cJSON_Delete(root);
   return true;
 }
 
