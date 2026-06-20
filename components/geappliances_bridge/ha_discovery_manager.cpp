@@ -312,14 +312,25 @@ void HaDiscoveryManager::fetch_ha_definitions_()
   };
   bool need[10] = {};
   need[0] = true;
-  // Iterate the ERD cache directly to determine which categories are needed.
-  uint16_t iterator = 0;
+
+  // Debug: log cache contents
+  uint16_t cache_count = 0;
+  uint16_t cache_iterator = 0;
+  char debug_buf[256] = {0};
   while (true) {
-    erd_cache_entry_t* entry = erd_cache_get_next_entry(this->erd_cache_, &iterator);
+    erd_cache_entry_t* entry = erd_cache_get_next_entry(this->erd_cache_, &cache_iterator);
     if (!entry) break;
+    cache_count++;
+    if (cache_count <= 5) {
+      snprintf(debug_buf + strlen(debug_buf), sizeof(debug_buf) - strlen(debug_buf),
+               " 0x%04X", entry->erd);
+    }
     for (int j = 1; j < 10; ++j)
       if (entry->erd >= CATS[j].lo && entry->erd <= CATS[j].hi) { need[j] = true; break; }
   }
+  if (cache_count > 5) snprintf(debug_buf + strlen(debug_buf), sizeof(debug_buf) - strlen(debug_buf), " ...");
+  ESP_LOGI(TAG, "HA fetch: cache has %u ERDs (first 5:%s)", cache_count, debug_buf);
+
   std::string device_json = this->build_device_json_();
   for (int i = 0; i < 10; ++i) {
     if (!need[i]) continue;
@@ -466,6 +477,12 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
           if (entry->erd == paired_id || entry->erd == erd_id) { found = true; break; }
         }
       }
+    }
+    // Debug: log first few mismatches
+    static uint32_t debug_filtered = 0;
+    if (!found && debug_filtered++ < 5) {
+      ESP_LOGD(TAG, "HA match: ERD 0x%04X (from '%s') NOT in cache (role='%s', paired='%s')",
+               erd_id, erd_hex, role, paired);
     }
     if (!found) { cJSON_Delete(root); return false; }
   }
