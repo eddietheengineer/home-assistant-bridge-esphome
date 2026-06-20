@@ -364,7 +364,22 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
     return false;
   }
 
-  char line_buf[4096];
+  // tinfl_decompressor is ~10KB on ESP32-C3 (includes 32KB LZ dictionary).
+  // Allocate from heap to avoid blowing the task stack.
+  tinfl_decompressor* decomp = static_cast<tinfl_decompressor*>(malloc(sizeof(tinfl_decompressor)));
+  if (!decomp) {
+    ESP_LOGE(TAG, "HA fetch: failed to allocate decompressor");
+    free(out_buf);
+    return false;
+  }
+
+  char* line_buf = static_cast<char*>(malloc(4096));
+  if (!line_buf) {
+    ESP_LOGE(TAG, "HA fetch: failed to allocate line buffer");
+    free(decomp);
+    free(out_buf);
+    return false;
+  }
   int line_pos = 0;
   int entities = 0;
 
@@ -374,16 +389,17 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
     size_t src_size = chunk->size;
     size_t dst_size = cat->max_decompressed_chunk;
 
-    tinfl_decompressor decomp;
-    tinfl_init(&decomp);
+    tinfl_init(decomp);
 
     tinfl_status status = tinfl_decompress(
-        &decomp, src, &src_size,
+        decomp, src, &src_size,
         out_buf, out_buf, &dst_size,
         TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
 
     if (status != TINFL_STATUS_DONE) {
       ESP_LOGE(TAG, "HA fetch: chunk %u of %s failed (status %d)", ci, cat->name, status);
+      free(line_buf);
+      free(decomp);
       free(out_buf);
       return false;
     }
@@ -399,7 +415,7 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
           }
         }
         line_pos = 0;
-      } else if (line_pos < (int)sizeof(line_buf) - 1) {
+      } else if (line_pos < 4095) {
         line_buf[line_pos++] = ch;
       }
     }
@@ -413,6 +429,8 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
     }
   }
 
+  free(line_buf);
+  free(decomp);
   free(out_buf);
   ESP_LOGI(TAG, "HA fetch: %s -> %d entities", cat->name, entities);
   return true;
