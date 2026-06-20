@@ -264,6 +264,12 @@ void GeappliancesBridge::initialize_erd_bridge_()
     tiny_gea_broadcast_address);
   this->write_bridge_initialized_ = true;
 
+  // Autodiscovery is complete by this point, so set the real host address.
+  // In polling mode this is also done in on_poll_discovery_complete_(), but
+  // in subscription mode that callback is never reached.
+  erd_write_bridge_set_host_address(&this->erd_write_bridge_,
+      this->autodiscovery_manager_.get_host_address());
+
   // Subscribe to the wildcard write topic so incoming write commands from
   // Home Assistant are routed to the write bridge via on_write_request_event.
   esphome_mqtt_client_adapter_subscribe_write_topic(&this->mqtt_client_adapter_);
