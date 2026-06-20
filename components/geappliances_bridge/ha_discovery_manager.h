@@ -132,6 +132,18 @@ class HaDiscoveryManager {
   void publish_next_entity_();
   void publish_next_clear_();
 
+  // Context for streaming decompression callback.
+  struct DecompressCtx {
+    HaDiscoveryManager* self;
+    const std::string* device_id;
+    const std::string* device_json;
+    int entities;
+    char line_buf[8192];
+    int line_pos;
+  };
+
+  // tinfl callback for streaming decompression.
+  static int tinfl_callback_(const void* buf, int len, void* user);
   static void ha_fetch_task_fn_(void* param);
   void fetch_ha_definitions_();
   bool process_category_(const HaDiscoveryCategory* cat,
