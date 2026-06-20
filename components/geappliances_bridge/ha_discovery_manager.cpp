@@ -207,17 +207,26 @@ void HaDiscoveryManager::publish_next_clear_()
   }
 }
 
-std::string HaDiscoveryManager::escape_json_str_(const std::string& s)
+int HaDiscoveryManager::escape_json_str_(const char* s, char* buf, int buf_size)
 {
-  std::string out;
-  out.reserve(s.size() + 4);
-  for (unsigned char c : s) {
-    if      (c == '"')  { out += "\\\""; }
-    else if (c == '\\') { out += "\\\\"; }
-    else if (c < 0x20)  { char buf[8]; snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned>(c)); out += buf; }
-    else                { out += static_cast<char>(c); }
+  int pos = 0;
+  for (const char* p = s; *p && pos < buf_size - 1; p++) {
+    unsigned char c = static_cast<unsigned char>(*p);
+    int needed;
+    if (c == '"') {
+      needed = snprintf(buf + pos, buf_size - pos, "\\\"");
+    } else if (c == '\\') {
+      needed = snprintf(buf + pos, buf_size - pos, "\\\\");
+    } else if (c < 0x20) {
+      needed = snprintf(buf + pos, buf_size - pos, "\\u%04x", c);
+    } else {
+      buf[pos++] = static_cast<char>(c);
+      needed = 1;
+    }
+    pos += needed;
   }
-  return out;
+  if (pos < buf_size) buf[pos] = '\0';
+  return pos;
 }
 
 std::string HaDiscoveryManager::build_device_json_()
@@ -523,75 +532,80 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
 
   // Build payload on a stack buffer — no heap allocation.
   char payload_buf[1024];
+  char esc_buf[128];
   int pos = 0;
+  auto esc = [&](const char* s) -> const char* {
+    escape_json_str_(s, esc_buf, sizeof(esc_buf));
+    return esc_buf;
+  };
   pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
       "{\"device\":%s", device_json.c_str());
   pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-      ",\"name\":\"%s\"", this->escape_json_str_(get_str("n")).c_str());
+      ",\"name\":\"%s\"", esc(get_str("n")));
   pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
       ",\"unique_id\":\"%s_%s\"", device_id.c_str(), unique_suffix);
   pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-      ",\"object_id\":\"%s\"", this->escape_json_str_(get_str("o")).c_str());
+      ",\"object_id\":\"%s\"", esc(get_str("o")));
 
   const char* unit = get_str("u");
   if (unit[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"unit_of_measurement\":\"%s\"", this->escape_json_str_(unit).c_str());
+        ",\"unit_of_measurement\":\"%s\"", esc(unit));
   }
   const char* ic = get_str("ic");
   if (ic[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"icon\":\"%s\"", this->escape_json_str_(ic).c_str());
+        ",\"icon\":\"%s\"", esc(ic));
   }
   const char* dev_cl = get_str("dc");
   if (dev_cl[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"device_class\":\"%s\"", this->escape_json_str_(dev_cl).c_str());
+        ",\"device_class\":\"%s\"", esc(dev_cl));
   }
   const char* ent_cat = get_str("e");
   if (ent_cat[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"entity_category\":\"%s\"", this->escape_json_str_(ent_cat).c_str());
+        ",\"entity_category\":\"%s\"", esc(ent_cat));
   }
   const char* state_topic = get_str("s");
   if (state_topic[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"state_topic\":\"%s\"", this->escape_json_str_(state_topic).c_str());
+        ",\"state_topic\":\"%s\"", esc(state_topic));
   }
   const char* cmd_topic = get_str("c");
   if (cmd_topic[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"command_topic\":\"%s\"", this->escape_json_str_(cmd_topic).c_str());
+        ",\"command_topic\":\"%s\"", esc(cmd_topic));
   }
   const char* payload_on = get_str("on");
   if (payload_on[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"payload_on\":\"%s\"", this->escape_json_str_(payload_on).c_str());
+        ",\"payload_on\":\"%s\"", esc(payload_on));
   }
   const char* payload_off = get_str("of");
   if (payload_off[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"payload_off\":\"%s\"", this->escape_json_str_(payload_off).c_str());
+        ",\"payload_off\":\"%s\"", esc(payload_off));
   }
   const char* avail_topic = get_str("a");
   if (avail_topic[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"availability_topic\":\"%s\"", this->escape_json_str_(avail_topic).c_str());
+        ",\"availability_topic\":\"%s\"", esc(avail_topic));
   }
   const char* json_attr = get_str("j");
   if (json_attr[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"json_attributes_topic\":\"%s\"", this->escape_json_str_(json_attr).c_str());
+        ",\"json_attributes_topic\":\"%s\"", esc(json_attr));
   }
   const char* val_tpl = get_str("v");
   if (val_tpl[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"value_template\":\"%s\"", this->escape_json_str_(val_tpl).c_str());
+        ",\"value_template\":\"%s\"", esc(val_tpl));
   }
   const char* cmd_tpl = get_str("cm");
   if (cmd_tpl[0] != '\0') {
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos,
-        ",\"command_template\":\"%s\"", this->escape_json_str_(cmd_tpl).c_str());
+        ",\"command_template\":\"%s\"", esc(cmd_tpl));
   }
   const char* opt = get_str("opt");
   if (opt[0] != '\0') {
@@ -599,16 +613,21 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
     bool first = true;
     for (const char* p = opt; *p; ) {
       const char* comma = strchr(p, ',');
-      std::string val;
+      char val_buf[64];
+      int vlen;
       if (comma) {
-        val = std::string(p, comma - p);
-        p = comma + 1;
+        vlen = (int)(comma - p);
+        if (vlen >= (int)sizeof(val_buf)) vlen = (int)sizeof(val_buf) - 1;
       } else {
-        val = p;
-        p += val.size();
+        vlen = (int)strlen(p);
+        if (vlen >= (int)sizeof(val_buf)) vlen = (int)sizeof(val_buf) - 1;
+        p += vlen;
       }
+      memcpy(val_buf, p, vlen);
+      val_buf[vlen] = '\0';
+      p = comma ? comma + 1 : p + vlen;
       if (!first) pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, ",");
-      pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, "\"%s\"", this->escape_json_str_(val).c_str());
+      pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, "\"%s\"", esc(val_buf));
       first = false;
     }
     pos += snprintf(payload_buf + pos, sizeof(payload_buf) - pos, "]");

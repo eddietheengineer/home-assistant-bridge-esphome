@@ -142,7 +142,7 @@ class HaDiscoveryManager {
                            const std::string& device_id,
                            const std::string& device_json);
 
-  std::string escape_json_str_(const std::string& s);
+  int escape_json_str_(const char* s, char* buf, int buf_size);
   std::string build_device_json_();
 
   bool contains_erd_(const tiny_erd_t* erds, uint16_t count, tiny_erd_t target) const;
