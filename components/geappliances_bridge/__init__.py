@@ -341,13 +341,10 @@ async def to_code(config: dict[str, Any]) -> None:
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    # The HA-discovery HTTPS fetch uses esp_http_client, which ESPHome excludes
-    # from all builds by default.  Re-enable it here for ESP32 targets so that
-    # esp_http_client.h (and its transitive dependencies like esp_crt_bundle.h)
-    # are on the include path — the same technique used by ESPHome's built-in
-    # http_request component.
+    # The HA-discovery fetch uses esp_zlib to decompress embedded JSONL data.
+    # Re-enable it here for ESP32 targets.
     if CORE.is_esp32:
-        esp32.include_builtin_idf_component("esp_http_client")
+        esp32.include_builtin_idf_component("esp_zlib")
 
     # Get optional GEA3 UART component reference
     if CONF_GEA3_UART_ID in config:
@@ -372,9 +369,6 @@ async def to_code(config: dict[str, Any]) -> None:
     cg.add(var.set_polling_only_publish_on_change(config[CONF_POLLING_ONLY_PUBLISH_ON_CHANGE]))
     cg.add(var.set_appliance_api_parsing(config[CONF_APPLIANCE_API_PARSING]))
     cg.add(var.set_generate_device_config(config[CONF_GENERATE_DEVICE_CONFIG]))
-
-    # Set the base URL for runtime HA-discovery JSONL download
-    cg.add(var.set_ha_discovery_base_url(config[CONF_HA_DISCOVERY_BASE_URL]))
 
     # Optionally create the ERD publish rate sensor
     if CONF_ERD_PUBLISH_RATE_SENSOR in config:

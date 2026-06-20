@@ -86,11 +86,12 @@ struct HaDiscoveryItem {
 /* Maximum number of registered/seen ERDs for HA discovery. */
 #define HA_DISCOVERY_MAX_ERDS 645
 #define HA_DISCOVERY_MAX_PUBLISHED_TOPICS 645
+struct HaDiscoveryCategory;
+
 
 class HaDiscoveryManager {
  public:
-  void init(const std::string& base_url,
-            const std::string& device_id,
+  void init(const std::string& device_id,
             const std::string& model_number,
             const std::string& serial_number,
             erd_cache_t* erd_cache,
@@ -133,12 +134,9 @@ class HaDiscoveryManager {
 
   static void ha_fetch_task_fn_(void* param);
   void fetch_ha_definitions_();
-  bool fetch_category_(const std::string& url,
-                       const std::string& device_id,
-                       const std::string& device_json);
-  bool process_jsonl_line_(const std::string& line,
-                           const std::string& device_id,
-                           const std::string& device_json);
+  bool process_category_(const HaDiscoveryCategory* cat,
+                         const std::string& device_id,
+                         const std::string& device_json);
 
   std::string escape_json_str_(const std::string& s);
   std::string build_device_json_();
@@ -156,7 +154,6 @@ class HaDiscoveryManager {
   uint16_t clear_index_{0};
 
   HaDiscoveryState state_{HA_DISCOVERY_IDLE};
-  std::string base_url_;
   std::string device_id_;
   std::string model_number_;
   std::string serial_number_;

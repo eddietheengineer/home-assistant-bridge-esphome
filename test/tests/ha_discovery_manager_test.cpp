@@ -66,7 +66,7 @@ TEST_GROUP(ha_discovery_manager)
   {
     uint8_t dummy = 0;
     erd_cache_update(&test_cache_, erd, &dummy, 1);
-    manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, gen_config);
+    manager.init("dev1", "model1", "sn1", &test_cache_, gen_config);
   }
 };
 
@@ -78,7 +78,7 @@ TEST(ha_discovery_manager, init_sets_state_to_waiting_for_ready)
 {
   tiny_erd_t erds[] = { 0x0001, 0x0002 };
   add_erds(erds, 2);
-  manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, false);
+  manager.init("dev1", "model1", "sn1", &test_cache_, false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
@@ -100,14 +100,14 @@ TEST(ha_discovery_manager, init_clamps_registered_erds_to_max)
   for (int i = 0; i < ERD_CACHE_CAPACITY; i++) {
     erd_cache_update(&test_cache_, static_cast<uint16_t>(i), &dummy, 1);
   }
-  manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, false);
+  manager.init("dev1", "model1", "sn1", &test_cache_, false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
 TEST(ha_discovery_manager, init_with_empty_erds)
 {
   // test_cache_ is empty (no entries added)
-  manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, false);
+  manager.init("dev1", "model1", "sn1", &test_cache_, false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
@@ -140,7 +140,7 @@ TEST(ha_discovery_manager, on_erd_seen_adds_erd_to_seen_list)
 {
   tiny_erd_t erds[] = { 0x0001, 0x0002 };
   add_erds(erds, 2);
-  manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, false);
+  manager.init("dev1", "model1", "sn1", &test_cache_, false);
 
   manager.on_erd_seen(0x0001);
   // Should not crash and state should remain WAITING_FOR_READY
@@ -319,7 +319,7 @@ TEST(ha_discovery_manager, non_esp_idf_fetch_is_noop_discovery_completes)
 {
   tiny_erd_t erds[] = { 0x0001, 0x0002, 0x0003 };
   add_erds(erds, 3);
-  manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, true);
+  manager.init("dev1", "model1", "sn1", &test_cache_, true);
 
   // In stub builds, publish_ha_discovery_() does not spawn a fetch task
   // and transitions directly to COMPLETE
@@ -365,7 +365,7 @@ TEST(ha_discovery_manager, can_reinit_after_completion)
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 
   // Re-init should reset to WAITING_FOR_READY
-  manager.init("https://example.com", "dev2", "model2", "sn2", &test_cache_, false);
+  manager.init("dev2", "model2", "sn2", &test_cache_, false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
@@ -402,7 +402,7 @@ TEST(ha_discovery_manager, on_erd_seen_handles_max_seen_erds)
   for (int i = 0; i < HA_DISCOVERY_MAX_ERDS; i++) {
     erd_cache_update(&test_cache_, static_cast<uint16_t>(i), &dummy, 1);
   }
-  manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, false);
+  manager.init("dev1", "model1", "sn1", &test_cache_, false);
 
   // Fill seen_erds_ to capacity
   for (int i = 0; i < HA_DISCOVERY_MAX_ERDS; i++) {

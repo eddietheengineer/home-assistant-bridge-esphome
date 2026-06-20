@@ -748,10 +748,9 @@ void GeappliancesBridge::init_ha_discovery()
   // Clear any previously-published HA discovery topics before generating new ones.
   this->ha_discovery_manager_.clear_ha_discovery_sync();
 
-  // Pass the ERD cache pointer directly — the fetch task will iterate it
-  // at fetch time, so there's no snapshot to get stale or overwritten.
+  // Pass the ERD cache pointer directly — the fetch task reads embedded
+  // JSONL from flash, filtered against the live cache.
   this->ha_discovery_manager_.init(
-      this->ha_discovery_base_url_,
       this->device_identity_manager_.get_device_id(),
       this->device_identity_manager_.get_model_number(),
       this->device_identity_manager_.get_serial_number(),

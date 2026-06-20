@@ -4,27 +4,26 @@
  */
 
 #include "ha_discovery_manager.h"
+#include "ha_discovery_data.h"
 #include "esphome_mqtt_client_adapter.h"
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 #include <cstring>
 
 #ifdef USE_ESP_IDF_STUBS
-#  include "esp-idf/esp_http_client.h"
-#  include "esp-idf/esp_crt_bundle.h"
 #  include "esp-idf/cJSON.h"
 #  include "esp-idf/freertos_stub.h"
 #  include "esp-idf/esp_heap_caps.h"
 #  include "esp-idf/esp_task_wdt.h"
+#  include "esp-idf/esp_zlib_stub.h"
 #else
-#  include "esp_http_client.h"
-#  include "esp_crt_bundle.h"
-#  include "cJSON.h"
+#  include "esp-idf/cJSON.h"
 #  include "freertos/FreeRTOS.h"
 #  include "freertos/task.h"
 #  include "freertos/queue.h"
 #  include "esp_heap_caps.h"
 #  include "esp_task_wdt.h"
+#  include "esp_zlib.h"
 #endif
 
 namespace esphome {
@@ -40,14 +39,12 @@ bool HaDiscoveryManager::contains_erd_(const tiny_erd_t* erds, uint16_t count, t
   return false;
 }
 
-void HaDiscoveryManager::init(const std::string& base_url,
-                              const std::string& device_id,
+void HaDiscoveryManager::init(const std::string& device_id,
                               const std::string& model_number,
                               const std::string& serial_number,
                               erd_cache_t* erd_cache,
                               bool generate_device_config)
 {
-  this->base_url_               = base_url;
   this->device_id_              = device_id;
   this->model_number_           = model_number;
   this->serial_number_          = serial_number;
@@ -310,7 +307,6 @@ void HaDiscoveryManager::fetch_ha_definitions_()
   };
   bool need[10] = {};
   need[0] = true;
-
   // Iterate the ERD cache directly to determine which categories are needed.
   uint16_t iterator = 0;
   while (true) {
@@ -321,50 +317,65 @@ void HaDiscoveryManager::fetch_ha_definitions_()
   }
 
   std::string device_json = this->build_device_json_();
+
+  // For each needed category, find the matching embedded data and process it.
   for (int i = 0; i < 10; ++i) {
     if (!need[i]) continue;
-    std::string url = this->base_url_ + "/" + CATS[i].name + ".jsonl";
-    this->fetch_category_(url, this->device_id_, device_json);
+
+    // Find matching category in embedded data
+    const HaDiscoveryCategory* cat = nullptr;
+    for (uint16_t c = 0; c < ha_discovery_category_count; c++) {
+      if (strcmp(ha_discovery_categories[c].name, CATS[i].name) == 0) {
+        cat = &ha_discovery_categories[c];
+        break;
+      }
+    }
+    if (!cat) continue;
+
+    this->process_category_(cat, this->device_id_, device_json);
     vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
-
-bool HaDiscoveryManager::fetch_category_(const std::string& url,
-                                          const std::string& device_id,
-                                          const std::string& device_json)
+bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
+                                           const std::string& device_id,
+                                           const std::string& device_json)
 {
-  esp_http_client_config_t cfg = {};
-  cfg.url = url.c_str();
-  cfg.crt_bundle_attach = esp_crt_bundle_attach;
-  cfg.timeout_ms = 20000;
-  cfg.max_redirection_count = 5;
-  esp_http_client_handle_t client = esp_http_client_init(&cfg);
-  if (!client) return false;
-  if (esp_http_client_open(client, 0) != ESP_OK) { esp_http_client_cleanup(client); return false; }
-  esp_http_client_fetch_headers(client);
-  int status = esp_http_client_get_status_code(client);
-  if (status == 404) { esp_http_client_cleanup(client); return true; }
-  if (status != 200) { esp_http_client_cleanup(client); return false; }
-
-  static constexpr int READ_BUF = 512;
-  static constexpr int LINE_BUF = 8192;
-  char* read_buf = static_cast<char*>(malloc(READ_BUF));
-  char* line_buf = static_cast<char*>(malloc(LINE_BUF));
-  if (!read_buf || !line_buf) { free(read_buf); free(line_buf); esp_http_client_cleanup(client); return false; }
-
-  int line_pos = 0; int entities = 0; int read_len;
-  while ((read_len = esp_http_client_read(client, read_buf, READ_BUF - 1)) > 0) {
-    for (int i = 0; i < read_len; ++i) {
-      char c = read_buf[i];
-      if (c == '\n' || c == '\r') {
-        if (line_pos > 2) { line_buf[line_pos] = '\0'; if (this->process_jsonl_line_(line_buf, device_id, device_json)) ++entities; }
-        line_pos = 0;
-      } else if (line_pos < LINE_BUF - 1) { line_buf[line_pos++] = c; }
-    }
+  // Allocate buffer for decompressed data.
+  uint32_t out_size = cat->decompressed_size;
+  uint8_t* decompressed_buf = static_cast<uint8_t*>(malloc(out_size));
+  if (!decompressed_buf) {
+    ESP_LOGE(TAG, "HA fetch: failed to allocate %u bytes for %s", out_size, cat->name);
+    return false;
   }
-  if (line_pos > 2) { line_buf[line_pos] = '\0'; if (this->process_jsonl_line_(line_buf, device_id, device_json)) ++entities; }
-  free(read_buf); free(line_buf); esp_http_client_cleanup(client);
-  ESP_LOGI(TAG, "HA fetch: %s -> %d entities", url.c_str(), entities);
+
+  uint32_t actual_size = out_size;
+  esp_err_t err = esp_zlib_inflate(cat->data, cat->compressed_size,
+                                   decompressed_buf, &actual_size);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "HA fetch: failed to decompress %s (err %d)", cat->name, err);
+    free(decompressed_buf);
+    return false;
+  }
+
+  // Process line by line from decompressed data.
+  int entities = 0;
+  const char* p = reinterpret_cast<const char*>(decompressed_buf);
+  const char* end = p + actual_size;
+  while (p < end) {
+    const char* nl = strchr(p, '\n');
+    if (!nl) nl = end;
+    int line_len = (int)(nl - p);
+    if (line_len > 2) {
+      char line_buf[8192];
+      int copy_len = (line_len > (int)sizeof(line_buf) - 1) ? (int)sizeof(line_buf) - 1 : line_len;
+      memcpy(line_buf, p, copy_len);
+      line_buf[copy_len] = '\0';
+      if (this->process_jsonl_line_(line_buf, device_id, device_json)) ++entities;
+    }
+    p = nl + 1;
+  }
+  free(decompressed_buf);
+  ESP_LOGI(TAG, "HA fetch: %s -> %d entities", cat->name, entities);
   return true;
 }
 
