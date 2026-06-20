@@ -113,6 +113,10 @@ class HaDiscoveryManager {
 
   HaDiscoveryState get_state() const { return state_; }
 
+  /// Synchronously clear all retained HA discovery topics (publish empty retained messages).
+  /// Resets published_topics_count_ to 0 and sets state to IDLE.
+  void clear_ha_discovery_sync();
+
   /// Clear all retained HA discovery topics for this device.
   /// Publishes empty retained payloads to each previously-published topic.
   /// Call this from the main loop context (ESPHome loop).

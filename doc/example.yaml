@@ -70,8 +70,6 @@ geappliances_bridge:
   # polling_onlypublish_onchange: true    # Default: true, only publish if value changed
   # appliance_api_parsing: true           # Default: true, restricts polling to appliance-supported ERDs
   # generate_device_config: false         # Default: false, set to true to enable automatic HA MQTT discovery
-  # clear_discovery_button:               # Optional: Creates a button to clear all HA discovery topics
-  #   name: "Clear HA Discovery"
   # ha_discovery_base_url: "..."          # Optional: Override URL for HA discovery JSONL files
 
   # Optional diagnostic sensors:

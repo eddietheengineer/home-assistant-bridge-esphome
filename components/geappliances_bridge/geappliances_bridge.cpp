@@ -20,10 +20,6 @@ void GeappliancesBridge::add_custom_erd(tiny_erd_t erd)
   this->custom_erds_[this->custom_erds_count_++] = erd;
 }
 
-void GeappliancesBridge::clear_ha_discovery()
-{
-  this->ha_discovery_manager_.clear_ha_discovery();
-}
 
 static const tiny_gea3_erd_client_configuration_t client_configuration = {
   .request_timeout = 250,
@@ -181,12 +177,6 @@ void GeappliancesBridge::setup() {
            AUTODISCOVERY_STARTUP_DELAY_MS / 1000);
   ESP_LOGCONFIG(TAG, "GE Appliances Bridge setup complete");
 
-  // Wire the clear-discovery button if configured
-  if (this->clear_discovery_button_ != nullptr) {
-    this->clear_discovery_button_->add_on_press_callback([this]() {
-      this->clear_ha_discovery();
-    });
-  }
 }
 
 void GeappliancesBridge::loop() {

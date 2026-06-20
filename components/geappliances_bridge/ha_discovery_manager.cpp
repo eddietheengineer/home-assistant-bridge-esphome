@@ -202,6 +202,24 @@ void HaDiscoveryManager::run(bool is_poll_mode,
   }
 }
 
+void HaDiscoveryManager::clear_ha_discovery_sync()
+{
+  if (this->published_topics_count_ == 0) {
+    return;
+  }
+  ESP_LOGI(TAG, "Clearing %u HA discovery topics (sync)", this->published_topics_count_);
+  for (uint16_t i = 0; i < this->published_topics_count_; i++) {
+    const auto& t = this->published_topics_[i];
+    std::string topic = "homeassistant/" + t.component + "/" + this->device_id_ + "/" + t.erd_hex + "/config";
+    if (this->mqtt_adapter_) {
+      esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, topic, "", true);
+    }
+  }
+  this->published_topics_count_ = 0;
+  this->clear_index_ = 0;
+  this->state_ = HA_DISCOVERY_IDLE;
+}
+
 void HaDiscoveryManager::clear_ha_discovery()
 {
   if (this->published_topics_count_ == 0) {

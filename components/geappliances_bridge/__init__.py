@@ -11,7 +11,7 @@ from typing import Any
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import button, esp32, sensor, uart
+from esphome.components import esp32, sensor, uart
 from esphome.const import CONF_ID
 from esphome.core import CORE
 
@@ -19,7 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CODEOWNERS = ["@joshualongenecker"]
 DEPENDENCIES = ["uart"]
-AUTO_LOAD = ["button", "sensor"]
+AUTO_LOAD = ["sensor"]
 
 # UART configuration keys
 CONF_GEA3_UART_ID = "gea3_uart_id"
@@ -39,7 +39,6 @@ CONF_ERD_PUBLISH_RATE_SENSOR = "erd_publish_rate_sensor"
 CONF_ERD_CACHE_ENTRIES_SENSOR = "erd_cache_entries_sensor"
 CONF_ERD_CACHE_UPDATES_SENSOR = "erd_cache_updates_sensor"
 CONF_MQTT_PUBLISH_RATE_SENSOR = "mqtt_publish_rate_sensor"
-CONF_CLEAR_DISCOVERY_BUTTON = "clear_discovery_button"
 
 
 
@@ -319,9 +318,6 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_MQTT_PUBLISH_RATE_SENSOR): cv.Schema({
             cv.Optional("name", default="MQTT Publish Rate"): cv.string,
         }).extend(sensor.sensor_schema(state_class="measurement")),
-        cv.Optional(CONF_CLEAR_DISCOVERY_BUTTON): cv.Schema({
-            cv.Optional("name", default="Clear HA Discovery"): cv.string,
-        }).extend(button.BUTTON_SCHEMA),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
@@ -400,12 +396,6 @@ async def to_code(config: dict[str, Any]) -> None:
         sens = await sensor.new_sensor(config[CONF_MQTT_PUBLISH_RATE_SENSOR])
         cg.add(var.set_mqtt_publish_rate_sensor(sens))
 
-    # Optionally create the clear discovery button
-    if CONF_CLEAR_DISCOVERY_BUTTON in config:
-        btn = await button.new_button(
-            config[CONF_CLEAR_DISCOVERY_BUTTON],
-        )
-        cg.add(var.set_clear_discovery_button(btn))
 
     # Register any user-configured custom ERDs
     for erd in config[CONF_CUSTOM_ERDS]:

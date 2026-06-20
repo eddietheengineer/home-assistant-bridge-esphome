@@ -30,7 +30,6 @@
 #include "esphome/core/component.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/uart/uart.h"
-#include "esphome/components/button/button.h"
 #include <string>
 
 extern "C" {
@@ -99,11 +98,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_mqtt_publish_rate_sensor(sensor::Sensor* sensor) { this->mqtt_publish_rate_sensor_ = sensor; }
   void add_custom_erd(tiny_erd_t erd);
 
-  /// Clear all retained HA discovery topics for this device.
-  void clear_ha_discovery();
-
-  /// Set the button that triggers clearing HA discovery topics.
-  void set_clear_discovery_button(esphome::button::Button* btn);
 
  protected:
   // ── IBridgeServices implementation (called exclusively by the startup HSM) ──
@@ -312,8 +306,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   tiny_event_subscription_t erd_client_activity_subscription_;
   tiny_event_subscription_t gea2_activity_subscription_;
 
-  // Button for clearing HA discovery topics
-  esphome::button::Button* clear_discovery_button_{nullptr};
 };
 
 }  // namespace geappliances_bridge

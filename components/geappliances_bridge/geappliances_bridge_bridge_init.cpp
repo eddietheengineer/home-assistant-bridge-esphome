@@ -273,6 +273,8 @@ void GeappliancesBridge::initialize_erd_bridge_()
 
   // Defer HA device discovery until ERD registration has settled.
   if (this->generate_device_config_) {
+    // Clear any previously-published HA discovery topics before generating new ones.
+    this->ha_discovery_manager_.clear_ha_discovery_sync();
     tiny_erd_t erds[ERD_CACHE_CAPACITY];
     uint16_t count = 0;
     erd_cache_to_array(&this->erd_cache_, erds, &count);
