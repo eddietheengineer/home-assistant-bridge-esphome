@@ -68,7 +68,8 @@ enum HaDiscoveryState {
   HA_DISCOVERY_WAITING_FOR_READY,
   HA_DISCOVERY_PUBLISHING,
   HA_DISCOVERY_COMPLETE,
-  HA_DISCOVERY_FAILED
+  HA_DISCOVERY_FAILED,
+  HA_DISCOVERY_CLEARING  // clearing retained discovery topics
 };
 
 /*!
@@ -81,6 +82,7 @@ struct HaDiscoveryItem {
 
 /* Maximum number of registered/seen ERDs for HA discovery. */
 #define HA_DISCOVERY_MAX_ERDS 645
+#define HA_DISCOVERY_MAX_PUBLISHED_TOPICS 645
 
 class HaDiscoveryManager {
  public:
@@ -111,12 +113,18 @@ class HaDiscoveryManager {
 
   HaDiscoveryState get_state() const { return state_; }
 
+  /// Clear all retained HA discovery topics for this device.
+  /// Publishes empty retained payloads to each previously-published topic.
+  /// Call this from the main loop context (ESPHome loop).
+  void clear_ha_discovery();
+
   /// Clean up resources (FreeRTOS task, queue, stack). Call from teardown.
   void cleanup();
 
  private:
   void publish_ha_discovery_();
   void publish_next_entity_();
+  void publish_next_clear_();
 
 #ifdef USE_ESP_IDF
   static void ha_fetch_task_fn_(void* param);
@@ -133,6 +141,16 @@ class HaDiscoveryManager {
   std::string build_device_json_();
 
   bool contains_erd_(const tiny_erd_t* erds, uint16_t count, tiny_erd_t target) const;
+
+  // Track published discovery topics for clearing later.
+  // Each entry stores the component type and ERD hex string.
+  struct PublishedTopic {
+    std::string component;  // e.g. "sensor", "switch", "binary_sensor"
+    std::string erd_hex;    // e.g. "0002", "2001"
+  };
+  PublishedTopic published_topics_[HA_DISCOVERY_MAX_PUBLISHED_TOPICS];
+  uint16_t published_topics_count_{0};
+  uint16_t clear_index_{0};
 
   HaDiscoveryState state_{HA_DISCOVERY_IDLE};
   std::string base_url_;

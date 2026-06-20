@@ -192,17 +192,40 @@ void HaDiscoveryManager::run(bool is_poll_mode,
       this->publish_next_entity_();
     }
   }
+
+  if (this->state_ == HA_DISCOVERY_CLEARING) {
+    uint32_t now = millis();
+    if (now - this->last_publish_ms_ >= HA_ENTITY_PUBLISH_INTERVAL_MS) {
+      this->last_publish_ms_ = now;
+      this->publish_next_clear_();
+    }
+  }
 }
 
-void HaDiscoveryManager::publish_ha_discovery_()
+void HaDiscoveryManager::clear_ha_discovery()
 {
-  ESP_LOGD(TAG, "HA discovery triggered (no MQTT broker — skipping entity publish)");
-  this->state_ = HA_DISCOVERY_COMPLETE;
+  if (this->published_topics_count_ == 0) {
+    ESP_LOGW(TAG, "No published topics to clear");
+    return;
+  }
+  ESP_LOGI(TAG, "Clearing %u HA discovery topics", this->published_topics_count_);
+  this->clear_index_ = 0;
+  this->last_publish_ms_ = millis();
+  this->state_ = HA_DISCOVERY_CLEARING;
 }
 
-void HaDiscoveryManager::publish_next_entity_()
+void HaDiscoveryManager::publish_next_clear_()
 {
-  // No MQTT broker — no-op.
+  if (this->clear_index_ >= this->published_topics_count_) {
+    ESP_LOGI(TAG, "Cleared all HA discovery topics");
+    this->state_ = HA_DISCOVERY_COMPLETE;
+    return;
+  }
+  const auto& t = this->published_topics_[this->clear_index_++];
+  std::string topic = "homeassistant/" + t.component + "/" + this->device_id_ + "/" + t.erd_hex + "/config";
+  if (this->mqtt_adapter_) {
+    esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, topic, "", true);
+  }
 }
 
 std::string HaDiscoveryManager::escape_json_str_(const std::string& s)
@@ -264,6 +287,18 @@ std::string HaDiscoveryManager::build_device_json_()
   if (pos < (int)sizeof(buf) - 2) buf[pos++] = '}';
   buf[pos] = '\0';
   return std::string(buf);
+}
+
+// Non-ESP-IDF stubs: no MQTT broker available in test builds.
+void HaDiscoveryManager::publish_ha_discovery_()
+{
+  ESP_LOGD(TAG, "HA discovery triggered (no MQTT broker — skipping entity publish)");
+  this->state_ = HA_DISCOVERY_COMPLETE;
+}
+
+void HaDiscoveryManager::publish_next_entity_()
+{
+  // No MQTT broker — no-op.
 }
 
 #ifdef USE_ESP_IDF
@@ -463,6 +498,13 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
 
   const char* comp = get_str("t");
   if (comp[0] == '\0') { cJSON_Delete(root); return false; }
+
+  // Track this topic for later clearing
+  if (this->published_topics_count_ < HA_DISCOVERY_MAX_PUBLISHED_TOPICS) {
+    this->published_topics_[this->published_topics_count_].component = std::string(comp);
+    this->published_topics_[this->published_topics_count_].erd_hex = std::string(erd_hex);
+    this->published_topics_count_++;
+  }
 
   std::string topic = "homeassistant/" + std::string(comp) + "/" + device_id + "/" + std::string(erd_hex) + "/config";
 
