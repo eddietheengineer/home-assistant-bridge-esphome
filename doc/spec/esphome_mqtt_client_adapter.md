@@ -39,6 +39,8 @@ typedef struct {
   tiny_event_t on_mqtt_disconnect_event;
   tiny_event_t on_mqtt_connect_event;
   esphome::geappliances_bridge::ErdRegistry* erd_registry;
+  uint8_t write_payload_buffer_[32];
+  uint8_t write_payload_size_;
 } esphome_mqtt_client_adapter_t;
 ```
 
@@ -50,6 +52,8 @@ typedef struct {
 | `on_mqtt_disconnect_event` | `tiny_event_t` | Event published when the MQTT client disconnects |
 | `on_mqtt_connect_event` | `tiny_event_t` | Event published when the MQTT client connects |
 | `erd_registry` | `ErdRegistry*` | Optional pointer; when non-null, provides valid-ERD filtering, string-ERD type detection, and registered-ERD tracking |
+| `write_payload_buffer_` | `uint8_t[32]` | Stack-allocated buffer for decoded hex payload from write topic (max 32 bytes / 64 hex chars) |
+| `write_payload_size_` | `uint8_t` | Number of decoded bytes in `write_payload_buffer_` |
 
 ### 2.2 Static vtable
 
@@ -108,7 +112,7 @@ void esphome_mqtt_client_adapter_subscribe_write_topic(
   esphome_mqtt_client_adapter_t* self);
 ```
 
-Subscribe to the wildcard write topic `geappliances/{device_id}/erd/+/write`. In the current implementation this is a no-op (no MQTT broker available in test/debug mode). In the full implementation, this subscribes once to the wildcard topic, eliminating the need for per-ERD subscriptions.
+Subscribe to the wildcard write topic `geappliances/{device_id}/erd/+/write`. When a message arrives, the adapter parses the ERD ID from the topic path (e.g., `0x7701` from `.../erd/0x7701/write`), decodes the hex-encoded payload into raw bytes (e.g., `"01"` → `0x01`), stores the result in `write_payload_buffer_`, and publishes `on_write_request_event` with the decoded data. The `erd_write_bridge` receives the event and dispatches the write to the ERD client.
 
 ### 3.6 `esphome_mqtt_client_adapter_drain_pending_updates`
 
@@ -247,8 +251,14 @@ The `+` wildcard matches any single topic level, covering all possible ERD ident
 - Eliminates a ~3-second stall on MQTT reconnect caused by synchronous re-subscriptions
 
 ### 5.3 Write Command Routing
+When a message arrives on the wildcard topic, the adapter:
 
-When a message arrives on the wildcard topic, the adapter parses the ERD from the topic path and publishes the `on_write_request_event` with the appropriate `mqtt_client_on_write_request_args_t`. The `erd_write_bridge` receives the event and dispatches the write to the ERD client.
+1. Parses the ERD ID from the topic path (e.g., `0x7701` from `.../erd/0x7701/write`)
+2. Decodes the hex-encoded payload into raw bytes (e.g., `"01"` → `0x01`, `"FF"` → `0xFF`)
+3. Stores the decoded bytes in `write_payload_buffer_` (max 32 bytes / 64 hex chars)
+4. Publishes `on_write_request_event` with the ERD ID, decoded size, and decoded data pointer
+
+The `erd_write_bridge` receives the event and dispatches the write to the ERD client.
 
 ---
 
@@ -289,12 +299,11 @@ The adapter holds an optional pointer to `ErdRegistry`. When set via `esphome_mq
 - The filter is checked at publish time, not at registration time.
 
 ---
-
 ## 8. Invariants
 
 1. **Single vtable instance:** The `i_mqtt_client_api_t` vtable is a file-scope `static const` variable. It is assigned once during `init()` and never modified.
 2. **Wildcard subscription eliminates per-ERD overhead:** A single wildcard topic replaces per-ERD subscriptions, eliminating heap-allocated closures and MQTT outbox entries.
-3. **Hex payloads:** All ERD values are published as uppercase hex strings. String conversion is handled at the HA discovery level, not in the MQTT adapter.
+3. **Bidirectional hex encoding:** Outgoing ERD values are published as uppercase hex strings. Incoming write payloads are received as hex strings and decoded to raw bytes before being passed to the write bridge.
 4. **Settle delay after reconnect:** Pending updates are not flushed immediately after reconnect; a delay ensures the MQTT transport is ready.
 5. **Fire-and-forget publishes:** Both `publish()` and `publish_raw()` guard against null/disconnected MQTT client and return void. They do not report success or failure.
 6. **Event-driven architecture:** Write requests and connection state changes are communicated via `tiny_event_t` pub/sub, not direct callbacks. This allows multiple subscribers.
@@ -323,6 +332,5 @@ The adapter holds an optional pointer to `ErdRegistry`. When set via `esphome_mq
 2. **No publish acknowledgment:** All publish operations are fire-and-forget. There is no QoS or acknowledgment mechanism exposed to the caller.
 3. **Single write request event:** There is one `on_write_request` event shared across all ERDs. The bridge must filter by `erd` in the event args if it needs to handle specific ERDs differently.
 4. **No pending queue in current implementation:** The pending update queue, drain, and settle delay are described as design decisions but not yet implemented in the current code. The adapter currently returns 0 for `get_pending_update_count()` and `drain_pending_updates()`.
-5. **No write topic subscription in current implementation:** `subscribe_write_topic()` is a no-op in the current implementation. Write command handling requires the full MQTT broker integration.
-6. **Heap allocation for device_id:** The device ID is heap-allocated via `new std::string()`. If `destroy()` is never called, this leaks memory.
-7. **ESPHome MQTT client singleton dependency:** The adapter depends on `esphome::mqtt::global_mqtt_client` being non-null and properly initialized before any publish operation. There is no fallback or alternative transport.
+5. **Heap allocation for device_id:** The device ID is heap-allocated via `new std::string()`. If `destroy()` is never called, this leaks memory.
+6. **ESPHome MQTT client singleton dependency:** The adapter depends on `esphome::mqtt::global_mqtt_client` being non-null and properly initialized before any publish operation. There is no fallback or alternative transport.

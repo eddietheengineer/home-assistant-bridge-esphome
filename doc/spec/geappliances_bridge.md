@@ -100,7 +100,7 @@ During `startup_state_bridge_init`, `initialize_erd_bridge_()` runs:
 4. **Initialize bridges:**
    - **Polling mode:** Initializes `erd_bridge_poll_` with the probe list, known host address, and appliance type.
    - **Subscription mode:** Initializes `erd_bridge_subscribe_` with the known host address.
-   - **Write bridge:** Always initialized with the broadcast address (updated after appliance identification).
+   - **Write bridge:** Always initialized with the real host address from `autodiscovery_manager_.get_host_address()` (autodiscovery completes before bridge init).
 5. **Defer HA discovery:** If enabled, initializes `ha_discovery_manager_` — it starts when the bridge signals readiness.
 
 ---
