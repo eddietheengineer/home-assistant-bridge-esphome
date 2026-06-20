@@ -44,22 +44,15 @@ void HaDiscoveryManager::init(const std::string& base_url,
                               const std::string& device_id,
                               const std::string& model_number,
                               const std::string& serial_number,
-                              const tiny_erd_t* registered_erds,
-                              uint16_t registered_erds_count,
+                              erd_cache_t* erd_cache,
                               bool generate_device_config)
 {
   this->base_url_               = base_url;
   this->device_id_              = device_id;
   this->model_number_           = model_number;
   this->serial_number_          = serial_number;
-  uint16_t n = (registered_erds_count > HA_DISCOVERY_MAX_ERDS) ? HA_DISCOVERY_MAX_ERDS : registered_erds_count;
-  for (uint16_t i = 0; i < n; i++) {
-    this->registered_erds_[i] = registered_erds[i];
-    this->registered_erds_snapshot_[i] = registered_erds[i];
-  }
-  this->registered_erds_count_ = n;
-  this->registered_erds_snapshot_count_ = n;
-  this->seen_erds_count_ = 0;
+  this->erd_cache_              = erd_cache;
+  this->seen_erds_count_        = 0;
   this->generate_device_config_ = generate_device_config;
   this->state_                  = HA_DISCOVERY_WAITING_FOR_READY;
   this->last_activity_          = millis();
@@ -68,13 +61,10 @@ void HaDiscoveryManager::init(const std::string& base_url,
 
 void HaDiscoveryManager::set_registered_erds(const tiny_erd_t* erds, uint16_t count)
 {
-  uint16_t n = (count > HA_DISCOVERY_MAX_ERDS) ? HA_DISCOVERY_MAX_ERDS : count;
-  for (uint16_t i = 0; i < n; i++) {
-    this->registered_erds_[i] = erds[i];
-    this->registered_erds_snapshot_[i] = erds[i];
-  }
-  this->registered_erds_count_ = n;
-  this->registered_erds_snapshot_count_ = n;
+  // No-op: the fetch task reads the ERD cache directly.
+  // Kept for API compatibility with callers that may still invoke it.
+  (void)erds;
+  (void)count;
 }
 
 void HaDiscoveryManager::on_erd_seen(tiny_erd_t erd)
@@ -322,10 +312,13 @@ void HaDiscoveryManager::fetch_ha_definitions_()
   };
   bool need[10] = {};
   need[0] = true;
-  for (uint16_t i = 0; i < this->registered_erds_snapshot_count_; i++) {
-    uint16_t erd = this->registered_erds_snapshot_[i];
+  // Iterate the ERD cache directly to determine which categories are needed.
+  uint16_t iterator = 0;
+  while (true) {
+    erd_cache_entry_t* entry = erd_cache_get_next_entry(this->erd_cache_, &iterator);
+    if (!entry) break;
     for (int j = 1; j < 10; ++j)
-      if (erd >= CATS[j].lo && erd <= CATS[j].hi) { need[j] = true; break; }
+      if (entry->erd >= CATS[j].lo && entry->erd <= CATS[j].hi) { need[j] = true; break; }
   }
   std::string device_json = this->build_device_json_();
   for (int i = 0; i < 10; ++i) {
@@ -453,16 +446,28 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
 
   const char* role = get_str("r");
   const char* paired = get_str("p");
-  if (!this->registered_erds_snapshot_count_) {
-    /* No registered ERD filter — accept all. */
-  } else {
-    bool registered = this->contains_erd_(this->registered_erds_snapshot_, this->registered_erds_snapshot_count_, erd_id);
-    if (!registered && role[0] == 'r' && paired[0] != '\0') {
-      uint16_t paired_id = static_cast<uint16_t>(strtol(paired, nullptr, 16));
-      if (paired_id) registered = this->contains_erd_(this->registered_erds_snapshot_, this->registered_erds_snapshot_count_, paired_id) ||
-                                  this->contains_erd_(this->registered_erds_snapshot_, this->registered_erds_snapshot_count_, erd_id);
+  // Check if this ERD exists in the cache — accept if found or if paired ERD is found.
+  if (this->erd_cache_ != nullptr) {
+    bool found = false;
+    uint16_t iterator = 0;
+    while (!found) {
+      erd_cache_entry_t* entry = erd_cache_get_next_entry(this->erd_cache_, &iterator);
+      if (!entry) break;
+      if (entry->erd == erd_id) { found = true; break; }
     }
-    if (!registered) { cJSON_Delete(root); return false; }
+    // Check paired ERD if not found and this is a request role with a paired ERD.
+    if (!found && role[0] == 'r' && paired[0] != '\0') {
+      uint16_t paired_id = static_cast<uint16_t>(strtol(paired, nullptr, 16));
+      if (paired_id) {
+        iterator = 0;
+        while (!found) {
+          erd_cache_entry_t* entry = erd_cache_get_next_entry(this->erd_cache_, &iterator);
+          if (!entry) break;
+          if (entry->erd == paired_id || entry->erd == erd_id) { found = true; break; }
+        }
+      }
+    }
+    if (!found) { cJSON_Delete(root); return false; }
   }
 
   /* Build the MQTT discovery payload. */

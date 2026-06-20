@@ -43,6 +43,7 @@
 #include "esphome_mqtt_client_adapter.h"
 
 extern "C" {
+#include "erd_cache.h"
 #include "tiny_gea3_erd_client.h"
 }
 
@@ -92,8 +93,7 @@ class HaDiscoveryManager {
             const std::string& device_id,
             const std::string& model_number,
             const std::string& serial_number,
-            const tiny_erd_t* registered_erds,
-            uint16_t registered_erds_count,
+            erd_cache_t* erd_cache,
             bool generate_device_config);
 
   void set_registered_erds(const tiny_erd_t* erds, uint16_t count);
@@ -160,10 +160,8 @@ class HaDiscoveryManager {
   std::string device_id_;
   std::string model_number_;
   std::string serial_number_;
-  tiny_erd_t registered_erds_[HA_DISCOVERY_MAX_ERDS];
-  uint16_t registered_erds_count_{0};
-  tiny_erd_t registered_erds_snapshot_[HA_DISCOVERY_MAX_ERDS];
-  uint16_t registered_erds_snapshot_count_{0};
+  // Pointer to the ERD cache — read directly during fetch, no snapshot needed.
+  erd_cache_t* erd_cache_{nullptr};
   tiny_erd_t seen_erds_[HA_DISCOVERY_MAX_ERDS];
   uint16_t seen_erds_count_{0};
   bool generate_device_config_{false};

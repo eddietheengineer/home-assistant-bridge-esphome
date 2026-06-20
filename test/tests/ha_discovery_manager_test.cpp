@@ -5,7 +5,7 @@
  * Tests the state machine logic on non-ESP-IDF builds (USE_ESP_IDF_STUBS).
  * The HTTPS fetch path is a no-op in stub builds; tests cover:
  *   - init: state transition, device info storage
- *   - set_registered_erds: updates registered ERD arrays
+ *   - set_registered_erds: no-op (cache is read directly)
  *   - on_erd_seen: adds ERDs, resets activity timestamp
  *   - run in poll mode: ready when polling_list_complete
  *   - run in subscription mode: ready after quiet window or safety cap
@@ -20,6 +20,7 @@
 #endif
 
 #include "ha_discovery_manager.h"
+#include "erd_cache.h"
 #include "esphome_mqtt_client_adapter.h"
 #include "double/esphome_hal_double.hpp"
 
@@ -36,16 +37,36 @@ using namespace esphome::geappliances_bridge;
 TEST_GROUP(ha_discovery_manager)
 {
   HaDiscoveryManager manager;
+  erd_cache_t test_cache_;
 
   void setup()
   {
     esphome_hal_double_set_millis(0);
     manager.cleanup();
+    erd_cache_init(&test_cache_);
   }
 
   void teardown()
   {
     manager.cleanup();
+    erd_cache_destroy(&test_cache_);
+  }
+
+  // Helper: populate the test cache with the given ERDs
+  void add_erds(tiny_erd_t* erds, int count)
+  {
+    uint8_t dummy = 0;
+    for (int i = 0; i < count; i++) {
+      erd_cache_update(&test_cache_, erds[i], &dummy, 1);
+    }
+  }
+
+  // Helper: init with a single ERD
+  void init_with_erd(tiny_erd_t erd, bool gen_config = false)
+  {
+    uint8_t dummy = 0;
+    erd_cache_update(&test_cache_, erd, &dummy, 1);
+    manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, gen_config);
   }
 };
 
@@ -56,14 +77,14 @@ TEST_GROUP(ha_discovery_manager)
 TEST(ha_discovery_manager, init_sets_state_to_waiting_for_ready)
 {
   tiny_erd_t erds[] = { 0x0001, 0x0002 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 2, false);
+  add_erds(erds, 2);
+  manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
 TEST(ha_discovery_manager, init_stores_device_info)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, true);
+  init_with_erd(0x0001, true);
   CHECK_TRUE(manager.is_ready_to_start());
   CHECK_FALSE(manager.is_complete());
   CHECK_FALSE(manager.is_failed());
@@ -72,29 +93,31 @@ TEST(ha_discovery_manager, init_stores_device_info)
 
 TEST(ha_discovery_manager, init_clamps_registered_erds_to_max)
 {
-  tiny_erd_t erds[HA_DISCOVERY_MAX_ERDS + 10];
-  for (int i = 0; i < static_cast<int>(HA_DISCOVERY_MAX_ERDS + 10); i++) {
-    erds[i] = static_cast<uint16_t>(i);
+  // Populate cache with more than HA_DISCOVERY_MAX_ERDS entries.
+  // The cache itself caps at ERD_CACHE_CAPACITY (200), so we fill that.
+  // The point is init() should not crash with a full cache.
+  uint8_t dummy = 0;
+  for (int i = 0; i < ERD_CACHE_CAPACITY; i++) {
+    erd_cache_update(&test_cache_, static_cast<uint16_t>(i), &dummy, 1);
   }
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, HA_DISCOVERY_MAX_ERDS + 10, false);
+  manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
 TEST(ha_discovery_manager, init_with_empty_erds)
 {
-  manager.init("https://example.com", "dev1", "model1", "sn1", nullptr, 0, false);
+  // test_cache_ is empty (no entries added)
+  manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
 /* ------------------------------------------------------------------ */
-/* set_registered_erds                                                  */
+/* set_registered_erds — now a no-op (cache is read directly)           */
 /* ------------------------------------------------------------------ */
 
-TEST(ha_discovery_manager, set_registered_erds_updates_count)
+TEST(ha_discovery_manager, set_registered_erds_is_noop)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
-
+  init_with_erd(0x0001);
   tiny_erd_t new_erds[] = { 0x0002, 0x0003, 0x0004 };
   manager.set_registered_erds(new_erds, 3);
   // State should remain WAITING_FOR_READY
@@ -103,12 +126,7 @@ TEST(ha_discovery_manager, set_registered_erds_updates_count)
 
 TEST(ha_discovery_manager, set_registered_erds_clamps_to_max)
 {
-  tiny_erd_t erds[HA_DISCOVERY_MAX_ERDS + 10];
-  for (int i = 0; i < static_cast<int>(HA_DISCOVERY_MAX_ERDS + 10); i++) {
-    erds[i] = static_cast<uint16_t>(i);
-  }
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, HA_DISCOVERY_MAX_ERDS + 10, false);
-
+  init_with_erd(0x0001);
   tiny_erd_t new_erds[] = { 0x0001, 0x0002 };
   manager.set_registered_erds(new_erds, 2);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
@@ -121,7 +139,8 @@ TEST(ha_discovery_manager, set_registered_erds_clamps_to_max)
 TEST(ha_discovery_manager, on_erd_seen_adds_erd_to_seen_list)
 {
   tiny_erd_t erds[] = { 0x0001, 0x0002 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 2, false);
+  add_erds(erds, 2);
+  manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, false);
 
   manager.on_erd_seen(0x0001);
   // Should not crash and state should remain WAITING_FOR_READY
@@ -130,9 +149,8 @@ TEST(ha_discovery_manager, on_erd_seen_adds_erd_to_seen_list)
 
 TEST(ha_discovery_manager, on_erd_seen_resets_activity_timestamp)
 {
-  tiny_erd_t erds[] = { 0x0001 };
   esphome_hal_double_set_millis(1000);
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
 
   esphome_hal_double_set_millis(5000);
   manager.on_erd_seen(0x0001);
@@ -146,9 +164,8 @@ TEST(ha_discovery_manager, on_erd_seen_resets_activity_timestamp)
 
 TEST(ha_discovery_manager, on_erd_seen_ignores_duplicate)
 {
-  tiny_erd_t erds[] = { 0x0001 };
   esphome_hal_double_set_millis(1000);
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
 
   manager.on_erd_seen(0x0001);
   esphome_hal_double_set_millis(2000);
@@ -164,8 +181,7 @@ TEST(ha_discovery_manager, on_erd_seen_ignores_duplicate)
 
 TEST(ha_discovery_manager, on_erd_seen_noop_after_state_changes)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
 
   // Transition to COMPLETE via steady state
   manager.run(true);
@@ -182,8 +198,7 @@ TEST(ha_discovery_manager, on_erd_seen_noop_after_state_changes)
 
 TEST(ha_discovery_manager, run_triggers_discovery_when_steady_state)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
 
   manager.run(true);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
@@ -192,8 +207,7 @@ TEST(ha_discovery_manager, run_triggers_discovery_when_steady_state)
 
 TEST(ha_discovery_manager, run_does_nothing_when_not_steady_state)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
 
   manager.run(false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
@@ -205,8 +219,7 @@ TEST(ha_discovery_manager, run_does_nothing_when_not_steady_state)
 
 TEST(ha_discovery_manager, is_complete_returns_true_in_complete_state)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
   manager.run(true);
   CHECK_TRUE(manager.is_complete());
 }
@@ -216,8 +229,7 @@ TEST(ha_discovery_manager, is_failed_returns_true_in_failed_state)
   // Cannot directly transition to FAILED in stub builds (no HTTPS errors),
   // but the method simply checks state_ == HA_DISCOVERY_FAILED
   // We verify the getter works by confirming it returns false in other states
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
   CHECK_FALSE(manager.is_failed());
 }
 
@@ -225,22 +237,19 @@ TEST(ha_discovery_manager, is_publishing_returns_true_in_publishing_state)
 {
   // In stub builds, publish_ha_discovery_() goes straight to COMPLETE.
   // We verify is_publishing() returns false in WAITING_FOR_READY
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
   CHECK_FALSE(manager.is_publishing());
 }
 
 TEST(ha_discovery_manager, is_ready_to_start_returns_true_in_waiting_state)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
   CHECK_TRUE(manager.is_ready_to_start());
 }
 
 TEST(ha_discovery_manager, is_ready_to_start_returns_false_after_completion)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
   manager.run(true);
   CHECK_FALSE(manager.is_ready_to_start());
 }
@@ -256,15 +265,13 @@ TEST(ha_discovery_manager, get_state_returns_idle_before_init)
 
 TEST(ha_discovery_manager, get_state_returns_waiting_for_ready_after_init)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
 TEST(ha_discovery_manager, get_state_returns_complete_after_run)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
   manager.run(true);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
@@ -281,16 +288,14 @@ TEST(ha_discovery_manager, cleanup_no_crash_on_idle)
 
 TEST(ha_discovery_manager, cleanup_no_crash_on_double_call)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
   manager.cleanup();
   manager.cleanup();
 }
 
 TEST(ha_discovery_manager, cleanup_after_run_no_crash)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
   manager.run(true);
   manager.cleanup();
 }
@@ -301,8 +306,7 @@ TEST(ha_discovery_manager, cleanup_after_run_no_crash)
 
 TEST(ha_discovery_manager, set_mqtt_adapter_accepts_null)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
   manager.set_mqtt_adapter(nullptr);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
@@ -314,7 +318,8 @@ TEST(ha_discovery_manager, set_mqtt_adapter_accepts_null)
 TEST(ha_discovery_manager, non_esp_idf_fetch_is_noop_discovery_completes)
 {
   tiny_erd_t erds[] = { 0x0001, 0x0002, 0x0003 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 3, true);
+  add_erds(erds, 3);
+  manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, true);
 
   // In stub builds, publish_ha_discovery_() does not spawn a fetch task
   // and transitions directly to COMPLETE
@@ -325,9 +330,8 @@ TEST(ha_discovery_manager, non_esp_idf_fetch_is_noop_discovery_completes)
 
 TEST(ha_discovery_manager, non_esp_idf_fetch_completes_via_quiet_window)
 {
-  tiny_erd_t erds[] = { 0x0001 };
   esphome_hal_double_set_millis(0);
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, true);
+  init_with_erd(0x0001, true);
 
   esphome_hal_double_set_millis(HA_DISCOVERY_QUIET_MS);
   manager.run(true);
@@ -336,9 +340,8 @@ TEST(ha_discovery_manager, non_esp_idf_fetch_completes_via_quiet_window)
 
 TEST(ha_discovery_manager, non_esp_idf_fetch_completes_via_steady_state)
 {
-  tiny_erd_t erds[] = { 0x0001 };
   esphome_hal_double_set_millis(0);
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, true);
+  init_with_erd(0x0001, true);
 
   // Even with continuous ERD activity, steady_state=true triggers discovery
   for (uint32_t t = 1000; t <= HA_DISCOVERY_MAX_WAIT_MS; t += 1000) {
@@ -357,13 +360,12 @@ TEST(ha_discovery_manager, non_esp_idf_fetch_completes_via_steady_state)
 
 TEST(ha_discovery_manager, can_reinit_after_completion)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
   manager.run(true);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 
   // Re-init should reset to WAITING_FOR_READY
-  manager.init("https://example.com", "dev2", "model2", "sn2", erds, 1, false);
+  manager.init("https://example.com", "dev2", "model2", "sn2", &test_cache_, false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
@@ -373,8 +375,7 @@ TEST(ha_discovery_manager, can_reinit_after_completion)
 
 TEST(ha_discovery_manager, run_noop_in_complete_state)
 {
-  tiny_erd_t erds[] = { 0x0001 };
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
+  init_with_erd(0x0001);
   manager.run(true);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 
@@ -396,11 +397,12 @@ TEST(ha_discovery_manager, run_noop_in_idle_state)
 
 TEST(ha_discovery_manager, on_erd_seen_handles_max_seen_erds)
 {
-  tiny_erd_t erds[HA_DISCOVERY_MAX_ERDS];
+  // Fill cache with many unique ERDs
+  uint8_t dummy = 0;
   for (int i = 0; i < HA_DISCOVERY_MAX_ERDS; i++) {
-    erds[i] = static_cast<uint16_t>(i);
+    erd_cache_update(&test_cache_, static_cast<uint16_t>(i), &dummy, 1);
   }
-  manager.init("https://example.com", "dev1", "model1", "sn1", erds, HA_DISCOVERY_MAX_ERDS, false);
+  manager.init("https://example.com", "dev1", "model1", "sn1", &test_cache_, false);
 
   // Fill seen_erds_ to capacity
   for (int i = 0; i < HA_DISCOVERY_MAX_ERDS; i++) {

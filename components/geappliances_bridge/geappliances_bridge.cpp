@@ -748,22 +748,18 @@ void GeappliancesBridge::init_ha_discovery()
   // Clear any previously-published HA discovery topics before generating new ones.
   this->ha_discovery_manager_.clear_ha_discovery_sync();
 
-  // Snapshot the ERD cache now that both subscription and polling are in
-  // steady state — this captures all ERDs discovered during the subscription
-  // burst, not just the feature-bit ERDs available at bridge init time.
-  tiny_erd_t erds[ERD_CACHE_CAPACITY];
-  uint16_t count = 0;
-  GeappliancesBridge::erd_cache_to_array(&this->erd_cache_, erds, &count);
+  // Pass the ERD cache pointer directly — the fetch task will iterate it
+  // at fetch time, so there's no snapshot to get stale or overwritten.
   this->ha_discovery_manager_.init(
       this->ha_discovery_base_url_,
       this->device_identity_manager_.get_device_id(),
       this->device_identity_manager_.get_model_number(),
       this->device_identity_manager_.get_serial_number(),
-      erds, count,
+      &this->erd_cache_,
       true);
   this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
-  ESP_LOGI(TAG, "HA discovery initialized with %u ERDs from cache",
-           static_cast<unsigned>(count));
+  ESP_LOGI(TAG, "HA discovery initialized — will read %u ERDs from cache at fetch time",
+           static_cast<unsigned>(erd_cache_get_count(&this->erd_cache_)));
 }
 
 void GeappliancesBridge::run_all_managers()
