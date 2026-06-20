@@ -361,7 +361,6 @@ bool HaDiscoveryManager::fetch_category_(const std::string& url,
       if (c == '\n' || c == '\r') {
         if (line_pos > 2) { line_buf[line_pos] = '\0'; if (this->process_jsonl_line_(line_buf, device_id, device_json)) ++entities; }
         line_pos = 0;
-        vTaskDelay(pdMS_TO_TICKS(1));  // yield to other tasks
       } else if (line_pos < LINE_BUF - 1) { line_buf[line_pos++] = c; }
     }
   }
@@ -384,8 +383,8 @@ void HaDiscoveryManager::publish_ha_discovery_()
     this->state_ = HA_DISCOVERY_FAILED;
     return;
   }
-  this->queue_ = xQueueCreateStatic(HA_DISCOVERY_MAX_PUBLISHED_TOPICS, sizeof(HaDiscoveryItem*),
-      static_cast<uint8_t*>(heap_caps_malloc(HA_DISCOVERY_MAX_PUBLISHED_TOPICS * sizeof(HaDiscoveryItem*), MALLOC_CAP_8BIT)),
+  this->queue_ = xQueueCreateStatic(64, sizeof(HaDiscoveryItem*),
+      static_cast<uint8_t*>(heap_caps_malloc(64 * sizeof(HaDiscoveryItem*), MALLOC_CAP_8BIT)),
       static_cast<StaticQueue_t*>(heap_caps_malloc(sizeof(StaticQueue_t), MALLOC_CAP_8BIT)));
   if (!this->queue_) {
     free(this->task_stack_); free(this->task_tcb_);
@@ -575,25 +574,23 @@ bool HaDiscoveryManager::process_jsonl_line_(const std::string& line,
     this->published_topics_count_++;
   }
 
-  std::string topic = "homeassistant/" + std::string(comp) + "/" + device_id + "/" + unique_suffix + "/config";
-
-  auto* item = new HaDiscoveryItem();
-  item->topic = std::move(topic);
-  item->payload = std::move(payload);
-
-  // Always queue — the main loop publishes from publish_next_entity_.
-  // This avoids MQTT calls from the fetch task, which caused crashes
-  // under memory pressure with many entities.
-  if (this->queue_) {
-    if (xQueueSend(this->queue_, &item, pdMS_TO_TICKS(100)) != pdTRUE) {
-      ESP_LOGW(TAG, "HA fetch: queue full, dropping entity for ERD %s", erd_hex);
-      delete item;
-    }
-  } else {
-    delete item;
+  // Build the topic as a C string to avoid std::string heap allocation.
+  char topic_buf[128];
+  int topic_len = snprintf(topic_buf, sizeof(topic_buf),
+      "homeassistant/%s/%s/%s/config", comp, device_id.c_str(), unique_suffix.c_str());
+  if (topic_len < 0 || topic_len >= (int)sizeof(topic_buf)) {
+    ESP_LOGW(TAG, "HA fetch: topic too long for ERD %s", erd_hex);
+    cJSON_Delete(root);
+    return false;
   }
 
-  cJSON_Delete(root);
+  // Publish directly via raw C strings to avoid std::string heap churn.
+  if (this->mqtt_adapter_) {
+    esphome_mqtt_client_adapter_publish_raw(&this->mqtt_adapter_->interface,
+        topic_buf, payload.c_str(), payload.size(), true);
+  }
+  // Yield to let the main loop drain the MQTT outgoing queue.
+  vTaskDelay(pdMS_TO_TICKS(1));
   return true;
 }
 
