@@ -76,6 +76,9 @@ class IBridgeServices {
 
   virtual BridgeMode get_mode() const = 0;
   virtual bool is_subscription_mode_active() const = 0;
+  /// Returns true when the bridge is in steady-state operation
+  /// (subscription settled and any polling probe phase complete).
+  virtual bool is_steady_state() const = 0;
 
   // -- Startup delay ---------------------------------------------------------
 

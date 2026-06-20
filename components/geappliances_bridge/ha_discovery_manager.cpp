@@ -158,7 +158,8 @@ void HaDiscoveryManager::cleanup()
 void HaDiscoveryManager::run(bool is_poll_mode,
                              bool polling_bridge_initialized,
                              bool polling_list_complete,
-                             bool subscription_activity_detected)
+                             bool subscription_activity_detected,
+                             bool is_steady_state)
 {
   if (this->state_ == HA_DISCOVERY_WAITING_FOR_READY) {
     bool ready = false;
@@ -166,7 +167,10 @@ void HaDiscoveryManager::run(bool is_poll_mode,
       ready = polling_list_complete;
     } else {
       bool quiet = false;
-      if (subscription_activity_detected) {
+      // If the bridge reports steady state, skip the quiet-window check.
+      if (is_steady_state) {
+        quiet = true;
+      } else if (subscription_activity_detected) {
         if (millis() - this->last_activity_ >= HA_DISCOVERY_QUIET_MS) {
           quiet = true;
         }

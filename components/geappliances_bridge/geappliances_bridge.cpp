@@ -673,6 +673,32 @@ bool GeappliancesBridge::is_subscription_mode_active() const
   return subscription_mode_active_;
 }
 
+bool GeappliancesBridge::is_steady_state() const
+{
+  // Steady state: subscription watchdog timeout has elapsed (meaning we've
+  // confirmed subscription is working or fallen back to polling) AND
+  // any custom ERD polling probe phase is complete.
+  if (this->mode_ != BRIDGE_MODE_AUTO) {
+    // Non-AUTO modes: steady state is just bridge initialized.
+    return this->erd_bridge_initialized_;
+  }
+  // AUTO mode: subscription watchdog timeout must have elapsed.
+  uint32_t elapsed = millis() - this->subscription_start_time_;
+  if (elapsed < SUBSCRIPTION_TIMEOUT_MS) {
+    return false;
+  }
+  // If subscription fell back to polling, check polling list complete.
+  if (!this->subscription_mode_active_) {
+    return this->erd_bridge_poll_.polling_list_complete;
+  }
+  // Subscription still active: check if custom ERD polling is done.
+  if (this->custom_erd_polling_started_) {
+    return this->erd_bridge_poll_.polling_list_complete;
+  }
+  // No custom ERDs — subscription is the only source, steady state reached.
+  return true;
+}
+
 // -- Recurring tasks ----------------------------------------------------------
 
 void GeappliancesBridge::check_subscription_activity()
@@ -697,7 +723,8 @@ void GeappliancesBridge::run_ha_discovery()
         (mode_ == BRIDGE_MODE_AUTO && subscription_mode_active_)),
       polling_bridge_initialized_,
       erd_bridge_poll_.polling_list_complete,
-      subscription_activity_detected_);
+      subscription_activity_detected_,
+      is_steady_state());
 }
 
 void GeappliancesBridge::run_all_managers()

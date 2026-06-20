@@ -140,7 +140,7 @@ TEST(ha_discovery_manager, on_erd_seen_resets_activity_timestamp)
   // Verify by checking that quiet window has NOT elapsed yet
   esphome_hal_double_set_millis(10000);
   // 10000 - 5000 = 5000 < HA_DISCOVERY_QUIET_MS (10000), so not quiet yet
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
@@ -156,7 +156,7 @@ TEST(ha_discovery_manager, on_erd_seen_ignores_duplicate)
   // Duplicate should NOT reset last_activity_ — so activity from first call (1000)
   // After 10s from 1000 = 11000, should be quiet
   esphome_hal_double_set_millis(11000);
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
 
@@ -166,7 +166,7 @@ TEST(ha_discovery_manager, on_erd_seen_noop_after_state_changes)
   manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
 
   // Transition to COMPLETE
-  manager.run(true, true, true, false);
+  manager.run(true, true, true, false, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 
   // on_erd_seen should be a no-op in non-WAITING_FOR_READY state
@@ -183,7 +183,7 @@ TEST(ha_discovery_manager, run_poll_mode_ready_when_polling_list_complete)
   tiny_erd_t erds[] = { 0x0001 };
   manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
 
-  manager.run(true, true, true, false);
+  manager.run(true, true, true, false, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
   CHECK_TRUE(manager.is_complete());
 }
@@ -193,7 +193,7 @@ TEST(ha_discovery_manager, run_poll_mode_not_ready_when_list_incomplete)
   tiny_erd_t erds[] = { 0x0001 };
   manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
 
-  manager.run(true, true, false, false);
+  manager.run(true, true, false, false, false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
@@ -209,7 +209,7 @@ TEST(ha_discovery_manager, run_subscription_ready_after_quiet_window)
 
   // No activity for 10s
   esphome_hal_double_set_millis(HA_DISCOVERY_QUIET_MS);
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
 
@@ -221,7 +221,7 @@ TEST(ha_discovery_manager, run_subscription_not_ready_before_quiet_window)
 
   // Only 9s elapsed — not enough for quiet window
   esphome_hal_double_set_millis(HA_DISCOVERY_QUIET_MS - 1000);
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
@@ -237,7 +237,7 @@ TEST(ha_discovery_manager, run_subscription_activity_resets_quiet_window)
 
   // At 10s total, only 5s since last activity — not quiet
   esphome_hal_double_set_millis(HA_DISCOVERY_QUIET_MS);
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
@@ -253,7 +253,7 @@ TEST(ha_discovery_manager, run_subscription_quiet_after_new_activity_window)
 
   // 10s after the activity at 5s = 15000 total
   esphome_hal_double_set_millis(5000 + HA_DISCOVERY_QUIET_MS);
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
 
@@ -271,7 +271,7 @@ TEST(ha_discovery_manager, run_subscription_uses_activity_flag_for_quiet_check)
   esphome_hal_double_set_millis(HA_DISCOVERY_QUIET_MS);
   // subscription_activity_detected=true but no new on_erd_seen since init
   // last_activity_ was set at init (0), so 10000 - 0 = 10000 >= QUIET_MS
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
 
@@ -287,7 +287,7 @@ TEST(ha_discovery_manager, run_subscription_activity_detected_blocks_quiet)
 
   // At 10s total, activity_detected=true and only 5s since last activity
   esphome_hal_double_set_millis(HA_DISCOVERY_QUIET_MS);
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
 
@@ -315,7 +315,7 @@ TEST(ha_discovery_manager, run_safety_cap_ready_after_max_wait)
 
   // At 30s, safety cap should trigger regardless of activity
   esphome_hal_double_set_millis(HA_DISCOVERY_MAX_WAIT_MS);
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
 
@@ -327,7 +327,7 @@ TEST(ha_discovery_manager, run_safety_cap_before_max_wait_with_quiet)
 
   // Quiet window (10s) triggers before safety cap (30s)
   esphome_hal_double_set_millis(HA_DISCOVERY_QUIET_MS);
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
 
@@ -343,7 +343,7 @@ TEST(ha_discovery_manager, run_subscription_requires_polling_bridge_initialized_
 
   // Quiet window elapsed, but polling_bridge_initialized=false and polling_list_complete=false
   esphome_hal_double_set_millis(HA_DISCOVERY_QUIET_MS);
-  manager.run(false, false, false, true);
+  manager.run(false, false, false, true, false);
   // In the code: quiet=true, polling_bridge_initialized=false -> falls to `else if (quiet) ready = true`
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
@@ -356,7 +356,7 @@ TEST(ha_discovery_manager, run_subscription_quiet_with_polling_bridge_initialize
 
   // Quiet window elapsed, polling_bridge_initialized=true, but list not complete
   esphome_hal_double_set_millis(HA_DISCOVERY_QUIET_MS);
-  manager.run(false, true, false, true);
+  manager.run(false, true, false, true, false);
   // In the code: quiet=true, polling_bridge_initialized=true -> ready = polling_list_complete (false)
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
@@ -368,7 +368,7 @@ TEST(ha_discovery_manager, run_subscription_quiet_with_polling_bridge_initialize
   manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
 
   esphome_hal_double_set_millis(HA_DISCOVERY_QUIET_MS);
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
 
@@ -380,7 +380,7 @@ TEST(ha_discovery_manager, is_complete_returns_true_in_complete_state)
 {
   tiny_erd_t erds[] = { 0x0001 };
   manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
-  manager.run(true, true, true, false);
+  manager.run(true, true, true, false, false);
   CHECK_TRUE(manager.is_complete());
 }
 
@@ -414,7 +414,7 @@ TEST(ha_discovery_manager, is_ready_to_start_returns_false_after_completion)
 {
   tiny_erd_t erds[] = { 0x0001 };
   manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
-  manager.run(true, true, true, false);
+  manager.run(true, true, true, false, false);
   CHECK_FALSE(manager.is_ready_to_start());
 }
 
@@ -438,7 +438,7 @@ TEST(ha_discovery_manager, get_state_returns_complete_after_run)
 {
   tiny_erd_t erds[] = { 0x0001 };
   manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
-  manager.run(true, true, true, false);
+  manager.run(true, true, true, false, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
 
@@ -464,7 +464,7 @@ TEST(ha_discovery_manager, cleanup_after_run_no_crash)
 {
   tiny_erd_t erds[] = { 0x0001 };
   manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
-  manager.run(true, true, true, false);
+  manager.run(true, true, true, false, false);
   manager.cleanup();
 }
 
@@ -491,7 +491,7 @@ TEST(ha_discovery_manager, non_esp_idf_fetch_is_noop_discovery_completes)
 
   // In stub builds, publish_ha_discovery_() does not spawn a fetch task
   // and transitions directly to COMPLETE
-  manager.run(true, true, true, false);
+  manager.run(true, true, true, false, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
   CHECK_TRUE(manager.is_complete());
 }
@@ -503,7 +503,7 @@ TEST(ha_discovery_manager, non_esp_idf_fetch_completes_via_quiet_window)
   manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, true);
 
   esphome_hal_double_set_millis(HA_DISCOVERY_QUIET_MS);
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
 
@@ -520,7 +520,7 @@ TEST(ha_discovery_manager, non_esp_idf_fetch_completes_via_safety_cap)
   }
 
   esphome_hal_double_set_millis(HA_DISCOVERY_MAX_WAIT_MS);
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
 
@@ -532,7 +532,7 @@ TEST(ha_discovery_manager, can_reinit_after_completion)
 {
   tiny_erd_t erds[] = { 0x0001 };
   manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
-  manager.run(true, true, true, false);
+  manager.run(true, true, true, false, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 
   // Re-init should reset to WAITING_FOR_READY
@@ -548,18 +548,18 @@ TEST(ha_discovery_manager, run_noop_in_complete_state)
 {
   tiny_erd_t erds[] = { 0x0001 };
   manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
-  manager.run(true, true, true, false);
+  manager.run(true, true, true, false, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 
   // Running again should not change state
-  manager.run(true, true, true, false);
+  manager.run(true, true, true, false, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
 
 TEST(ha_discovery_manager, run_noop_in_idle_state)
 {
   // Uninitialized manager — run should do nothing
-  manager.run(true, true, true, false);
+  manager.run(true, true, true, false, false);
   CHECK_EQUAL(HA_DISCOVERY_IDLE, manager.get_state());
 }
 
@@ -574,7 +574,7 @@ TEST(ha_discovery_manager, subscription_quiet_with_polling_initialized_and_list_
   manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
 
   esphome_hal_double_set_millis(HA_DISCOVERY_QUIET_MS);
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
 
@@ -585,7 +585,7 @@ TEST(ha_discovery_manager, subscription_quiet_with_polling_initialized_but_list_
   manager.init("https://example.com", "dev1", "model1", "sn1", erds, 1, false);
 
   esphome_hal_double_set_millis(HA_DISCOVERY_QUIET_MS);
-  manager.run(false, true, false, true);
+  manager.run(false, true, false, true, false);
   // quiet=true, polling_bridge_initialized=true -> ready = polling_list_complete (false)
   CHECK_EQUAL(HA_DISCOVERY_WAITING_FOR_READY, manager.get_state());
 }
@@ -608,7 +608,7 @@ TEST(ha_discovery_manager, safety_cap_overrides_continuous_activity)
 
   // At exactly 30s, safety cap triggers
   esphome_hal_double_set_millis(HA_DISCOVERY_MAX_WAIT_MS);
-  manager.run(false, true, true, true);
+  manager.run(false, true, true, true, false);
   CHECK_EQUAL(HA_DISCOVERY_COMPLETE, manager.get_state());
 }
 

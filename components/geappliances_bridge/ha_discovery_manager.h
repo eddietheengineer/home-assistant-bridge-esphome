@@ -101,7 +101,8 @@ class HaDiscoveryManager {
   void run(bool is_poll_mode,
            bool polling_bridge_initialized,
            bool polling_list_complete,
-           bool subscription_activity_detected);
+           bool subscription_activity_detected,
+           bool is_steady_state);
 
   /// Set the MQTT adapter for async publishing (typed pointer, nullptr = sync fallback)
   void set_mqtt_adapter(esphome_mqtt_client_adapter_t* mqtt_adapter);
