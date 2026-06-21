@@ -149,12 +149,13 @@ void HaDiscoveryManager::run(bool device_steady_state)
 
   if (this->state_ == HA_DISCOVERY_CLEANING_STALE) {
     uint32_t now = millis();
-    if (now - this->stale_discovery_start_ms_ >= HA_STALE_DISCOVERY_TIMEOUT_MS) {
-      // Timeout reached — unsubscribe and start cleanup
-      if (this->mqtt_adapter_ && this->stale_subscription_handle_) {
-        esphome_mqtt_client_adapter_unsubscribe(this->mqtt_adapter_, this->stale_subscription_handle_);
-        this->stale_subscription_handle_ = 0;
-      }
+    if (this->stale_subscription_handle_ &&
+        now - this->stale_discovery_start_ms_ >= HA_STALE_DISCOVERY_TIMEOUT_MS) {
+      // Timeout reached — unsubscribe and start cleanup.
+      // The stale_subscription_handle_ guard ensures this block runs
+      // exactly once (it is cleared below on the first entry).
+      esphome_mqtt_client_adapter_unsubscribe(this->mqtt_adapter_, this->stale_subscription_handle_);
+      this->stale_subscription_handle_ = 0;
       ESP_LOGI(TAG, "Stale discovery timeout — found %u stale topics",
                static_cast<unsigned>(this->stale_topics_count_));
       this->stale_cleanup_index_ = 0;
