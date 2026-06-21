@@ -140,6 +140,11 @@ void HaDiscoveryManager::run(bool device_steady_state)
   }
 
   if (this->state_ == HA_DISCOVERY_PUBLISHING) {
+    // Feed the task watchdog — MQTT publish below can block for seconds
+    // on the IDF MQTT mutex, starving the main loop WDT.
+#ifdef USE_ESP32
+    esp_task_wdt_reset();
+#endif
     uint32_t now = millis();
     if (now - this->last_publish_ms_ >= HA_ENTITY_PUBLISH_INTERVAL_MS) {
       this->last_publish_ms_ = now;
@@ -148,6 +153,9 @@ void HaDiscoveryManager::run(bool device_steady_state)
   }
 
   if (this->state_ == HA_DISCOVERY_CLEARING) {
+#ifdef USE_ESP32
+    esp_task_wdt_reset();
+#endif
     uint32_t now = millis();
     if (now - this->last_publish_ms_ >= HA_ENTITY_PUBLISH_INTERVAL_MS) {
       this->last_publish_ms_ = now;
@@ -156,6 +164,9 @@ void HaDiscoveryManager::run(bool device_steady_state)
   }
 
   if (this->state_ == HA_DISCOVERY_CLEANING_STALE) {
+#ifdef USE_ESP32
+    esp_task_wdt_reset();
+#endif
     uint32_t now = millis();
     if (now - this->stale_discovery_start_ms_ >= HA_STALE_DISCOVERY_TIMEOUT_MS) {
       // Timeout reached — unsubscribe and start cleanup
