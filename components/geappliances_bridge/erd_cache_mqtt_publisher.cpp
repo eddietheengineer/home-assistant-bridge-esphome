@@ -237,11 +237,11 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
     xSemaphoreGive(self->work_semaphore);
   }
   // Wait for the task to signal completion via done_semaphore.
-  // This is a dual-core safe handshake: the task gives the semaphore
-  // before calling vTaskDelete, so we know it's truly gone.
+  // The task gives this semaphore before calling vTaskDelete, so we
+  // know it has entered the termination path.
   if (self->done_semaphore != NULL) {
     if (xSemaphoreTake(self->done_semaphore, pdMS_TO_TICKS(1000)) != pdTRUE) {
-      ESP_LOGW(TAG, "MQTT publisher task did not terminate within 1 s");
+      ESP_LOGW(TAG, "MQTT publisher task did not signal done within 1 s");
     }
   } else {
     // Fallback: poll with delay when done_semaphore creation failed.
@@ -253,6 +253,24 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
     if (self->task_handle != NULL) {
       ESP_LOGW(TAG, "MQTT publisher task did not terminate within 1 s");
     }
+  }
+
+  // After vTaskDelete() the task is on the "tasks waiting termination"
+  // list.  The idle task will eventually run prvCheckTasksWaitingTermination
+  // to remove it from the list and free its TCB.  We MUST wait until the
+  // idle task has finished this cleanup before returning, because the
+  // caller (destroy()) will memset the struct — which includes the
+  // StaticTask_t TCB — zeroing the list pointers the idle task still
+  // needs.  On single-core ESP32 this is safe: vTaskDelay yields to the
+  // idle task, which does the cleanup, then we wake and see task_handle ==
+  // NULL.
+  uint32_t start = esphome::millis();
+  while (self->task_handle != NULL && esphome::millis() - start < 2000) {
+    esp_task_wdt_reset();
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+  if (self->task_handle != NULL) {
+    ESP_LOGW(TAG, "MQTT publisher task TCB not cleaned up within 2 s");
   }
   self->task_handle = NULL;
 #else
