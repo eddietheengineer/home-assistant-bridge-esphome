@@ -233,3 +233,36 @@ extern "C" bool esphome_mqtt_client_adapter_is_connected(
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   return mqtt_client != nullptr && mqtt_client->is_connected();
 }
+
+extern "C" mqtt_subscription_handle_t esphome_mqtt_client_adapter_subscribe(
+  esphome_mqtt_client_adapter_t* self,
+  const char* topic,
+  mqtt_subscribe_callback_t callback,
+  void* user_data)
+{
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client == nullptr || !mqtt_client->is_connected()) return 0;
+
+  mqtt_subscription_handle_t handle = self->next_subscription_handle_++;
+
+  // Wrap the C callback in a std::function for ESPHome's subscribe API.
+  auto wrapper = [callback, user_data](const std::string& t, const std::string& p) {
+    callback(t.c_str(), p.c_str(), p.size(), user_data);
+  };
+  self->subscriptions_[handle] = {topic, wrapper};
+  mqtt_client->subscribe(topic, wrapper, 0);
+  return handle;
+}
+
+extern "C" void esphome_mqtt_client_adapter_unsubscribe(
+  esphome_mqtt_client_adapter_t* self,
+  mqtt_subscription_handle_t handle)
+{
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client == nullptr) return;
+  auto it = self->subscriptions_.find(handle);
+  if (it != self->subscriptions_.end()) {
+    mqtt_client->unsubscribe(it->second.topic);
+    self->subscriptions_.erase(it);
+  }
+}

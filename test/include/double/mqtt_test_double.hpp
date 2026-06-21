@@ -41,6 +41,8 @@ class MqttTestDouble : public MQTTClientComponent {
     subscribe_callback_ = callback;
   }
 
+  void unsubscribe(const std::string& /*topic*/) override {}
+
   void set_on_connect(std::function<on_connect_callback_t>&& callback) override {
     on_connect_callback_ = std::move(callback);
   }

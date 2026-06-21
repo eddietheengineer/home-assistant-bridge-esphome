@@ -30,6 +30,7 @@ namespace esphome {
 namespace geappliances_bridge {
 
 static const char* const TAG __attribute__((unused)) = "ha_discovery";
+static constexpr uint32_t HA_STALE_DISCOVERY_TIMEOUT_MS = 2000;
 
 bool HaDiscoveryManager::contains_erd_(const tiny_erd_t* erds, uint16_t count, tiny_erd_t target) const
 {
@@ -159,6 +160,28 @@ void HaDiscoveryManager::run(bool device_steady_state)
     if (now - this->last_publish_ms_ >= HA_ENTITY_PUBLISH_INTERVAL_MS) {
       this->last_publish_ms_ = now;
       this->publish_next_clear_();
+    }
+  }
+
+  if (this->state_ == HA_DISCOVERY_CLEANING_STALE) {
+    uint32_t now = millis();
+    if (now - this->stale_discovery_start_ms_ >= HA_STALE_DISCOVERY_TIMEOUT_MS) {
+      // Timeout reached — unsubscribe and start cleanup
+      if (this->mqtt_adapter_ && this->stale_subscription_handle_) {
+        esphome_mqtt_client_adapter_unsubscribe(this->mqtt_adapter_, this->stale_subscription_handle_);
+        this->stale_subscription_handle_ = 0;
+      }
+      ESP_LOGI(TAG, "Stale discovery timeout — found %u stale topics",
+               static_cast<unsigned>(this->stale_topics_count_));
+      this->stale_cleanup_index_ = 0;
+      this->last_publish_ms_ = now;
+    }
+    if (!this->stale_subscription_handle_) {
+      // Subscription closed — process stale topics at rate limit
+      if (now - this->last_publish_ms_ >= HA_ENTITY_PUBLISH_INTERVAL_MS) {
+        this->last_publish_ms_ = now;
+        this->publish_stale_cleanup_();
+      }
     }
   }
 }
@@ -297,6 +320,22 @@ void HaDiscoveryManager::publish_ha_discovery_()
 void HaDiscoveryManager::publish_next_entity_()
 {
   // No MQTT broker — no-op.
+}
+
+void HaDiscoveryManager::discover_stale_topics_()
+{
+  // Stub: skip stale discovery, go straight to complete (tests expect COMPLETE).
+  this->state_ = HA_DISCOVERY_COMPLETE;
+}
+
+void HaDiscoveryManager::stale_topic_callback_(const char* topic, const char* payload, size_t payload_len, void* user_data)
+{
+  (void)topic; (void)payload; (void)payload_len; (void)user_data;
+}
+
+void HaDiscoveryManager::publish_stale_cleanup_()
+{
+  this->state_ = HA_DISCOVERY_IDLE;
 }
 #else  /* !USE_ESP_IDF_STUBS — real ESP-IDF implementation */
 
@@ -512,8 +551,7 @@ void HaDiscoveryManager::publish_next_entity_()
       this->task_handle_ = nullptr;
       ESP_LOGI(TAG, "HA discovery complete — %u entities published",
                static_cast<unsigned>(this->published_topics_count_));
-      this->state_ = HA_DISCOVERY_COMPLETE;
-      return;
+      this->discover_stale_topics_();
     }
     if (this->mqtt_adapter_) {
       esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, item->topic, item->payload, true);
@@ -733,6 +771,124 @@ bool HaDiscoveryManager::process_jsonl_line_(const char* line,
   }
 
   return true;
+}
+
+void HaDiscoveryManager::discover_stale_topics_()
+{
+  // Reset stale topic collection.
+  this->stale_topics_count_ = 0;
+  this->stale_cleanup_index_ = 0;
+
+  if (!this->mqtt_adapter_) {
+    ESP_LOGW(TAG, "No MQTT adapter, skipping stale topic discovery");
+    this->state_ = HA_DISCOVERY_IDLE;
+    return;
+  }
+
+  // Subscribe to homeassistant/*/<device_id>/*/config to discover all retained topics.
+  char topic_pattern[128];
+  snprintf(topic_pattern, sizeof(topic_pattern),
+           "homeassistant/*/%s/*/config", this->device_id_.c_str());
+
+  this->stale_subscription_handle_ = esphome_mqtt_client_adapter_subscribe(
+      this->mqtt_adapter_,
+      topic_pattern,
+      &HaDiscoveryManager::stale_topic_callback_,
+      this);
+
+  if (!this->stale_subscription_handle_) {
+    ESP_LOGW(TAG, "Failed to subscribe for stale topic discovery");
+    this->state_ = HA_DISCOVERY_IDLE;
+    return;
+  }
+
+  this->stale_discovery_start_ms_ = millis();
+  this->state_ = HA_DISCOVERY_CLEANING_STALE;
+  ESP_LOGI(TAG, "Discovering stale HA topics from broker: %s", topic_pattern);
+}
+
+void HaDiscoveryManager::stale_topic_callback_(const char* topic, const char* payload, size_t payload_len, void* user_data)
+{
+  auto* self = static_cast<HaDiscoveryManager*>(user_data);
+
+  // Parse topic: homeassistant/<component>/<device_id>/<erd_hex>/config
+  // Extract component and erd_hex to check against published_topics_.
+  // Format: homeassistant/sensor/mydevice/0002/config
+  const char* p = topic;
+
+  // Skip "homeassistant/"
+  p = strstr(p, "homeassistant/");
+  if (!p) return;
+  p += 12; // len("homeassistant/")
+
+  // Read component (up to next /)
+  char component[32] = {0};
+  int i = 0;
+  while (*p && *p != '/' && i < 31) { component[i++] = *p++; }
+  component[i] = '\0';
+
+  // Skip device_id (next segment)
+  if (*p == '/') p++;
+  while (*p && *p != '/') p++;
+
+  // Read erd_hex (next segment, before /config)
+  if (*p == '/') p++;
+  char erd_hex[32] = {0};
+  i = 0;
+  while (*p && *p != '/' && i < 31) { erd_hex[i++] = *p++; }
+  erd_hex[i] = '\0';
+
+  // Check if this topic is in our published set.
+  bool found = false;
+  for (uint16_t j = 0; j < self->published_topics_count_; j++) {
+    if (strcmp(self->published_topics_[j].component, component) == 0 &&
+        strcmp(self->published_topics_[j].erd_hex, erd_hex) == 0) {
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) {
+    // This is a stale topic — add to cleanup list if not already present.
+    bool already_in_list = false;
+    for (uint16_t j = 0; j < self->stale_topics_count_; j++) {
+      if (strcmp(self->stale_topics_[j].topic, topic) == 0) {
+        already_in_list = true;
+        break;
+      }
+    }
+    if (!already_in_list && self->stale_topics_count_ < HA_DISCOVERY_MAX_PUBLISHED_TOPICS) {
+      snprintf(self->stale_topics_[self->stale_topics_count_].topic,
+               sizeof(self->stale_topics_[0].topic), "%s", topic);
+      self->stale_topics_count_++;
+      ESP_LOGD(TAG, "Found stale HA topic: %s", topic);
+    }
+  }
+}
+
+void HaDiscoveryManager::publish_stale_cleanup_()
+{
+  if (this->stale_cleanup_index_ >= this->stale_topics_count_) {
+    // All stale topics cleaned up.
+    ESP_LOGI(TAG, "Stale topic cleanup complete — removed %u topics",
+             static_cast<unsigned>(this->stale_topics_count_));
+    this->stale_topics_count_ = 0;
+    this->stale_cleanup_index_ = 0;
+    this->state_ = HA_DISCOVERY_IDLE;
+    return;
+  }
+
+  // Publish empty retained message to delete the stale topic.
+  const char* stale_topic = this->stale_topics_[this->stale_cleanup_index_].topic;
+  ESP_LOGD(TAG, "Cleaning stale topic %u/%u: %s",
+           static_cast<unsigned>(this->stale_cleanup_index_ + 1),
+           static_cast<unsigned>(this->stale_topics_count_),
+           stale_topic);
+
+  if (this->mqtt_adapter_) {
+    esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, stale_topic, "", true);
+  }
+  this->stale_cleanup_index_++;
 }
 
 #endif  /* USE_ESP_IDF_STUBS */

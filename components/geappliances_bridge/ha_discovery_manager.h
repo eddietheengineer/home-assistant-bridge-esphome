@@ -71,6 +71,7 @@ enum HaDiscoveryState {
   HA_DISCOVERY_WAITING_FOR_READY,
   HA_DISCOVERY_PUBLISHING,
   HA_DISCOVERY_COMPLETE,
+  HA_DISCOVERY_CLEANING_STALE,  // discovering and cleaning stale topics
   HA_DISCOVERY_FAILED,
   HA_DISCOVERY_CLEARING  // clearing retained discovery topics
 };
@@ -131,6 +132,9 @@ class HaDiscoveryManager {
   void publish_ha_discovery_();
   void publish_next_entity_();
   void publish_next_clear_();
+  void discover_stale_topics_();
+  static void stale_topic_callback_(const char* topic, const char* payload, size_t payload_len, void* user_data);
+  void publish_stale_cleanup_();
 
 
   static void ha_fetch_task_fn_(void* param);
@@ -156,6 +160,14 @@ class HaDiscoveryManager {
   PublishedTopic published_topics_[HA_DISCOVERY_MAX_PUBLISHED_TOPICS];
   uint16_t published_topics_count_{0};
   uint16_t clear_index_{0};
+
+  // Stale topic cleanup
+  mqtt_subscription_handle_t stale_subscription_handle_{0};
+  uint16_t stale_cleanup_index_{0};
+  struct StaleTopic { char topic[128]; };
+  StaleTopic stale_topics_[HA_DISCOVERY_MAX_PUBLISHED_TOPICS];
+  uint16_t stale_topics_count_{0};
+  uint32_t stale_discovery_start_ms_{0};
 
   HaDiscoveryState state_{HA_DISCOVERY_IDLE};
   std::string device_id_;

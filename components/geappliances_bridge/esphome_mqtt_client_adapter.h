@@ -23,7 +23,10 @@
 #pragma once
 #include "esphome/components/mqtt/mqtt_client.h"
 
+#include <functional>
+#include <map>
 #include <string>
+
 
 #include "erd_registry.h"
 
@@ -47,6 +50,13 @@ typedef struct {
   // Max ERD write payload is 32 bytes (64 hex chars).
   uint8_t write_payload_buffer_[32];
   uint8_t write_payload_size_;
+  // Subscription tracking for esphome_mqtt_client_adapter_subscribe/unsubscribe.
+  struct MqttSubscription {
+    std::string topic;
+    std::function<void(const std::string&, const std::string&)> callback;
+  };
+  std::map<uint16_t, MqttSubscription> subscriptions_;
+  uint16_t next_subscription_handle_{1};
 } esphome_mqtt_client_adapter_t;
 
 #ifdef __cplusplus
@@ -109,6 +119,27 @@ void esphome_mqtt_client_adapter_publish_raw(
   const char* payload,
   size_t payload_len,
   bool retain);
+
+/*!
+ * Subscribe to an MQTT topic with a callback.
+ * The callback receives (topic, payload, payload_len, user_data).
+ * Returns a handle for later unsubscribe, or 0 on failure.
+ */
+typedef uint16_t mqtt_subscription_handle_t;
+typedef void (*mqtt_subscribe_callback_t)(const char* topic, const char* payload, size_t payload_len, void* user_data);
+
+mqtt_subscription_handle_t esphome_mqtt_client_adapter_subscribe(
+  esphome_mqtt_client_adapter_t* self,
+  const char* topic,
+  mqtt_subscribe_callback_t callback,
+  void* user_data);
+
+/*!
+ * Unsubscribe from a topic by handle.
+ */
+void esphome_mqtt_client_adapter_unsubscribe(
+  esphome_mqtt_client_adapter_t* self,
+  mqtt_subscription_handle_t handle);
 
 #ifdef __cplusplus
 }

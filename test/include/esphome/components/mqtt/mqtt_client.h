@@ -22,6 +22,8 @@ enum class MQTTClientDisconnectReason : int8_t {
   MQTT_MALFORMED_CREDENTIALS = 4,
   MQTT_NOT_AUTHORIZED = 5,
 };
+
+
 class MQTTClientComponent {
  public:
   virtual ~MQTTClientComponent() {}
@@ -31,6 +33,7 @@ class MQTTClientComponent {
   virtual void subscribe(const std::string& topic,
                          std::function<void(const std::string&, const std::string&)> callback,
                          uint8_t qos) = 0;
+  virtual void unsubscribe(const std::string& topic) = 0;
 
   using on_connect_callback_t = void(bool session_present);
   using on_disconnect_callback_t = void(MQTTClientDisconnectReason reason);
