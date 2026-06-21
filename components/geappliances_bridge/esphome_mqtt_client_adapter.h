@@ -51,9 +51,11 @@ typedef struct {
   uint8_t write_payload_buffer_[32];
   uint8_t write_payload_size_;
   // Subscription tracking for esphome_mqtt_client_adapter_subscribe/unsubscribe.
+  // Stores C callback + user_data instead of std::function to avoid heap allocation.
   struct MqttSubscription {
     std::string topic;
-    std::function<void(const std::string&, const std::string&)> callback;
+    void (*callback)(const char* topic, const char* payload, size_t payload_len, void* user_data);
+    void* user_data;
   };
   std::map<uint16_t, MqttSubscription> subscriptions_;
   uint16_t next_subscription_handle_{1};

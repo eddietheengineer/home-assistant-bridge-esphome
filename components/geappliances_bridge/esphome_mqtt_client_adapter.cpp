@@ -244,13 +244,13 @@ extern "C" mqtt_subscription_handle_t esphome_mqtt_client_adapter_subscribe(
   if (mqtt_client == nullptr || !mqtt_client->is_connected()) return 0;
 
   mqtt_subscription_handle_t handle = self->next_subscription_handle_++;
+  self->subscriptions_[handle] = {topic, callback, user_data};
 
-  // Wrap the C callback in a std::function for ESPHome's subscribe API.
-  auto wrapper = [callback, user_data](const std::string& t, const std::string& p) {
-    callback(t.c_str(), p.c_str(), p.size(), user_data);
-  };
-  self->subscriptions_[handle] = {topic, wrapper};
-  mqtt_client->subscribe(topic, wrapper, 0);
+  // Create a std::function wrapper only for the ESPHome subscribe call.
+  mqtt_client->subscribe(topic,
+    [callback, user_data](const std::string& t, const std::string& p) {
+      callback(t.c_str(), p.c_str(), p.size(), user_data);
+    }, 0);
   return handle;
 }
 

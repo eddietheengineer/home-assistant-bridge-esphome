@@ -48,7 +48,7 @@ extern "C" {
 }
 
 #ifndef USE_ESP_IDF
-#error "generate_device_config requires the ESP-IDF framework. Please set framework: type: esp-idf or set generate_device_config: false"
+#  define USE_ESP_IDF_STUBS
 #endif
 
 #ifdef USE_ESP_IDF_STUBS
@@ -56,7 +56,8 @@ extern "C" {
 #else
 #  include "freertos/FreeRTOS.h"
 #  include "freertos/task.h"
-#  include "freertos/semphr.h"
+#  include "freertos/queue.h"
+#  include "miniz.h"
 #endif
 
 namespace esphome {
@@ -141,13 +142,13 @@ class HaDiscoveryManager {
   void fetch_ha_definitions_();
   bool process_category_(const HaDiscoveryCategory* cat,
                          const std::string& device_id,
-                         const std::string& device_json);
+                         const char* device_json);
   bool process_jsonl_line_(const char* line,
                            const std::string& device_id,
-                           const std::string& device_json);
+                           const char* device_json);
 
   int escape_json_str_(const char* s, char* buf, int buf_size);
-  std::string build_device_json_();
+  const char* build_device_json_();
 
   bool contains_erd_(const tiny_erd_t* erds, uint16_t count, tiny_erd_t target) const;
 
@@ -175,6 +176,9 @@ class HaDiscoveryManager {
   std::string serial_number_;
   // Pointer to the ERD cache — read directly during fetch, no snapshot needed.
   erd_cache_t* erd_cache_{nullptr};
+  // Sorted array of ERDs from the cache, built once at fetch start for binary search.
+  tiny_erd_t sorted_erds_[HA_DISCOVERY_MAX_ERDS];
+  uint16_t sorted_erds_count_{0};
   tiny_erd_t seen_erds_[HA_DISCOVERY_MAX_ERDS];
   uint16_t seen_erds_count_{0};
   bool generate_device_config_{false};
@@ -185,8 +189,19 @@ class HaDiscoveryManager {
   // Pointer to the MQTT adapter for async publishing (typed, set via set_mqtt_adapter)
   esphome_mqtt_client_adapter_t* mqtt_adapter_{nullptr};
 
-  TaskHandle_t        task_handle_{nullptr};
-  SemaphoreHandle_t   done_semaphore_{nullptr};
+  QueueHandle_t queue_{nullptr};
+  TaskHandle_t  task_handle_{nullptr};
+  StackType_t*  task_stack_{nullptr};
+  StaticTask_t* task_tcb_{nullptr};
+  // Pre-allocated decompression buffers (reused across categories).
+  // Max decompressed chunk is typically ~2KB; line buffer 4KB.
+  static constexpr uint16_t HA_DECOMP_BUF_SIZE = 4096;
+  uint8_t decomp_buf_[HA_DECOMP_BUF_SIZE];
+#ifndef USE_ESP_IDF_STUBS
+  tinfl_decompressor decomp_state_;
+#endif
+  char line_buf_[4096];
+  char device_json_buf_[512];
 };
 
 }  // namespace geappliances_bridge

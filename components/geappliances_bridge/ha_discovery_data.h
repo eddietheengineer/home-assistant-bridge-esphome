@@ -1,7 +1,13 @@
 // Auto-generated — do not edit.
 // Compressed JSONL data for HA discovery, embedded in flash.
-// Each category is split into fixed-size zlib-compressed chunks for low-fragmentation
-// streaming decompression on memory-constrained devices (ESP32-C3).
+//
+// DESIGN TRADE-OFF: All 10 appliance category JSONL files are embedded as
+// compressed byte arrays (~421KB compressed from 2.4MB). This eliminates
+// network dependency (no HTTP/TLS needed) but increases firmware size.
+// On ESP32-C3 with 1.8MB flash, this uses ~23% of flash. For appliances
+// that only need 1-2 categories, this is overkill. A future optimization
+// could lazy-load categories from network on first use, caching in PSRAM
+// if available, to reduce flash usage for single-appliance deployments.
 #pragma once
 
 #include <stdint.h>
