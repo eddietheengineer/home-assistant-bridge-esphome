@@ -92,14 +92,14 @@ void HaDiscoveryManager::cleanup()
   this->task_handle_ = nullptr;
 
   // If a fetch task is still running, signal it to stop via the sentinel.
-  HaDiscoveryItem* sentinel = nullptr;
+  uint16_t sentinel = HA_DISCOVERY_ITEM_POOL_SENTINEL;
   xQueueSend(this->queue_, &sentinel, 0);
 
-  // Drain all remaining items from the queue.
+  // Drain all remaining indices from the queue (no deletion needed — pool is static).
   {
-    HaDiscoveryItem* item = nullptr;
-    while (xQueueReceive(this->queue_, &item, 0) == pdTRUE) {
-      if (item != nullptr) delete item;
+    uint16_t idx;
+    while (xQueueReceive(this->queue_, &idx, 0) == pdTRUE) {
+      // Pool items are reused; no deletion needed.
     }
   }
   // Re-send the sentinel now that space is guaranteed.
@@ -440,7 +440,7 @@ static const char* json_get_str(const char* json, const char* key)
   auto* self = static_cast<HaDiscoveryManager*>(param);
   self->fetch_ha_definitions_();
   // Send sentinel to signal completion to the main loop.
-  HaDiscoveryItem* sentinel = nullptr;
+  uint16_t sentinel = HA_DISCOVERY_ITEM_POOL_SENTINEL;
   BaseType_t sent = xQueueSend(self->queue_, &sentinel, pdMS_TO_TICKS(5000));
   // Mark done regardless of whether the sentinel was queued successfully.
   // If the queue was full, publish_next_entity_() will detect fetch_done_
@@ -448,10 +448,10 @@ static const char* json_get_str(const char* json, const char* key)
   self->fetch_done_ = true;
   if (sent != pdTRUE) {
     // Queue was full for 5s — the main loop may have already cleaned up.
-    // Drain remaining items ourself to avoid leaks.
-    HaDiscoveryItem* item = nullptr;
-    while (xQueueReceive(self->queue_, &item, 0) == pdTRUE) {
-      if (item != nullptr) delete item;
+    // Drain remaining indices from the queue (no-op since pool is pre-allocated).
+    uint16_t idx;
+    while (xQueueReceive(self->queue_, &idx, 0) == pdTRUE) {
+      // Items in the pool are reused; no deletion needed.
     }
   }
   vTaskDelete(nullptr);
@@ -599,8 +599,8 @@ void HaDiscoveryManager::publish_ha_discovery_()
     this->state_ = HA_DISCOVERY_FAILED;
     return;
   }
-  this->queue_ = xQueueCreateStatic(64, sizeof(HaDiscoveryItem*),
-      static_cast<uint8_t*>(heap_caps_malloc(64 * sizeof(HaDiscoveryItem*), MALLOC_CAP_8BIT)),
+  this->queue_ = xQueueCreateStatic(64, sizeof(uint16_t),
+      static_cast<uint8_t*>(heap_caps_malloc(64 * sizeof(uint16_t), MALLOC_CAP_8BIT)),
       static_cast<StaticQueue_t*>(heap_caps_malloc(sizeof(StaticQueue_t), MALLOC_CAP_8BIT)));
   if (!this->queue_) {
     free(this->task_stack_); free(this->task_tcb_);
@@ -623,8 +623,8 @@ void HaDiscoveryManager::publish_ha_discovery_()
 }
 void HaDiscoveryManager::publish_next_entity_()
 {
-  HaDiscoveryItem* item = nullptr;
-  if (xQueueReceive(this->queue_, &item, 0) != pdTRUE) {
+  uint16_t idx = 0;
+  if (xQueueReceive(this->queue_, &idx, 0) != pdTRUE) {
     // Queue is empty. Check if the fetch task has terminated.
     if (this->fetch_done_) {
       vQueueDelete(this->queue_); this->queue_ = nullptr;
@@ -640,7 +640,7 @@ void HaDiscoveryManager::publish_next_entity_()
   }
 
   // Sentinel — fetch task is done.
-  if (item == nullptr) {
+  if (idx == HA_DISCOVERY_ITEM_POOL_SENTINEL) {
     this->fetch_done_ = true;
     vQueueDelete(this->queue_); this->queue_ = nullptr;
     free(this->task_stack_); free(this->task_tcb_);
@@ -652,11 +652,11 @@ void HaDiscoveryManager::publish_next_entity_()
     return;
   }
 
-  // Publish the entity.
+  // Publish the entity from the pre-allocated pool.
+  auto& item = this->item_pool_[idx];
   if (this->mqtt_adapter_) {
-    esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, item->topic, item->payload, true);
+    esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, item.topic, item.payload, true);
   }
-  delete item;
 }
 bool HaDiscoveryManager::process_jsonl_line_(const char* line,
                                               const std::string& device_id,
@@ -878,18 +878,17 @@ bool HaDiscoveryManager::process_jsonl_line_(const char* line,
     this->published_topics_count_++;
   }
 
-  // Queue the item for the main loop to publish.
-  auto* item = new HaDiscoveryItem();
-  safe_strncpy(item->topic, topic_buf, sizeof(item->topic));
-  safe_strncpy(item->payload, payload_buf, sizeof(item->payload));
+  // Get a slot from the pre-allocated pool (round-robin).
+  uint16_t idx = this->item_pool_next_;
+  this->item_pool_next_ = (this->item_pool_next_ + 1) % HA_DISCOVERY_ITEM_POOL_SIZE;
+  auto& item = this->item_pool_[idx];
+  safe_strncpy(item.topic, topic_buf, sizeof(item.topic));
+  safe_strncpy(item.payload, payload_buf, sizeof(item.payload));
 
   if (this->queue_) {
-    if (xQueueSend(this->queue_, &item, pdMS_TO_TICKS(500)) != pdTRUE) {
+    if (xQueueSend(this->queue_, &idx, pdMS_TO_TICKS(500)) != pdTRUE) {
       ESP_LOGW(TAG, "HA fetch: queue full after 500ms, dropping entity for ERD %s", erd_hex);
-      delete item;
     }
-  } else {
-    delete item;
   }
 
   return true;

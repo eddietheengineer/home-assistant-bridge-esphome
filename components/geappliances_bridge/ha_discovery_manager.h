@@ -88,6 +88,8 @@ struct HaDiscoveryItem {
 /* Maximum number of registered/seen ERDs for HA discovery. */
 #define HA_DISCOVERY_MAX_ERDS 645
 #define HA_DISCOVERY_MAX_PUBLISHED_TOPICS 645
+#define HA_DISCOVERY_ITEM_POOL_SIZE 64  // max items in flight (queue depth)
+#define HA_DISCOVERY_ITEM_POOL_SENTINEL 0xFFFF  // sentinel for queue: fetch done
 struct HaDiscoveryCategory;
 
 
@@ -188,8 +190,7 @@ class HaDiscoveryManager {
 
   // Pointer to the MQTT adapter for async publishing (typed, set via set_mqtt_adapter)
   esphome_mqtt_client_adapter_t* mqtt_adapter_{nullptr};
-
-  QueueHandle_t queue_{nullptr};
+  QueueHandle_t queue_{nullptr};  // queue of uint16_t indices into item_pool_
   TaskHandle_t  task_handle_{nullptr};
   bool fetch_done_{false};  // true once the fetch task has terminated (sentinel or timeout)
   StackType_t*  task_stack_{nullptr};
@@ -203,6 +204,10 @@ class HaDiscoveryManager {
 #endif
   char line_buf_[4096];
   char device_json_buf_[512];
+  // Pre-allocated pool of HaDiscoveryItem objects — avoids heap allocation
+  // per entity during the fetch task, preventing OOM on constrained devices.
+  HaDiscoveryItem item_pool_[HA_DISCOVERY_ITEM_POOL_SIZE];
+  uint16_t item_pool_next_{0};  // round-robin index into item_pool_
 };
 
 }  // namespace geappliances_bridge
