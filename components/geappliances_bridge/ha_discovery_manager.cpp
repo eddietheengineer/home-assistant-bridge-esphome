@@ -102,54 +102,24 @@ void HaDiscoveryManager::cleanup()
     // Re-send the sentinel now that space is guaranteed.
     xQueueSend(this->queue_, &sentinel, 0);
 
-    // Wait for the task to signal it has entered the termination path
-    // (gives the semaphore before calling vTaskDelete).  Use non-blocking
-    // xSemaphoreTake in a yield loop — blocking xSemaphoreTake uses
-    // vTaskDelay internally which crashes on ESP32-C6 via vSystimerSetup.
-    bool signaled = false;
+    // Wait for the task to signal it has entered the termination path.
+    // Use non-blocking xSemaphoreTake — blocking version uses vTaskDelay
+    // internally which crashes on ESP32-C6 via vSystimerSetup.
     if (this->done_semaphore_ != nullptr) {
+      // Poll with short delays.  vTaskDelay(1) is the minimum that
+      // doesn't trigger the systimer assertion on ESP32-C6.
       uint32_t start = millis();
-      while (!signaled && millis() - start < 5000) {
-        if (xSemaphoreTake(this->done_semaphore_, 0) == pdTRUE) {
-          signaled = true;
-        } else {
-          esp_task_wdt_reset();
-          taskYIELD();
-        }
-      }
-      if (!signaled) {
-        ESP_LOGW(TAG, "HA discovery task did not signal done within 5 s");
-      }
-    } else if (this->task_handle_ != nullptr) {
-      // Fallback: poll with yield when semaphore was never created.
-      uint32_t start = millis();
-      while (this->task_handle_ != nullptr && millis() - start < 5000) {
+      while (xSemaphoreTake(this->done_semaphore_, 0) != pdTRUE &&
+             millis() - start < 5000) {
         esp_task_wdt_reset();
-        taskYIELD();
-      }
-      if (this->task_handle_ != nullptr) {
-        ESP_LOGW(TAG, "HA discovery task did not terminate within 5 s");
+        vTaskDelay(pdMS_TO_TICKS(1));
       }
     }
 
-    // Wait for the idle task to unlink the TCB from
-    // xTasksWaitingTermination before calling vQueueDelete, which
-    // triggers prvCheckTasksWaitingTermination and crashes on ESP32-C6.
-    if (this->task_handle_ != nullptr) {
-      uint32_t start = millis();
-      while (eTaskGetState(this->task_handle_) != eInvalid &&
-             millis() - start < 5000) {
-        esp_task_wdt_reset();
-        taskYIELD();
-      }
-      if (eTaskGetState(this->task_handle_) != eInvalid) {
-        ESP_LOGW(TAG, "HA discovery task TCB not cleaned within 5 s");
-      }
-    }
-  }
-  // Delete the queue.
-  if (this->queue_ != nullptr) {
-    vQueueDelete(this->queue_);
+    // Leak the queue rather than calling vQueueDelete.  On ESP32-C6
+    // vQueueDelete triggers prvUnlockQueue -> prvCheckTasksWaitingTermination
+    // -> uxListRemove on the fetch task's TCB, which crashes via
+    // vSystimerSetup.  The queue is ~512 bytes — acceptable one-time leak.
     this->queue_ = nullptr;
   }
   // Clean up the semaphore.
@@ -561,25 +531,15 @@ void HaDiscoveryManager::publish_next_entity_()
   HaDiscoveryItem* item = nullptr;
   if (xQueueReceive(this->queue_, &item, 0) == pdTRUE) {
     if (item == nullptr) {
-      // Sentinel — fetch task has called vTaskDelete().  On ESP32-C6 the
-      // idle task must unlink the TCB from xTasksWaitingTermination BEFORE
-      // we call vQueueDelete(), because prvUnlockQueue triggers
-      // prvCheckTasksWaitingTermination which crashes when it tries to
-      // uxListRemove a TCB whose list items are in an inconsistent state.
-      // Yield in a tight loop until eTaskGetState reports eInvalid (TCB
-      // cleaned up), then it's safe to delete the queue.
-      if (this->task_handle_ != nullptr) {
-        uint32_t start = millis();
-        while (eTaskGetState(this->task_handle_) != eInvalid &&
-               millis() - start < 5000) {
-          taskYIELD();
-        }
-        if (eTaskGetState(this->task_handle_) != eInvalid) {
-          ESP_LOGW(TAG, "HA discovery task TCB not cleaned within 5 s");
-        }
-      }
+      // Sentinel received.  The fetch task has called vTaskDelete().
+      // FreeRTOS owns the TCB/stack (xTaskCreate) so the idle task will
+      // clean them up.  We intentionally leak the queue rather than
+      // calling vQueueDelete, because on ESP32-C6 vQueueDelete triggers
+      // prvUnlockQueue -> prvCheckTasksWaitingTermination -> uxListRemove
+      // on the still-linked TCB, which crashes via vSystimerSetup.
+      // The queue is ~512 bytes — acceptable one-time leak.
       this->task_handle_ = nullptr;
-      vQueueDelete(this->queue_); this->queue_ = nullptr;
+      this->queue_ = nullptr;       // leak the queue to avoid crash
       if (this->done_semaphore_ != nullptr) {
         vSemaphoreDelete(this->done_semaphore_);
         this->done_semaphore_ = nullptr;

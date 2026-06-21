@@ -37,9 +37,6 @@ typedef struct TaskControlBlock_t StaticTask_t;
 static inline void vTaskDelay(UBaseType_t ticks) { (void)ticks; }
 static inline void vTaskDelete(TaskHandle_t) { }
 static inline UBaseType_t uxTaskGetStackHighWaterMark(TaskHandle_t) { return 1024; }
-typedef enum { eRunning, eReady, eBlocked, eSuspended, eDeleted, eInvalid } eTaskState;
-static inline eTaskState eTaskGetState(TaskHandle_t) { return eInvalid; }
-static inline void taskYIELD(void) { }
 static inline TaskHandle_t xTaskCreateStatic(void (*fn)(void*), const char* name,
         uint32_t stack, void* arg, UBaseType_t prio,
         StackType_t* stack_buf, StaticTask_t* tcb) {
