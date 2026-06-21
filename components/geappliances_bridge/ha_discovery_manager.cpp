@@ -20,7 +20,6 @@
 #  include "cJSON.h"
 #  include "freertos/FreeRTOS.h"
 #  include "freertos/task.h"
-#  include "freertos/queue.h"
 #  include "esp_heap_caps.h"
 #  include "esp_task_wdt.h"
 #  include "miniz.h"
@@ -83,45 +82,39 @@ void HaDiscoveryManager::set_mqtt_adapter(esphome_mqtt_client_adapter_t* mqtt_ad
 
 void HaDiscoveryManager::cleanup()
 {
-  // If a fetch task is still running, signal it to stop via the sentinel.
-  if (this->queue_ != nullptr) {
-    HaDiscoveryItem* sentinel = nullptr;
-    // Non-blocking send — if queue is full, the task will get the sentinel
-    // after it drains existing items.
-    xQueueSend(this->queue_, &sentinel, 0);
-
-    // Drain all remaining items from the queue before waiting for the task.
-    // If the fetch task is blocked on xQueueSend() (queue full), this
-    // unblocks it so it can finish and call vTaskDelete().
-    {
-      HaDiscoveryItem* item = nullptr;
-      while (xQueueReceive(this->queue_, &item, 0) == pdTRUE) {
-        if (item != nullptr) delete item;
+  // Poll for the fetch task's done signal via the semaphore.
+  // Non-blocking take + vTaskDelay(1) avoids the ESP32-C6 crash from
+  // blocking xSemaphoreTake (which uses vTaskDelay internally via
+  // vSystimerSetup).
+  if (this->done_semaphore_ != nullptr) {
+    bool signaled = false;
+    uint32_t start = millis();
+    while (!signaled && millis() - start < 5000) {
+      if (xSemaphoreTake(this->done_semaphore_, 0) == pdTRUE) {
+        signaled = true;
+      } else {
+        vTaskDelay(1);
       }
     }
-    // Re-send the sentinel now that space is guaranteed.
-    xQueueSend(this->queue_, &sentinel, 0);
-
-    // Wait for the task to signal it has entered the termination path.
-    // Use non-blocking xSemaphoreTake — blocking version uses vTaskDelay
-    // internally which crashes on ESP32-C6 via vSystimerSetup.
-    if (this->done_semaphore_ != nullptr) {
-      // Poll with short delays.  vTaskDelay(1) is the minimum that
-      // doesn't trigger the systimer assertion on ESP32-C6.
-      uint32_t start = millis();
-      while (xSemaphoreTake(this->done_semaphore_, 0) != pdTRUE &&
-             millis() - start < 5000) {
-        esp_task_wdt_reset();
-        vTaskDelay(pdMS_TO_TICKS(1));
-      }
+    if (!signaled) {
+      ESP_LOGW(TAG, "HA discovery task did not signal done within 5 s");
     }
-
-    // Leak the queue rather than calling vQueueDelete.  On ESP32-C6
-    // vQueueDelete triggers prvUnlockQueue -> prvCheckTasksWaitingTermination
-    // -> uxListRemove on the fetch task's TCB, which crashes via
-    // vSystimerSetup.  The queue is ~512 bytes — acceptable one-time leak.
-    this->queue_ = nullptr;
+  } else if (this->task_handle_ != nullptr) {
+    // Fallback: poll with delay when semaphore was never created.
+    uint32_t start = millis();
+    while (this->task_handle_ != nullptr && millis() - start < 5000) {
+      vTaskDelay(1);
+    }
+    if (this->task_handle_ != nullptr) {
+      ESP_LOGW(TAG, "HA discovery task did not terminate within 5 s");
+    }
   }
+
+  // Wait for the idle task to clean up the TCB (same pattern as MQTT publisher).
+  if (this->task_handle_ != nullptr) {
+    vTaskDelay(100);
+  }
+
   // Clean up the semaphore.
   if (this->done_semaphore_ != nullptr) {
     vSemaphoreDelete(this->done_semaphore_);
@@ -355,9 +348,6 @@ static const char* json_get_str(const char* json, const char* key)
 {
   auto* self = static_cast<HaDiscoveryManager*>(param);
   self->fetch_ha_definitions_();
-  // Send sentinel to signal completion to the main loop.
-  HaDiscoveryItem* sentinel = nullptr;
-  xQueueSend(self->queue_, &sentinel, portMAX_DELAY);
   // Signal the cleanup path that we're about to exit, before calling
   // vTaskDelete so the caller can wait for termination + idle-task TCB
   // cleanup without polling a handle the task never clears.
@@ -505,19 +495,10 @@ void HaDiscoveryManager::publish_ha_discovery_()
   // After vTaskDelete() the idle task frees both automatically,
   // eliminating the TCB use-after-free that crashed on ESP32-C6.
   static constexpr int STACK_SIZE = 48 * 1024;  // 48 KB
-  this->queue_ = xQueueCreateStatic(64, sizeof(HaDiscoveryItem*),
-      static_cast<uint8_t*>(heap_caps_malloc(64 * sizeof(HaDiscoveryItem*), MALLOC_CAP_8BIT)),
-      static_cast<StaticQueue_t*>(heap_caps_malloc(sizeof(StaticQueue_t), MALLOC_CAP_8BIT)));
-  if (!this->queue_) {
-    ESP_LOGE(TAG, "Failed to create queue for HA discovery task");
-    this->state_ = HA_DISCOVERY_FAILED;
-    return;
-  }
   this->done_semaphore_ = xSemaphoreCreateBinary();
   if (xTaskCreate(ha_fetch_task_fn_, "ha_fetch", STACK_SIZE, this, 1,
       &this->task_handle_) != pdTRUE) {
     vSemaphoreDelete(this->done_semaphore_); this->done_semaphore_ = nullptr;
-    vQueueDelete(this->queue_); this->queue_ = nullptr;
     this->task_handle_ = nullptr;
     ESP_LOGE(TAG, "Failed to create HA discovery task");
     this->state_ = HA_DISCOVERY_FAILED;
@@ -528,30 +509,33 @@ void HaDiscoveryManager::publish_ha_discovery_()
 
 void HaDiscoveryManager::publish_next_entity_()
 {
-  HaDiscoveryItem* item = nullptr;
-  if (xQueueReceive(this->queue_, &item, 0) == pdTRUE) {
-    if (item == nullptr) {
-      // Sentinel received.  The fetch task has called vTaskDelete().
-      // FreeRTOS owns the TCB/stack (xTaskCreate) so the idle task will
-      // clean them up.  We intentionally leak the queue rather than
-      // calling vQueueDelete, because on ESP32-C6 vQueueDelete triggers
-      // prvUnlockQueue -> prvCheckTasksWaitingTermination -> uxListRemove
-      // on the still-linked TCB, which crashes via vSystimerSetup.
-      // The queue is ~512 bytes — acceptable one-time leak.
-      this->task_handle_ = nullptr;
-      this->queue_ = nullptr;       // leak the queue to avoid crash
-      if (this->done_semaphore_ != nullptr) {
-        vSemaphoreDelete(this->done_semaphore_);
-        this->done_semaphore_ = nullptr;
+  // Poll for the fetch task's done signal via the semaphore.
+  // Non-blocking take + vTaskDelay(1) avoids the ESP32-C6 crash from
+  // blocking xSemaphoreTake (which uses vTaskDelay internally via
+  // vSystimerSetup).
+  if (this->done_semaphore_ != nullptr) {
+    if (xSemaphoreTake(this->done_semaphore_, 0) == pdTRUE) {
+      // Fetch task has finished and given the semaphore.
+      // Wait for the idle task to clean up the TCB.
+      if (this->task_handle_ != nullptr) {
+        uint32_t start = millis();
+        while (eTaskGetState(this->task_handle_) != eInvalid &&
+               millis() - start < 5000) {
+          vTaskDelay(1);
+        }
+        if (eTaskGetState(this->task_handle_) != eInvalid) {
+          ESP_LOGW(TAG, "HA discovery task TCB not cleaned within 5 s");
+        }
       }
+      this->task_handle_ = nullptr;
+      vSemaphoreDelete(this->done_semaphore_);
+      this->done_semaphore_ = nullptr;
       ESP_LOGI(TAG, "HA discovery complete — %u entities published",
                static_cast<unsigned>(this->published_topics_count_));
       this->discover_stale_topics_();
+    } else {
+      vTaskDelay(1);
     }
-    if (this->mqtt_adapter_) {
-      esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, item->topic, item->payload, true);
-    }
-    delete item;
   }
 }
 bool HaDiscoveryManager::process_jsonl_line_(const char* line,
@@ -748,21 +732,9 @@ bool HaDiscoveryManager::process_jsonl_line_(const char* line,
     this->published_topics_count_++;
   }
 
-  // Queue the item for the main loop to publish.
-  // Blocks if queue is full — backpressures the fetch task.
-  auto* item = new HaDiscoveryItem();
-  strncpy(item->topic, topic_buf, sizeof(item->topic) - 1);
-  item->topic[sizeof(item->topic) - 1] = '\0';
-  strncpy(item->payload, payload_buf, sizeof(item->payload) - 1);
-  item->payload[sizeof(item->payload) - 1] = '\0';
-
-  if (this->queue_) {
-    if (xQueueSend(this->queue_, &item, pdMS_TO_TICKS(2000)) != pdTRUE) {
-      ESP_LOGW(TAG, "HA fetch: queue full after 2s, dropping entity for ERD %s", erd_hex);
-      delete item;
-    }
-  } else {
-    delete item;
+  // Publish directly via MQTT adapter — no queue needed.
+  if (this->mqtt_adapter_) {
+    esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, topic_buf, payload_buf, true);
   }
 
   return true;
