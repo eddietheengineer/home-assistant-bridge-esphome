@@ -666,6 +666,7 @@ bool HaDiscoveryManager::process_jsonl_line_(const char* line,
   char val_buf[128];
   get_str("i", val_buf, sizeof(val_buf));
   const char* erd_hex = val_buf;
+  const char* unique_suffix = erd_hex;
   if (erd_hex[0] == '\0') return false;
   uint16_t erd_id = static_cast<uint16_t>(strtol(erd_hex, nullptr, 16));
 
