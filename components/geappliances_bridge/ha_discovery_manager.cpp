@@ -82,34 +82,37 @@ void HaDiscoveryManager::set_mqtt_adapter(esphome_mqtt_client_adapter_t* mqtt_ad
 
 void HaDiscoveryManager::cleanup()
 {
+  // Idempotent: if publish_next_entity_() already cleaned up after the
+  // sentinel, all pointers are null and this is a no-op.
+  if (this->queue_ == nullptr && this->task_stack_ == nullptr) {
+    return;
+  }
+
   // If a fetch task is still running, signal it to stop via the sentinel.
-  if (this->queue_ != nullptr) {
-    HaDiscoveryItem* sentinel = nullptr;
-    // Non-blocking send — if queue is full, the task will get the sentinel
-    // after it drains existing items.
-    xQueueSend(this->queue_, &sentinel, 0);
+  HaDiscoveryItem* sentinel = nullptr;
+  xQueueSend(this->queue_, &sentinel, 0);
 
-    // Drain all remaining items from the queue.
-    // If the fetch task is blocked on xQueueSend() (queue full), this
-    // unblocks it so it can finish and call vTaskDelete().
-    {
-      HaDiscoveryItem* item = nullptr;
-      while (xQueueReceive(this->queue_, &item, 0) == pdTRUE) {
-        if (item != nullptr) delete item;
-      }
-    }
-    // Re-send the sentinel now that space is guaranteed.
-    xQueueSend(this->queue_, &sentinel, 0);
-
-    // Forcefully delete the task if it hasn't terminated.
-    // This is non-blocking — the task will be cleaned up by the kernel.
-    if (this->task_handle_ != nullptr) {
-      vTaskDelete(this->task_handle_);
-      this->task_handle_ = nullptr;
+  // Drain all remaining items from the queue.
+  {
+    HaDiscoveryItem* item = nullptr;
+    while (xQueueReceive(this->queue_, &item, 0) == pdTRUE) {
+      if (item != nullptr) delete item;
     }
   }
+  // Re-send the sentinel now that space is guaranteed.
+  xQueueSend(this->queue_, &sentinel, 0);
+
+  // Forcefully delete the task if it hasn't terminated.
+  if (this->task_handle_ != nullptr) {
+    vTaskDelete(this->task_handle_);
+    this->task_handle_ = nullptr;
+  }
+
+  // Delete the queue before freeing stack/TCB (queue may still be referenced).
+  vQueueDelete(this->queue_);
+  this->queue_ = nullptr;
+
   // Free heap-allocated stack and TCB.
-  // The task has been deleted (or never started), so it's safe to free.
   if (this->task_stack_ != nullptr) {
     free(this->task_stack_);
     this->task_stack_ = nullptr;
@@ -117,11 +120,6 @@ void HaDiscoveryManager::cleanup()
   if (this->task_tcb_ != nullptr) {
     free(this->task_tcb_);
     this->task_tcb_ = nullptr;
-  }
-  // Delete the queue.
-  if (this->queue_ != nullptr) {
-    vQueueDelete(this->queue_);
-    this->queue_ = nullptr;
   }
 }
 
