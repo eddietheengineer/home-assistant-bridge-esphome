@@ -34,7 +34,7 @@ static void mqtt_publisher_task(void* arg)
     }
 
     // Acquire mutex to safely read shared state (mqtt_connected, cache pointers).
-    // On dual-core, these fields can be modified by the main loop concurrently.
+    // These fields can be modified by the main loop during context switches.
     bool connected = false;
     bool has_deps = false;
     if (self->state_mutex) {
@@ -92,7 +92,7 @@ static void mqtt_publisher_task(void* arg)
         ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
       }
 
-      // Update stats under mutex for dual-core safety.
+      // Update stats under mutex to prevent torn writes from the main loop.
       if (self->state_mutex) {
         if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
           self->total_published++;
@@ -106,7 +106,7 @@ static void mqtt_publisher_task(void* arg)
     }
   }
 
-  // Signal completion before deleting the task (dual-core safe shutdown).
+  // Signal completion before deleting the task (clean shutdown handshake).
   if (self->done_semaphore) {
     xSemaphoreGive(self->done_semaphore);
   }
