@@ -255,23 +255,15 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
     }
   }
 
-  // After vTaskDelete() the task is on the "tasks waiting termination"
-  // list.  The idle task will eventually run prvCheckTasksWaitingTermination
-  // to remove it from the list and free its TCB.  We MUST wait until the
-  // idle task has finished this cleanup before returning, because the
-  // caller (destroy()) will memset the struct — which includes the
-  // StaticTask_t TCB — zeroing the list pointers the idle task still
-  // needs.  On single-core ESP32 this is safe: vTaskDelay yields to the
-  // idle task, which does the cleanup, then we wake and see task_handle ==
-  // NULL.
-  uint32_t start = esphome::millis();
-  while (self->task_handle != NULL && esphome::millis() - start < 2000) {
-    esp_task_wdt_reset();
-    vTaskDelay(pdMS_TO_TICKS(10));
-  }
-  if (self->task_handle != NULL) {
-    ESP_LOGW(TAG, "MQTT publisher task TCB not cleaned up within 2 s");
-  }
+  // After vTaskDelete() the task is on xTasksWaitingTermination.
+  // The idle task runs prvCheckTasksWaitingTermination to unlink the
+  // TCB's list items via uxListRemove().  For StaticTask_t the TCB
+  // memory is caller-owned so FreeRTOS doesn't free it, but it does
+  // access the TCB's list pointers during unlinking.  We MUST yield
+  // here so the idle task can finish before destroy() memsets the
+  // struct — which would zero those list pointers mid-uxListRemove.
+  esp_task_wdt_reset();
+  vTaskDelay(pdMS_TO_TICKS(100));
   self->task_handle = NULL;
 #else
   (void)self;
