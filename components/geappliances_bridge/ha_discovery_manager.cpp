@@ -639,13 +639,14 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
 
 void HaDiscoveryManager::publish_ha_discovery_()
 {
-  // Check if there's enough heap for the fetch task (~58KB peak).
+  // Check if there's enough *contiguous* heap for the fetch task.
+  // The 16KB stack needs a single contiguous block.
   // If not, skip HA discovery gracefully rather than crashing.
-  size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-  static constexpr size_t HA_DISCOVERY_MIN_HEAP = 32 * 1024;  // 32 KB minimum
-  if (free_heap < HA_DISCOVERY_MIN_HEAP) {
-    ESP_LOGW(TAG, "Skipping HA discovery: heap too low (%u bytes, need %u)",
-             static_cast<unsigned>(free_heap),
+  size_t largest_free = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+  static constexpr size_t HA_DISCOVERY_MIN_HEAP = 48 * 1024;  // 48 KB minimum (stack + growth)
+  if (largest_free < HA_DISCOVERY_MIN_HEAP) {
+    ESP_LOGW(TAG, "Skipping HA discovery: largest free block %u bytes (need %u)",
+             static_cast<unsigned>(largest_free),
              static_cast<unsigned>(HA_DISCOVERY_MIN_HEAP));
     this->state_ = HA_DISCOVERY_COMPLETE;
     return;
