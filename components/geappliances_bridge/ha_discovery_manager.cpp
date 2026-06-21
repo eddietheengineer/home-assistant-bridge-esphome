@@ -268,7 +268,7 @@ const char* HaDiscoveryManager::build_device_json_()
     if (pos >= buf_size - 8) break;
     if      (c == '"')  { pos += snprintf(buf + pos, buf_size - pos, "\\\""); }
     else if (c == '\\') { pos += snprintf(buf + pos, buf_size - pos, "\\\\"); }
-    else if (c < 0x20)  { pos += snprintf(buf + pos, buf_size - pos, "\\u%04x", c); }
+    else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F))  { pos += snprintf(buf + pos, buf_size - pos, "\\u%04x", c); }
     else                { buf[pos++] = (char)c; }
   }
   if (pos < buf_size - 64) {
@@ -281,7 +281,7 @@ const char* HaDiscoveryManager::build_device_json_()
       if (pos >= buf_size - 8) break;
       if      (c == '"')  { pos += snprintf(buf + pos, buf_size - pos, "\\\""); }
       else if (c == '\\') { pos += snprintf(buf + pos, buf_size - pos, "\\\\"); }
-      else if (c < 0x20)  { pos += snprintf(buf + pos, buf_size - pos, "\\u%04x", c); }
+      else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F))  { pos += snprintf(buf + pos, buf_size - pos, "\\u%04x", c); }
       else                { buf[pos++] = (char)c; }
     }
     if (pos < buf_size - 2) buf[pos++] = '"';
@@ -292,7 +292,7 @@ const char* HaDiscoveryManager::build_device_json_()
       if (pos >= buf_size - 8) break;
       if      (c == '"')  { pos += snprintf(buf + pos, buf_size - pos, "\\\""); }
       else if (c == '\\') { pos += snprintf(buf + pos, buf_size - pos, "\\\\"); }
-      else if (c < 0x20)  { pos += snprintf(buf + pos, buf_size - pos, "\\u%04x", c); }
+      else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F))  { pos += snprintf(buf + pos, buf_size - pos, "\\u%04x", c); }
       else                { buf[pos++] = (char)c; }
     }
     if (pos < buf_size - 2) buf[pos++] = '"';
