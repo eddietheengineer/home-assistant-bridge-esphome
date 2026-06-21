@@ -521,6 +521,9 @@ void HaDiscoveryManager::publish_next_entity_()
         uint32_t start = millis();
         while (eTaskGetState(this->task_handle_) != eInvalid &&
                millis() - start < 5000) {
+#ifdef USE_ESP32
+          esp_task_wdt_reset();
+#endif
           vTaskDelay(1);
         }
         if (eTaskGetState(this->task_handle_) != eInvalid) {
@@ -534,6 +537,9 @@ void HaDiscoveryManager::publish_next_entity_()
                static_cast<unsigned>(this->published_topics_count_));
       this->discover_stale_topics_();
     } else {
+#ifdef USE_ESP32
+      esp_task_wdt_reset();
+#endif
       vTaskDelay(1);
     }
   }
