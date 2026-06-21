@@ -8,7 +8,6 @@
 #include "esphome_mqtt_client_adapter.h"
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
-#include <new>
 #include <cstring>
 #ifdef USE_ESP_IDF_STUBS
 #  include "esp-idf/cJSON.h"
@@ -124,10 +123,10 @@ void HaDiscoveryManager::cleanup()
   }
 
   // Free heap-allocated topic arrays.
-  delete[] this->published_topics_;
+  free(this->published_topics_);
   this->published_topics_ = nullptr;
   this->published_topics_count_ = 0;
-  delete[] this->stale_topics_;
+  free(this->stale_topics_);
   this->stale_topics_ = nullptr;
   this->stale_topics_count_ = 0;
 }
@@ -341,11 +340,11 @@ bool HaDiscoveryManager::grow_published_topics_(uint16_t min_cap)
   if (new_cap < min_cap) new_cap = min_cap;
   if (new_cap > HA_DISCOVERY_MAX_PUBLISHED_TOPICS) new_cap = HA_DISCOVERY_MAX_PUBLISHED_TOPICS;
 
-  auto* tmp = new (std::nothrow) PublishedTopic[new_cap];
+  auto* tmp = static_cast<PublishedTopic*>(malloc(new_cap * sizeof(PublishedTopic)));
   if (!tmp) return false;
   if (this->published_topics_) {
     memcpy(tmp, this->published_topics_, this->published_topics_count_ * sizeof(PublishedTopic));
-    delete[] this->published_topics_;
+    free(this->published_topics_);
   }
   this->published_topics_ = tmp;
   this->published_topics_cap_ = new_cap;
@@ -359,11 +358,11 @@ bool HaDiscoveryManager::grow_stale_topics_(uint16_t min_cap)
   if (new_cap < min_cap) new_cap = min_cap;
   if (new_cap > HA_DISCOVERY_MAX_PUBLISHED_TOPICS) new_cap = HA_DISCOVERY_MAX_PUBLISHED_TOPICS;
 
-  auto* tmp = new (std::nothrow) StaleTopic[new_cap];
+  auto* tmp = static_cast<StaleTopic*>(malloc(new_cap * sizeof(StaleTopic)));
   if (!tmp) return false;
   if (this->stale_topics_) {
     memcpy(tmp, this->stale_topics_, this->stale_topics_count_ * sizeof(StaleTopic));
-    delete[] this->stale_topics_;
+    free(this->stale_topics_);
   }
   this->stale_topics_ = tmp;
   this->stale_topics_cap_ = new_cap;
@@ -648,57 +647,62 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
 
 void HaDiscoveryManager::publish_ha_discovery_()
 {
-  // Check if there's enough *contiguous* heap for the fetch task.
-  // The 16KB stack needs a single contiguous block.
-  // If not, skip HA discovery gracefully rather than crashing.
-  size_t largest_free = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-  static constexpr size_t HA_DISCOVERY_MIN_HEAP = 48 * 1024;  // 48 KB minimum (stack + growth)
-  if (largest_free < HA_DISCOVERY_MIN_HEAP) {
-    ESP_LOGW(TAG, "Skipping HA discovery: largest free block %u bytes (need %u)",
-             static_cast<unsigned>(largest_free),
-             static_cast<unsigned>(HA_DISCOVERY_MIN_HEAP));
+  // Try to allocate resources incrementally; skip gracefully on OOM.
+  // Start with small capacity; grow incrementally as entities are found.
+  if (!grow_published_topics_(8)) {
+    ESP_LOGW(TAG, "Skipping HA discovery: unable to allocate published_topics_");
     this->state_ = HA_DISCOVERY_COMPLETE;
     return;
   }
 
-  // Start with small capacity; grow incrementally as entities are found.
-  // This avoids allocating ~120KB of contiguous heap at once.
-  if (!grow_published_topics_(8)) {
-    ESP_LOGE(TAG, "Failed to allocate published_topics_ for HA discovery");
-    this->state_ = HA_DISCOVERY_FAILED;
-    return;
-  }
   // Allocate the static queue storage and TCB.
   this->queue_ = xQueueCreateStatic(HA_DISCOVERY_ITEM_POOL_SIZE, sizeof(uint16_t),
       static_cast<uint8_t*>(heap_caps_malloc(HA_DISCOVERY_ITEM_POOL_SIZE * sizeof(uint16_t), MALLOC_CAP_8BIT)),
       static_cast<StaticQueue_t*>(heap_caps_malloc(sizeof(StaticQueue_t), MALLOC_CAP_8BIT)));
   if (!this->queue_) {
-    ESP_LOGE(TAG, "Failed to create queue for HA discovery task");
-    this->state_ = HA_DISCOVERY_FAILED;
+    ESP_LOGW(TAG, "Skipping HA discovery: unable to allocate queue");
+    free(this->published_topics_); this->published_topics_ = nullptr;
+    this->published_topics_cap_ = 0; this->published_topics_count_ = 0;
+    this->state_ = HA_DISCOVERY_COMPLETE;
     return;
   }
 
-  // Allocate the task stack and TCB on the heap before creating the static task.
-  static constexpr int STACK_SIZE = 16 * 1024;
-  this->task_stack_ = static_cast<StackType_t*>(heap_caps_malloc(STACK_SIZE, MALLOC_CAP_8BIT));
+  // Try to allocate the task stack — start with 8 KB, fall back to 4 KB.
+  static constexpr int STACK_SIZE_BIG = 8 * 1024;
+  static constexpr int STACK_SIZE_SMALL = 4 * 1024;
+  int stack_size = STACK_SIZE_BIG;
+
+  this->task_stack_ = static_cast<StackType_t*>(heap_caps_malloc(STACK_SIZE_BIG, MALLOC_CAP_8BIT));
+  if (!this->task_stack_) {
+    this->task_stack_ = static_cast<StackType_t*>(heap_caps_malloc(STACK_SIZE_SMALL, MALLOC_CAP_8BIT));
+    if (this->task_stack_) {
+      stack_size = STACK_SIZE_SMALL;
+    }
+  }
+
   this->task_tcb_ = static_cast<StaticTask_t*>(heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_8BIT));
   if (!this->task_stack_ || !this->task_tcb_) {
-    ESP_LOGE(TAG, "Failed to allocate task stack or TCB for HA discovery");
+    ESP_LOGW(TAG, "Skipping HA discovery: unable to allocate task stack/TCB (largest free block %u bytes)",
+             static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)));
     if (this->task_stack_) { free(this->task_stack_); this->task_stack_ = nullptr; }
     if (this->task_tcb_) { free(this->task_tcb_); this->task_tcb_ = nullptr; }
     vQueueDelete(this->queue_); this->queue_ = nullptr;
-    this->state_ = HA_DISCOVERY_FAILED;
+    free(this->published_topics_); this->published_topics_ = nullptr;
+    this->published_topics_cap_ = 0; this->published_topics_count_ = 0;
+    this->state_ = HA_DISCOVERY_COMPLETE;
     return;
   }
 
-  this->task_handle_ = xTaskCreateStatic(ha_fetch_task_fn_, "ha_fetch", STACK_SIZE, this, 1,
+  this->task_handle_ = xTaskCreateStatic(ha_fetch_task_fn_, "ha_fetch", stack_size, this, 1,
       this->task_stack_, this->task_tcb_);
   if (!this->task_handle_) {
     vQueueDelete(this->queue_); this->queue_ = nullptr;
     free(this->task_stack_); free(this->task_tcb_);
     this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
-    ESP_LOGE(TAG, "Failed to create HA discovery task");
-    this->state_ = HA_DISCOVERY_FAILED;
+    free(this->published_topics_); this->published_topics_ = nullptr;
+    this->published_topics_cap_ = 0; this->published_topics_count_ = 0;
+    ESP_LOGW(TAG, "Skipping HA discovery: xTaskCreateStatic failed");
+    this->state_ = HA_DISCOVERY_COMPLETE;
     return;
   }
   this->state_ = HA_DISCOVERY_PUBLISHING;
@@ -989,7 +993,7 @@ void HaDiscoveryManager::discover_stale_topics_()
 {
   // Free published_topics_ — no longer needed after all entities are published.
   // This reclaims ~40KB before the stale discovery phase.
-  delete[] this->published_topics_;
+  free(this->published_topics_);
   this->published_topics_ = nullptr;
   this->published_topics_cap_ = 0;
   this->published_topics_count_ = 0;
@@ -1122,7 +1126,7 @@ void HaDiscoveryManager::publish_stale_cleanup_()
     ESP_LOGI(TAG, "Stale topic cleanup complete — removed %u topics",
              static_cast<unsigned>(this->stale_topics_count_));
     // Free stale_topics_ — no longer needed.
-    delete[] this->stale_topics_;
+    free(this->stale_topics_);
     this->stale_topics_ = nullptr;
     this->stale_topics_cap_ = 0;
     this->stale_topics_count_ = 0;
