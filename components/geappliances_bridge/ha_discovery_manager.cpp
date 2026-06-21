@@ -350,16 +350,36 @@ void HaDiscoveryManager::publish_stale_cleanup_()
 // the key name inside a value string.
 static const char* json_get_str(const char* json, const char* key)
 {
-  // Build the search pattern: "key":
-  // We need to find the key as a JSON key, not as a substring of a value.
-  // A JSON key is preceded by { or , (possibly with whitespace).
+  // Finds "key":"value" in flat JSON objects. Returns a pointer to the first
+  // character of the value (after the opening quote), or "" if the key is not
+  // found or the value is not a string.
+  //
+  // Structural validation: a JSON key must be preceded by { or , (with optional
+  // whitespace), ensuring we don't match a key name that appears inside a value.
   int key_len = (int)strlen(key);
   if (key_len == 0) return "";
 
   const char* p = json;
   while ((p = strstr(p, "\"")) != nullptr) {
+    // Verify this quoted string is at a structural key position:
+    // preceded by { or , (with optional whitespace/newlines).
+    {
+      const char* prev = p - 1;
+      while (prev >= json && (*prev == ' ' || *prev == '\t' || *prev == '\n' || *prev == '\r'))
+        prev--;
+      if (prev < json || (*prev != '{' && *prev != ',')) {
+        // Not a key position — advance past this quoted string.
+        p++;
+        while (*p && *p != '"') {
+          if (*p == '\\') p++;
+          p++;
+        }
+        if (*p == '"') p++;
+        continue;
+      }
+    }
+
     // Check if this quoted string is our key.
-    // p points to the opening quote of a potential key.
     const char* key_start = p + 1;
     const char* q = key_start;
     int i = 0;
