@@ -430,7 +430,7 @@ static const char* json_get_str(const char* json, const char* key)
   self->fetch_ha_definitions_();
   // Send sentinel to signal completion to the main loop.
   HaDiscoveryItem* sentinel = nullptr;
-  xQueueSend(self->queue_, &sentinel, portMAX_DELAY);
+  xQueueSend(self->queue_, &sentinel, pdMS_TO_TICKS(5000));
   vTaskDelete(nullptr);
 }
 
@@ -599,6 +599,17 @@ void HaDiscoveryManager::publish_next_entity_()
 {
   HaDiscoveryItem* item = nullptr;
   if (xQueueReceive(this->queue_, &item, 0) != pdTRUE) {
+    // Queue is empty. If the task has terminated (sentinel send timed out),
+    // clean up and transition to stale discovery.
+    if (this->task_handle_ == nullptr) {
+      vQueueDelete(this->queue_); this->queue_ = nullptr;
+      free(this->task_stack_); free(this->task_tcb_);
+      this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
+      ESP_LOGI(TAG, "HA discovery complete — %u entities published",
+               static_cast<unsigned>(this->published_topics_count_));
+      this->discover_stale_topics_();
+      return;
+    }
     return;
   }
 
