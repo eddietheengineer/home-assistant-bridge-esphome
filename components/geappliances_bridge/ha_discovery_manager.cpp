@@ -516,20 +516,10 @@ void HaDiscoveryManager::publish_next_entity_()
   if (this->done_semaphore_ != nullptr) {
     if (xSemaphoreTake(this->done_semaphore_, 0) == pdTRUE) {
       // Fetch task has finished and given the semaphore.
-      // Wait for the idle task to clean up the TCB.
-      if (this->task_handle_ != nullptr) {
-        uint32_t start = millis();
-        while (eTaskGetState(this->task_handle_) != eInvalid &&
-               millis() - start < 5000) {
-#ifdef USE_ESP32
-          esp_task_wdt_reset();
-#endif
-          vTaskDelay(1);
-        }
-        if (eTaskGetState(this->task_handle_) != eInvalid) {
-          ESP_LOGW(TAG, "HA discovery task TCB not cleaned within 5 s");
-        }
-      }
+      // The task has called vTaskDelete(); the idle task will clean up
+      // the TCB asynchronously. Do NOT call eTaskGetState() on the handle
+      // after vTaskDelete — it reads the freed TCB's event queue list
+      // members, causing load access faults on ESP32-C6.
       this->task_handle_ = nullptr;
       vSemaphoreDelete(this->done_semaphore_);
       this->done_semaphore_ = nullptr;
