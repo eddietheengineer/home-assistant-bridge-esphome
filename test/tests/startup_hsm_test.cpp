@@ -121,6 +121,7 @@ class MockBridgeServices : public IBridgeServices {
     mock().actualCall("init_ha_discovery").onObject(this);
   }
   void log_poll_state_transitions() override {}
+  void check_steady_state() override {}
   void run_all_managers() override {}
 };
 

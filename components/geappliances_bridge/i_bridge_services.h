@@ -86,6 +86,7 @@ class IBridgeServices {
   virtual bool is_polling_steady_state() const = 0;
   /// True when both active bridges are in steady state.
   virtual bool is_device_steady_state() const = 0;
+  virtual void check_steady_state() = 0;  // Log steady-state transitions once
 
   // -- Startup delay ---------------------------------------------------------
 

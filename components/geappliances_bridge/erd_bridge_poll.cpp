@@ -125,7 +125,13 @@ static bool send_next_read_request(erd_bridge_poll_t* self)
   bool more_erds_to_try = (self->erd_index < self->appliance_erd_list_count);
   if (more_erds_to_try) {
     self->request_id++;
-    tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    if (!queued) {
+      /* Queue full — the read was silently dropped. Mark as excluded
+       * and immediately try the next ERD. */
+      erd_set_insert(&self->erd_set, self->appliance_erd_list[self->erd_index]);
+      return send_next_read_request(self);
+    }
   }
   return more_erds_to_try;
 }
@@ -323,6 +329,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
 
   switch (signal) {
     case tiny_hsm_signal_entry:
+      ESP_LOGI(TAG, "Polling: Steady State reached");
       self->erd_index = 0;
       self->cycle_completed_count = 0;
       self->restart_pending = false;
@@ -474,8 +481,13 @@ static void erd_bridge_poll_init_impl(
   self->cycle_count                 = 0;
   erd_set_init(&self->erd_set);
   self->erd_cache = cache;
-  self->on_discovery_complete        = nullptr;
-  self->on_discovery_complete_context = nullptr;
+  // Preserve caller-provided callback — the caller may set on_discovery_complete
+  // before calling init() to avoid a race where the HSM fires the callback
+  // during state_probe_list entry before the caller has a chance to wire it.
+  if (self->on_discovery_complete == nullptr) {
+    self->on_discovery_complete = nullptr;
+    self->on_discovery_complete_context = nullptr;
+  }
 
   tiny_event_subscription_init(
     &self->erd_client_activity_subscription, self, +[](void* context, const void* _args) {

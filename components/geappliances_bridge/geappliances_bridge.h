@@ -127,6 +127,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool is_subscription_steady_state() const override;
   bool is_polling_steady_state() const override;
   bool is_device_steady_state() const override;
+  void check_steady_state();  // Log steady-state transitions once
 
   void check_subscription_activity() override;
   void maybe_start_custom_erd_polling() override;
@@ -183,6 +184,10 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool subscription_activity_detected_{false};
   uint32_t subscription_start_time_{0};
   uint32_t custom_erd_subscription_last_activity_{0};
+  // Steady-state transition logging — log once when each becomes true.
+  bool subscription_steady_state_logged_{false};
+  bool polling_steady_state_logged_{false};
+  bool device_steady_state_logged_{false};
   // Fixed-capacity set for tracking seen subscription ERDs (replaces std::set).
   erd_set_t custom_erd_subscription_seen_erds_;
   // Pre-built ERD probe list for the polling bridge.

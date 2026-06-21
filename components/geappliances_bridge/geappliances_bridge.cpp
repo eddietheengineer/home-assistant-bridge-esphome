@@ -719,6 +719,27 @@ bool GeappliancesBridge::is_device_steady_state() const
   return is_subscription_steady_state() && is_polling_steady_state();
 }
 
+void GeappliancesBridge::check_steady_state()
+{
+  bool subSteady = is_subscription_steady_state();
+  bool pollSteady = is_polling_steady_state();
+
+  if (subSteady && !this->subscription_steady_state_logged_) {
+    this->subscription_steady_state_logged_ = true;
+    ESP_LOGI(TAG, "Subscription: Steady State");
+  }
+
+  if (pollSteady && !this->polling_steady_state_logged_) {
+    this->polling_steady_state_logged_ = true;
+    ESP_LOGI(TAG, "Polling: Steady State");
+  }
+
+  if (subSteady && pollSteady && !this->device_steady_state_logged_) {
+    this->device_steady_state_logged_ = true;
+    ESP_LOGI(TAG, "Appliance in Steady State");
+  }
+}
+
 // -- Recurring tasks ----------------------------------------------------------
 
 void GeappliancesBridge::check_subscription_activity()
