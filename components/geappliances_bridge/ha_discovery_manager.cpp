@@ -849,8 +849,8 @@ bool HaDiscoveryManager::process_jsonl_line_(const char* line,
   safe_strncpy(item->payload, payload_buf, sizeof(item->payload));
 
   if (this->queue_) {
-    if (xQueueSend(this->queue_, &item, pdMS_TO_TICKS(2000)) != pdTRUE) {
-      ESP_LOGW(TAG, "HA fetch: queue full after 2s, dropping entity for ERD %s", erd_hex);
+    if (xQueueSend(this->queue_, &item, pdMS_TO_TICKS(500)) != pdTRUE) {
+      ESP_LOGW(TAG, "HA fetch: queue full after 500ms, dropping entity for ERD %s", erd_hex);
       delete item;
     }
   } else {
