@@ -82,11 +82,14 @@ void HaDiscoveryManager::set_mqtt_adapter(esphome_mqtt_client_adapter_t* mqtt_ad
 
 void HaDiscoveryManager::cleanup()
 {
-  // Idempotent: if publish_next_entity_() already cleaned up after the
-  // sentinel, all pointers are null and this is a no-op.
+  // Idempotent: if already cleaned up, no-op.
   if (this->queue_ == nullptr && this->task_stack_ == nullptr) {
     return;
   }
+
+  // Mark fetch as done so publish_next_entity_() won't race with us.
+  this->fetch_done_ = true;
+  this->task_handle_ = nullptr;
 
   // If a fetch task is still running, signal it to stop via the sentinel.
   HaDiscoveryItem* sentinel = nullptr;
@@ -103,10 +106,7 @@ void HaDiscoveryManager::cleanup()
   xQueueSend(this->queue_, &sentinel, 0);
 
   // Forcefully delete the task if it hasn't terminated.
-  if (this->task_handle_ != nullptr) {
-    vTaskDelete(this->task_handle_);
-    this->task_handle_ = nullptr;
-  }
+  // (task_handle_ is already null from above, so this is a no-op.)
 
   // Delete the queue before freeing stack/TCB (queue may still be referenced).
   vQueueDelete(this->queue_);
@@ -430,7 +430,19 @@ static const char* json_get_str(const char* json, const char* key)
   self->fetch_ha_definitions_();
   // Send sentinel to signal completion to the main loop.
   HaDiscoveryItem* sentinel = nullptr;
-  xQueueSend(self->queue_, &sentinel, pdMS_TO_TICKS(5000));
+  BaseType_t sent = xQueueSend(self->queue_, &sentinel, pdMS_TO_TICKS(5000));
+  // Mark done regardless of whether the sentinel was queued successfully.
+  // If the queue was full, publish_next_entity_() will detect fetch_done_
+  // when the queue drains and the task handle is gone.
+  self->fetch_done_ = true;
+  if (sent != pdTRUE) {
+    // Queue was full for 5s — the main loop may have already cleaned up.
+    // Drain remaining items ourself to avoid leaks.
+    HaDiscoveryItem* item = nullptr;
+    while (xQueueReceive(self->queue_, &item, 0) == pdTRUE) {
+      if (item != nullptr) delete item;
+    }
+  }
   vTaskDelete(nullptr);
 }
 
@@ -488,6 +500,9 @@ void HaDiscoveryManager::fetch_ha_definitions_()
 
     this->process_category_(cat, this->device_id_, device_json);
     vTaskDelay(pdMS_TO_TICKS(50));
+#ifdef USE_ESP32
+    esp_task_wdt_reset();
+#endif
   }
 }
 bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
@@ -525,8 +540,9 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
         TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
 
     if (status != TINFL_STATUS_DONE) {
-      ESP_LOGE(TAG, "HA fetch: chunk %u of %s failed (status %d)", ci, cat->name, status);
-      return false;
+      ESP_LOGW(TAG, "HA fetch: chunk %u of %s failed (status %d) — skipping", ci, cat->name, status);
+      line_pos = 0;
+      continue;
     }
 
     // Process decompressed bytes as lines.
@@ -562,7 +578,7 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
 void HaDiscoveryManager::publish_ha_discovery_()
 {
   // Spawn a FreeRTOS task to fetch JSONL definitions and queue entities.
-  static constexpr int STACK_SIZE = 48 * 1024;  // 48 KB
+  static constexpr int STACK_SIZE = 16 * 1024;  // 16 KB (reduced from 48KB for ESP32-C6)
   this->task_stack_ = static_cast<StackType_t*>(heap_caps_malloc(STACK_SIZE * sizeof(StackType_t), MALLOC_CAP_8BIT));
   this->task_tcb_ = static_cast<StaticTask_t*>(heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_8BIT));
   if (!this->task_stack_ || !this->task_tcb_) {
@@ -594,17 +610,16 @@ void HaDiscoveryManager::publish_ha_discovery_()
   }
   this->state_ = HA_DISCOVERY_PUBLISHING;
 }
-
 void HaDiscoveryManager::publish_next_entity_()
 {
   HaDiscoveryItem* item = nullptr;
   if (xQueueReceive(this->queue_, &item, 0) != pdTRUE) {
-    // Queue is empty. If the task has terminated (sentinel send timed out),
-    // clean up and transition to stale discovery.
-    if (this->task_handle_ == nullptr) {
+    // Queue is empty. Check if the fetch task has terminated.
+    if (this->fetch_done_) {
       vQueueDelete(this->queue_); this->queue_ = nullptr;
       free(this->task_stack_); free(this->task_tcb_);
       this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
+      this->task_handle_ = nullptr;
       ESP_LOGI(TAG, "HA discovery complete — %u entities published",
                static_cast<unsigned>(this->published_topics_count_));
       this->discover_stale_topics_();
@@ -615,6 +630,7 @@ void HaDiscoveryManager::publish_next_entity_()
 
   // Sentinel — fetch task is done.
   if (item == nullptr) {
+    this->fetch_done_ = true;
     vQueueDelete(this->queue_); this->queue_ = nullptr;
     free(this->task_stack_); free(this->task_tcb_);
     this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
@@ -642,16 +658,23 @@ bool HaDiscoveryManager::process_jsonl_line_(const char* line,
     if (val[0] == '\0') { out[0] = '\0'; return; }
     int i = 0;
     const char* p = val;
-    while (*p != '\0' && *p != '"') {
-      if (*p == '\\') {
+    while (*p != '\0') {
+      if (*p == '\\' && *(p + 1) == '"') {
+        // Escaped quote inside the value — emit literal " and skip the escape.
+        if (i < out_size - 1) out[i++] = '"';
+        p += 2;
+      } else if (*p == '"') {
+        // End of JSON string value.
+        break;
+      } else if (*p == '\\') {
         p++;
         switch (*p) {
-          case '"':  if (i < out_size - 1) out[i++] = '"'; break;
           case '\\': if (i < out_size - 1) out[i++] = '\\'; break;
-          case '/':  if (i < out_size - 1) out[i++] = '/'; break;
+          case '/':  if (i < out_size - 1) out[i++] = '/';  break;
           case 'n':  if (i < out_size - 1) out[i++] = '\n'; break;
           case 'r':  if (i < out_size - 1) out[i++] = '\r'; break;
           case 't':  if (i < out_size - 1) out[i++] = '\t'; break;
+          case 'u':  /* skip \uXXXX — not needed for JSONL data */ p += 4; break;
           default:   if (i < out_size - 1) out[i++] = *p; break;
         }
         p++;

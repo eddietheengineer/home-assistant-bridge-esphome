@@ -191,6 +191,7 @@ class HaDiscoveryManager {
 
   QueueHandle_t queue_{nullptr};
   TaskHandle_t  task_handle_{nullptr};
+  bool fetch_done_{false};  // true once the fetch task has terminated (sentinel or timeout)
   StackType_t*  task_stack_{nullptr};
   StaticTask_t* task_tcb_{nullptr};
   // Pre-allocated decompression buffers (reused across categories).
