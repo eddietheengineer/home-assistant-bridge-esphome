@@ -56,6 +56,7 @@ extern "C" {
 #else
 #  include "freertos/FreeRTOS.h"
 #  include "freertos/task.h"
+#  include "freertos/semphr.h"
 #  include "freertos/queue.h"
 #endif
 
@@ -185,10 +186,11 @@ class HaDiscoveryManager {
   // Pointer to the MQTT adapter for async publishing (typed, set via set_mqtt_adapter)
   esphome_mqtt_client_adapter_t* mqtt_adapter_{nullptr};
 
-  QueueHandle_t queue_{nullptr};
-  TaskHandle_t  task_handle_{nullptr};
-  StackType_t*  task_stack_{nullptr};
-  StaticTask_t* task_tcb_{nullptr};
+  QueueHandle_t       queue_{nullptr};
+  TaskHandle_t        task_handle_{nullptr};
+  StackType_t*        task_stack_{nullptr};
+  StaticTask_t*       task_tcb_{nullptr};
+  SemaphoreHandle_t   done_semaphore_{nullptr};
 };
 
 }  // namespace geappliances_bridge

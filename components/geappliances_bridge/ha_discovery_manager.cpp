@@ -102,15 +102,17 @@ void HaDiscoveryManager::cleanup()
     // Re-send the sentinel now that space is guaranteed.
     xQueueSend(this->queue_, &sentinel, 0);
 
-    // Wait for the task to actually terminate before freeing its stack/TCB.
-    // Without this, freeing the stack while the task is still executing
-    // causes a use-after-free crash.
-    if (this->task_handle_ != nullptr) {
-      // Poll with a generous timeout (up to 5 s) to wait for the task
-      // to call vTaskDelete().  The task deletes itself after sending the
-      // sentinel to the queue, so we wait until the handle becomes NULL.
-      // Use subtraction to avoid millis() overflow (deadline = start + 5000
-      // wraps incorrectly when millis() is near UINT32_MAX).
+    // Wait for the task to signal it has entered the termination path
+    // (gives the semaphore before calling vTaskDelete).  This replaces
+    // the broken polling loop that checked task_handle_ != nullptr —
+    // FreeRTOS never sets the caller's stored handle to NULL for
+    // StaticTask_t, so that loop always timed out after 5 s.
+    if (this->done_semaphore_ != nullptr) {
+      if (xSemaphoreTake(this->done_semaphore_, pdMS_TO_TICKS(5000)) != pdTRUE) {
+        ESP_LOGW(TAG, "HA discovery task did not signal done within 5 s");
+      }
+    } else if (this->task_handle_ != nullptr) {
+      // Fallback: poll with delay when semaphore was never created.
       uint32_t start = millis();
       while (this->task_handle_ != nullptr && millis() - start < 5000) {
         esp_task_wdt_reset();
@@ -120,6 +122,16 @@ void HaDiscoveryManager::cleanup()
         ESP_LOGW(TAG, "HA discovery task did not terminate within 5 s");
       }
     }
+
+    // After vTaskDelete() the task is on xTasksWaitingTermination.
+    // The idle task runs prvCheckTasksWaitingTermination to unlink the
+    // TCB's list items via uxListRemove().  For heap-allocated TCBs the
+    // memory is freed by the idle task, but it accesses the TCB's list
+    // pointers during unlinking.  We MUST yield here so the idle task
+    // can finish before we free the TCB — which would corrupt those
+    // list pointers mid-uxListRemove and crash.
+    esp_task_wdt_reset();
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
   // Free heap-allocated stack and TCB (allocated in publish_ha_discovery_).
   // Safe to free now — the task has terminated (or timed out).
@@ -135,6 +147,11 @@ void HaDiscoveryManager::cleanup()
   if (this->queue_ != nullptr) {
     vQueueDelete(this->queue_);
     this->queue_ = nullptr;
+  }
+  // Clean up the semaphore.
+  if (this->done_semaphore_ != nullptr) {
+    vSemaphoreDelete(this->done_semaphore_);
+    this->done_semaphore_ = nullptr;
   }
   this->task_handle_ = nullptr;
 }
@@ -367,6 +384,12 @@ static const char* json_get_str(const char* json, const char* key)
   // Send sentinel to signal completion to the main loop.
   HaDiscoveryItem* sentinel = nullptr;
   xQueueSend(self->queue_, &sentinel, portMAX_DELAY);
+  // Signal the cleanup path that we're about to exit, before calling
+  // vTaskDelete so the caller can wait for termination + idle-task TCB
+  // cleanup without polling a handle the task never clears.
+  if (self->done_semaphore_ != nullptr) {
+    xSemaphoreGive(self->done_semaphore_);
+  }
   vTaskDelete(nullptr);
 }
 
@@ -525,9 +548,11 @@ void HaDiscoveryManager::publish_ha_discovery_()
     this->state_ = HA_DISCOVERY_FAILED;
     return;
   }
+  this->done_semaphore_ = xSemaphoreCreateBinary();
   this->task_handle_ = xTaskCreateStatic(ha_fetch_task_fn_, "ha_fetch", STACK_SIZE, this, 1,
       this->task_stack_, this->task_tcb_);
   if (!this->task_handle_) {
+    vSemaphoreDelete(this->done_semaphore_); this->done_semaphore_ = nullptr;
     vQueueDelete(this->queue_); this->queue_ = nullptr;
     free(this->task_stack_); free(this->task_tcb_);
     this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
@@ -543,12 +568,22 @@ void HaDiscoveryManager::publish_next_entity_()
   HaDiscoveryItem* item = nullptr;
   if (xQueueReceive(this->queue_, &item, 0) == pdTRUE) {
     if (item == nullptr) {
-      // Sentinel — fetch task is done.
-      vQueueDelete(this->queue_); this->queue_ = nullptr;
-      // Clean up task resources.
+      // Sentinel — fetch task is done.  The task has already called
+      // vTaskDelete().  Wait for the idle task to finish unlinking the
+      // TCB from xTasksWaitingTermination before freeing the TCB memory
+      // or deleting the queue (vQueueDelete triggers
+      // prvCheckTasksWaitingTermination, which would access the freed
+      // TCB and crash).
+      esp_task_wdt_reset();
+      vTaskDelay(pdMS_TO_TICKS(100));
       free(this->task_stack_); free(this->task_tcb_);
       this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
       this->task_handle_ = nullptr;
+      vQueueDelete(this->queue_); this->queue_ = nullptr;
+      if (this->done_semaphore_ != nullptr) {
+        vSemaphoreDelete(this->done_semaphore_);
+        this->done_semaphore_ = nullptr;
+      }
       ESP_LOGI(TAG, "HA discovery complete — %u entities published",
                static_cast<unsigned>(this->published_topics_count_));
       this->discover_stale_topics_();
