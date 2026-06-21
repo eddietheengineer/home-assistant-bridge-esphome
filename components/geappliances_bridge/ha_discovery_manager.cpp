@@ -103,10 +103,7 @@ void HaDiscoveryManager::cleanup()
     xQueueSend(this->queue_, &sentinel, 0);
 
     // Wait for the task to signal it has entered the termination path
-    // (gives the semaphore before calling vTaskDelete).  This replaces
-    // the broken polling loop that checked task_handle_ != nullptr —
-    // FreeRTOS never sets the caller's stored handle to NULL for
-    // StaticTask_t, so that loop always timed out after 5 s.
+    // (gives the semaphore before calling vTaskDelete).
     if (this->done_semaphore_ != nullptr) {
       if (xSemaphoreTake(this->done_semaphore_, pdMS_TO_TICKS(5000)) != pdTRUE) {
         ESP_LOGW(TAG, "HA discovery task did not signal done within 5 s");
@@ -122,26 +119,6 @@ void HaDiscoveryManager::cleanup()
         ESP_LOGW(TAG, "HA discovery task did not terminate within 5 s");
       }
     }
-
-    // After vTaskDelete() the task is on xTasksWaitingTermination.
-    // The idle task runs prvCheckTasksWaitingTermination to unlink the
-    // TCB's list items via uxListRemove().  For heap-allocated TCBs the
-    // memory is freed by the idle task, but it accesses the TCB's list
-    // pointers during unlinking.  We MUST yield here so the idle task
-    // can finish before we free the TCB — which would corrupt those
-    // list pointers mid-uxListRemove and crash.
-    esp_task_wdt_reset();
-    vTaskDelay(pdMS_TO_TICKS(100));
-  }
-  // Free heap-allocated stack and TCB (allocated in publish_ha_discovery_).
-  // Safe to free now — the task has terminated (or timed out).
-  if (this->task_stack_ != nullptr) {
-    free(this->task_stack_);
-    this->task_stack_ = nullptr;
-  }
-  if (this->task_tcb_ != nullptr) {
-    free(this->task_tcb_);
-    this->task_tcb_ = nullptr;
   }
   // Delete the queue.
   if (this->queue_ != nullptr) {
@@ -527,35 +504,24 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
 
 void HaDiscoveryManager::publish_ha_discovery_()
 {
-  // Spawn a FreeRTOS task to fetch JSONL definitions and queue entities.
+  // Use xTaskCreate so FreeRTOS owns the TCB/stack lifecycle.
+  // After vTaskDelete() the idle task frees both automatically,
+  // eliminating the TCB use-after-free that crashed on ESP32-C6.
   static constexpr int STACK_SIZE = 48 * 1024;  // 48 KB
-  this->task_stack_ = static_cast<StackType_t*>(heap_caps_malloc(STACK_SIZE * sizeof(StackType_t), MALLOC_CAP_8BIT));
-  this->task_tcb_ = static_cast<StaticTask_t*>(heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_8BIT));
-  if (!this->task_stack_ || !this->task_tcb_) {
-    free(this->task_stack_); free(this->task_tcb_);
-    this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
-    ESP_LOGE(TAG, "Failed to allocate stack/TCB for HA discovery task");
-    this->state_ = HA_DISCOVERY_FAILED;
-    return;
-  }
   this->queue_ = xQueueCreateStatic(64, sizeof(HaDiscoveryItem*),
       static_cast<uint8_t*>(heap_caps_malloc(64 * sizeof(HaDiscoveryItem*), MALLOC_CAP_8BIT)),
       static_cast<StaticQueue_t*>(heap_caps_malloc(sizeof(StaticQueue_t), MALLOC_CAP_8BIT)));
   if (!this->queue_) {
-    free(this->task_stack_); free(this->task_tcb_);
-    this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
     ESP_LOGE(TAG, "Failed to create queue for HA discovery task");
     this->state_ = HA_DISCOVERY_FAILED;
     return;
   }
   this->done_semaphore_ = xSemaphoreCreateBinary();
-  this->task_handle_ = xTaskCreateStatic(ha_fetch_task_fn_, "ha_fetch", STACK_SIZE, this, 1,
-      this->task_stack_, this->task_tcb_);
-  if (!this->task_handle_) {
+  if (xTaskCreate(ha_fetch_task_fn_, "ha_fetch", STACK_SIZE, this, 1,
+      &this->task_handle_) != pdTRUE) {
     vSemaphoreDelete(this->done_semaphore_); this->done_semaphore_ = nullptr;
     vQueueDelete(this->queue_); this->queue_ = nullptr;
-    free(this->task_stack_); free(this->task_tcb_);
-    this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
+    this->task_handle_ = nullptr;
     ESP_LOGE(TAG, "Failed to create HA discovery task");
     this->state_ = HA_DISCOVERY_FAILED;
     return;
@@ -568,16 +534,8 @@ void HaDiscoveryManager::publish_next_entity_()
   HaDiscoveryItem* item = nullptr;
   if (xQueueReceive(this->queue_, &item, 0) == pdTRUE) {
     if (item == nullptr) {
-      // Sentinel — fetch task is done.  The task has already called
-      // vTaskDelete().  Wait for the idle task to finish unlinking the
-      // TCB from xTasksWaitingTermination before freeing the TCB memory
-      // or deleting the queue (vQueueDelete triggers
-      // prvCheckTasksWaitingTermination, which would access the freed
-      // TCB and crash).
-      esp_task_wdt_reset();
-      vTaskDelay(pdMS_TO_TICKS(100));
-      free(this->task_stack_); free(this->task_tcb_);
-      this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
+      // Sentinel — fetch task is done.  FreeRTOS owns the TCB/stack
+      // (xTaskCreate), so the idle task will free them after vTaskDelete.
       this->task_handle_ = nullptr;
       vQueueDelete(this->queue_); this->queue_ = nullptr;
       if (this->done_semaphore_ != nullptr) {

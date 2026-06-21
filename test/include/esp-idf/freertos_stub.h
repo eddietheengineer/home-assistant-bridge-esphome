@@ -44,6 +44,12 @@ static inline TaskHandle_t xTaskCreateStatic(void (*fn)(void*), const char* name
     (void)stack_buf; (void)tcb;
     return (TaskHandle_t)0x1;
 }
+static inline BaseType_t xTaskCreate(void (*fn)(void*), const char* name,
+        uint32_t stack, void* arg, UBaseType_t prio, TaskHandle_t* out) {
+    (void)fn; (void)name; (void)stack; (void)arg; (void)prio;
+    if (out) *out = (TaskHandle_t)0x1;
+    return pdTRUE;
+}
 
 /* ---------- queue.h types & functions ---------- */
 typedef void* QueueHandle_t;

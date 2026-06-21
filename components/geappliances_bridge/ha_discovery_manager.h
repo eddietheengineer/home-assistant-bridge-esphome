@@ -188,8 +188,6 @@ class HaDiscoveryManager {
 
   QueueHandle_t       queue_{nullptr};
   TaskHandle_t        task_handle_{nullptr};
-  StackType_t*        task_stack_{nullptr};
-  StaticTask_t*       task_tcb_{nullptr};
   SemaphoreHandle_t   done_semaphore_{nullptr};
 };
 
