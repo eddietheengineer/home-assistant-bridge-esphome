@@ -2,7 +2,42 @@
 
 ## Overview
 
-This component is designed for use with the **FirstBuild Home Assistant Adapter** featuring the SeeedStudio Xiao ESP32-C3 microcontroller. It supports the GEA3 serial interface.
+This component is designed for use with the **FirstBuild Home Assistant Adapter** featuring the SeeedStudio Xiao ESP32-C3 microcontroller, and is also compatible with the ESP32-C6. It supports the GEA2 and GEA3 serial interfaces.
+
+## Target Platform
+
+This component is designed for the **ESP32-C3** (Xiao ESP32C3 module) and **ESP32-C6** running **ESP-IDF**.
+
+### ESP32-C3 (Primary Target)
+
+| Property | Value |
+|----------|-------|
+| Core | Single-core RISC-V 32-bit
+| Max clock | 160 MHz |
+| SRAM | 320 KB (shared IRAM/DRAM) |
+| PSRAM | None |
+| Flash | 4 MB (module), typically 2 MB usable for app partition |
+
+### ESP32-C6 (Secondary Target)
+
+| Property | Value |
+|----------|-------|
+| Core | Single-core RISC-V 32-bit |
+| Max clock | 160 MHz |
+| SRAM | 320 KB (shared IRAM/DRAM) |
+| PSRAM | None (on most modules) |
+| Flash | 4–16 MB depending on module |
+
+### Design Constraints
+
+All architectural decisions in this component are driven by the single-core, no-PSRAM constraints of the ESP32-C3:
+
+- **No dual-core concurrency.** The ESP32-C3 and ESP32-C6 each have a single CPU core. FreeRTOS tasks share the core through preemptive context switches — they never run in parallel. Synchronization primitives (`state_mutex`, `done_semaphore`) protect against torn reads/writes during context switches, not against true parallel access.
+- **No PSRAM.** All data structures, buffers, and task stacks must fit in the 320 KB of on-chip SRAM shared with the OS and ESPHome framework. This is why the MQTT publisher task uses a statically allocated 2 KB stack (`xTaskCreateStatic`), why ERD data is hex-encoded into fixed-size buffers, and why HA discovery entity definitions are embedded as compressed byte arrays rather than fetched at runtime.
+- **DRAM budget:** ~275 KB of 320 KB total. ESPHome's core services (WiFi, MQTT, HTTP) consume ~100 KB of DRAM. The bridge component targets ~175 KB maximum, leaving headroom for the OS and future features.
+- **Flash budget:** ~1.5 MB of 1.8 MB app partition. The embedded HA discovery JSONL data (~421 KB compressed) is the single largest consumer. Any new embedded data must be balanced against this ceiling.
+
+> **Note:** The original ESP32 (WROOM) is dual-core with 520 KB SRAM and optional PSRAM. This component is **not** designed for the original ESP32 — the pinout, module form factor, and carrier board are specific to the Xiao ESP32-C3.
 
 ## FirstBuild Home Assistant Adapter
 
