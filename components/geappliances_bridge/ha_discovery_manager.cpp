@@ -94,22 +94,24 @@ void HaDiscoveryManager::cleanup()
   this->task_handle_ = nullptr;
 
   // If a fetch task is still running, signal it to stop via the sentinel.
-  uint16_t sentinel = HA_DISCOVERY_ITEM_POOL_SENTINEL;
-  xQueueSend(this->queue_, &sentinel, 0);
+  if (this->queue_ != nullptr) {
+    uint16_t sentinel = HA_DISCOVERY_ITEM_POOL_SENTINEL;
+    xQueueSend(this->queue_, &sentinel, 0);
 
-  // Drain all remaining indices from the queue (no deletion needed — pool is static).
-  {
-    uint16_t idx;
-    while (xQueueReceive(this->queue_, &idx, 0) == pdTRUE) {
-      // Pool items are reused; no deletion needed.
+    // Drain all remaining indices from the queue (no deletion needed — pool is static).
+    {
+      uint16_t idx;
+      while (xQueueReceive(this->queue_, &idx, 0) == pdTRUE) {
+        // Pool items are reused; no deletion needed.
+      }
     }
-  }
-  // Re-send the sentinel now that space is guaranteed.
-  xQueueSend(this->queue_, &sentinel, 0);
+    // Re-send the sentinel now that space is guaranteed.
+    xQueueSend(this->queue_, &sentinel, 0);
 
-  // Delete the queue before freeing stack/TCB (queue may still be referenced).
-  vQueueDelete(this->queue_);
-  this->queue_ = nullptr;
+    // Delete the queue before freeing stack/TCB (queue may still be referenced).
+    vQueueDelete(this->queue_);
+    this->queue_ = nullptr;
+  }
 
   // Free heap-allocated stack and TCB.
   if (this->task_stack_ != nullptr) {
@@ -177,16 +179,23 @@ void HaDiscoveryManager::run(bool device_steady_state)
     uint32_t now = millis();
     if (this->stale_subscription_handle_ &&
         now - this->stale_discovery_start_ms_ >= HA_STALE_DISCOVERY_TIMEOUT_MS) {
-      // Timeout reached — unsubscribe and start cleanup.
-      esphome_mqtt_client_adapter_unsubscribe(this->mqtt_adapter_, this->stale_subscription_handle_);
+      // Timeout reached — stop the callback from adding more topics by
+      // clearing the handle BEFORE unsubscribing. The callback checks
+      // stale_subscription_handle_ as a guard, so it will stop collecting.
+      // Keep stale_topics_ alive so the cleanup phase can process what we found.
+      mqtt_subscription_handle_t handle = this->stale_subscription_handle_;
       this->stale_subscription_handle_ = 0;
+      esphome_mqtt_client_adapter_unsubscribe(this->mqtt_adapter_, handle);
       ESP_LOGI(TAG, "Stale discovery timeout — found %u stale topics",
                static_cast<unsigned>(this->stale_topics_count_));
       this->stale_cleanup_index_ = 0;
       this->last_publish_ms_ = now;
+      // Stay in CLEANING_STALE so the next tick hits the cleanup branch
+      // below (stale_subscription_handle_ is now 0).
     }
-    if (!this->stale_subscription_handle_) {
-      // Subscription closed — process stale topics at rate limit
+    else if (!this->stale_subscription_handle_) {
+      // Subscription closed (either by timeout above or natural completion).
+      // Process remaining stale topics at rate limit.
       if (now - this->last_publish_ms_ >= HA_ENTITY_PUBLISH_INTERVAL_MS) {
         this->last_publish_ms_ = now;
         this->publish_stale_cleanup_();
@@ -659,18 +668,29 @@ void HaDiscoveryManager::publish_ha_discovery_()
     this->state_ = HA_DISCOVERY_FAILED;
     return;
   }
-
+  // Allocate the static queue storage and TCB.
   this->queue_ = xQueueCreateStatic(HA_DISCOVERY_ITEM_POOL_SIZE, sizeof(uint16_t),
       static_cast<uint8_t*>(heap_caps_malloc(HA_DISCOVERY_ITEM_POOL_SIZE * sizeof(uint16_t), MALLOC_CAP_8BIT)),
       static_cast<StaticQueue_t*>(heap_caps_malloc(sizeof(StaticQueue_t), MALLOC_CAP_8BIT)));
   if (!this->queue_) {
-    free(this->task_stack_); free(this->task_tcb_);
-    this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
     ESP_LOGE(TAG, "Failed to create queue for HA discovery task");
     this->state_ = HA_DISCOVERY_FAILED;
     return;
   }
+
+  // Allocate the task stack and TCB on the heap before creating the static task.
   static constexpr int STACK_SIZE = 16 * 1024;
+  this->task_stack_ = static_cast<StackType_t*>(heap_caps_malloc(STACK_SIZE, MALLOC_CAP_8BIT));
+  this->task_tcb_ = static_cast<StaticTask_t*>(heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_8BIT));
+  if (!this->task_stack_ || !this->task_tcb_) {
+    ESP_LOGE(TAG, "Failed to allocate task stack or TCB for HA discovery");
+    if (this->task_stack_) { free(this->task_stack_); this->task_stack_ = nullptr; }
+    if (this->task_tcb_) { free(this->task_tcb_); this->task_tcb_ = nullptr; }
+    vQueueDelete(this->queue_); this->queue_ = nullptr;
+    this->state_ = HA_DISCOVERY_FAILED;
+    return;
+  }
+
   this->task_handle_ = xTaskCreateStatic(ha_fetch_task_fn_, "ha_fetch", STACK_SIZE, this, 1,
       this->task_stack_, this->task_tcb_);
   if (!this->task_handle_) {
@@ -1062,7 +1082,7 @@ void HaDiscoveryManager::stale_topic_callback_(const char* topic, const char* pa
     }
   }
 
-  if (!found && self->stale_topics_) {
+  if (!found && self->stale_topics_ && self->stale_subscription_handle_) {
     // This is a stale topic — add to cleanup list if not already present.
     // Use binary search since stale_topics_ is maintained in sorted order.
     bool already_in_list = false;
