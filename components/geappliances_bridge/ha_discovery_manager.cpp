@@ -103,20 +103,47 @@ void HaDiscoveryManager::cleanup()
     xQueueSend(this->queue_, &sentinel, 0);
 
     // Wait for the task to signal it has entered the termination path
-    // (gives the semaphore before calling vTaskDelete).
+    // (gives the semaphore before calling vTaskDelete).  Use non-blocking
+    // xSemaphoreTake in a yield loop — blocking xSemaphoreTake uses
+    // vTaskDelay internally which crashes on ESP32-C6 via vSystimerSetup.
+    bool signaled = false;
     if (this->done_semaphore_ != nullptr) {
-      if (xSemaphoreTake(this->done_semaphore_, pdMS_TO_TICKS(5000)) != pdTRUE) {
+      uint32_t start = millis();
+      while (!signaled && millis() - start < 5000) {
+        if (xSemaphoreTake(this->done_semaphore_, 0) == pdTRUE) {
+          signaled = true;
+        } else {
+          esp_task_wdt_reset();
+          taskYIELD();
+        }
+      }
+      if (!signaled) {
         ESP_LOGW(TAG, "HA discovery task did not signal done within 5 s");
       }
     } else if (this->task_handle_ != nullptr) {
-      // Fallback: poll with delay when semaphore was never created.
+      // Fallback: poll with yield when semaphore was never created.
       uint32_t start = millis();
       while (this->task_handle_ != nullptr && millis() - start < 5000) {
         esp_task_wdt_reset();
-        vTaskDelay(pdMS_TO_TICKS(10));
+        taskYIELD();
       }
       if (this->task_handle_ != nullptr) {
         ESP_LOGW(TAG, "HA discovery task did not terminate within 5 s");
+      }
+    }
+
+    // Wait for the idle task to unlink the TCB from
+    // xTasksWaitingTermination before calling vQueueDelete, which
+    // triggers prvCheckTasksWaitingTermination and crashes on ESP32-C6.
+    if (this->task_handle_ != nullptr) {
+      uint32_t start = millis();
+      while (eTaskGetState(this->task_handle_) != eInvalid &&
+             millis() - start < 5000) {
+        esp_task_wdt_reset();
+        taskYIELD();
+      }
+      if (eTaskGetState(this->task_handle_) != eInvalid) {
+        ESP_LOGW(TAG, "HA discovery task TCB not cleaned within 5 s");
       }
     }
   }
@@ -534,8 +561,23 @@ void HaDiscoveryManager::publish_next_entity_()
   HaDiscoveryItem* item = nullptr;
   if (xQueueReceive(this->queue_, &item, 0) == pdTRUE) {
     if (item == nullptr) {
-      // Sentinel — fetch task is done.  FreeRTOS owns the TCB/stack
-      // (xTaskCreate), so the idle task will free them after vTaskDelete.
+      // Sentinel — fetch task has called vTaskDelete().  On ESP32-C6 the
+      // idle task must unlink the TCB from xTasksWaitingTermination BEFORE
+      // we call vQueueDelete(), because prvUnlockQueue triggers
+      // prvCheckTasksWaitingTermination which crashes when it tries to
+      // uxListRemove a TCB whose list items are in an inconsistent state.
+      // Yield in a tight loop until eTaskGetState reports eInvalid (TCB
+      // cleaned up), then it's safe to delete the queue.
+      if (this->task_handle_ != nullptr) {
+        uint32_t start = millis();
+        while (eTaskGetState(this->task_handle_) != eInvalid &&
+               millis() - start < 5000) {
+          taskYIELD();
+        }
+        if (eTaskGetState(this->task_handle_) != eInvalid) {
+          ESP_LOGW(TAG, "HA discovery task TCB not cleaned within 5 s");
+        }
+      }
       this->task_handle_ = nullptr;
       vQueueDelete(this->queue_); this->queue_ = nullptr;
       if (this->done_semaphore_ != nullptr) {
