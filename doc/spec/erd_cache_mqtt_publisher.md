@@ -93,8 +93,9 @@ On ESP-IDF:
 - Set `task_running = false`
 - Signal `work_semaphore` to wake the task so it can exit its loop
 - Wait for the task to signal completion via `done_semaphore` (1 s timeout)
-- If `done_semaphore` is NULL (creation failed): fallback to polling `task_handle` with 10 ms delays, resetting the task watchdog each iteration, for up to 1 s
-- Log a warning if the task does not terminate within 1 s
+- If `done_semaphore` is NULL (creation failed): fallback to polling with 10 ms delays, resetting the task watchdog each iteration, for up to 1 s
+- Log a warning if the task does not signal completion within 1 s
+- After the task has called `vTaskDelete`, yield to the idle task (100 ms via `vTaskDelay`) so it can run `prvCheckTasksWaitingTermination` and unlink the TCB's list items before `destroy()` memsets the struct
 - Set `task_handle = NULL`
 
 On non-ESP-IDF: no-op.
@@ -128,10 +129,9 @@ On ESP-IDF, the publisher runs as a FreeRTOS task (`mqtt_publisher_task`) with:
 3. If not connected or dependencies are invalid: loop back to step 1
 4. Drain all available cache updates (no per-loop budget in the background task)
 5. On `task_running = false`: signal `done_semaphore`, call `vTaskDelete`
-
-**Dual-core safety:**
-- `state_mutex` protects shared state (`mqtt_connected`, `cache`, `mqtt_client`, `device_id`, `get_time_ms`, `total_published`, `publish_count_window`) from concurrent access by the main loop and the background task
-- `done_semaphore` provides a dual-core safe shutdown handshake: the task gives the semaphore before calling `vTaskDelete`, so `stop()` can wait for true termination before proceeding
+**Concurrent task safety:**
+- `state_mutex` protects shared state (`mqtt_connected`, `cache`, `mqtt_client`, `device_id`, `get_time_ms`, `total_published`, `publish_count_window`) from torn reads during context switches between the background task and the main loop
+- `done_semaphore` provides a clean shutdown handshake: the task gives the semaphore before calling `vTaskDelete`, so `stop()` can wait for true termination before proceeding
 - Stats updates (`total_published`, `publish_count_window`) are performed under `state_mutex` with a 10 ms timeout
 
 **Graceful degradation:**
@@ -257,7 +257,7 @@ Override the time source (defaults to `esphome::millis`). Used for testing to co
 
 1. **No cache ownership:** The publisher holds a raw pointer to the cache but never frees or modifies its lifecycle. Cache ownership belongs to `GeappliancesBridge`.
 2. **No MQTT lifecycle ownership:** The publisher does not create, connect, or destroy the MQTT client. It reacts to connect/disconnect events from `EsphomeMqttClientAdapter`.
-3. **Dual-core safety via mutex/semaphores:** On ESP-IDF, all shared state accessed by both the main loop and the background task is protected by `state_mutex`. Shutdown uses `done_semaphore` for a guaranteed handshake.
+3. **Concurrent task safety via mutex/semaphores:** On ESP-IDF, shared state accessed by both the main loop and the background task is protected by `state_mutex` to prevent torn reads during context switches. Shutdown uses `done_semaphore` for a guaranteed handshake, followed by a yield to the idle task for TCB cleanup.
 4. **Optimistic connection state:** `mqtt_connected` is initialized to `true` in `init()`. If the MQTT client is not yet connected at init time, the first event will correct the state.
 5. **Publish index is monotonic:** `publish_index` advances through the cache entries via `erd_cache_get_next_updated()`, wrapping around as the cache implementation dictates.
 6. **Retain flag is always true:** All publishes use `retain=true` to ensure the broker retains the last known value for each ERD topic.
@@ -286,4 +286,4 @@ Override the time source (defaults to `esphome::millis`). Used for testing to co
 3. **Single device ID:** The publisher is configured with one device ID at init time. Supporting multiple devices would require multiple publisher instances.
 4. **Hex encoding is CPU-intensive:** Converting binary data to hex via `snprintf` per byte is simple but not optimal for large payloads. A lookup table or bit-manipulation approach would be faster.
 5. **Background task has no publish budget:** The ESP-IDF background task drains all available updates in one pass. If the cache has many updates, this could block the task for an extended period. The 1000 ms slow-publish warning provides visibility but no enforcement.
-6. **Semaphore failure is degraded, not fatal:** If any semaphore creation fails in `init()`, the publisher continues with reduced safety (no mutex protection, no clean shutdown handshake). This is acceptable for single-core or low-contention scenarios but could lead to data races on dual-core systems under heavy load.
+6. **Semaphore failure is degraded, not fatal:** If any semaphore creation fails in `init()`, the publisher continues with reduced safety (no mutex protection, no clean shutdown handshake). This is acceptable for the single-core ESP32-C3 target where context switches provide natural serialization, but could lead to data races on dual-core ESP32 variants.

@@ -34,7 +34,7 @@ static void mqtt_publisher_task(void* arg)
     }
 
     // Acquire mutex to safely read shared state (mqtt_connected, cache pointers).
-    // On dual-core, these fields can be modified by the main loop concurrently.
+    // These fields can be modified by the main loop during context switches.
     bool connected = false;
     bool has_deps = false;
     if (self->state_mutex) {
@@ -92,7 +92,7 @@ static void mqtt_publisher_task(void* arg)
         ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
       }
 
-      // Update stats under mutex for dual-core safety.
+      // Update stats under mutex to prevent torn writes from the main loop.
       if (self->state_mutex) {
         if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
           self->total_published++;
@@ -106,7 +106,7 @@ static void mqtt_publisher_task(void* arg)
     }
   }
 
-  // Signal completion before deleting the task (dual-core safe shutdown).
+  // Signal completion before deleting the task (clean shutdown handshake).
   if (self->done_semaphore) {
     xSemaphoreGive(self->done_semaphore);
   }
@@ -237,11 +237,11 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
     xSemaphoreGive(self->work_semaphore);
   }
   // Wait for the task to signal completion via done_semaphore.
-  // This is a dual-core safe handshake: the task gives the semaphore
-  // before calling vTaskDelete, so we know it's truly gone.
+  // The task gives this semaphore before calling vTaskDelete, so we
+  // know it has entered the termination path.
   if (self->done_semaphore != NULL) {
     if (xSemaphoreTake(self->done_semaphore, pdMS_TO_TICKS(1000)) != pdTRUE) {
-      ESP_LOGW(TAG, "MQTT publisher task did not terminate within 1 s");
+      ESP_LOGW(TAG, "MQTT publisher task did not signal done within 1 s");
     }
   } else {
     // Fallback: poll with delay when done_semaphore creation failed.
@@ -254,6 +254,16 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
       ESP_LOGW(TAG, "MQTT publisher task did not terminate within 1 s");
     }
   }
+
+  // After vTaskDelete() the task is on xTasksWaitingTermination.
+  // The idle task runs prvCheckTasksWaitingTermination to unlink the
+  // TCB's list items via uxListRemove().  For StaticTask_t the TCB
+  // memory is caller-owned so FreeRTOS doesn't free it, but it does
+  // access the TCB's list pointers during unlinking.  We MUST yield
+  // here so the idle task can finish before destroy() memsets the
+  // struct — which would zero those list pointers mid-uxListRemove.
+  esp_task_wdt_reset();
+  vTaskDelay(pdMS_TO_TICKS(100));
   self->task_handle = NULL;
 #else
   (void)self;
