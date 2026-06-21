@@ -945,15 +945,26 @@ void HaDiscoveryManager::stale_topic_callback_(const char* topic, const char* pa
 
   if (!found) {
     // This is a stale topic — add to cleanup list if not already present.
+    // Use binary search since stale_topics_ is maintained in sorted order.
     bool already_in_list = false;
-    for (uint16_t j = 0; j < self->stale_topics_count_; j++) {
-      if (strcmp(self->stale_topics_[j].topic, topic) == 0) {
-        already_in_list = true;
-        break;
+    {
+      uint16_t lo = 0, hi = self->stale_topics_count_;
+      while (lo < hi) {
+        uint16_t mid = lo + (hi - lo) / 2;
+        int cmp = strcmp(self->stale_topics_[mid].topic, topic);
+        if (cmp < 0) lo = mid + 1;
+        else if (cmp > 0) hi = mid;
+        else { already_in_list = true; break; }
       }
     }
     if (!already_in_list && self->stale_topics_count_ < HA_DISCOVERY_MAX_PUBLISHED_TOPICS) {
-      snprintf(self->stale_topics_[self->stale_topics_count_].topic,
+      // Insert in sorted order.
+      uint16_t insert_idx = self->stale_topics_count_;
+      while (insert_idx > 0 && strcmp(self->stale_topics_[insert_idx - 1].topic, topic) > 0) {
+        self->stale_topics_[insert_idx] = self->stale_topics_[insert_idx - 1];
+        insert_idx--;
+      }
+      snprintf(self->stale_topics_[insert_idx].topic,
                sizeof(self->stale_topics_[0].topic), "%s", topic);
       self->stale_topics_count_++;
       ESP_LOGD(TAG, "Found stale HA topic: %s", topic);
