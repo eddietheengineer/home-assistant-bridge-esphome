@@ -88,7 +88,7 @@ struct HaDiscoveryItem {
 /* Maximum number of registered/seen ERDs for HA discovery. */
 #define HA_DISCOVERY_MAX_ERDS 645
 #define HA_DISCOVERY_MAX_PUBLISHED_TOPICS 645
-#define HA_DISCOVERY_ITEM_POOL_SIZE 64  // max items in flight (queue depth)
+#define HA_DISCOVERY_ITEM_POOL_SIZE 16  // items in flight (queue depth)
 #define HA_DISCOVERY_ITEM_POOL_SENTINEL 0xFFFF  // sentinel for queue: fetch done
 struct HaDiscoveryCategory;
 
@@ -151,24 +151,30 @@ class HaDiscoveryManager {
 
   int escape_json_str_(const char* s, char* buf, int buf_size);
   const char* build_device_json_();
+  // Dynamic array growth helpers — allocate in small increments to avoid
+  // large contiguous heap blocks on memory-constrained devices.
+  bool grow_published_topics_(uint16_t min_cap);
+  bool grow_stale_topics_(uint16_t min_cap);
 
   bool contains_erd_(const tiny_erd_t* erds, uint16_t count, tiny_erd_t target) const;
 
   // Track published discovery topics for clearing later.
-  // Each entry stores the component type and ERD hex string.
+  // Heap-allocated on demand during fetch; freed after publishing completes.
   struct PublishedTopic {
     char component[32];  // e.g. "sensor", "switch", "binary_sensor"
     char erd_hex[32];    // e.g. "0002", "2001"
   };
-  PublishedTopic published_topics_[HA_DISCOVERY_MAX_PUBLISHED_TOPICS];
+  PublishedTopic* published_topics_{nullptr};
+  uint16_t published_topics_cap_{0};  // allocated capacity
   uint16_t published_topics_count_{0};
   uint16_t clear_index_{0};
 
-  // Stale topic cleanup
+  // Stale topic cleanup — heap-allocated on demand
   mqtt_subscription_handle_t stale_subscription_handle_{0};
   uint16_t stale_cleanup_index_{0};
   struct StaleTopic { char topic[128]; };
-  StaleTopic stale_topics_[HA_DISCOVERY_MAX_PUBLISHED_TOPICS];
+  StaleTopic* stale_topics_{nullptr};
+  uint16_t stale_topics_cap_{0};  // allocated capacity
   uint16_t stale_topics_count_{0};
   uint32_t stale_discovery_start_ms_{0};
 
@@ -181,8 +187,6 @@ class HaDiscoveryManager {
   // Sorted array of ERDs from the cache, built once at fetch start for binary search.
   tiny_erd_t sorted_erds_[HA_DISCOVERY_MAX_ERDS];
   uint16_t sorted_erds_count_{0};
-  tiny_erd_t seen_erds_[HA_DISCOVERY_MAX_ERDS];
-  uint16_t seen_erds_count_{0};
   bool generate_device_config_{false};
   uint32_t last_activity_{0};
   uint32_t last_publish_ms_{0};
@@ -196,7 +200,6 @@ class HaDiscoveryManager {
   StackType_t*  task_stack_{nullptr};
   StaticTask_t* task_tcb_{nullptr};
   // Pre-allocated decompression buffers (reused across categories).
-  // Max decompressed chunk is typically ~2KB; line buffer 4KB.
   static constexpr uint16_t HA_DECOMP_BUF_SIZE = 4096;
   uint8_t decomp_buf_[HA_DECOMP_BUF_SIZE];
 #ifndef USE_ESP_IDF_STUBS
