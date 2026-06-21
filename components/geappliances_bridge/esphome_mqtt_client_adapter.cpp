@@ -8,7 +8,7 @@ extern "C" {
 }
 
 #include <cstdio>
-#include <string>
+#include <cstring>
 
 static const char *const TAG __attribute__((unused)) = "geappliances_bridge.mqtt";
 
@@ -244,7 +244,12 @@ extern "C" mqtt_subscription_handle_t esphome_mqtt_client_adapter_subscribe(
   if (mqtt_client == nullptr || !mqtt_client->is_connected()) return 0;
 
   mqtt_subscription_handle_t handle = self->next_subscription_handle_++;
-  self->subscriptions_[handle] = {topic, callback, user_data};
+  esphome_mqtt_client_adapter_t::MqttSubscription sub;
+  strncpy(sub.topic, topic, sizeof(sub.topic) - 1);
+  sub.topic[sizeof(sub.topic) - 1] = '\0';
+  sub.callback = callback;
+  sub.user_data = user_data;
+  self->subscriptions_[handle] = sub;
 
   // Create a std::function wrapper only for the ESPHome subscribe call.
   mqtt_client->subscribe(topic,

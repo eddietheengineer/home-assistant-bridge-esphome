@@ -53,7 +53,7 @@ typedef struct {
   // Subscription tracking for esphome_mqtt_client_adapter_subscribe/unsubscribe.
   // Stores C callback + user_data instead of std::function to avoid heap allocation.
   struct MqttSubscription {
-    std::string topic;
+    char topic[128];
     void (*callback)(const char* topic, const char* payload, size_t payload_len, void* user_data);
     void* user_data;
   };
