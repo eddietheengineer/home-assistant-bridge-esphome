@@ -662,17 +662,6 @@ void HaDiscoveryManager::publish_ha_discovery_()
   this->queue_ = xQueueCreateStatic(HA_DISCOVERY_ITEM_POOL_SIZE, sizeof(uint16_t),
       static_cast<uint8_t*>(heap_caps_malloc(HA_DISCOVERY_ITEM_POOL_SIZE * sizeof(uint16_t), MALLOC_CAP_8BIT)),
       static_cast<StaticQueue_t*>(heap_caps_malloc(sizeof(StaticQueue_t), MALLOC_CAP_8BIT)));
-  this->task_tcb_ = static_cast<StaticTask_t*>(heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_8BIT));
-  if (!this->task_stack_ || !this->task_tcb_) {
-    free(this->task_stack_); free(this->task_tcb_);
-    this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
-    ESP_LOGE(TAG, "Failed to allocate stack/TCB for HA discovery task");
-    this->state_ = HA_DISCOVERY_FAILED;
-    return;
-  }
-  this->queue_ = xQueueCreateStatic(16, sizeof(uint16_t),
-      static_cast<uint8_t*>(heap_caps_malloc(16 * sizeof(uint16_t), MALLOC_CAP_8BIT)),
-      static_cast<StaticQueue_t*>(heap_caps_malloc(sizeof(StaticQueue_t), MALLOC_CAP_8BIT)));
   if (!this->queue_) {
     free(this->task_stack_); free(this->task_tcb_);
     this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
@@ -680,6 +669,7 @@ void HaDiscoveryManager::publish_ha_discovery_()
     this->state_ = HA_DISCOVERY_FAILED;
     return;
   }
+  static constexpr int STACK_SIZE = 16 * 1024;
   this->task_handle_ = xTaskCreateStatic(ha_fetch_task_fn_, "ha_fetch", STACK_SIZE, this, 1,
       this->task_stack_, this->task_tcb_);
   if (!this->task_handle_) {
