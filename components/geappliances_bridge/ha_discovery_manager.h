@@ -88,7 +88,7 @@ struct HaDiscoveryItem {
 /* Maximum number of registered/seen ERDs for HA discovery. */
 #define HA_DISCOVERY_MAX_ERDS 645
 #define HA_DISCOVERY_MAX_PUBLISHED_TOPICS 645
-#define HA_DISCOVERY_ITEM_POOL_SIZE 16  // items in flight (queue depth)
+#define HA_DISCOVERY_ITEM_POOL_SIZE 32  // items in flight (queue depth)
 #define HA_DISCOVERY_ITEM_POOL_SENTINEL 0xFFFF  // sentinel for queue: fetch done
 struct HaDiscoveryCategory;
 

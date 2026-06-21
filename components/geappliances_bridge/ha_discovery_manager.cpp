@@ -175,12 +175,11 @@ void HaDiscoveryManager::run(bool device_steady_state)
     esp_task_wdt_reset();
 #endif
     uint32_t now = millis();
-    if (now - this->stale_discovery_start_ms_ >= HA_STALE_DISCOVERY_TIMEOUT_MS) {
-      // Timeout reached — unsubscribe and start cleanup
-      if (this->mqtt_adapter_ && this->stale_subscription_handle_) {
-        esphome_mqtt_client_adapter_unsubscribe(this->mqtt_adapter_, this->stale_subscription_handle_);
-        this->stale_subscription_handle_ = 0;
-      }
+    if (this->stale_subscription_handle_ &&
+        now - this->stale_discovery_start_ms_ >= HA_STALE_DISCOVERY_TIMEOUT_MS) {
+      // Timeout reached — unsubscribe and start cleanup.
+      esphome_mqtt_client_adapter_unsubscribe(this->mqtt_adapter_, this->stale_subscription_handle_);
+      this->stale_subscription_handle_ = 0;
       ESP_LOGI(TAG, "Stale discovery timeout — found %u stale topics",
                static_cast<unsigned>(this->stale_topics_count_));
       this->stale_cleanup_index_ = 0;
@@ -660,9 +659,9 @@ void HaDiscoveryManager::publish_ha_discovery_()
     return;
   }
 
-  // Spawn a FreeRTOS task to fetch JSONL definitions and queue entities.
-  static constexpr int STACK_SIZE = 16 * 1024;  // 16 KB (reduced from 48KB for ESP32-C6)
-  this->task_stack_ = static_cast<StackType_t*>(heap_caps_malloc(STACK_SIZE * sizeof(StackType_t), MALLOC_CAP_8BIT));
+  this->queue_ = xQueueCreateStatic(HA_DISCOVERY_ITEM_POOL_SIZE, sizeof(uint16_t),
+      static_cast<uint8_t*>(heap_caps_malloc(HA_DISCOVERY_ITEM_POOL_SIZE * sizeof(uint16_t), MALLOC_CAP_8BIT)),
+      static_cast<StaticQueue_t*>(heap_caps_malloc(sizeof(StaticQueue_t), MALLOC_CAP_8BIT)));
   this->task_tcb_ = static_cast<StaticTask_t*>(heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_8BIT));
   if (!this->task_stack_ || !this->task_tcb_) {
     free(this->task_stack_); free(this->task_tcb_);
@@ -962,8 +961,13 @@ bool HaDiscoveryManager::process_jsonl_line_(const char* line,
   safe_strncpy(item.payload, payload_buf, sizeof(item.payload));
 
   if (this->queue_) {
-    if (xQueueSend(this->queue_, &idx, pdMS_TO_TICKS(500)) != pdTRUE) {
-      ESP_LOGW(TAG, "HA fetch: queue full after 500ms, dropping entity for ERD %s", erd_hex);
+    // Spin-yield until the main loop drains an entry from the queue.
+    // The main loop publishes at 50ms intervals, so this won't spin long.
+    while (xQueueSend(this->queue_, &idx, 0) != pdTRUE) {
+      vTaskDelay(1);
+#ifdef USE_ESP32
+      esp_task_wdt_reset();
+#endif
     }
   }
 
