@@ -85,13 +85,14 @@ No timeout — if no appliance is present, the bridge loops forever in the autod
 **Recommendation:** Option 1 — add `is_autodiscovery_timed_out()` to `IBridgeServices`. The bridge records the start time in `startup_state_autodiscovery` entry and checks elapsed time in `signal_run_loop`.
 
 **Fix:**
+- Add `signal_restart` to the startup HSM signal enum (`geappliances_bridge_startup_hsm.h:55-63`) — **does not exist yet**
 - Add `is_autodiscovery_timed_out()` to `IBridgeServices` interface
 - In `startup_state_autodiscovery` entry, record the start time
 - In `signal_run_loop`, check `is_autodiscovery_timed_out()` (60s threshold) and transition to `startup_state_failed`
-- Add `startup_state_failed` as a terminal state with a `signal_restart` handler for recovery
+- Add `startup_state_failed` as a new terminal state — **does not exist yet** — with `signal_restart` handler that transitions back to `startup_state_protocol_stack`
 - Log a clear error message so users know no appliance was found
 
-**Test:** Add `is_autodiscovery_timed_out()` to `MockBridgeServices`. Mock `is_autodiscovery_complete()` false and `is_autodiscovery_timed_out()` true. Verify transition to `startup_state_failed`. Test `signal_restart` recovery to `protocol_stack`.
+**Test:** Add `is_autodiscovery_timed_out()` to `MockBridgeServices`. Mock `is_autodiscovery_complete()` false and `is_autodiscovery_timed_out()` true. Verify transition to `startup_state_failed`. Test `signal_restart` recovery to `startup_state_protocol_stack`.
 ---
 
 ### 7. Synchronize write payload buffer 🔴 P1
@@ -107,10 +108,14 @@ No timeout — if no appliance is present, the bridge loops forever in the autod
 
 File-scope static global `g_bridge_services` makes the HSM non-reentrant and non-testable. Breaks if multiple bridge instances ever exist or if the HSM is used before `set_bridge_services()` is called.
 
-**Fix:** Pass `IBridgeServices*` through the HSM's user_data field instead of a global. This requires a small API change to `services_from_hsm()`.
+**⚠️ Implementation constraint:** `tiny_hsm_t` (`lib/tiny/include/tiny_hsm.h:103-106`) has **no `user_data` field** — only `configuration` and `current`. The proposed "pass through HSM's user_data field" is infeasible. Two alternatives:
 
-**Regression risk:** Low — only one bridge instance exists in practice.
+1. **Embed the HSM in a wrapper struct** that holds both the `tiny_hsm_t` and the `IBridgeServices*` pointer, using `container_of` to recover the wrapper from the HSM pointer (same pattern used by `erd_bridge_poll_t` and `erd_write_bridge_t`).
+2. **Keep the global but make it safer** — add a null-check in `services_from_hsm()` and log an error if called before `set_bridge_services()`.
 
+**Recommendation:** Option 1 — create a `startup_hsm_wrapper_t` struct embedding `tiny_hsm_t hsm` and `IBridgeServices* services`, using `container_of` in `services_from_hsm()`. This is the same pattern used throughout the codebase.
+
+**Regression risk:** Low — only one bridge instance exists in practice. Requires updating all `services_from_hsm()` call sites.
 ---
 
 ### M2. Global GEA2 state not reset on re-init 🟡 P2
