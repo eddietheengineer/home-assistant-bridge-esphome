@@ -428,6 +428,7 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
           svc->handle_subscription_failed();
         }
       }
+      svc->handle_polling_failed();
       svc->log_poll_state_transitions();
       svc->maybe_start_custom_erd_polling();
       break;

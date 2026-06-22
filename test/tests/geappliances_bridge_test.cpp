@@ -237,6 +237,12 @@ TEST(geappliances_bridge, get_subscription_state_default_none)
   CHECK_EQUAL(static_cast<int>(subscription_state_none), static_cast<int>(services->get_subscription_state()));
 }
 
+TEST(geappliances_bridge, get_polling_state_default_none)
+{
+  IBridgeServices* services = &bridge;
+  CHECK_EQUAL(static_cast<int>(polling_state_none), static_cast<int>(services->get_polling_state()));
+}
+
 TEST(geappliances_bridge, get_discovered_host_address_default_zero)
 {
   IBridgeServices* services = &bridge;

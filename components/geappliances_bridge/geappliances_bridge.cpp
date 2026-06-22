@@ -394,22 +394,21 @@ void GeappliancesBridge::log_poll_state_transitions_()
   subscription_state_t sub_state = this->get_subscription_state();
   bool sub_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
 
-  // Log polling bridge state changes.
-  bool is_poll_mode = !((this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-                        (this->mode_ == BRIDGE_MODE_AUTO && sub_active));
-  if (is_poll_mode) {
-    const char* new_state = this->erd_bridge_poll_.current_state_name;
-    if (new_state != nullptr && new_state != this->last_logged_poll_state_) {
+  // Log polling bridge state changes.  The polling bridge is always active
+  // when erd_bridge_initialized_ is true (either as the primary bridge in
+  // poll mode, or as the custom-ERD polling bridge alongside subscription).
+  if (this->polling_bridge_initialized_) {
+    polling_state_t poll_state = this->get_polling_state();
+    const char* new_state = polling_state_name(poll_state);
+    if (new_state != nullptr && poll_state != this->last_logged_poll_state_) {
       ESP_LOGI(TAG, "Polling bridge state: %s (ERDs cached: %u)",
                new_state, erd_cache_get_count(&this->erd_cache_));
-      this->last_logged_poll_state_ = new_state;
+      this->last_logged_poll_state_ = poll_state;
     }
   }
 
   // Log subscription bridge state changes.
-  bool is_sub_mode = (this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-                     (this->mode_ == BRIDGE_MODE_AUTO && sub_active);
-  if (is_sub_mode) {
+  if (this->subscription_bridge_initialized_) {
     if (sub_state != subscription_state_none && sub_state != this->last_logged_subscribe_state_) {
       ESP_LOGI(TAG, "Subscription bridge state: %s (ERDs cached: %u)",
                subscription_state_name(sub_state), erd_cache_get_count(&this->erd_cache_));
@@ -508,6 +507,13 @@ void GeappliancesBridge::dump_config() {
   ESP_LOGCONFIG(TAG, "  Appliance API Parsing: %s", this->appliance_api_parsing_ ? "enabled" : "disabled");
   if (this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE) {
     ESP_LOGCONFIG(TAG, "  Appliance API Valid ERDs: %u", this->feature_bit_manager_.get_valid_erd_count());
+  }
+  if (this->polling_bridge_initialized_) {
+    polling_state_t poll_state = this->get_polling_state();
+    const char* poll_state_str = polling_state_name(poll_state);
+    if (poll_state_str != nullptr) {
+      ESP_LOGCONFIG(TAG, "  Polling Bridge State: %s", poll_state_str);
+    }
   }
   if (this->custom_erds_count_ > 0) {
     ESP_LOGCONFIG(TAG, "  Custom ERDs: %u configured", this->custom_erds_count_);
@@ -671,6 +677,11 @@ subscription_state_t GeappliancesBridge::get_subscription_state() const
   return this->erd_bridge_subscribe_.current_state;
 }
 
+polling_state_t GeappliancesBridge::get_polling_state() const
+{
+  return this->erd_bridge_poll_.current_state;
+}
+
 // -- Recurring tasks ----------------------------------------------------------
 
 
@@ -678,6 +689,7 @@ void GeappliancesBridge::maybe_start_custom_erd_polling()
 {
   maybe_start_custom_erd_polling_();
 }
+
 
 void GeappliancesBridge::log_poll_state_transitions()
 {

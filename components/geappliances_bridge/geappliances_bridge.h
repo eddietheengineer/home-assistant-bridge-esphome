@@ -119,7 +119,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   BridgeMode get_mode() const override;
   subscription_state_t get_subscription_state() const override;
+  polling_state_t get_polling_state() const override;
   void handle_subscription_failed() override;
+  void handle_polling_failed() override;
   void maybe_start_custom_erd_polling() override;
   void log_poll_state_transitions() override;
   void initialize_erd_cache_publisher() override;
@@ -195,7 +197,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // Feature bit reading state machine (runs after autodiscovery, before device ID gen)
   // The FeatureBitManager owns the valid ERD list and ready flag; use its getters directly.
 
-  const char* last_logged_poll_state_{nullptr};
+  polling_state_t last_logged_poll_state_{polling_state_none};
   subscription_state_t last_logged_subscribe_state_{subscription_state_none};
 
   // ERD publish rate sensor: counts ERD updates per ~60s window and

@@ -183,3 +183,24 @@ static erd_set_t& erd_set(T* self)
 {
   return self->erd_set;
 }
+// ============================================================================
+// Polling state machine states
+// ============================================================================
+
+typedef enum {
+  polling_state_none,
+  polling_state_probing,
+  polling_state_polling,
+  polling_state_failed
+} polling_state_t;
+
+static inline const char* polling_state_name(polling_state_t state)
+{
+  switch(state) {
+    case polling_state_none: return nullptr;
+    case polling_state_probing: return "probing";
+    case polling_state_polling: return "polling";
+    case polling_state_failed: return "failed";
+    default: return "unknown";
+  }
+}

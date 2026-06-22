@@ -77,6 +77,7 @@ class IBridgeServices {
 
   virtual BridgeMode get_mode() const = 0;
   virtual subscription_state_t get_subscription_state() const = 0;
+  virtual polling_state_t get_polling_state() const = 0;
 
   // -- Startup delay ---------------------------------------------------------
 
@@ -92,6 +93,9 @@ class IBridgeServices {
   /// Called when the subscription bridge enters the failed state; triggers
   /// fallback to polling mode in AUTO mode.
   virtual void handle_subscription_failed() = 0;
+  /// Called when the polling bridge enters the failed state while running
+  /// alongside a subscription bridge; cleans up the polling bridge.
+  virtual void handle_polling_failed() = 0;
   /// Log any pending polling-bridge state-name transitions.
   virtual void log_poll_state_transitions() = 0;
   /// Run one tick of all managers (autodiscovery, device-ID, feature bits).

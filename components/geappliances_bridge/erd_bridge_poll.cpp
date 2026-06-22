@@ -285,7 +285,7 @@ static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
   auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
 
   if (signal == tiny_hsm_signal_entry) {
-    self->current_state_name = "probe_list";
+    self->current_state = polling_state_probing;
     self->appliance_erd_list = self->probe_list;
     self->appliance_erd_list_count = self->probe_list_count;
     self->erd_index = (uint16_t)-1;
@@ -328,7 +328,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       self->restart_pending = false;
       arm_polling_timer(self, self->polling_interval_ms);
       self->polling_list_complete = true;
-      self->current_state_name    = "polling";
+      self->current_state = polling_state_polling;
       // Notify startup HSM that discovery is complete.  Safe to call
       // synchronously from inside the polling HSM's state entry because:
       // 1. The callback sends a signal to the *startup* HSM (a different
@@ -467,7 +467,7 @@ static void erd_bridge_poll_init_impl(
   self->restart_pending             = false;
   self->cycle_sending_in_progress   = false;
   self->polling_timer_armed         = false;
-  self->current_state_name          = nullptr;
+  self->current_state             = polling_state_none;
   self->polling_list_complete       = false;
   self->cycle_start_ms              = 0;
   self->last_cycle_time_ms          = 0;
@@ -535,4 +535,5 @@ void erd_bridge_poll_destroy(erd_bridge_poll_t* self)
 
   /* erd_set and erd_polling_list are fixed arrays embedded in the struct —
    * no heap cleanup needed. */
+  self->current_state = polling_state_none;
 }

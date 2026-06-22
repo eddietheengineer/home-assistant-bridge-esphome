@@ -89,6 +89,11 @@ class MockBridgeServices : public IBridgeServices {
       mock().actualCall("get_subscription_state").onObject(this)
         .returnIntValueOrDefault(subscription_state_none));
   }
+  polling_state_t get_polling_state() const override {
+    return static_cast<polling_state_t>(
+      mock().actualCall("get_polling_state").onObject(this)
+        .returnIntValueOrDefault(polling_state_none));
+  }
 
   // -- Startup delay ----------------------------------------------------------
   void record_startup_delay_start() override {
@@ -102,6 +107,9 @@ class MockBridgeServices : public IBridgeServices {
   // -- Recurring tasks --------------------------------------------------------
   void handle_subscription_failed() override {
     mock().actualCall("handle_subscription_failed").onObject(this);
+  }
+  void handle_polling_failed() override {
+    mock().actualCall("handle_polling_failed").onObject(this);
   }
   void maybe_start_custom_erd_polling() override {
     mock().actualCall("maybe_start_custom_erd_polling").onObject(this);
@@ -292,6 +300,7 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
   /* Phase 7: running run_loop */
   mock().expectOneCall("get_subscription_state").onObject(&svc).andReturnValue(static_cast<subscription_state_t>(subscription_state_none));
+  mock().expectOneCall("handle_polling_failed").onObject(&svc);
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
   /* Drive the HSM through all phases. */
   tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_protocol_stack);

@@ -235,6 +235,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
       this->poll_probe_list_count_,
       &this->erd_cache_);
     erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
+    this->polling_bridge_initialized_ = true;
   }
 
   // Initialize the subscription bridge for non-polling modes (subscribe, auto).
@@ -347,6 +348,33 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
 }
 
 // ---------------------------------------------------------------------------
+// Check if the polling bridge (running alongside subscription) has failed,
+// and if so, transition to full polling mode.
+// ---------------------------------------------------------------------------
+
+void GeappliancesBridge::handle_polling_failed()
+{
+  // Only relevant when we have both bridges active (subscription + custom polling).
+  if (!this->polling_bridge_initialized_ || !this->subscription_bridge_initialized_) {
+    return;
+  }
+
+  polling_state_t poll_state = this->get_polling_state();
+  if (poll_state != polling_state_failed) {
+    return;
+  }
+
+  // If the custom ERD polling bridge has failed, destroy it and let
+  // subscription continue handling standard ERDs.  The custom ERDs will
+  // simply not be polled.
+  ESP_LOGW(TAG, "Custom ERD polling bridge failed; continuing with subscription only");
+  erd_bridge_poll_destroy(&this->erd_bridge_poll_);
+  this->polling_bridge_initialized_ = false;
+  this->custom_erd_polling_started_ = false;
+  this->last_logged_poll_state_ = polling_state_none;
+}
+
+// ---------------------------------------------------------------------------
 // Subscription failed: fallback to polling
 // ---------------------------------------------------------------------------
 
@@ -393,6 +421,7 @@ void GeappliancesBridge::handle_subscription_failed()
       this->poll_probe_list_count_,
       &this->erd_cache_);
   erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
+  this->polling_bridge_initialized_ = true;
 
   // Signal the startup HSM that subscription fallback has occurred.
   tiny_hsm_send_signal(&this->startup_hsm_, signal_subscription_fallback, nullptr);
