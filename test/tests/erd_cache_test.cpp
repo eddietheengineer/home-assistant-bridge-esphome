@@ -644,3 +644,52 @@ TEST(erd_cache, rate_limit_tick_noop_when_disabled)
   CHECK(entry != NULL);
   CHECK_EQUAL(0, entry->publish_cooldown);
 }
+
+/* Rate limiting + only_publish_onchange: unchanged data does not reset cooldown */
+TEST(erd_cache, rate_limit_with_only_publish_onchange_unchanged_data)
+{
+  erd_cache_set_update_fastest_rate(&cache, 5);
+  erd_cache_set_only_publish_onchange(&cache, true);
+  uint8_t data[] = { 0x01 };
+  erd_cache_update(&cache, 0x0001, data, 1);
+
+  /* First publish — immediate (new entry). */
+  uint16_t iter = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
+  CHECK(entry != NULL);
+  erd_cache_mark_published(&cache, entry);
+
+  /* Send the same data again — only_publish_onchange skips it. */
+  erd_cache_update(&cache, 0x0001, data, 1);
+
+  /* update_required should not have been set, so cooldown is untouched. */
+  iter = 0;
+  entry = erd_cache_get_next_entry(&cache, &iter);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(5, entry->publish_cooldown);  /* still 5, unchanged */
+  CHECK(!entry->update_required);
+
+  /* Tick 4 times — cooldown stays at 5 (update_required=false, tick skips). */
+  for (int i = 0; i < 4; i++) {
+    erd_cache_tick_cooldowns(&cache);
+  }
+  iter = 0;
+  entry = erd_cache_get_next_entry(&cache, &iter);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(5, entry->publish_cooldown);  /* unchanged — tick skips when !update_required */
+
+  /* Now send different data — update_required is set, cooldown still 5, blocked. */
+  uint8_t data2[] = { 0x02 };
+  erd_cache_update(&cache, 0x0001, data2, 1);
+  iter = 0;
+  CHECK(NULL == erd_cache_get_next_updated(&cache, &iter));
+
+  /* Tick 5 times — cooldown reaches 0, now eligible. */
+  for (int i = 0; i < 5; i++) {
+    erd_cache_tick_cooldowns(&cache);
+  }
+  iter = 0;
+  entry = erd_cache_get_next_updated(&cache, &iter);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(0x0001, entry->erd);
+}

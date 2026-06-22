@@ -186,12 +186,14 @@ void GeappliancesBridge::loop() {
   // processing past the appliance's timeout window.
   this->run_protocol_stack_();
 
-  /* Tick ERD publish cooldowns once per second. */
+  /* Tick ERD publish cooldowns once per second.
+   * Uses a member variable (not static) so it resets on re-init and
+   * avoids the first-tick race on cold start. Unsigned subtraction
+   * handles millis() wrap correctly. */
   if (this->update_fastest_rate_ > 0) {
-    static uint32_t last_cooldown_tick = 0;
     uint32_t now = esphome::millis();
-    if (now - last_cooldown_tick >= 1000) {
-      last_cooldown_tick = now;
+    if (now - this->last_cooldown_tick_ >= 1000) {
+      this->last_cooldown_tick_ = now;
       erd_cache_tick_cooldowns(&this->erd_cache_);
     }
   }
@@ -729,6 +731,12 @@ bool GeappliancesBridge::is_erd_cache_publisher_initialized() const
 void GeappliancesBridge::init_erd_cache_publisher_()
 {
   if (this->erd_cache_publisher_.cache) return; // already initialized
+
+  /* Apply rate limit configuration before starting the publisher.
+   * On ESP-IDF the background task starts immediately in init() and
+   * could drain cache entries before the rate limit takes effect. */
+  erd_cache_set_update_fastest_rate(&this->erd_cache_, this->update_fastest_rate_);
+
   erd_cache_mqtt_publisher_init(
     &this->erd_cache_publisher_,
     &this->erd_cache_,
@@ -739,9 +747,6 @@ void GeappliancesBridge::init_erd_cache_publisher_()
 #ifdef USE_ESP_IDF
   erd_cache_mqtt_publisher_start(&this->erd_cache_publisher_);
 #endif
-
-  /* Apply rate limit configuration. */
-  erd_cache_set_update_fastest_rate(&this->erd_cache_, this->update_fastest_rate_);
 
   ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
 }

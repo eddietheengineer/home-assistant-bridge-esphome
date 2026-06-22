@@ -69,14 +69,23 @@ void erd_cache_set_update_fastest_rate(erd_cache_t* self, uint8_t rate);
 
 /* Mark an ERD entry as successfully published to MQTT.
  * Reloads the publish_cooldown timer. Call after mqtt_client_publish_raw() succeeds.
- * Static inline — zero overhead when max_cooldown is 0 (early return). */
+ * Static inline — zero overhead when max_cooldown is 0 (early return).
+ *
+ * Thread safety: on ESP-IDF this is called from the background MQTT publisher
+ * task while tick_cooldowns() runs from the main loop.  On single-core ESP32
+ * uint8_t access is atomic and the tick→signal_work ordering in loop() ensures
+ * the tick always runs before the task drains, so no additional locking is needed. */
 static inline void erd_cache_mark_published(erd_cache_t* self, erd_cache_entry_t* entry) {
   if (self->max_cooldown == 0 || entry == NULL) return;
   entry->publish_cooldown = self->max_cooldown;
 }
 
 /* Decrement publish_cooldown for all entries with update_required=true.
- * Call once per second. Static inline — zero overhead when max_cooldown is 0. */
+ * Call once per second. Static inline — zero overhead when max_cooldown is 0.
+ *
+ * Thread safety: see erd_cache_mark_published() above.  This only touches
+ * entries with update_required=true; mark_published() only touches entries
+ * whose update_required was just cleared, so they operate on disjoint sets. */
 static inline void erd_cache_tick_cooldowns(erd_cache_t* self) {
   if (self->max_cooldown == 0) return;
   for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
