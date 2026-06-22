@@ -98,7 +98,6 @@ The startup HSM holds a pointer to `IBridgeServices` and calls methods through t
 | `check_subscription_activity()` | Check subscription activity and fall back to polling if timed out. |
 | `maybe_start_custom_erd_polling()` | Start custom-ERD polling bridge if conditions are met. Idempotent. |
 | `log_poll_state_transitions()` | Log any pending polling-bridge state-name transitions. |
-| `run_ha_discovery()` | Run one tick of the Home Assistant discovery manager. |
 | `run_all_managers()` | Run one tick of all managers (autodiscovery, device-ID, feature bits). |
 
 ### 3.9 ERD Cache Publisher

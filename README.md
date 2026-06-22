@@ -63,9 +63,8 @@ geappliances_bridge:
   # polling_interval: 10000               # Default: 10000 ms (10 seconds), used when in polling mode
   # polling_onlypublish_onchange: true   # Default: true, only publish if value changed
   # appliance_api_parsing: true           # Default: true, restricts polling to appliance-supported ERDs
-  # generate_device_config: false         # Default: false, set to true to enable automatic HA MQTT discovery
-  # custom_erds: [0x0003, 0x0004]         # Optional: Additional ERDs to poll
-  # ha_discovery_base_url: "..."          # Optional: Override URL for HA discovery JSONL files
+  # generate_device_config: false         # Deprecated: no-op, kept for backward compatibility
+
 ```
 
 ## Configurable Parameters
@@ -108,17 +107,12 @@ See [doc/example.yaml](doc/example.yaml) for the complete configuration example.
 
 The `appliance_api_parsing` parameter is **optional** (default: `true`). When enabled, the component reads appliance API feature bit ERDs (0x0092–0x010D) after discovery to determine which ERDs are actually supported by the connected appliance. In polling mode this restricts polling to only those ERDs, resulting in faster poll cycles and a cleaner MQTT topic namespace. Set to `false` to poll all known ERDs regardless of appliance support.
 
-### Home Assistant Auto-Discovery
 
-The `generate_device_config` parameter is **optional** (default: `false`). When set to `true`, the component automatically publishes [Home Assistant MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery) payloads after the appliance's ERD list is fully enumerated. This causes sensors, switches, selects, and other entities to appear in Home Assistant automatically — no manual YAML configuration required.
-
-The entity definitions are downloaded at runtime from compact JSONL files hosted in this repository, so no extra flash space is consumed. Only entities for ERDs actually supported by the connected appliance are published.
-
-### Additional Configuration Options
+## Additional Configuration Options
 
 - **`adapter_address`** (default: `0xE4`) — The bridge's address on the GEA bus.
 - **`custom_erds`** (default: none) — A list of additional ERD IDs to poll beyond the standard list. Useful for ERDs not yet in the appliance API documentation.
-- **`ha_discovery_base_url`** (default: GitHub raw URL for this repo's `ha_discovery/` folder) — Override the base URL where the component fetches the per-category JSONL entity definition files at runtime.
+- **`generate_device_config`** (default: `false`) — Deprecated, no-op. Kept for backward compatibility.
 
 ## Development
 

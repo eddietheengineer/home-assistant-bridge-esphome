@@ -11,7 +11,7 @@ The ERD cache is a fixed-size store for the latest data of up to `ERD_CACHE_CAPA
 - Store the latest data for each ERD observed by the bridge
 - Choose inline or heap storage at registration based on data size
 - Detect data changes via `memcmp` and set `update_required` accordingly
-- Provide iteration over updated entries (for publishing) and all entries (for HA discovery)
+- Provide iteration over updated entries (for publishing) and all entries
 - Track update rates via windowed counters
 
 ### 1.3 Not Responsible For

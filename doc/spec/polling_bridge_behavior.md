@@ -1,6 +1,6 @@
 # Polling Bridge Behavior Specification
 
-This document defines the requirements for the GE Appliances polling bridge, covering ERD probe discovery, steady-state polling, and Home Assistant discovery timing.
+This document defines the requirements for the GE Appliances polling bridge, covering ERD probe discovery and steady-state polling.
 
 ## 1. Probe ERD Discovery
 
@@ -102,86 +102,28 @@ Tests must verify that:
 
 ---
 
-## 3. Home Assistant Discovery Timing
+## 3. Custom ERD Handling
 
-### Requirement 3.1: Poll Mode
-
-In poll mode, HA discovery MUST NOT initiate until the polling bridge has completed the probe phase (all probe list ERDs processed, `polling_list_complete` is true).
-
-### Requirement 3.2: Subscription Mode
-
-In subscription mode, HA discovery MUST NOT initiate until the subscription has been idle for a quiet window period (default 10 seconds) with no new ERD registrations. A safety cap (default 30 seconds) ensures discovery is never permanently blocked.
-
-### Requirement 3.3: Auto Mode
-
-In auto mode, HA discovery MUST NOT initiate until BOTH conditions are met:
-1. The subscription quiet window has elapsed (same as subscription mode).
-2. If the polling bridge is active (e.g., for custom ERDs), the polling probe phase has been completed.
-
-### Implementation
-
-The `HaDiscoveryManager::run()` method checks readiness based on the bridge mode:
-- Poll mode: `ready = polling_list_complete`
-- Subscription mode: `ready = quiet_window_elapsed` (with safety cap)
-- Auto mode: `ready = quiet_window_elapsed AND (polling_list_complete if polling bridge exists)`
-
-The `on_discovery_complete` callback of the polling bridge updates the HA discovery registry with the live ERD snapshot and signals the startup HSM via `signal_bridge_ready`.
-
-### Prohibited
-
-- Initiating HA discovery before ERD registration has settled.
-- In auto mode, initiating HA discovery before both subscription quiet window and polling probe are complete.
-
-### Verification
-
-Tests must verify that HA discovery does not start prematurely in any mode, and that in auto mode, both subscription and polling conditions are satisfied.
-
----
-
-## 4. Startup HSM Gating
-
-### Requirement 4.1: Wait for Probe Completion
-
-The startup HSM MUST NOT transition to steady-state operation (`startup_state_subscription_watch`) until the polling bridge has completed the probe phase and sent `signal_bridge_ready`.
-
-### Requirement 4.2: Bridge Ready Signal
-
-The polling bridge sends `signal_bridge_ready` to the startup HSM via the `on_discovery_complete` callback when entering `state_polling`. This signal carries the completed ERD registry snapshot for HA discovery.
-
-### Implementation
-
-- `startup_state_bridge_init` does NOT auto-transition on `signal_mqtt_connected`.
-- It waits for `signal_bridge_ready` before transitioning to `startup_state_subscription_watch`.
-- The `on_discovery_complete` callback updates `ha_discovery_manager_.set_registered_erds()` and sends the signal.
-
-### Verification
-
-Tests must verify that the startup HSM remains in `startup_state_bridge_init` until `signal_bridge_ready` is received.
-
----
-
-## 5. Custom ERD Handling
-
-### Requirement 5.1: Subscription Mode — Separate Polling Bridge After Registration Settles
+### Requirement 3.1: Subscription Mode — Separate Polling Bridge After Registration Settles
 
 When custom ERDs are defined in subscription or auto mode (with subscription active), the custom ERD polling phase MUST NOT start until the subscription registration phase has settled. Settlement is defined as a quiet window period (default 10 seconds) with no new ERDs seen via subscription publications.
 
 Custom ERDs are polled by a **separate** polling bridge instance running alongside the subscription bridge. The subscription bridge continues to handle all standard ERD publications; the polling bridge handles only the custom ERDs that may not be covered by subscription.
 
-### Requirement 5.2: Poll Mode — Included in Probe List
+### Requirement 3.2: Poll Mode — Included in Probe List
 
 When custom ERDs are defined in poll mode (or auto mode that falls back to poll), custom ERDs MUST be included in the probe list built by `erd_poll_list_builder` and go through the same probe phase as standard ERDs. A single polling instance handles both standard and custom ERDs.
 
 Custom ERDs that respond successfully during probing are added to the polling list. Custom ERDs that do not respond (not supported or timeout) are excluded from the polling list, just like any other ERD.
 
-### Requirement 5.3: Auto Mode Fallback
+### Requirement 3.3: Auto Mode Fallback
 
-When auto mode falls back from subscription to poll mode, custom ERDs are handled per Requirement 5.2 (included in the probe list built by `erd_poll_list_builder`).
+When auto mode falls back from subscription to poll mode, custom ERDs are handled per Requirement 3.2 (included in the probe list built by `erd_poll_list_builder`).
 
 ### Implementation
 
 **Subscription mode:**
-- `maybe_start_custom_erd_polling_()` gates on three conditions: in subscription mode, subscription activity confirmed, and `custom_erd_subscription_last_activity_` older than `HA_DISCOVERY_QUIET_MS` (10s).
+- `maybe_start_custom_erd_polling_()` gates on three conditions: in subscription mode, subscription activity confirmed, and `custom_erd_subscription_last_activity_` older than the quiet window period (10s).
 - `start_custom_erd_polling_()` builds the probe list via `build_poll_list_()` (which calls `erd_poll_list_builder`), then initializes a separate polling bridge with the probe list.
 - The subscription bridge is NOT destroyed; both bridges share the same ERD client.
 
@@ -200,13 +142,13 @@ Tests must verify that custom ERD polling in subscription mode does not start un
 
 ---
 
-## 6. Probe List Building
+## 4. Probe List Building
 
-### Requirement 6.1: Pure Function
+### Requirement 4.1: Pure Function
 
 The probe list is built by `erd_poll_list_builder`, a pure function with no side effects. It takes the current bridge mode, subscription state, feature-bit results, custom ERDs, and appliance type, and returns a deduplicated list of ERDs to probe.
 
-### Requirement 6.2: Decision Logic
+### Requirement 4.2: Decision Logic
 
 | Mode | Condition | Probe List Contents |
 |------|-----------|---------------------|
@@ -216,7 +158,7 @@ The probe list is built by `erd_poll_list_builder`, a pure function with no side
 | AUTO | subscription active | custom ERDs only |
 | AUTO | subscription not active (fallback) | same as POLL with current appliance_api_parsing |
 
-### Requirement 6.3: Deduplication
+### Requirement 4.3: Deduplication
 
 The returned list is deduplicated. Order is: standard ERDs first (in their original group order), then custom ERDs.
 

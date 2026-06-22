@@ -22,7 +22,6 @@ ESPHome Component (GeappliancesBridge)
 ├── 1× esphome_mqtt_client_adapter_t
 ├── 1× erd_bridge_subscribe_t or erd_bridge_poll_t
 ├── 1× erd_write_bridge_t
-├── 1× HaDiscoveryManager
 ├── 1× startup_hsm_t
 └── 1× IBridgeServices (the bridge itself)
 ```
@@ -136,7 +135,6 @@ The `__init__.py` `to_code()` function already handles multiple component instan
 - **Write bridge** — already per-bridge
 - **Feature bit manager** — already per-bridge
 - **Device identity manager** — already per-bridge
-- **HA discovery manager** — already per-bridge
 - **`esphome_mqtt_client_adapter_t`** — already per-bridge (wraps the shared ESPHome MQTT singleton)
 
 ---

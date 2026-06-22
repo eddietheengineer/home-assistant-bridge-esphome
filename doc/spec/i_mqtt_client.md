@@ -61,7 +61,7 @@ typedef struct i_mqtt_client_api_t {
 void mqtt_client_register_erd(i_mqtt_client_t* self, tiny_erd_t erd);
 ```
 
-Register a newly discovered ERD with the MQTT adapter. The adapter is responsible for creating Home Assistant discovery topics for the ERD. Called by the polling and subscription bridges when they discover an ERD to expose.
+Register a newly discovered ERD with the MQTT adapter. The adapter creates MQTT topics for the ERD. Called by the polling and subscription bridges when they discover an ERD to expose.
 
 ### 3.2 `mqtt_client_update_erd_write_result`
 

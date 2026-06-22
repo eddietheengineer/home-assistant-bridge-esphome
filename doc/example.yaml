@@ -69,9 +69,7 @@ geappliances_bridge:
   # polling_interval: 10000               # Default: 10000 ms (10 seconds), used when in polling mode
   # polling_onlypublish_onchange: true    # Default: true, only publish if value changed
   # appliance_api_parsing: true           # Default: true, restricts polling to appliance-supported ERDs
-  # generate_device_config: false         # Default: false, set to true to enable automatic HA MQTT discovery
   # custom_erds: [0x0003, 0x0004]        # Optional: Additional ERDs to poll
-  # ha_discovery_base_url: "..."          # Optional: Override URL for HA discovery JSONL files
 
   # Optional diagnostic sensors:
   # erd_publish_rate_sensor:

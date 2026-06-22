@@ -1,8 +1,0 @@
-{"i":"8004","n":"Water Softener Error State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'No Error', '01': 'No position swicth detected timeout', '02': 'Reserved', '03': 'Cannot find Service position', '04': 'Position switch changing after motor is shutoff', '05': 'Bad Printed Wire Assembly (corrupted RAM memory)', '06': 'Shutoff Valve not closed timeout', '07': 'Shutoff Valve not open timeout', '08': 'Shutoff Valve closed and open switches both low', '09': 'UI and Power board communication error', '0a': 'Salt Level Sensor error'}.get(value[:2], 'Unknown') }}"}
-{"i":"8005","n":"Water Softener Estimated Days of Salt Remaining","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"8007","n":"Water Softener Low Salt Alert","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Cleared - Salt is good', '01': 'Set - Low Salt Indicated'}.get(value[:2], 'Unknown') }}"}
-{"i":"800d","n":"Water Softener Average Daily Water Usage","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
-{"i":"800e","n":"Water Softener Daily Water Usage","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
-{"i":"8032","n":"Water Softener Shutoff Valve Installed","d":"binary_sensor","ds":1}
-{"i":"8033","n":"Water Softener Shutoff Valve Actual State","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"8034","n":"Water Softener Shutoff Valve Requested State","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}

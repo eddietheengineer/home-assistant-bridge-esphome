@@ -58,7 +58,7 @@ This convergence suggests a fixed timeout or operation that blocks for a determi
 ### 5. Only One Run Reached Steady State
 
 Boot #2 (11:22:42–11:25:15) is the only run that completed the full startup sequence:
-- Autodiscovery → Feature bits → Bridge init → HA discovery → Steady-state polling
+- Autodiscovery → Feature bits → Bridge init → Steady-state polling
 - Lived for **153 seconds** before crashing during normal polling operation
 - This crash had `aioesphomeapi` disconnect at 11:24:56, then WDT at 11:25:15 (~19s later)
 

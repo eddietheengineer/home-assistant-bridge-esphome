@@ -366,7 +366,7 @@ tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_sig
     case tiny_hsm_signal_entry:
       if (svc->get_mode() != BRIDGE_MODE_AUTO) {
         svc->maybe_start_custom_erd_polling();
-        tiny_hsm_transition(hsm, startup_state_ha_discovery);
+        tiny_hsm_transition(hsm, startup_state_running);
       }
       break;
 
@@ -378,43 +378,11 @@ tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_sig
       svc->log_poll_state_transitions();
 
       if (svc->get_mode() != BRIDGE_MODE_AUTO || !svc->is_subscription_mode_active()) {
-        tiny_hsm_transition(hsm, startup_state_ha_discovery);
+        tiny_hsm_transition(hsm, startup_state_running);
       }
       break;
 
     case signal_subscription_fallback:
-      tiny_hsm_transition(hsm, startup_state_ha_discovery);
-      break;
-
-    case tiny_hsm_signal_exit:
-      break;
-
-    default:
-      return tiny_hsm_result_signal_deferred;
-  }
-
-  return tiny_hsm_result_signal_consumed;
-}
-
-// ============================================================================
-// Phase 8: HA Discovery — publish Home Assistant entity configs
-//
-// Runs the HaDiscoveryManager each loop iteration.  Transitions to
-// heap_monitor once HA discovery is complete or not needed.
-// ============================================================================
-
-tiny_hsm_result_t startup_state_ha_discovery(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
-{
-  IBridgeServices* svc = services_from_hsm(hsm);
-  (void)data;
-
-  switch (signal) {
-    case tiny_hsm_signal_entry:
-      ESP_LOGI(TAG, "Startup: HA discovery phase");
-      break;
-
-    case signal_run_loop:
-      svc->run_ha_discovery();
       tiny_hsm_transition(hsm, startup_state_running);
       break;
 
@@ -428,8 +396,8 @@ tiny_hsm_result_t startup_state_ha_discovery(tiny_hsm_t* hsm, tiny_hsm_signal_t 
   return tiny_hsm_result_signal_consumed;
 }
 
-// ============================================================================
-// Phase 9: Running — steady-state operation
+
+// Phase 8: Running — steady-state operation
 //
 // All recurring tasks run every loop() iteration.  This is the terminal
 // state of the startup sequence.
@@ -453,7 +421,6 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
       }
       svc->maybe_start_custom_erd_polling();
       svc->log_poll_state_transitions();
-      svc->run_ha_discovery();
       break;
 
     case tiny_hsm_signal_exit:
@@ -480,7 +447,6 @@ static const tiny_hsm_state_descriptor_t startup_hsm_state_descriptors[] = {
   { .state = startup_state_feature_bits,     .parent = startup_state_top },
   { .state = startup_state_bridge_init,      .parent = startup_state_top },
   { .state = startup_state_subscription_watch, .parent = startup_state_top },
-  { .state = startup_state_ha_discovery,     .parent = startup_state_top },
   { .state = startup_state_running,          .parent = startup_state_top },
 };
 

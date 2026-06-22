@@ -168,9 +168,9 @@ class DeviceIdentityManager {
 | `on_erd_read_failed(erd)` | `void` | Callback: ERD read failed. Re-queues the same ERD. Retries indefinitely. |
 | `get_state()` | `DeviceIdState` | Returns current state. Used by the startup HSM to detect completion. |
 | `get_device_id()` | `const std::string&` | Returns preconfigured ID if set, otherwise auto-generated ID. |
-| `get_model_number()` | `const std::string&` | Returns raw model number string (used by HA discovery manager). |
+| `get_model_number()` | `const std::string&` | Returns raw model number string. |
 | `get_appliance_type()` | `uint8_t` | Returns raw appliance type byte (from ERD 0x0008). |
-| `get_serial_number()` | `const std::string&` | Returns raw serial number string (used by HA discovery manager). |
+| `get_serial_number()` | `const std::string&` | Returns raw serial number string. |
 
 ---
 
@@ -197,7 +197,7 @@ After `on_erd_read_completed()` transitions to `COMPLETE`, the bridge signals th
 
 ### 9.3 Accessors
 
-The bridge and HA discovery manager read `get_model_number()`, `get_serial_number()`, `get_appliance_type()`, and `get_device_id()` after the state is `COMPLETE`.
+The bridge reads `get_model_number()`, `get_serial_number()`, `get_appliance_type()`, and `get_device_id()` after the state is `COMPLETE`.
 
 ---
 

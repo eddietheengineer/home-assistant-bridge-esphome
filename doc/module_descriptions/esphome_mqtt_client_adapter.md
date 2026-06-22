@@ -41,7 +41,7 @@ The adapter implements the `i_mqtt_client_api_t` interface:
   - A 3-second stall on MQTT reconnect from synchronous re-subscriptions
 - **Pending update queue**: When MQTT is disconnected, ERD updates are queued (keyed by ERD, so repeated updates overwrite rather than append). Max 200 pending updates, flushed at 5 per `notify_connected()` call to avoid stalling the main loop.
 - **Settle delay**: After reconnect, pending updates are not flushed immediately — the `mqtt_connected_at_ms` timestamp gates the flush to give the IDF MQTT task time to process the broker's reconnect backlog.
-- **Hex payloads**: All ERD values are published as uppercase hex strings. String conversion is handled at the HA discovery level, not in the MQTT adapter.
+- **Hex payloads**: All ERD values are published as uppercase hex strings. String conversion is handled at the application level, not in the MQTT adapter.
 
 ## Testing
 

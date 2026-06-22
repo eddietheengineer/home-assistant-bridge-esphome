@@ -25,13 +25,13 @@ static const tiny_gea3_erd_client_configuration_t client_configuration = {
   .request_retries = 10
 };
 
-// GEA2 ERD client: no internal retries.  Bridge-level retries
-// (try_read_erd_with_retry_) handle all retry logic with ~500 ms spacing
-// between attempts, giving appliances time to service slow first-access
-// NVRAM lookups.
+// GEA2 ERD client: one internal retry.  With request_timeout=250ms and
+// request_retries=1, each read gets two attempts (500ms total), giving
+// appliances time to service slow first-access NVRAM lookups or transient
+// bus collisions without needing bridge-level retry logic.
 static const tiny_gea2_erd_client_configuration_t gea2_client_configuration = {
   .request_timeout = 250,
-  .request_retries = 0
+  .request_retries = 1
 };
 
 // Tick-counter time source for the GEA2 interface's internal timer group.
@@ -405,8 +405,7 @@ void GeappliancesBridge::log_poll_state_transitions_()
 }
 
 void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args) {
-  // Subscription publications: track AUTO mode activity and reset the HA
-  // discovery quiet window for both AUTO and SUBSCRIBE modes.
+  // Subscription publications: track AUTO mode activity.
   if (this->erd_bridge_initialized_ &&
       args->address == this->autodiscovery_manager_.get_host_address() &&
       args->type == tiny_gea3_erd_client_activity_type_subscription_publication_received) {
@@ -418,9 +417,6 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
     if (erd_set_insert(&this->custom_erd_subscription_seen_erds_, args->subscription_publication_received.erd)) {
       this->custom_erd_subscription_last_activity_ = millis();
     }
-    // Reset the HA discovery quiet window only for new ERD IDs. Repeated value
-    // updates for already-seen ERDs do not extend the wait.
-    this->on_ha_discovery_erd_seen_(args->subscription_publication_received.erd);
   }
 
   // Device ID reads (after discovery, before bridge init)
@@ -452,11 +448,6 @@ bool GeappliancesBridge::should_route_to_feature_bits_(tiny_erd_t erd)
   FeatureBitState state = this->feature_bit_manager_.get_state();
   bool feature_bit_active = (state != FEATURE_BIT_STATE_COMPLETE);
   return feature_bit_active && is_feature_bit_erd(erd);
-}
-
-void GeappliancesBridge::on_ha_discovery_erd_seen_(tiny_erd_t erd)
-{
-  this->ha_discovery_manager_.on_erd_seen(erd);
 }
 
 void GeappliancesBridge::dump_config() {
@@ -520,7 +511,6 @@ void GeappliancesBridge::dump_config() {
   else if (this->startup_hsm_.current == startup_state_feature_bits)     phase_str = "Feature Bits";
   else if (this->startup_hsm_.current == startup_state_bridge_init)      phase_str = "Bridge Init";
   else if (this->startup_hsm_.current == startup_state_subscription_watch) phase_str = "Subscription Watch";
-  else if (this->startup_hsm_.current == startup_state_ha_discovery)     phase_str = "HA Discovery";
   else if (this->startup_hsm_.current == startup_state_running)          phase_str = "Running";
   (void)phase_str;
   ESP_LOGCONFIG(TAG, "  Startup State: %s", phase_str);
@@ -532,9 +522,6 @@ float GeappliancesBridge::get_setup_priority() const {
 }
 
 bool GeappliancesBridge::teardown() {
-  // Clean up HA discovery manager first (may have a running FreeRTOS task).
-  this->ha_discovery_manager_.cleanup();
-
   // Clean up feature bit manager (unsubscribe from ERD client events, stop timers).
   this->feature_bit_manager_.cleanup();
   // Destroy whichever bridge(s) were actually initialized.
@@ -687,16 +674,6 @@ void GeappliancesBridge::maybe_start_custom_erd_polling()
 void GeappliancesBridge::log_poll_state_transitions()
 {
   log_poll_state_transitions_();
-}
-
-void GeappliancesBridge::run_ha_discovery()
-{
-  ha_discovery_manager_.run(
-      !((mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-        (mode_ == BRIDGE_MODE_AUTO && subscription_mode_active_)),
-      polling_bridge_initialized_,
-      erd_bridge_poll_.polling_list_complete,
-      subscription_activity_detected_);
 }
 
 void GeappliancesBridge::run_all_managers()

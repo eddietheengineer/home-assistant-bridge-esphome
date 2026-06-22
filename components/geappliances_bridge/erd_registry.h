@@ -8,7 +8,7 @@
 //   - Own the valid-ERD set (populated by FeatureBitManager at startup)
 //   - Own the registered-ERD set (appended by the MQTT adapter at runtime)
 //   - Expose query methods used by the MQTT adapter during publish
-//   - Expose read-only accessors used by HaDiscoveryManager and diagnostics
+//   - Expose read-only accessors used by diagnostics
 //
 // NOT responsible for:
 //   - Reading ERDs from the appliance (FeatureBitManager does that)
@@ -66,7 +66,7 @@ class ErdRegistry {
 
 
   // -------------------------------------------------------------------------
-  // Read-only accessors (HaDiscoveryManager, diagnostics)
+  // Read-only accessors (diagnostics)
   // -------------------------------------------------------------------------
 
   /// Returns the number of registered ERDs.

@@ -11,7 +11,7 @@ All ERD data published to MQTT topics under `geappliances/<deviceId>/erd/0x<ERD>
 ### Rationale
 
 - Raw binary data is not MQTT-safe; hex encoding ensures reliable transport
-- String conversion belongs at the consumer level (HA discovery), not the transport level
+- String conversion belongs at the consumer level, not the transport level
 - Consistent format simplifies downstream processing and testing
 
 ### Implementation

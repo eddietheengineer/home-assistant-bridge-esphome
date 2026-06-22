@@ -4,7 +4,7 @@
  *
  * Fully self-driving: owns its own timers and event subscriptions.
  * Reads and parses appliance API feature bit ERDs (0x0092-0x010D),
- * building a filtered ERD list for polling mode and gating HA discovery.
+ * building a filtered ERD list for polling mode.
  *
  * The bridge calls init() to configure, then start() to begin reading.
  * The manager subscribes to ERD client activity events and drives

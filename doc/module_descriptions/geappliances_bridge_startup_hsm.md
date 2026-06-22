@@ -56,17 +56,13 @@ startup_state_top (root — handles entry/exit, defers all other signals)
   │    └─ mqtt_connected/signal → subscription_watch
   │
   ├─ startup_state_subscription_watch
-  │    ├─ non-AUTO modes: skip to ha_discovery
-  │    ├─ AUTO mode: monitor subscription activity, fall back to polling
-  │    └─ fallback or non-AUTO → ha_discovery
-  │
-  ├─ startup_state_ha_discovery
-  │    ├─ run_loop: run HaDiscoveryManager
-  │    └─ transition to running (HA discovery runs in background)
+  ├─ non-AUTO modes: skip to running
+  ├─ AUTO mode: monitor subscription activity, fall back to polling
+  └─ fallback or non-AUTO → running
   │
   └─ startup_state_running (steady state)
        └─ run_loop: run all managers (autodiscovery, device identity,
-           feature bits, ha discovery), check subscription activity
+           feature bits), check subscription activity
            (AUTO mode), maybe start custom ERD polling, log poll state
            transitions
 ```

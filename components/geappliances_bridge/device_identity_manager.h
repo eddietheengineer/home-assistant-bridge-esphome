@@ -97,7 +97,7 @@ class DeviceIdentityManager {
   const std::string& get_device_id() const;
 
   /*
-   * Get the model number string (used by HA discovery manager).
+   * Get the model number string.
    */
   const std::string& get_model_number() const { return model_number_; }
   /*
@@ -106,7 +106,7 @@ class DeviceIdentityManager {
   uint8_t get_appliance_type() const { return appliance_type_; }
 
   /*
-   * Get the serial number string (used by HA discovery manager).
+   * Get the serial number string.
    */
   const std::string& get_serial_number() const { return serial_number_; }
 

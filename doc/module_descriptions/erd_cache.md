@@ -103,7 +103,7 @@ typedef struct erd_cache_t {
 - **Size invariance**: ERD data size never changes after registration. A size mismatch is treated as an appliance firmware change — `erd_cache_update()` logs an error and returns `false`, signaling the bridge should reinitialize.
 - **Early exit on unchanged data**: When `only_publish_onchange` is true and data hasn't changed, the update returns immediately without touching storage.
 - **Change detection at update time**: `update_required` is set during `erd_cache_update()`, not during iteration. This eliminates per-read `memcmp` overhead in the publisher loop.
-- **Two iterators**: `erd_cache_get_next_updated()` for the publisher (clears `update_required` flag) and `erd_cache_get_next_entry()` for read-only iteration (used by HA discovery).
+- **Two iterators**: `erd_cache_get_next_updated()` for the publisher (clears `update_required` flag) and `erd_cache_get_next_entry()` for read-only iteration.
 - **Rate counters**: `update_count_window` and `required_update_count_window` accumulate updates and are reset by `get_update_rate()` and `get_required_update_rate()`. The window is determined by the call interval of the consumer (e.g. ~60s if called once per minute).
 - **No eviction**: The cache has a fixed capacity with no eviction policy. If the cache is full and a new ERD arrives that isn't already cached, the update is silently dropped. This is acceptable because the ERD set is bounded by the appliance's supported ERDs, which is typically well under 200.
 

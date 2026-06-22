@@ -15,14 +15,13 @@ Implement the `i_mqtt_client_t` interface for the ESPHome bridge, providing the 
 - Accept write commands through a single wildcard subscription topic rather than per-ERD subscriptions
 - Queue ERD updates during MQTT disconnect and flush on reconnect with a settle delay
 - Delegate ERD registration tracking and valid-ERD filtering to `ErdRegistry`
-- Provide a `publish()` helper for HA discovery manager to send arbitrary MQTT messages
+- Provide a `publish()` helper for arbitrary MQTT message publishing
 
 ### 1.3 Not Responsible For
 
 - Deciding which ERDs to publish (filtering is applied via `ErdRegistry`)
 - Managing bridge lifecycle or startup phases
-- HA discovery publishing (`HaDiscoveryManager`)
-- ERD value serialization or string conversion (handled at the HA discovery level)
+- ERD value serialization or string conversion
 - MQTT connection management (connect, disconnect, reconnection — handled by ESPHome)
 
 ---
@@ -151,7 +150,7 @@ void esphome_mqtt_client_adapter_publish(
   bool retain);
 ```
 
-Publish an MQTT message using `std::string` arguments. Used by `HaDiscoveryManager` for discovery payload publishing. Guards against null or disconnected MQTT client.
+Publish an MQTT message using `std::string` arguments. Guards against null or disconnected MQTT client.
 
 ### 3.10 `esphome_mqtt_client_adapter_publish_raw`
 
@@ -289,7 +288,7 @@ The pending update queue has a maximum capacity of 200 entries. If the queue is 
 The adapter holds an optional pointer to `ErdRegistry`. When set via `esphome_mqtt_client_adapter_set_erd_registry()`, the registry provides:
 
 - **Valid-ERD filtering:** `ErdRegistry::is_valid()` checks whether an ERD is in the valid set populated by `FeatureBitManager` at startup. This prevents publishing ERDs that the appliance does not support.
-- **Registered-ERD tracking:** `ErdRegistry::register_erd()` records which ERDs have been registered at runtime, used by `HaDiscoveryManager` and diagnostics.
+- **Registered-ERD tracking:** `ErdRegistry::register_erd()` records which ERDs have been registered at runtime, used by diagnostics.
 - **String-ERD type detection:** The registry can identify ERDs whose values are strings rather than binary, allowing appropriate payload encoding.
 
 ### 7.2 Filtering Behavior
