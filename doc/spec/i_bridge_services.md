@@ -83,7 +83,7 @@ The startup HSM holds a pointer to `IBridgeServices` and calls methods through t
 |--------|-------------|
 | `get_mode()` | Returns the current `BridgeMode` (POLL, SUBSCRIBE, or AUTO). |
 | `is_subscription_mode_active()` | Returns `true` if subscription mode is currently active (may differ from configured mode in AUTO when fallback to polling occurs). |
-| `is_subscription_steady()` | Returns `true` if the subscription bridge has reached steady state (no new ERD registrations for `subscription_quiet_period`, 10 s). Used by `maybe_start_custom_erd_polling()` to gate custom ERD polling until the subscription has settled. |
+| `is_subscription_steady()` | Returns `true` if the subscription bridge has reached steady state (no new ERD registrations for `subscription_quiet_period`, 2 s). Used by `maybe_start_custom_erd_polling()` to gate custom ERD polling until the subscription has settled. |
 
 ### 3.7 Startup Delay
 

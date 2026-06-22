@@ -48,7 +48,7 @@ extern "C" {
 enum {
   resubscribe_delay = 1000,
   subscription_retention_period = 30 * 1000,
-  subscription_quiet_period = 10 * 1000,
+  subscription_quiet_period = 2 * 1000,
   retry_delay = 100,
   appliance_lost_timeout = 60000
 };

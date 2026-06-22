@@ -19,7 +19,7 @@ TEST_GROUP(erd_bridge_subscribe)
   enum {
     resubscribe_delay = 1000,
     subscription_retention_period = 30 * 1000,
-    subscription_quiet_period = 10 * 1000
+    subscription_quiet_period = 2 * 1000
   };
 
   erd_bridge_subscribe_t self;

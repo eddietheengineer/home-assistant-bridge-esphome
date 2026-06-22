@@ -74,7 +74,7 @@ Handles signals globally across all child states:
 - If the ERD is **new** (not already in `erd_set`): transitions to `state_subscribed`, restarting the quiet period
 
 **`signal_quiet_period_expired`:**
-- Transitions to `state_steady` (no new ERDs registered for 10 s)
+- Transitions to `state_steady` (no new ERDs registered for 2 s)
 
 **`signal_timer_expired`:**
 - Calls `tiny_gea3_erd_client_retain_subscription()` to keep the appliance publishing
@@ -90,7 +90,7 @@ Handles signals globally across all child states:
 
 ### `state_subscribed`
 
-- On entry: arms a periodic retention timer at `subscription_retention_period` (30 s) and a one-shot quiet timer at `subscription_quiet_period` (10 s); sets `current_state_name` to `"subscribed"`
+- On entry: arms a periodic retention timer at `subscription_retention_period` (30 s) and a one-shot quiet timer at `subscription_quiet_period` (2 s); sets `current_state_name` to `"subscribed"`
 - On `signal_subscription_host_came_online`: transitions to `state_subscribing`
 - On exit: disarms the quiet timer only; the retention timer persists across transitions to `state_steady`
 
@@ -133,7 +133,7 @@ The `erd_set_t` is a fixed-capacity sorted array (capacity 645). It tracks which
 - **No `signal_write_requested`**: Write request handling has been extracted to `erd_write_bridge`.
 - **Fixed-capacity ERD set**: Uses `erd_set_t` (sorted array) instead of `std::set` to eliminate heap node allocations.
 - **30-second retention**: The subscription is retained every 30 seconds (`subscription_retention_period`) to keep the appliance publishing ERD values.
-- **10-second quiet period**: After 10 seconds (`subscription_quiet_period`) with no new ERD registrations, the bridge transitions from `state_subscribed` to `state_steady`. This signals to the main bridge that the subscription has settled, allowing custom ERD polling to start.
+- **2-second quiet period**: After 2 seconds (`subscription_quiet_period`) with no new ERD registrations, the bridge transitions from `state_subscribed` to `state_steady`. This signals to the main bridge that the subscription has settled, allowing custom ERD polling to start.
 - **1-second resubscribe delay**: If `subscribe()` fails, the bridge waits 1 second (`resubscribe_delay`) before retrying.
 - **Retention timer persists across subscribed/steady**: The retention timer is not disarmed when transitioning between `state_subscribed` and `state_steady`, ensuring continuous 30-second retention without gaps.
 - **New ERD exits steady state**: When a new ERD is published while in `state_steady`, the bridge transitions back to `state_subscribed`, restarting the quiet period.
