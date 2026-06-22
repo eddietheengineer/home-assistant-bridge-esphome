@@ -38,25 +38,12 @@
 
 namespace esphome {
 namespace geappliances_bridge {
-static void erd_cache_to_array(erd_cache_t* cache, tiny_erd_t* out, uint16_t* count)
-{
-  *count = 0;
-  uint16_t iterator = 0;
-  while (*count < ERD_CACHE_CAPACITY) {
-    erd_cache_entry_t* entry = erd_cache_get_next_entry(cache, &iterator);
-    if (!entry) break;
-    out[(*count)++] = entry->erd;
-  }
-}
 // ---------------------------------------------------------------------------
 // Polling bridge discovery-complete callback (shared by all three init paths)
 // ---------------------------------------------------------------------------
 
 void GeappliancesBridge::on_poll_discovery_complete_()
 {
-  tiny_erd_t erds[ERD_CACHE_CAPACITY];
-  uint16_t count = 0;
-  erd_cache_to_array(&this->erd_cache_, erds, &count);
   tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
 }
 
@@ -72,7 +59,7 @@ ErdPollListResult build_poll_list_(GeappliancesBridge* bridge)
   config.subscription_capable = !bridge->autodiscovery_manager_.is_gea2_protocol();
   {
     subscription_state_t sub_state = bridge->get_subscription_state();
-    config.subscription_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
+    config.subscription_active = subscription_is_active(sub_state);
   }
   config.appliance_api_parsing = bridge->appliance_api_parsing_;
   config.feature_bit_valid_erds = bridge->feature_bit_manager_.get_valid_erd_count() ? bridge->feature_bit_manager_.valid_erds_ : nullptr;
@@ -329,13 +316,6 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
   }
 
   subscription_state_t sub_state = this->get_subscription_state();
-  // Custom polling only when subscription mode is active and not failed.
-  if (sub_state == subscription_state_none) {
-    return;
-  }
-  if (sub_state == subscription_state_failed) {
-    return;
-  }
   // Wait for the subscription bridge to reach steady state before starting
   // custom ERD polling. This gives the subscription bridge time to publish
   // its ERDs, so we can avoid redundant polling of ERDs already covered
@@ -390,6 +370,7 @@ void GeappliancesBridge::handle_subscription_failed()
   erd_bridge_subscribe_destroy(&this->erd_bridge_subscribe_);
   this->subscription_bridge_initialized_ = false;
   this->last_logged_poll_state_ = polling_state_none;
+  this->last_logged_subscribe_state_ = subscription_state_none;
 
   // Destroy any existing polling bridge (e.g., from custom ERD polling)
   // before re-initializing to avoid leaking heap allocations.

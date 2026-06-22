@@ -392,7 +392,6 @@ void GeappliancesBridge::log_poll_state_transitions_()
   }
 
   subscription_state_t sub_state = this->get_subscription_state();
-  bool sub_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
 
   // Log polling bridge state changes.  The polling bridge is always active
   // when erd_bridge_initialized_ is true (either as the primary bridge in
@@ -488,8 +487,7 @@ void GeappliancesBridge::dump_config() {
     mode_str = "Subscription";
   } else if (this->mode_ == BRIDGE_MODE_AUTO) {
     subscription_state_t sub_state = this->get_subscription_state();
-    bool sub_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
-    if (sub_active) {
+    if (subscription_is_active(sub_state)) {
       mode_str = "Auto (Subscription)";
     } else {
       mode_str = "Auto (Polling - fallback)";
@@ -498,11 +496,12 @@ void GeappliancesBridge::dump_config() {
   (void)mode_str;
   ESP_LOGCONFIG(TAG, "  Mode: %s", mode_str);
 
-  subscription_state_t sub_state = this->get_subscription_state();
-  bool sub_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
-  if (this->mode_ == BRIDGE_MODE_POLL || !sub_active) {
-    ESP_LOGCONFIG(TAG, "  Polling Interval: %u ms", this->polling_interval_ms_);
-    ESP_LOGCONFIG(TAG, "  Only Publish On Change: %s", this->polling_only_publish_on_change_ ? "yes" : "no");
+  {
+    subscription_state_t sub_state = this->get_subscription_state();
+    if (this->mode_ == BRIDGE_MODE_POLL || !subscription_is_active(sub_state)) {
+      ESP_LOGCONFIG(TAG, "  Polling Interval: %u ms", this->polling_interval_ms_);
+      ESP_LOGCONFIG(TAG, "  Only Publish On Change: %s", this->polling_only_publish_on_change_ ? "yes" : "no");
+    }
   }
   ESP_LOGCONFIG(TAG, "  Appliance API Parsing: %s", this->appliance_api_parsing_ ? "enabled" : "disabled");
   if (this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE) {

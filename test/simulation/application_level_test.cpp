@@ -186,8 +186,7 @@ TEST(application_level, should_enter_polling_with_empty_probe_list)
   initialize_erd_bridge_polling_mode();
 
   mock().enable();
-  CHECK(erd_bridge_poll.current_state_name != nullptr);
-  CHECK(strcmp(erd_bridge_poll.current_state_name, "polling") == 0);
+  CHECK(erd_bridge_poll.current_state == polling_state_polling);
 }
 
 /*!
@@ -220,8 +219,7 @@ TEST(application_level, should_poll_erds_periodically_in_polling_mode)
 
   // Bridge should be in the probe_list state initially.
   mock().enable();
-  CHECK(erd_bridge_poll.current_state_name != nullptr);
-  CHECK(strcmp(erd_bridge_poll.current_state_name, "polling") == 0);
+  CHECK(erd_bridge_poll.current_state == polling_state_polling);
 }
 
 

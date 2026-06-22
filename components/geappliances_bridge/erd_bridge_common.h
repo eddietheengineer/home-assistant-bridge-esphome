@@ -77,6 +77,11 @@ static inline const char* subscription_state_name(subscription_state_t state)
   }
 }
 
+static inline bool subscription_is_active(subscription_state_t state)
+{
+  return (state != subscription_state_none) && (state != subscription_state_failed);
+}
+
 // ============================================================================
 // Shared signal identifiers
 // ============================================================================
