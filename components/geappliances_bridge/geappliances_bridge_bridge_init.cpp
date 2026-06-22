@@ -25,6 +25,7 @@
  * the timeout window.
  */
 
+#include <cstring>
 #include "geappliances_bridge.h"
 #include "appliance_api_feature_lists.h"
 #include "geappliances_bridge_constants.h"
@@ -34,7 +35,6 @@
 #include "erd_poll_list_builder.h"
 #include "erd_cache.h"
 #include "erd_bridge_common.h"
-#include <cstring>
 
 namespace esphome {
 namespace geappliances_bridge {
@@ -71,8 +71,8 @@ ErdPollListResult build_poll_list_(GeappliancesBridge* bridge)
   config.mode = bridge->mode_;
   config.subscription_capable = !bridge->autodiscovery_manager_.is_gea2_protocol();
   {
-    const char* sub_state = bridge->get_subscription_state();
-    config.subscription_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+    subscription_state_t sub_state = bridge->get_subscription_state();
+    config.subscription_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
   }
   config.appliance_api_parsing = bridge->appliance_api_parsing_;
   config.feature_bit_valid_erds = bridge->feature_bit_manager_.get_valid_erd_count() ? bridge->feature_bit_manager_.valid_erds_ : nullptr;
@@ -329,12 +329,12 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
     return;
   }
 
-  const char* sub_state = this->get_subscription_state();
+  subscription_state_t sub_state = this->get_subscription_state();
   // Custom polling only when subscription mode is active and not failed.
-  if (sub_state == nullptr) {
+  if (sub_state == subscription_state_none) {
     return;
   }
-  if (strcmp(sub_state, "failed") == 0) {
+  if (sub_state == subscription_state_failed) {
     return;
   }
   // In AUTO mode, subscription must be confirmed before custom polling.
@@ -345,7 +345,7 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
   // custom ERD polling. This gives the subscription bridge time to publish
   // its ERDs, so we can avoid redundant polling of ERDs already covered
   // by subscription.
-  if (strcmp(sub_state, "steady") != 0) {
+  if (sub_state != subscription_state_steady) {
     return;
   }
 

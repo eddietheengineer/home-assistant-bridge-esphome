@@ -11,9 +11,9 @@
  * custom 'new' macro which breaks placement-new in standard library headers.
  */
 
+#include "erd_bridge_common.h"
 #include "geappliances_bridge_startup_hsm.h"
 #include "i_bridge_services.h"
-
 #include "CppUTest/TestHarness.h"
 #include "CppUTestExt/MockSupport.h"
 
@@ -84,9 +84,10 @@ class MockBridgeServices : public IBridgeServices {
       mock().actualCall("get_mode").onObject(this)
         .returnIntValueOrDefault(BRIDGE_MODE_AUTO));
   }
-  const char* get_subscription_state() const override {
-    return mock().actualCall("get_subscription_state").onObject(this)
-               .returnStringValueOrDefault(nullptr);
+  subscription_state_t get_subscription_state() const override {
+    return static_cast<subscription_state_t>(
+      mock().actualCall("get_subscription_state").onObject(this)
+        .returnIntValueOrDefault(subscription_state_none));
   }
 
   // -- Startup delay ----------------------------------------------------------
@@ -288,7 +289,7 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   mock().expectOneCall("get_mode").onObject(&svc).andReturnValue(BRIDGE_MODE_POLL);
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
   /* Phase 7: running run_loop */
-  mock().expectOneCall("get_subscription_state").onObject(&svc).andReturnValue(static_cast<const char*>(nullptr));
+  mock().expectOneCall("get_subscription_state").onObject(&svc).andReturnValue(static_cast<subscription_state_t>(subscription_state_none));
   mock().expectOneCall("get_mode").onObject(&svc).andReturnValue(BRIDGE_MODE_POLL);
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
   /* Drive the HSM through all phases. */

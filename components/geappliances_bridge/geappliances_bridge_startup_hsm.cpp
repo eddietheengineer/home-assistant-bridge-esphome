@@ -12,7 +12,7 @@
  */
 
 #include "i_bridge_services.h"
-#include <cstring>
+#include "erd_bridge_common.h"
 #include "geappliances_bridge_constants.h"
 #include "geappliances_bridge_startup_hsm.h"
 #include "esphome/core/log.h"
@@ -373,8 +373,8 @@ tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_sig
 
     case signal_run_loop:
       {
-        const char* sub_state = svc->get_subscription_state();
-        bool sub_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+        subscription_state_t sub_state = svc->get_subscription_state();
+        bool sub_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
         if (svc->get_mode() == BRIDGE_MODE_AUTO && sub_active) {
           svc->check_subscription_activity();
         }
@@ -421,8 +421,8 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
     case signal_run_loop:
       svc->run_all_managers();
       {
-        const char* sub_state = svc->get_subscription_state();
-        bool sub_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+        subscription_state_t sub_state = svc->get_subscription_state();
+        bool sub_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
         if (svc->get_mode() == BRIDGE_MODE_AUTO && sub_active) {
           svc->check_subscription_activity();
         }

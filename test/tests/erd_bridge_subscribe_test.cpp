@@ -535,5 +535,5 @@ TEST(erd_bridge_subscribe, transitions_to_failed_after_three_consecutive_subscri
   when_a_subscribe_failure_is_received_for(0xC0);
   when_a_subscribe_failure_is_received_for(0xC0);
 
-  CHECK(strcmp(self.current_state_name, "failed") == 0);
+  CHECK(self.current_state == subscription_state_failed);
 }

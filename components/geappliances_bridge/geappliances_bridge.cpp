@@ -4,7 +4,6 @@
 #include "esphome/core/hal.h"
 #include "esphome_time_source.h"
 #include "erd_cache.h"
-#include <cstring>
 
 #ifdef USE_ESP32
 #include "esp_system.h"
@@ -392,8 +391,8 @@ void GeappliancesBridge::log_poll_state_transitions_()
     return;
   }
 
-  const char* sub_state = this->get_subscription_state();
-  bool sub_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+  subscription_state_t sub_state = this->get_subscription_state();
+  bool sub_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
 
   // Log polling bridge state changes.
   bool is_poll_mode = !((this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
@@ -411,9 +410,9 @@ void GeappliancesBridge::log_poll_state_transitions_()
   bool is_sub_mode = (this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
                      (this->mode_ == BRIDGE_MODE_AUTO && sub_active);
   if (is_sub_mode) {
-    if (sub_state != nullptr && sub_state != this->last_logged_subscribe_state_) {
+    if (sub_state != subscription_state_none && sub_state != this->last_logged_subscribe_state_) {
       ESP_LOGI(TAG, "Subscription bridge state: %s (ERDs cached: %u)",
-               sub_state, erd_cache_get_count(&this->erd_cache_));
+               subscription_state_name(sub_state), erd_cache_get_count(&this->erd_cache_));
       this->last_logged_subscribe_state_ = sub_state;
     }
   }
@@ -424,8 +423,8 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
   if (this->erd_bridge_initialized_ &&
       args->address == this->autodiscovery_manager_.get_host_address() &&
       args->type == tiny_gea3_erd_client_activity_type_subscription_publication_received) {
-    const char* sub_state = this->get_subscription_state();
-    bool sub_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+    subscription_state_t sub_state = this->get_subscription_state();
+    bool sub_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
     if (this->mode_ == BRIDGE_MODE_AUTO && sub_active &&
         !this->subscription_activity_detected_) {
       ESP_LOGI(TAG, "Subscription activity detected - subscription mode is working");
@@ -497,8 +496,8 @@ void GeappliancesBridge::dump_config() {
   } else if (this->mode_ == BRIDGE_MODE_SUBSCRIBE) {
     mode_str = "Subscription";
   } else if (this->mode_ == BRIDGE_MODE_AUTO) {
-    const char* sub_state = this->get_subscription_state();
-    bool sub_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+    subscription_state_t sub_state = this->get_subscription_state();
+    bool sub_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
     if (sub_active) {
       mode_str = "Auto (Subscription)";
     } else {
@@ -508,8 +507,8 @@ void GeappliancesBridge::dump_config() {
   (void)mode_str;
   ESP_LOGCONFIG(TAG, "  Mode: %s", mode_str);
 
-  const char* sub_state = this->get_subscription_state();
-  bool sub_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+  subscription_state_t sub_state = this->get_subscription_state();
+  bool sub_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
   if (this->mode_ == BRIDGE_MODE_POLL || !sub_active) {
     ESP_LOGCONFIG(TAG, "  Polling Interval: %u ms", this->polling_interval_ms_);
     ESP_LOGCONFIG(TAG, "  Only Publish On Change: %s", this->polling_only_publish_on_change_ ? "yes" : "no");
@@ -675,9 +674,9 @@ BridgeMode GeappliancesBridge::get_mode() const
   return mode_;
 }
 
-const char* GeappliancesBridge::get_subscription_state() const
+subscription_state_t GeappliancesBridge::get_subscription_state() const
 {
-  return this->erd_bridge_subscribe_.current_state_name;
+  return this->erd_bridge_subscribe_.current_state;
 }
 
 // -- Recurring tasks ----------------------------------------------------------

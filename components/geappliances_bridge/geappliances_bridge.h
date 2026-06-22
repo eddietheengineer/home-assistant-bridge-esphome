@@ -118,7 +118,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void initialize_erd_bridge() override;
 
   BridgeMode get_mode() const override;
-  const char* get_subscription_state() const override;
+  subscription_state_t get_subscription_state() const override;
   void check_subscription_activity() override;
   void maybe_start_custom_erd_polling() override;
   void log_poll_state_transitions() override;
@@ -199,7 +199,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // The FeatureBitManager owns the valid ERD list and ready flag; use its getters directly.
 
   const char* last_logged_poll_state_{nullptr};
-  const char* last_logged_subscribe_state_{nullptr};
+  subscription_state_t last_logged_subscribe_state_{subscription_state_none};
 
   // ERD publish rate sensor: counts ERD updates per ~60s window and
   // publishes to Home Assistant.

@@ -231,10 +231,10 @@ TEST(geappliances_bridge, is_erd_cache_publisher_initialized_default_false)
   CHECK_FALSE(services->is_erd_cache_publisher_initialized());
 }
 
-TEST(geappliances_bridge, get_subscription_state_default_null)
+TEST(geappliances_bridge, get_subscription_state_default_none)
 {
   IBridgeServices* services = &bridge;
-  CHECK_EQUAL(nullptr, services->get_subscription_state());
+  CHECK_EQUAL(static_cast<int>(subscription_state_none), static_cast<int>(services->get_subscription_state()));
 }
 
 TEST(geappliances_bridge, get_discovered_host_address_default_zero)

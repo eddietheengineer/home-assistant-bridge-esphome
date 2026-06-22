@@ -25,6 +25,7 @@
 #include <cstdint>
 
 #include "bridge_mode.h"
+#include "erd_bridge_common.h"
 
 namespace esphome {
 namespace geappliances_bridge {
@@ -75,7 +76,7 @@ class IBridgeServices {
   // -- Operating mode --------------------------------------------------------
 
   virtual BridgeMode get_mode() const = 0;
-  virtual const char* get_subscription_state() const = 0;
+  virtual subscription_state_t get_subscription_state() const = 0;
 
   // -- Startup delay ---------------------------------------------------------
 

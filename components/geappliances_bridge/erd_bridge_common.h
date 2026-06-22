@@ -54,6 +54,30 @@ enum {
 };
 
 // ============================================================================
+// Subscription state machine states
+// ============================================================================
+
+typedef enum {
+  subscription_state_none,
+  subscription_state_subscribing,
+  subscription_state_subscribed,
+  subscription_state_steady,
+  subscription_state_failed
+} subscription_state_t;
+
+static inline const char* subscription_state_name(subscription_state_t state)
+{
+  switch(state) {
+    case subscription_state_none: return nullptr;
+    case subscription_state_subscribing: return "subscribing";
+    case subscription_state_subscribed: return "subscribed";
+    case subscription_state_steady: return "steady";
+    case subscription_state_failed: return "failed";
+    default: return "unknown";
+  }
+}
+
+// ============================================================================
 // Shared signal identifiers
 // ============================================================================
 enum {

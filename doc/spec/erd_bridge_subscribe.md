@@ -38,7 +38,7 @@ typedef struct {
   erd_cache_t* erd_cache;
   tiny_hsm_t hsm;
   uint8_t erd_host_address;
-  const char* current_state_name;
+  subscription_state_t current_state;
   uint8_t subscribe_failure_count;
 } erd_bridge_subscribe_t;
 ```
@@ -60,12 +60,12 @@ sub_state_top (parent — handles publication signals globally)
   │    └─ exit: disarm quiet timer only (retention timer persists)
   │
   ├─ state_steady
-  │    ├─ entry: stop quiet timer; current_state_name = "steady"
+  │    ├─ entry: stop quiet timer; current_state = subscription_state_steady
   │    ├─ subscription_host_came_online → state_subscribing
   │    └─ exit: no-op (retention timer persists)
   │
   └─ state_failed
-       ├─ entry: disarm all timers; current_state_name = "failed"
+       ├─ entry: disarm all timers; current_state = subscription_state_failed
        └─ exit: no-op
 ```
 
@@ -96,13 +96,13 @@ Handles signals globally across all child states:
 
 ### `state_subscribed`
 
-- On entry: arms a periodic retention timer at `subscription_retention_period` (30 s) and a one-shot quiet timer at `subscription_quiet_period` (2 s); sets `current_state_name` to `"subscribed"`
+- On entry: arms a periodic retention timer at `subscription_retention_period` (30 s) and a one-shot quiet timer at `subscription_quiet_period` (2 s); sets `current_state` to `subscription_state_subscribed`
 - On `signal_subscription_host_came_online`: transitions to `state_subscribing`
 - On exit: disarms the quiet timer only; the retention timer persists across transitions to `state_steady`
 
 ### `state_steady`
 
-- On entry: stops the quiet timer (belt-and-suspenders; it was already stopped on `state_subscribed` exit); sets `current_state_name` to `"steady"`
+- On entry: stops the quiet timer (belt-and-suspenders; it was already stopped on `state_subscribed` exit); sets `current_state` to `subscription_state_steady`
 - The retention timer continues firing every 30 s (it was not disarmed on the transition from `state_subscribed`)
 - On `signal_subscription_host_came_online`: transitions to `state_subscribing`
 - On a new ERD publication (handled by `sub_state_top`): transitions back to `state_subscribed`, restarting the quiet period
@@ -110,7 +110,7 @@ Handles signals globally across all child states:
 
 ### `state_failed`
 
-- On entry: disarms all timers (retention and quiet); sets `current_state_name` to `"failed"`
+- On entry: disarms all timers (retention and quiet); sets `current_state` to `subscription_state_failed`
 - Terminal state — no transitions out. The main bridge detects this state and falls back to polling.
 - On exit: no-op
 
@@ -146,7 +146,7 @@ The `erd_set_t` is a fixed-capacity sorted array (capacity 645). It tracks which
 - **Fixed-capacity ERD set**: Uses `erd_set_t` (sorted array) instead of `std::set` to eliminate heap node allocations.
 - **30-second retention**: The subscription is retained every 30 seconds (`subscription_retention_period`) to keep the appliance publishing ERD values.
 - **2-second quiet period**: After 2 seconds (`subscription_quiet_period`) with no new ERD registrations, the bridge transitions from `state_subscribed` to `state_steady`. This signals to the main bridge that the subscription has settled, allowing custom ERD polling to start.
-- **Failed state after 3 subscribe failures**: If `subscribe()` fails 3 times consecutively, the bridge transitions to `state_failed` and stops retrying. The main bridge detects this via `get_subscription_state()` returning `"failed"` and falls back to polling.
+- **Failed state after 3 subscribe failures**: If `subscribe()` fails 3 times consecutively, the bridge transitions to `state_failed` and stops retrying. The main bridge detects this via `get_subscription_state()` returning `subscription_state_failed` and falls back to polling.
 - **1-second resubscribe delay**: If `subscribe()` fails, the bridge waits 1 second (`resubscribe_delay`) before retrying.
 - **Retention timer persists across subscribed/steady**: The retention timer is not disarmed when transitioning between `state_subscribed` and `state_steady`, ensuring continuous 30-second retention without gaps.
 - **New ERD exits steady state**: When a new ERD is published while in `state_steady`, the bridge transitions back to `state_subscribed`, restarting the quiet period.

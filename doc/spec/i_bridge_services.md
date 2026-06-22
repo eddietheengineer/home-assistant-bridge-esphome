@@ -80,7 +80,7 @@ The startup HSM holds a pointer to `IBridgeServices` and calls methods through t
 ### 3.6 Operating Mode
 
 | `get_mode()` | Returns the current `BridgeMode` (POLL, SUBSCRIBE, or AUTO). |
-| `get_subscription_state()` | Returns the current subscription bridge state as a string: `"subscribing"`, `"subscribed"`, `"steady"`, `"failed"`, or `nullptr` (not initialized). Callers derive `is_subscription_mode_active` from this: active when the value is non-null and not `"failed"`. |
+| `get_subscription_state()` | Returns the current subscription bridge state as a `subscription_state_t` enum: `subscription_state_none`, `subscription_state_subscribing`, `subscription_state_subscribed`, `subscription_state_steady`, or `subscription_state_failed`. Callers derive `is_subscription_mode_active` from this: active when the value is not `subscription_state_none` and not `subscription_state_failed`. |
 
 ### 3.7 Startup Delay
 

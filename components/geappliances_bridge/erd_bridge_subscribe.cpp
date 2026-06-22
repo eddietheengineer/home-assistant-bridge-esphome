@@ -81,7 +81,7 @@ static tiny_hsm_result_t state_subscribing(tiny_hsm_t* hsm, tiny_hsm_signal_t si
       // Disarm the retention timer on entry to prevent spurious subscribe
       // retries. The timer is re-armed when transitioning to state_subscribed.
       disarm_timer(self);
-      self->current_state_name = "subscribing";
+      self->current_state = subscription_state_subscribing;
       /* Intentionally fall through to the subscribe case below. */
       __attribute__((fallthrough));
     case signal_subscription_failed:
@@ -139,7 +139,7 @@ static tiny_hsm_result_t state_subscribed(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
 
   switch(signal) {
     case tiny_hsm_signal_entry:
-      self->current_state_name = "subscribed";
+      self->current_state = subscription_state_subscribed;
       arm_periodic_timer(self, subscription_retention_period);
       arm_quiet_timer(self, subscription_quiet_period);
       break;
@@ -168,7 +168,7 @@ static tiny_hsm_result_t state_steady(tiny_hsm_t* hsm, tiny_hsm_signal_t signal,
 
   switch(signal) {
     case tiny_hsm_signal_entry:
-      self->current_state_name = "steady";
+      self->current_state = subscription_state_steady;
       // Stop the quiet timer — we're already steady, no need to re-enter.
       // Retention timer is already armed from state_subscribed and
       // was not disarmed on exit — no need to re-arm.
@@ -199,7 +199,7 @@ static tiny_hsm_result_t state_failed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal,
 
   switch(signal) {
     case tiny_hsm_signal_entry:
-      self->current_state_name = "failed";
+      self->current_state = subscription_state_failed;
       disarm_timer(self);
       tiny_timer_stop(self->timer_group, &self->quiet_timer);
       break;
@@ -237,7 +237,7 @@ void erd_bridge_subscribe_init(
   self->erd_client = erd_client;
   self->erd_host_address = address;
   self->erd_cache = cache;
-  self->current_state_name = nullptr;
+  self->current_state = subscription_state_none;
   self->subscribe_failure_count = 0;
   erd_set_init(&self->erd_set);
 
@@ -302,5 +302,5 @@ void erd_bridge_subscribe_destroy(erd_bridge_subscribe_t* self)
   }
 
   /* erd_set is a fixed array embedded in the struct — no heap cleanup needed. */
-  self->current_state_name = nullptr;
+  self->current_state = subscription_state_none;
 }
