@@ -33,6 +33,7 @@
 #include "tiny_gea_constants.h"
 #include "erd_poll_list_builder.h"
 #include "erd_cache.h"
+#include "erd_bridge_common.h"
 #include <cstring>
 
 namespace esphome {
@@ -240,6 +241,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
   // In polling mode (GEA2 or explicit poll), subscriptions are not used, but
   // the bridge is still initialized above for custom ERD subscription support.
   if (!use_polling) {
+
     erd_bridge_subscribe_init(
       &this->erd_bridge_subscribe_,
       &this->timer_group_,
@@ -336,11 +338,11 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
   if (!subscription_confirmed) {
     return;
   }
-  // Wait for the quiet window to elapse before starting custom ERD polling.
-  // This gives the subscription bridge time to publish its ERDs, so we can
-  // avoid redundant polling of ERDs already covered by subscription.
-
-  if (millis() - this->custom_erd_subscription_last_activity_ < SUBSCRIPTION_TIMEOUT_MS) {
+  // Wait for the subscription bridge to reach steady state before starting
+  // custom ERD polling. This gives the subscription bridge time to publish
+  // its ERDs, so we can avoid redundant polling of ERDs already covered
+  // by subscription.
+  if (!this->is_subscription_steady()) {
     return;
   }
 
@@ -359,12 +361,12 @@ void GeappliancesBridge::check_subscription_activity_()
 
   // Unsigned subtraction wraps correctly on the ~49-day millis() rollover.
   uint32_t elapsed = millis() - this->subscription_start_time_;
-  if (elapsed < SUBSCRIPTION_TIMEOUT_MS) {
+  if (elapsed < subscription_quiet_period) {
     return;
   }
 
   ESP_LOGW(TAG, "No subscription activity detected after %u seconds, falling back to polling mode",
-           SUBSCRIPTION_TIMEOUT_MS / 1000);
+           subscription_quiet_period / 1000);
 
   // Tear down the subscription bridge.
   erd_bridge_subscribe_destroy(&this->erd_bridge_subscribe_);

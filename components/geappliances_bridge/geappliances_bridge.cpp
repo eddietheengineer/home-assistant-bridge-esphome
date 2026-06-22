@@ -391,16 +391,29 @@ void GeappliancesBridge::log_poll_state_transitions_()
   if (!this->erd_bridge_initialized_) {
     return;
   }
+
+  // Log polling bridge state changes.
   bool is_poll_mode = !((this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
                         (this->mode_ == BRIDGE_MODE_AUTO && this->subscription_mode_active_));
-  if (!is_poll_mode) {
-    return;
+  if (is_poll_mode) {
+    const char* new_state = this->erd_bridge_poll_.current_state_name;
+    if (new_state != nullptr && new_state != this->last_logged_poll_state_) {
+      ESP_LOGI(TAG, "Polling bridge state: %s (ERDs cached: %u)",
+               new_state, erd_cache_get_count(&this->erd_cache_));
+      this->last_logged_poll_state_ = new_state;
+    }
   }
-  const char* new_state = this->erd_bridge_poll_.current_state_name;
-  if (new_state != nullptr && new_state != this->last_logged_poll_state_) {
-    ESP_LOGD(TAG, "Polling bridge state: %s (ERDs cached: %u)",
-             new_state, erd_cache_get_count(&this->erd_cache_));
-    this->last_logged_poll_state_ = new_state;
+
+  // Log subscription bridge state changes.
+  bool is_sub_mode = (this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
+                     (this->mode_ == BRIDGE_MODE_AUTO && this->subscription_mode_active_);
+  if (is_sub_mode) {
+    const char* new_state = this->erd_bridge_subscribe_.current_state_name;
+    if (new_state != nullptr && new_state != this->last_logged_subscribe_state_) {
+      ESP_LOGI(TAG, "Subscription bridge state: %s (ERDs cached: %u)",
+               new_state, erd_cache_get_count(&this->erd_cache_));
+      this->last_logged_subscribe_state_ = new_state;
+    }
   }
 }
 
@@ -414,9 +427,9 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
       ESP_LOGI(TAG, "Subscription activity detected - subscription mode is working");
       this->subscription_activity_detected_ = true;
     }
-    if (erd_set_insert(&this->custom_erd_subscription_seen_erds_, args->subscription_publication_received.erd)) {
-      this->custom_erd_subscription_last_activity_ = millis();
-    }
+    // Track seen ERDs for the custom ERD polling bridge to filter out
+    // ERDs already covered by subscription.
+    erd_set_insert(&this->custom_erd_subscription_seen_erds_, args->subscription_publication_received.erd);
   }
 
   // Device ID reads (after discovery, before bridge init)
@@ -657,6 +670,12 @@ BridgeMode GeappliancesBridge::get_mode() const
 bool GeappliancesBridge::is_subscription_mode_active() const
 {
   return subscription_mode_active_;
+}
+
+bool GeappliancesBridge::is_subscription_steady() const
+{
+  return this->erd_bridge_subscribe_.current_state_name != nullptr &&
+         strcmp(this->erd_bridge_subscribe_.current_state_name, "steady") == 0;
 }
 
 // -- Recurring tasks ----------------------------------------------------------

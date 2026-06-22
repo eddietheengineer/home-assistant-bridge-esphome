@@ -48,6 +48,7 @@ extern "C" {
 enum {
   resubscribe_delay = 1000,
   subscription_retention_period = 30 * 1000,
+  subscription_quiet_period = 10 * 1000,
   retry_delay = 100,
   appliance_lost_timeout = 60000
 };
@@ -63,6 +64,7 @@ enum {
   signal_subscription_added_or_retained,
   signal_subscription_host_came_online,
   signal_subscription_publication_received,
+  signal_quiet_period_expired,
   signal_read_failed,
   signal_read_completed,
   signal_appliance_lost

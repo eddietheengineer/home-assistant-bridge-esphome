@@ -85,6 +85,10 @@ class MockBridgeServices : public IBridgeServices {
         .returnIntValueOrDefault(BRIDGE_MODE_AUTO));
   }
   bool is_subscription_mode_active() const override { return true; }
+  bool is_subscription_steady() const override {
+    return mock().actualCall("is_subscription_steady").onObject(this)
+               .returnBoolValueOrDefault(false);
+  }
 
   // -- Startup delay ----------------------------------------------------------
   void record_startup_delay_start() override {
