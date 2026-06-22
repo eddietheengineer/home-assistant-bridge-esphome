@@ -316,7 +316,7 @@ TEST(erd_cache_mqtt_publisher, on_disconnected_then_connected_toggles_flag)
 /* ------------------------------------------------------------------ */
 /* Event-driven disconnect/reconnect                                    */
 /* ------------------------------------------------------------------ */
-TEST(erd_cache_mqtt_publisher, disconnect_event_triggers_callback)
+TEST(erd_cache_mqtt_publisher, disconnect_event_is_noop_when_already_disconnected)
 {
   erd_cache_mqtt_publisher_init(
     &publisher,
