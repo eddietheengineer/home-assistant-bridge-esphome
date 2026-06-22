@@ -20,9 +20,8 @@
  * (built from feature bit results), selects the operating mode
  * (poll / subscribe / auto), and initializes the appropriate bridge HSMs.
  *
- * check_subscription_activity_() runs every loop() iteration in AUTO mode
- * and falls back to polling if no subscription publications arrive within
- * the timeout window.
+ * handle_subscription_failed() / handle_polling_failed() are called from the
+ * startup HSM to handle bridge failures and trigger fallback to polling.
  */
 
 #include <cstring>

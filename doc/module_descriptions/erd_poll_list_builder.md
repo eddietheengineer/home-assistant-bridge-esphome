@@ -41,7 +41,7 @@ The returned list is deduplicated. Order is: standard ERDs first (in their origi
 Called by `build_poll_list_()` in `geappliances_bridge_bridge_init.cpp` during:
 - **Polling mode initialization** (`initialize_erd_bridge_()`): builds the full probe list before `erd_bridge_poll_init()`.
 - **Custom ERD polling** (`start_custom_erd_polling_()`): builds a custom-only probe list after the subscription quiet window elapses.
-- **AUTO mode fallback** (`check_subscription_activity_()`): builds the poll-mode probe list after subscription timeout.
+- **AUTO mode fallback** (`handle_subscription_failed()`): builds the poll-mode probe list after subscription enters the failed state.
 
 The result's `erds` vector is stored in `GeappliancesBridge::poll_probe_list_` so the pointer remains valid across the probe phase.
 

@@ -206,6 +206,7 @@ static tiny_hsm_result_t state_failed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal,
     case tiny_hsm_signal_entry:
       self->current_state = subscription_state_failed;
       disarm_timer(self);
+      tiny_timer_stop(self->timer_group, &self->quiet_timer);
       ESP_LOGI(TAG, "Subscription not supported by appliance, falling back to polling");
       break;
 

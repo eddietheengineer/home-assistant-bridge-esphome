@@ -65,7 +65,8 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `initialize_erd_bridge_()` | Initialize subscription or polling bridge based on mode |
 | `run_protocol_stack_()` | Drive GEA2/GEA3 hardware (includes GEA2 tight loop) |
 | `start_feature_bit_reading_()` | Start the feature bit read sequence |
-| `check_subscription_activity_()` | Check if subscription mode is receiving data (AUTO mode fallback) |
+| `handle_subscription_failed()` | Handle subscription bridge failure; trigger polling fallback in AUTO mode |
+| `handle_polling_failed()` | Handle polling bridge failure; clean up or recover |
 | `start_custom_erd_polling_()` | Initialize polling for user-configured custom ERDs |
 | `maybe_start_custom_erd_polling_()` | Guarded entry point for custom ERD polling (prevents re-initialization) |
 | `log_poll_state_transitions_()` | Debug: log polling HSM state changes |
