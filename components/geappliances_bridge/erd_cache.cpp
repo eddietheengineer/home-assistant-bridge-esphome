@@ -181,7 +181,7 @@ void erd_cache_set_only_publish_onchange(erd_cache_t* self, bool only_publish_on
   self->only_publish_onchange = only_publish_onchange;
 }
 
-void erd_cache_set_update_fastest_rate(erd_cache_t* self, uint8_t rate)
+void erd_cache_set_throttle_rate_sec(erd_cache_t* self, uint8_t rate)
 {
   self->max_cooldown = rate;
 }

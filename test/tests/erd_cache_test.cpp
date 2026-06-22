@@ -463,7 +463,7 @@ TEST(erd_cache, rate_limit_disabled_allows_immediate_publish)
 TEST(erd_cache, rate_limit_first_entry_publishes_immediately)
 {
   /* New entries always publish immediately, even with rate limiting enabled. */
-  erd_cache_set_update_fastest_rate(&cache, 5);
+  erd_cache_set_throttle_rate_sec(&cache, 5);
   uint8_t data[] = { 0x01 };
   erd_cache_update(&cache, 0x0001, data, 1);
 
@@ -482,7 +482,7 @@ TEST(erd_cache, rate_limit_first_entry_publishes_immediately)
 
 TEST(erd_cache, rate_limit_blocks_republish_until_cooldown_expires)
 {
-  erd_cache_set_update_fastest_rate(&cache, 5);
+  erd_cache_set_throttle_rate_sec(&cache, 5);
   uint8_t data[] = { 0x01 };
   erd_cache_update(&cache, 0x0001, data, 1);
 
@@ -525,7 +525,7 @@ TEST(erd_cache, rate_limit_blocks_republish_until_cooldown_expires)
 
 TEST(erd_cache, rate_limit_reload_after_publish)
 {
-  erd_cache_set_update_fastest_rate(&cache, 3);
+  erd_cache_set_throttle_rate_sec(&cache, 3);
   uint8_t data[] = { 0x01 };
   erd_cache_update(&cache, 0x0001, data, 1);
 
@@ -542,7 +542,7 @@ TEST(erd_cache, rate_limit_reload_after_publish)
 
 TEST(erd_cache, rate_limit_tick_only_decrements_when_update_required)
 {
-  erd_cache_set_update_fastest_rate(&cache, 5);
+  erd_cache_set_throttle_rate_sec(&cache, 5);
   uint8_t data[] = { 0x01 };
   erd_cache_update(&cache, 0x0001, data, 1);
 
@@ -561,7 +561,7 @@ TEST(erd_cache, rate_limit_tick_only_decrements_when_update_required)
 
 TEST(erd_cache, rate_limit_multiple_erds_independent)
 {
-  erd_cache_set_update_fastest_rate(&cache, 3);
+  erd_cache_set_throttle_rate_sec(&cache, 3);
   uint8_t data1[] = { 0x01 };
   uint8_t data2[] = { 0x02 };
   erd_cache_update(&cache, 0x0001, data1, 1);
@@ -603,7 +603,7 @@ TEST(erd_cache, rate_limit_multiple_erds_independent)
 
 TEST(erd_cache, rate_limit_disabled_via_zero)
 {
-  erd_cache_set_update_fastest_rate(&cache, 0);
+  erd_cache_set_throttle_rate_sec(&cache, 0);
   uint8_t data[] = { 0x01 };
   erd_cache_update(&cache, 0x0001, data, 1);
 
@@ -628,7 +628,7 @@ TEST(erd_cache, rate_limit_disabled_via_zero)
 
 TEST(erd_cache, rate_limit_tick_noop_when_disabled)
 {
-  erd_cache_set_update_fastest_rate(&cache, 0);
+  erd_cache_set_throttle_rate_sec(&cache, 0);
   uint8_t data[] = { 0x01 };
   erd_cache_update(&cache, 0x0001, data, 1);
 
@@ -648,7 +648,7 @@ TEST(erd_cache, rate_limit_tick_noop_when_disabled)
 /* Rate limiting + only_publish_onchange: unchanged data does not reset cooldown */
 TEST(erd_cache, rate_limit_with_only_publish_onchange_unchanged_data)
 {
-  erd_cache_set_update_fastest_rate(&cache, 5);
+  erd_cache_set_throttle_rate_sec(&cache, 5);
   erd_cache_set_only_publish_onchange(&cache, true);
   uint8_t data[] = { 0x01 };
   erd_cache_update(&cache, 0x0001, data, 1);

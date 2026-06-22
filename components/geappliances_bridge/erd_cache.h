@@ -65,7 +65,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
 void erd_cache_set_only_publish_onchange(erd_cache_t* self, bool only_publish_onchange);
 /* Set the minimum interval (in seconds) between publishes for any ERD.
  * 0 = disabled (publish on every update). Range: 0–255. */
-void erd_cache_set_update_fastest_rate(erd_cache_t* self, uint8_t rate);
+void erd_cache_set_throttle_rate_sec(erd_cache_t* self, uint8_t rate);
 
 /* Mark an ERD entry as successfully published to MQTT.
  * Reloads the publish_cooldown timer. Call after mqtt_client_publish_raw() succeeds.

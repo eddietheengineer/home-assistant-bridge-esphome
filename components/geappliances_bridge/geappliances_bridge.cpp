@@ -190,7 +190,7 @@ void GeappliancesBridge::loop() {
    * Uses a member variable (not static) so it resets on re-init and
    * avoids the first-tick race on cold start. Unsigned subtraction
    * handles millis() wrap correctly. */
-  if (this->update_fastest_rate_ > 0) {
+  if (this->throttle_rate_sec_ > 0) {
     uint32_t now = esphome::millis();
     if (now - this->last_cooldown_tick_ >= 1000) {
       this->last_cooldown_tick_ = now;
@@ -735,7 +735,7 @@ void GeappliancesBridge::init_erd_cache_publisher_()
   /* Apply rate limit configuration before starting the publisher.
    * On ESP-IDF the background task starts immediately in init() and
    * could drain cache entries before the rate limit takes effect. */
-  erd_cache_set_update_fastest_rate(&this->erd_cache_, this->update_fastest_rate_);
+  erd_cache_set_throttle_rate_sec(&this->erd_cache_, this->throttle_rate_sec_);
 
   erd_cache_mqtt_publisher_init(
     &this->erd_cache_publisher_,
