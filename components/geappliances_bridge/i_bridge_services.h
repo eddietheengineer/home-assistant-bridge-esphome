@@ -44,6 +44,8 @@ class IBridgeServices {
   virtual uint8_t get_discovered_host_address() const = 0;
   /// True if the discovered appliance uses the GEA2 protocol.
   virtual bool is_discovered_gea2_protocol() const = 0;
+  /// Returns true if the autodiscovery phase has timed out (no appliance found).
+  virtual bool is_autodiscovery_timed_out() const = 0;
 
   // -- Device ID -------------------------------------------------------------
 

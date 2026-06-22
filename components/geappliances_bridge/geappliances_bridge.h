@@ -70,6 +70,7 @@ namespace geappliances_bridge {
 
 class GeappliancesBridge : public Component, public IBridgeServices {
   friend ErdPollListResult build_poll_list_(GeappliancesBridge* bridge);
+  friend tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t*);
 
  public:
   static constexpr unsigned long baud = 230400;
@@ -101,6 +102,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool is_autodiscovery_complete() const override;
   uint8_t get_discovered_host_address() const override;
   bool is_discovered_gea2_protocol() const override;
+  bool is_autodiscovery_timed_out() const override;
 
   void init_device_id_reading() override;
   bool is_device_id_complete() const override;
@@ -144,7 +146,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   //   protocol_stack → autodiscovery → device_id → mqtt_client_init
   //                 → feature_bits → bridge_init → subscription_watch
   //                 → running
-  tiny_hsm_t startup_hsm_;
+  startup_hsm_wrapper_t startup_hsm_wrapper_;
 
   uart::UARTComponent *uart_{nullptr};
   uart::UARTComponent *gea2_uart_{nullptr};
@@ -262,6 +264,10 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // timer) so the 1 ms interrupt never fires in the GEA3 single-pass path and
   // cannot starve the GEA3/polling-bridge timers in the shared timer_group_.
   tiny_event_t gea2_msec_interrupt_;
+  // GEA2 time tracking — moved from file-scope statics to class members
+  // so they reset on re-init (deep sleep wake, ESPHome reconfiguration).
+  tiny_time_source_ticks_t gea2_tick_count_{0};
+  uint32_t gea2_last_ms_{0};
 
   // Adapter that wraps the GEA2 ERD client as a GEA3 ERD client interface
   gea2_erd_client_adapter_t gea2_erd_client_adapter_;

@@ -157,23 +157,29 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
     unsigned erd = 0;
     sscanf(erd_str, "%x", &erd);
 
-    // Decode hex payload to raw bytes. Each pair of hex chars = one byte.
+    // Decode hex payload to a local stack buffer to avoid race condition:
+    // if a new MQTT message arrives before tiny_event_publish() delivers
+    // this one, the shared write_payload_buffer_ would be overwritten.
+    uint8_t local_buffer[32];
     size_t decoded = 0;
-    for (size_t i = 0; i + 1 < payload.size() && decoded < sizeof(self->write_payload_buffer_); i += 2) {
+    for (size_t i = 0; i + 1 < payload.size() && decoded < sizeof(local_buffer); i += 2) {
       unsigned byte = 0;
       if (sscanf(&payload[i], "%2x", &byte) == 1) {
-        self->write_payload_buffer_[decoded++] = static_cast<uint8_t>(byte);
+        local_buffer[decoded++] = static_cast<uint8_t>(byte);
       } else {
         break;
       }
     }
-    self->write_payload_size_ = static_cast<uint8_t>(decoded);
+    uint8_t local_size = static_cast<uint8_t>(decoded);
 
     mqtt_client_on_write_request_args_t args;
     args.erd = static_cast<tiny_erd_t>(erd);
-    args.size = self->write_payload_size_;
-    args.value = self->write_payload_buffer_;
+    args.size = local_size;
+    args.value = local_buffer;
 
+    // tiny_event_publish() is synchronous (subscriber callback runs to
+    // completion before return), so the stack buffer is valid for the
+    // duration of the event delivery.
     tiny_event_publish(&self->on_write_request_event, &args);
   }, 0);
 }

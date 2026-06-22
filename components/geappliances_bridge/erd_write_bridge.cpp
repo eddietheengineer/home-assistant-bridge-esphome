@@ -16,8 +16,14 @@
 enum {
   signal_write_requested = tiny_hsm_signal_user_start,
   signal_write_completed,
-  signal_write_failed
+  signal_write_failed,
+  signal_write_timeout
 };
+
+// Maximum time to wait for a write to complete before giving up.
+// GEA client has request_retries=10 with request_timeout=250ms (2.5s max),
+// so 5s gives generous margin for the full retry cycle plus network latency.
+static const uint32_t WRITE_TIMEOUT_MS = 5000;
 
 static const char* const TAG __attribute__((unused)) = "erd_write_bridge";
 
@@ -78,6 +84,23 @@ static tiny_hsm_result_t state_writing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
   erd_write_bridge_t* self = container_of(erd_write_bridge_t, hsm, hsm);
 
   switch(signal) {
+    case tiny_hsm_signal_entry:
+      // Arm timeout timer to prevent permanent stuck state
+      tiny_timer_start(self->timer_group,
+                       &self->write_timeout_timer,
+                       WRITE_TIMEOUT_MS,
+                       self,
+                       [](void* ctx) {
+                         auto self = reinterpret_cast<erd_write_bridge_t*>(ctx);
+                         tiny_hsm_send_signal(&self->hsm, signal_write_timeout, nullptr);
+                       });
+      break;
+
+    case tiny_hsm_signal_exit:
+      // Disarm timeout on any exit (completion, failure, or timeout)
+      tiny_timer_stop(self->timer_group, &self->write_timeout_timer);
+      break;
+
     case signal_write_requested: {
       // Write already in progress — drop with warning.
       [[maybe_unused]] auto args = reinterpret_cast<const mqtt_client_on_write_request_args_t*>(data);
@@ -107,6 +130,15 @@ static tiny_hsm_result_t state_writing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         args->write_failed.reason);
       tiny_hsm_transition(hsm, state_ready);
     } break;
+
+    case signal_write_timeout: {
+      ESP_LOGW(TAG, "Write for ERD 0x%04x timed out after %u ms",
+        self->pending_erd, static_cast<unsigned>(WRITE_TIMEOUT_MS));
+      mqtt_client_update_erd_write_result(self->mqtt_client, self->pending_erd, false,
+        tiny_gea3_erd_client_write_failure_reason_retries_exhausted);
+      tiny_hsm_transition(hsm, state_ready);
+    } break;
+
     default:
       return tiny_hsm_result_signal_deferred;
   }

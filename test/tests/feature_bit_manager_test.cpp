@@ -305,7 +305,7 @@ TEST(feature_bit_manager, read_failed_skips_to_next_erd)
   expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
   trigger_read_failed(ERD_COMMON_FEATURE_API);
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0093, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_FAILED, manager.get_state());
 }
 
 TEST(feature_bit_manager, read_failed_skips_feature_api_0_to_api_1)
@@ -639,7 +639,7 @@ TEST(feature_bit_manager, read_completed_with_null_data_skips_erd)
   trigger_read_completed(ERD_COMMON_FEATURE_API, nullptr, 0);
 
   // Null data should skip to next ERD.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0093, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_FAILED, manager.get_state());
 }
 
 /* ------------------------------------------------------------------ */

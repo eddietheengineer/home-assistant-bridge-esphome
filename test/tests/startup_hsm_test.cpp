@@ -41,6 +41,10 @@ class MockBridgeServices : public IBridgeServices {
     return mock().actualCall("is_discovered_gea2_protocol").onObject(this)
                .returnBoolValueOrDefault(false);
   }
+  bool is_autodiscovery_timed_out() const override {
+    return mock().actualCall("is_autodiscovery_timed_out").onObject(this)
+               .returnBoolValueOrDefault(false);
+  }
 
   // -- Device ID --------------------------------------------------------------
   void init_device_id_reading() override {
@@ -125,26 +129,21 @@ class MockBridgeServices : public IBridgeServices {
   void run_all_managers() override {}
 };
 
-// =============================================================================
-// Test group
-// =============================================================================
-
 TEST_GROUP(startup_hsm)
 {
-  tiny_hsm_t hsm;
+  startup_hsm_wrapper_t wrapper;
   MockBridgeServices svc;
 
   void setup()
   {
     mock().clear();
     mock().strictOrder();
-    set_bridge_services(&svc);
   }
 
   void teardown()
   {
     mock().clear();
-    set_bridge_services(nullptr);
+    startup_hsm_wrapper_destroy(&wrapper);
   }
 
   // Helper: expect the full mqtt_client_init -> feature_bits entry chain.
@@ -174,9 +173,9 @@ TEST(startup_hsm, device_id_phase_complete_on_entry_transitions_to_mqtt_client_i
   mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(true);
   expect_mqtt_client_init_and_feature_bits_entry();
 
-  tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_device_id);
+  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_device_id);
 
-  CHECK(hsm.current == startup_state_feature_bits);
+  CHECK(wrapper.hsm.current == startup_state_feature_bits);
   mock().checkExpectations();
 }
 
@@ -189,14 +188,14 @@ TEST(startup_hsm, device_id_phase_complete_on_run_loop_transitions_to_feature_bi
   mock().expectOneCall("init_device_id_reading").onObject(&svc);
   mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(false);
 
-  tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_device_id);
+  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_device_id);
 
   mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(true);
   expect_mqtt_client_init_and_feature_bits_entry();
 
-  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
+  tiny_hsm_send_signal(&wrapper.hsm, signal_run_loop, nullptr);
 
-  CHECK(hsm.current == startup_state_feature_bits);
+  CHECK(wrapper.hsm.current == startup_state_feature_bits);
   mock().checkExpectations();
 }
 
@@ -209,13 +208,13 @@ TEST(startup_hsm, device_id_phase_signal_complete_transitions_to_mqtt_client_ini
   mock().expectOneCall("init_device_id_reading").onObject(&svc);
   mock().expectOneCall("is_device_id_complete").onObject(&svc).andReturnValue(false);
 
-  tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_device_id);
+  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_device_id);
 
   expect_mqtt_client_init_and_feature_bits_entry();
 
-  tiny_hsm_send_signal(&hsm, signal_device_id_complete, nullptr);
+  tiny_hsm_send_signal(&wrapper.hsm, signal_device_id_complete, nullptr);
 
-  CHECK(hsm.current == startup_state_feature_bits);
+  CHECK(wrapper.hsm.current == startup_state_feature_bits);
   mock().checkExpectations();
 }
 
@@ -225,16 +224,16 @@ TEST(startup_hsm, device_id_phase_signal_complete_transitions_to_mqtt_client_ini
 
 TEST(startup_hsm, feature_bits_incomplete_stays_in_feature_bits)
 {
-  tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_feature_bits);
+  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_feature_bits);
 
   mock()
     .expectOneCall("is_feature_bits_complete")
     .onObject(&svc)
     .andReturnValue(false);
 
-  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
+  tiny_hsm_send_signal(&wrapper.hsm, signal_run_loop, nullptr);
 
-  CHECK(hsm.current == startup_state_feature_bits);
+  CHECK(wrapper.hsm.current == startup_state_feature_bits);
   mock().checkExpectations();
 }
 
@@ -244,16 +243,16 @@ TEST(startup_hsm, feature_bits_incomplete_stays_in_feature_bits)
 
 TEST(startup_hsm, feature_bits_complete_on_run_loop_transitions_to_bridge_init)
 {
-  tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_feature_bits);
+  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_feature_bits);
 
   mock()
     .expectOneCall("is_feature_bits_complete")
     .onObject(&svc)
     .andReturnValue(true);
 
-  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
+  tiny_hsm_send_signal(&wrapper.hsm, signal_run_loop, nullptr);
 
-  CHECK(hsm.current == startup_state_bridge_init);
+  CHECK(wrapper.hsm.current == startup_state_bridge_init);
   mock().checkExpectations();
 }
 
@@ -263,11 +262,11 @@ TEST(startup_hsm, feature_bits_complete_on_run_loop_transitions_to_bridge_init)
 
 TEST(startup_hsm, feature_bits_signal_complete_transitions_to_bridge_init)
 {
-  tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_feature_bits);
+  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_feature_bits);
 
-  tiny_hsm_send_signal(&hsm, signal_feature_bits_complete, nullptr);
+  tiny_hsm_send_signal(&wrapper.hsm, signal_feature_bits_complete, nullptr);
 
-  CHECK(hsm.current == startup_state_bridge_init);
+  CHECK(wrapper.hsm.current == startup_state_bridge_init);
   mock().checkExpectations();
 }
 // =============================================================================
@@ -303,27 +302,27 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   mock().expectOneCall("handle_polling_failed").onObject(&svc);
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
   /* Drive the HSM through all phases. */
-  tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_protocol_stack);
-  CHECK(hsm.current == startup_state_startup_delay);
+  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_protocol_stack);
+  CHECK(wrapper.hsm.current == startup_state_startup_delay);
 
-  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
-  CHECK(hsm.current == startup_state_autodiscovery);
+  tiny_hsm_send_signal(&wrapper.hsm, signal_run_loop, nullptr);
+  CHECK(wrapper.hsm.current == startup_state_autodiscovery);
 
-  tiny_hsm_send_signal(&hsm, signal_autodiscovery_complete, nullptr);
-  CHECK(hsm.current == startup_state_feature_bits);
+  tiny_hsm_send_signal(&wrapper.hsm, signal_autodiscovery_complete, nullptr);
+  CHECK(wrapper.hsm.current == startup_state_feature_bits);
 
-  tiny_hsm_send_signal(&hsm, signal_feature_bits_complete, nullptr);
-  CHECK(hsm.current == startup_state_bridge_init);
+  tiny_hsm_send_signal(&wrapper.hsm, signal_feature_bits_complete, nullptr);
+  CHECK(wrapper.hsm.current == startup_state_bridge_init);
 
-  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
-  CHECK(hsm.current == startup_state_bridge_init);
+  tiny_hsm_send_signal(&wrapper.hsm, signal_run_loop, nullptr);
+  CHECK(wrapper.hsm.current == startup_state_bridge_init);
 
-  tiny_hsm_send_signal(&hsm, signal_bridge_ready, nullptr);
+  tiny_hsm_send_signal(&wrapper.hsm, signal_bridge_ready, nullptr);
   /* After bridge_ready, we should be in running (non-AUTO mode). */
-  CHECK(hsm.current == startup_state_running);
+  CHECK(wrapper.hsm.current == startup_state_running);
 
-  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
-  CHECK(hsm.current == startup_state_running);
+  tiny_hsm_send_signal(&wrapper.hsm, signal_run_loop, nullptr);
+  CHECK(wrapper.hsm.current == startup_state_running);
 
   mock().checkExpectations();
 }

@@ -60,6 +60,7 @@ enum {
   signal_feature_bits_complete,                   // All feature bit ERDs read and parsed
   signal_bridge_ready,                            // ERD bridge (poll/subscribe) initialized
   signal_subscription_fallback,                   // AUTO mode: subscription timed out, fell back to polling
+  signal_restart,                                 // Restart startup sequence from protocol_stack
 };
 
 // ============================================================================
@@ -68,8 +69,13 @@ enum {
 
 namespace esphome {
 namespace geappliances_bridge {
-
-// Forward declaration no longer needed — IBridgeServices is included above.
+// Wrapper struct that embeds the HSM and holds the bridge services pointer.
+// Uses container_of pattern (same as erd_write_bridge_t, erd_bridge_poll_t)
+// to recover the wrapper from the HSM pointer in state functions.
+typedef struct {
+  tiny_hsm_t hsm;
+  IBridgeServices* services;
+} startup_hsm_wrapper_t;
 
 tiny_hsm_result_t startup_state_top(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
@@ -101,10 +107,15 @@ tiny_hsm_result_t startup_state_subscription_watch(
 tiny_hsm_result_t startup_state_running(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
-/// Set the back-pointer to the bridge services so the HSM state functions
-/// can invoke bridge operations without a compile-time dependency on
-/// GeappliancesBridge's internals.
-void set_bridge_services(IBridgeServices* services);
+tiny_hsm_result_t startup_state_failed(
+  tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+
+/// Initialize the startup HSM wrapper with the given bridge services and initial state.
+void startup_hsm_wrapper_init(startup_hsm_wrapper_t* self, IBridgeServices* services,
+  tiny_hsm_state_t initial);
+
+/// Destroy the startup HSM wrapper (unsubscribes event subscriptions).
+void startup_hsm_wrapper_destroy(startup_hsm_wrapper_t* self);
 
 // HSM configuration (state descriptors + hierarchy)
 extern const tiny_hsm_configuration_t startup_hsm_configuration;
