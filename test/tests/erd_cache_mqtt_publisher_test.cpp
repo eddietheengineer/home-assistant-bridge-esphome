@@ -713,7 +713,7 @@ TEST(erd_cache_mqtt_publisher, loop_no_publish_after_reconnect_when_no_changes)
 /* Rate limiting: publisher reloads cooldown after successful publish */
 TEST(erd_cache_mqtt_publisher, loop_reloads_cooldown_after_publish)
 {
-  erd_cache_set_throttle_rate_sec(&cache, 5);
+  erd_cache_set_throttle_rate_seconds(&cache, 5);
   erd_cache_mqtt_publisher_init(
     &publisher,
     &cache,
@@ -738,7 +738,7 @@ TEST(erd_cache_mqtt_publisher, loop_reloads_cooldown_after_publish)
 /* Rate limiting: publisher skips entries whose cooldown has not expired */
 TEST(erd_cache_mqtt_publisher, loop_skips_rate_limited_entries)
 {
-  erd_cache_set_throttle_rate_sec(&cache, 5);
+  erd_cache_set_throttle_rate_seconds(&cache, 5);
   erd_cache_mqtt_publisher_init(
     &publisher,
     &cache,

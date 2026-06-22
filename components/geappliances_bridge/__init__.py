@@ -37,7 +37,7 @@ CONF_ERD_PUBLISH_RATE_SENSOR = "erd_publish_rate_sensor"
 CONF_ERD_CACHE_ENTRIES_SENSOR = "erd_cache_entries_sensor"
 CONF_ERD_CACHE_UPDATES_SENSOR = "erd_cache_updates_sensor"
 CONF_MQTT_PUBLISH_RATE_SENSOR = "mqtt_publish_rate_sensor"
-CONF_THROTTLE_RATE_SEC = "throttle_rate_sec"
+CONF_THROTTLE_RATE_SECONDS = "throttle_rate_seconds"
 
 
 
@@ -296,7 +296,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_CUSTOM_ERDS, default=[]): cv.ensure_list(
             cv.int_range(min=0, max=0xFFFF)
         ),
-        cv.Optional(CONF_THROTTLE_RATE_SEC, default=0): cv.int_range(min=0, max=255),
+        cv.Optional(CONF_THROTTLE_RATE_SECONDS, default=0): cv.int_range(min=0, max=255),
         cv.Optional(CONF_ERD_PUBLISH_RATE_SENSOR): cv.Schema({
             cv.Optional("name", default="ERD Publish Rate"): cv.string,
         }).extend(sensor.sensor_schema(state_class="measurement")),
@@ -355,7 +355,7 @@ async def to_code(config: dict[str, Any]) -> None:
     cg.add(var.set_polling_only_publish_on_change(config[CONF_POLLING_ONLY_PUBLISH_ON_CHANGE]))
     cg.add(var.set_appliance_api_parsing(config[CONF_APPLIANCE_API_PARSING]))
     cg.add(var.set_generate_device_config(config[CONF_GENERATE_DEVICE_CONFIG]))
-    cg.add(var.set_throttle_rate_sec(config[CONF_THROTTLE_RATE_SEC]))
+    cg.add(var.set_throttle_rate_seconds(config[CONF_THROTTLE_RATE_SECONDS]))
 
 
     # Optionally create the ERD publish rate sensor
