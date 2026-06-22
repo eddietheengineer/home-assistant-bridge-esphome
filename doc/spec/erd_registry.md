@@ -167,7 +167,7 @@ Runtime
        ├─ Dedup check → skip if already registered
        └─ Capacity check → skip if array full
 
-HA Discovery / Diagnostics
+Diagnostics
   │
   ├─ valid_erd_count() / valid_erd(idx) — enumerate valid ERDs
   ├─ registered_erd_count() / registered_erd(idx) — enumerate registered ERDs

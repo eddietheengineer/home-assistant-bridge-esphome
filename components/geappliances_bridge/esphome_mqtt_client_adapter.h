@@ -12,7 +12,6 @@
 // NOT responsible for:
 //   - Deciding which ERDs to publish (filtering is applied via ErdRegistry)
 //   - Managing bridge lifecycle or startup phases
-//   - HA discovery publishing
 //
 // Dependencies:
 //   - i_mqtt_client.h (interface implemented here)
@@ -86,7 +85,7 @@ size_t esphome_mqtt_client_adapter_get_pending_update_count(
   const esphome_mqtt_client_adapter_t* self);
 
 /*!
- * Publish an MQTT message.  Used by HA discovery manager.
+ * Publish an MQTT message.
  */
 void esphome_mqtt_client_adapter_publish(
   esphome_mqtt_client_adapter_t* self,

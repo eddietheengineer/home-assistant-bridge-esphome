@@ -135,7 +135,6 @@ The `__init__.py` `to_code()` function already handles multiple component instan
 - **Write bridge** — already per-bridge
 - **Feature bit manager** — already per-bridge
 - **Device identity manager** — already per-bridge
-- **HA discovery manager** — already per-bridge
 - **`esphome_mqtt_client_adapter_t`** — already per-bridge (wraps the shared ESPHome MQTT singleton)
 
 ---

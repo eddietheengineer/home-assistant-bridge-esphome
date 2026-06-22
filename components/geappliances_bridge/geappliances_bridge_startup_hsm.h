@@ -7,7 +7,7 @@
  *
  *   protocol_stack → autodiscovery → device_id → mqtt_client_init
  *                 → feature_bits → bridge_init → subscription_watch
- *                 → ha_discovery → running
+ *                 → running
  *
  * Each state handles its own entry/exit logic and waits for signals
  * from the managers (autodiscovery, device identity, feature bits,
