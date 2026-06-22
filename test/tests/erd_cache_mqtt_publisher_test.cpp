@@ -512,7 +512,6 @@ TEST_GROUP(erd_cache_change_detection)
 /* same-size, same data → no change */
 TEST(erd_cache_change_detection, same_size_same_data_no_change)
 {
-  erd_cache_set_only_publish_onchange(&cache, true);
   uint8_t data[] = { 0x01, 0x02, 0x03 };
   erd_cache_update(&cache, 0x1001, data, sizeof(data));
   /* update with identical data */
@@ -522,7 +521,6 @@ TEST(erd_cache_change_detection, same_size_same_data_no_change)
 /* same-size, different data → change detected */
 TEST(erd_cache_change_detection, same_size_different_data_change_detected)
 {
-  erd_cache_set_only_publish_onchange(&cache, true);
   uint8_t data1[] = { 0x01, 0x02, 0x03 };
   uint8_t data2[] = { 0x01, 0x02, 0x04 };
   erd_cache_update(&cache, 0x1001, data1, sizeof(data1));
@@ -532,7 +530,6 @@ TEST(erd_cache_change_detection, same_size_different_data_change_detected)
 /* Size shrink is treated as appliance lost — returns false. */
 TEST(erd_cache_change_detection, size_shrink_same_prefix_change_detected)
 {
-  erd_cache_set_only_publish_onchange(&cache, true);
   uint8_t data1[] = { 0x01, 0x02, 0x03, 0x04 };
   uint8_t data2[] = { 0x01, 0x02 };
   erd_cache_update(&cache, 0x1001, data1, sizeof(data1));
@@ -542,7 +539,6 @@ TEST(erd_cache_change_detection, size_shrink_same_prefix_change_detected)
 /* Size grow is treated as appliance lost — returns false. */
 TEST(erd_cache_change_detection, size_grow_same_prefix_change_detected)
 {
-  erd_cache_set_only_publish_onchange(&cache, true);
   uint8_t data1[] = { 0x01, 0x02 };
   uint8_t data2[] = { 0x01, 0x02, 0x03, 0x04 };
   erd_cache_update(&cache, 0x1001, data1, sizeof(data1));
@@ -552,7 +548,6 @@ TEST(erd_cache_change_detection, size_grow_same_prefix_change_detected)
 /* Inline-to-heap promotion is treated as appliance lost — returns false. */
 TEST(erd_cache_change_detection, inline_to_heap_promotion_change_detected)
 {
-  erd_cache_set_only_publish_onchange(&cache, true);
   uint8_t data_small[8];
   memset(data_small, 0xAA, sizeof(data_small));
   erd_cache_update(&cache, 0x1001, data_small, sizeof(data_small));
@@ -566,7 +561,6 @@ TEST(erd_cache_change_detection, inline_to_heap_promotion_change_detected)
 /* Heap-to-inline shrink is treated as appliance lost — returns false. */
 TEST(erd_cache_change_detection, heap_to_inline_shrink_change_detected)
 {
-  erd_cache_set_only_publish_onchange(&cache, true);
   uint8_t data_large[20];
   memset(data_large, 0xAA, sizeof(data_large));
   erd_cache_update(&cache, 0x1001, data_large, sizeof(data_large));
@@ -610,7 +604,6 @@ TEST(erd_cache_change_detection, heap_path_update_existing_entry)
   for (uint8_t i = 0; i < 20; i++) {
     data2[i] = 255 - i;
   }
-  erd_cache_set_only_publish_onchange(&cache, true);
   CHECK_TRUE(erd_cache_update(&cache, 0x1001, data2, sizeof(data2)));
 
   CHECK_EQUAL(1u, erd_cache_get_count(&cache));

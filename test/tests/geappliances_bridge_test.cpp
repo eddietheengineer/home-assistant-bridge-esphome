@@ -189,11 +189,6 @@ TEST(geappliances_bridge, set_sensor_null)
   bridge.set_mqtt_publish_rate_sensor(nullptr);
 }
 
-TEST(geappliances_bridge, set_polling_only_publish_on_change)
-{
-  bridge.set_polling_only_publish_on_change(true);
-  bridge.set_polling_only_publish_on_change(false);
-}
 
 TEST(geappliances_bridge, is_bridge_initialized_default_false)
 {

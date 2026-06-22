@@ -39,7 +39,6 @@ typedef struct erd_cache_t {
   uint32_t update_count_window;       /* updates since last get_update_rate() call */
   uint32_t required_update_count;     /* total updates setting update_required=true since init */
   uint32_t required_update_count_window; /* such updates since last get_required_update_rate() call */
-  bool only_publish_onchange;         /* when true, only mark update_required on data change */
   uint8_t max_cooldown;              /* configured rate limit in seconds; 0 = disabled */
   bool initialized;                   /* true after first successful erd_cache_init() */
 } erd_cache_t;
@@ -52,19 +51,15 @@ void erd_cache_init(erd_cache_t* self);
 void erd_cache_destroy(erd_cache_t* self);
 
 /* Updates or inserts ERD data.
- * If only_publish_onchange is true: marks update_required only when data has changed.
- * If only_publish_onchange is false: always marks update_required=true.
- * New entries always mark update_required=true regardless of the setting.
+ * Always marks update_required only when data has changed.
+ * New entries always mark update_required=true.
  * Returns true if update_required was set (or entry was new).
- * Returns false if cache is full, data is unchanged with only_publish_onchange,
+ * Returns false if cache is full, data is unchanged,
  * or ERD size changed (appliance lost). */
 bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size);
 
-/* Set whether the cache should only mark ERDs as updated when data changes.
- * Default is false (always mark updated). */
-void erd_cache_set_only_publish_onchange(erd_cache_t* self, bool only_publish_onchange);
 /* Set the minimum interval (in seconds) between publishes for any ERD.
- * 0 = disabled (publish on every update). Range: 0–255. */
+ * 0 = disabled (publish on every update). Range: 0-255. */
 void erd_cache_set_throttle_rate_seconds(erd_cache_t* self, uint8_t rate);
 
 /* Mark an ERD entry as successfully published to MQTT.

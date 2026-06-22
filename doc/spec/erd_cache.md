@@ -38,8 +38,7 @@ Initializes the cache for use. Safe to call on a previously-initialized cache (r
 2. If `was_initialized` is true: iterates all entries and frees any heap-allocated `ext_data` via `delete[]`
 3. Explicitly zeroes all entry fields (erd, data_size, uses_heap, update_required, valid, ext_data) — avoids UBSan issues with bool fields after `memset`
 4. Resets all counters (`update_count`, `update_count_window`, `required_update_count`, `required_update_count_window`) to zero
-5. Sets `only_publish_onchange = false`
-6. Sets `self->initialized = true`
+5. Sets `self->initialized = true`
 
 The guard on `was_initialized` makes the function safe against callers that pass a non-zeroed struct (stack garbage) — the free loop is skipped in that case.
 
@@ -90,9 +89,9 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
 2. Increment `update_count` and `update_count_window`
 3. **Size check:** If `data_size != existing->data_size`: log error, return `false` (appliance lost)
 4. **Change detection:** Call `erd_data_changed()` — `memcmp` of new data against existing buffer using `existing->data_size`
-5. **Early exit:** If `!data_changed && self->only_publish_onchange`: return `false` (no storage churn)
+5. **Early exit:** If `!data_changed`: return `false` (no storage churn)
 6. **In-place update:** `memcpy` into existing buffer (`ext_data` if heap, `inline_data` if inline)
-7. **Set flag:** `existing->update_required = !self->only_publish_onchange || data_changed`
+7. **Set flag:** `existing->update_required = data_changed`
 8. If `update_required` is true, increment `required_update_count` and `required_update_count_window`
 9. Return `existing->update_required`
 
@@ -161,7 +160,6 @@ typedef struct erd_cache_t {
   uint32_t update_count_window;       // updates since last get_update_rate() call
   uint32_t required_update_count;     // total updates setting update_required=true since init
   uint32_t required_update_count_window; // such updates since last get_required_update_rate() call
-  bool only_publish_onchange;         // when true, only mark update_required on data change
   bool initialized;                   // true after first successful erd_cache_init()
 } erd_cache_t;
 ```
@@ -173,7 +171,6 @@ typedef struct erd_cache_t {
 | `update_count_window` | `uint32_t` | Updates since last `get_update_rate()` call |
 | `required_update_count` | `uint32_t` | Total updates that set `update_required=true` since init |
 | `required_update_count_window` | `uint32_t` | Such updates since last `get_required_update_rate()` call |
-| `only_publish_onchange` | `bool` | Gate for `update_required` flag |
 | `initialized` | `bool` | Guard for safe init/destroy |
 
 ---
@@ -191,8 +188,7 @@ typedef struct erd_cache_t {
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `erd_cache_update` | `bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size)` | Update or insert ERD data. Returns `true` if `update_required` was set (or entry was new). Returns `false` if cache is full, data is unchanged with `only_publish_onchange`, or ERD size changed. |
-| `erd_cache_set_only_publish_onchange` | `void erd_cache_set_only_publish_onchange(erd_cache_t* self, bool only_publish_onchange)` | Set whether the cache should only mark ERDs as updated when data changes. Default is `false` (always mark updated). |
+| `erd_cache_update` | `bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size)` | Update or insert ERD data. Returns `true` if `update_required` was set (or entry was new). Returns `false` if cache is full, data is unchanged, or ERD size changed. |
 
 ### 7.3 Iteration
 
@@ -221,11 +217,11 @@ The window is determined by the call interval of the consumer (e.g., ~60 s if ca
 
 3. **No per-update allocation:** Updates to existing entries use in-place `memcpy` — no `new` or `delete` on the update path.
 
-4. **Early exit on unchanged data:** When `only_publish_onchange` is true and data hasn't changed, the update returns immediately without touching storage.
+4. **Early exit on unchanged data:** When data hasn't changed, the update returns immediately without touching storage.
 
 5. **Change detection at update time:** `update_required` is set during `erd_cache_update()`, not during iteration. This eliminates per-read `memcmp` overhead in the publisher loop.
 
-6. **New entries always marked updated:** New entries always set `update_required = true` regardless of the `only_publish_onchange` setting.
+6. **New entries always marked updated:** New entries always set `update_required = true`.
 
 7. **Iterator reset on exhaustion:** Both `get_next_updated()` and `get_next_entry()` reset the iterator to 0 when no more entries are found, allowing the caller to restart iteration.
 

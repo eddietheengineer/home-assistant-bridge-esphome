@@ -206,7 +206,7 @@ A polling cycle consists of sending reads for all ERDs in `erd_polling_list` and
 **On `signal_read_completed`:**
 - Resets the appliance-lost timer.
 - If the ERD is not in `erd_set`: adds it to the polling list via `add_erd_to_polling_list()` (handles late probe responses that arrive during polling).
-- Updates the ERD cache via `erd_cache_update()` (respects the cache's `only_publish_onchange` setting).
+- Updates the ERD cache via `erd_cache_update()` (always publishes only on change).
 - Increments `cycle_completed_count`; if cycle is complete, calls `on_polling_cycle_complete()`.
 
 **On `signal_read_failed`:**
@@ -252,8 +252,7 @@ After 3 consecutive polling cycles where at least one ERD in each cycle failed, 
 
 ### 6.4 Cache Publish Behavior
 
-The polling bridge does not own the publish-on-change setting — it is controlled by the shared ERD cache. The caller sets `erd_cache_set_only_publish_onchange()` after init to configure whether polled ERD reads should only publish on data change (`true`) or always publish (`false`, the default).
-
+The ERD cache always publishes only on change. Unchanged polled values are silently dropped.
 ### 6.5 Timers
 
 - `polling_timer`: armed for `polling_interval_ms` after each cycle starts. Fires `signal_polling_timer_expired`.

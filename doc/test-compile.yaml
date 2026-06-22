@@ -66,6 +66,6 @@ geappliances_bridge:
   # device_id: "YourDeviceId"   # Optional: Uncomment to use a custom device ID
   # mode: auto                  # Default: auto   Options: auto, subscribe, poll
   # polling_interval: 10000     # Default: 10000 ms (10 seconds), used when in polling mode
-  # polling_only_publish_on_change: true  # Default: true, only publish if value changed
+  # polling_only_publish_on_change: true  # Deprecated: always on, kept for backward compatibility
   erd_publish_rate_sensor:
     name: "ERD Publish Rate"

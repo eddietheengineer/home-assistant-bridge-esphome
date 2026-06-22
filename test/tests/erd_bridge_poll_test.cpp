@@ -165,21 +165,7 @@ TEST(erd_bridge_poll, should_preserve_cache_data_on_reprobe_after_appliance_lost
   CHECK_EQUAL(sizeof(new_value), entry->data_size);
 }
 
-TEST(erd_bridge_poll, should_always_publish_mqtt_when_only_publish_on_change_is_disabled)
-{
-  given_that_the_bridge_has_entered_polling_state();
-  erd_cache_set_only_publish_onchange(&test_cache, false);
-
-  should_request_read(0xC0, polled_erd);
-  after(polling_interval);
-  when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
-
-  should_request_read(0xC0, polled_erd);
-  after(polling_interval);
-  when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
-}
-
-TEST(erd_bridge_poll, should_publish_mqtt_on_first_poll_when_only_publish_on_change_is_enabled)
+TEST(erd_bridge_poll, should_publish_mqtt_on_first_poll)
 {
   given_that_the_bridge_has_entered_polling_state();
 
@@ -188,8 +174,7 @@ TEST(erd_bridge_poll, should_publish_mqtt_on_first_poll_when_only_publish_on_cha
 
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 }
-
-TEST(erd_bridge_poll, should_not_republish_mqtt_when_polled_erd_data_is_unchanged_and_only_publish_on_change_is_enabled)
+TEST(erd_bridge_poll, should_not_republish_mqtt_when_polled_erd_data_is_unchanged)
 {
   given_that_the_bridge_has_entered_polling_state();
 
@@ -202,8 +187,7 @@ TEST(erd_bridge_poll, should_not_republish_mqtt_when_polled_erd_data_is_unchange
   nothing_should_happen();
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 }
-
-TEST(erd_bridge_poll, should_republish_mqtt_when_polled_erd_data_changes_and_only_publish_on_change_is_enabled)
+TEST(erd_bridge_poll, should_republish_mqtt_when_polled_erd_data_changes)
 {
   given_that_the_bridge_has_entered_polling_state();
 
@@ -229,7 +213,6 @@ TEST(erd_bridge_poll, should_register_and_poll_erd_whose_discovery_response_arri
   enum { late_erd = 0x7b00 };
 
   given_that_the_bridge_has_entered_polling_state();
-  erd_cache_set_only_publish_onchange(&test_cache, false);
 
   // Cycle 1: polling timer fires and begins reading polled_erd
   should_request_read(0xC0, polled_erd);
@@ -255,8 +238,8 @@ TEST(erd_bridge_poll, should_register_and_poll_erd_whose_discovery_response_arri
   when_a_poll_read_completes(0xC0, late_erd, uint8_t(0xAB));
 }
 
-// Same late-response scenario with only_publish_on_change enabled.
-TEST(erd_bridge_poll, should_register_and_poll_late_erd_when_only_publish_on_change_is_enabled)
+// Same late-response scenario, default on-change behavior.
+TEST(erd_bridge_poll, should_register_and_poll_late_erd)
 {
   enum { late_erd = 0x7b05 };
 
