@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Be the single authoritative source for which ERDs are valid and which are registered at runtime. Owns the valid-ERD set (populated by FeatureBitManager at startup) and the registered-ERD set (appended by the MQTT adapter at runtime). Exposes query methods used by the MQTT adapter during publish and read-only accessors used by HaDiscoveryManager and diagnostics.
+Be the single authoritative source for which ERDs are valid and which are registered at runtime. Owns the valid-ERD set (populated by FeatureBitManager at startup) and the registered-ERD set (appended by the MQTT adapter at runtime). Exposes query methods used by the MQTT adapter during publish and read-only accessors for diagnostics.
 
 ## Public API
 
@@ -26,8 +26,7 @@ Be the single authoritative source for which ERDs are valid and which are regist
 | `has_valid_erds_filter()` | Returns `true` if valid-ERD filtering is active. When `false`, all ERDs pass the filter. |
 | `is_valid(erd)` | Returns `true` if the ERD passes the valid-ERD filter (or no filter active). |
 
-### Read-Only Accessors (HaDiscoveryManager, diagnostics)
-
+### Read-Only Accessors
 | Method | Description |
 |--------|-------------|
 | `registered_erd_count()` | Returns the number of registered ERDs. |
@@ -54,8 +53,7 @@ class ErdRegistry {
 1. **Startup**: `FeatureBitManager` reads and parses appliance feature bit ERDs, producing a list of valid ERDs.
 2. **Bridge init**: `GeappliancesBridge` calls `erd_registry.set_valid_erds()` to populate the valid-ERD filter.
 3. **Runtime**: `EsphomeMqttClientAdapter` calls `erd_registry.register_erd()` for each ERD it encounters. The adapter checks `is_valid()` before registering.
-4. **HA discovery**: `HaDiscoveryManager` iterates `registered_erd()` to discover entities.
-5. **Diagnostics**: The bridge reads `registered_erd_count()` and `valid_erd_count()` for logging.
+4. **Diagnostics**: The bridge reads `registered_erd_count()` and `valid_erd_count()` for logging.
 
 ## Dependencies
 
@@ -71,4 +69,4 @@ class ErdRegistry {
 
 ## Testing
 
-Exercised indirectly through the unit tests for `erd_bridge_poll`, `erd_cache_mqtt_publisher`, and `ha_discovery_manager`. The registry is used by the MQTT adapter during ERD registration and by the HA discovery manager during entity enumeration.
+Exercised indirectly through the unit tests for `erd_bridge_poll` and `erd_cache_mqtt_publisher`. The registry is used by the MQTT adapter during ERD registration and by diagnostics for entity enumeration.

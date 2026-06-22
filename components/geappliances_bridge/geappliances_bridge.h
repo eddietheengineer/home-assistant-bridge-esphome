@@ -15,7 +15,6 @@
 // NOT responsible for:
 //   - Assembling the device ID (DeviceIdentityManager)
 //   - Determining which ERDs are valid (FeatureBitManager / ErdRegistry)
-//   - Publishing HA discovery payloads (HaDiscoveryManager)
 //   - MQTT connection lifecycle (EsphomeMqttClientAdapter)
 //   - Startup phase sequencing (StartupHsm)
 //
@@ -57,7 +56,6 @@ extern "C" {
 #include "device_identity_manager.h"
 #include "feature_bit_manager.h"
 #include "autodiscovery_manager.h"
-#include "ha_discovery_manager.h"
 #include "geappliances_bridge_startup_hsm.h"
 #include "erd_poll_list_builder.h"
 
@@ -91,7 +89,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_polling_only_publish_on_change(bool only_publish_on_change) { this->polling_only_publish_on_change_ = only_publish_on_change; }
   void set_appliance_api_parsing(bool appliance_api_parsing) { this->appliance_api_parsing_ = appliance_api_parsing; }
   void set_generate_device_config(bool generate_device_config) { this->generate_device_config_ = generate_device_config; }
-  void set_ha_discovery_base_url(const std::string& url) { this->ha_discovery_base_url_ = url; }
   void set_erd_publish_rate_sensor(sensor::Sensor* sensor) { this->erd_publish_rate_sensor_ = sensor; }
   void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; }
   void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; }
@@ -126,7 +123,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void check_subscription_activity() override;
   void maybe_start_custom_erd_polling() override;
   void log_poll_state_transitions() override;
-  void run_ha_discovery() override;
   void initialize_erd_cache_publisher() override;
   bool is_erd_cache_publisher_initialized() const override;
   void run_all_managers() override;
@@ -142,14 +138,12 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void start_feature_bit_reading_();
   void init_erd_cache_publisher_();
   void on_poll_discovery_complete_();
-  void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 
   // Startup HSM — replaces the manual switch-based phase progression.
-  // The HSM drives the linear startup sequence:
   //   protocol_stack → autodiscovery → device_id → mqtt_client_init
   //                 → feature_bits → bridge_init → subscription_watch
-  //                 → ha_discovery → running
+  //                 → running
   tiny_hsm_t startup_hsm_;
 
   uart::UARTComponent *uart_{nullptr};
@@ -208,8 +202,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // Feature bit reading state machine (runs after autodiscovery, before device ID gen)
   // The FeatureBitManager owns the valid ERD list and ready flag; use its getters directly.
 
-  // HA device discovery state is managed by HaDiscoveryManager; the bridge
-  // delegates to it rather than maintaining redundant copies.
   const char* last_logged_poll_state_{nullptr};
 
   // ERD publish rate sensor: counts ERD updates per ~60s window and
@@ -235,19 +227,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   erd_cache_mqtt_publisher_t erd_cache_publisher_;
   erd_cache_t erd_cache_;
 
-  // Base URL for the per-category JSONL files.
-  // Can be overridden in YAML via ha_discovery_base_url.
-  // Uses HEAD to always resolve against the repository's default branch.
-  std::string ha_discovery_base_url_{
-    "https://raw.githubusercontent.com/joshualongenecker/"
-    "home-assistant-bridge-esphome/HEAD/ha_discovery"
-  };
-
   // Autodiscovery manager (extracted from god class)
   AutodiscoveryManager autodiscovery_manager_;
 
-  // HA discovery manager (extracted from god class)
-  HaDiscoveryManager ha_discovery_manager_;
 
   tiny_timer_group_t timer_group_;
 

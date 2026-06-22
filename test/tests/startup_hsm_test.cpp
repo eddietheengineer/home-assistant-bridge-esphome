@@ -107,9 +107,6 @@ class MockBridgeServices : public IBridgeServices {
     return mock().actualCall("is_erd_cache_publisher_initialized").onObject(this)
                .returnBoolValueOrDefault(false);
   }
-  void run_ha_discovery() override {
-    mock().actualCall("run_ha_discovery").onObject(this);
-  }
   void log_poll_state_transitions() override {}
   void run_all_managers() override {}
 };
@@ -284,12 +281,12 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   mock().expectOneCall("is_bridge_initialized").onObject(&svc).andReturnValue(false);
   mock().expectOneCall("is_autodiscovery_complete").onObject(&svc).andReturnValue(true);
   mock().expectOneCall("initialize_erd_bridge").onObject(&svc);
-  /* Phase 6: subscription_watch entry → ha_discovery */
+  /* Phase 6: subscription_watch entry → running */
   mock().expectOneCall("get_mode").onObject(&svc).andReturnValue(BRIDGE_MODE_POLL);
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
-  /* Phase 7: ha_discovery run_loop → running */
-  mock().expectOneCall("run_ha_discovery").onObject(&svc);
-
+  /* Phase 7: running run_loop */
+  mock().expectOneCall("get_mode").onObject(&svc).andReturnValue(BRIDGE_MODE_POLL);
+  mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
   /* Drive the HSM through all phases. */
   tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_protocol_stack);
   CHECK(hsm.current == startup_state_startup_delay);
@@ -307,10 +304,8 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   CHECK(hsm.current == startup_state_bridge_init);
 
   tiny_hsm_send_signal(&hsm, signal_bridge_ready, nullptr);
-  /* After bridge_ready, we should be in ha_discovery (non-AUTO mode). */
-  /* If we're in subscription_watch, get_mode returned AUTO. */
-  /* If we're in bridge_init, the transition didn't happen. */
-  CHECK(hsm.current == startup_state_ha_discovery);
+  /* After bridge_ready, we should be in running (non-AUTO mode). */
+  CHECK(hsm.current == startup_state_running);
 
   tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
   CHECK(hsm.current == startup_state_running);

@@ -4,7 +4,7 @@
 
 ### 1.1 Purpose
 
-The main ESPHome component class that orchestrates the entire GE Appliances bridge. It manages UART interfaces for GEA2/GEA3 protocols, drives the startup state machine, handles MQTT connection lifecycle, and coordinates all sub-managers (autodiscovery, device identity, feature bits, HA discovery).
+The main ESPHome component class that orchestrates the entire GE Appliances bridge. It manages UART interfaces for GEA2/GEA3 protocols, drives the startup state machine, handles MQTT connection lifecycle, and coordinates all sub-managers (autodiscovery, device identity, feature bits).
 
 ### 1.2 Responsibilities
 
@@ -18,7 +18,6 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 
 - Assembling the device ID (`DeviceIdentityManager`)
 - Determining which ERDs are valid (`FeatureBitManager` / `ErdRegistry`)
-- Publishing HA discovery payloads (`HaDiscoveryManager`)
 - MQTT connection lifecycle (`EsphomeMqttClientAdapter`)
 - Startup phase sequencing (`StartupHsm`)
 
@@ -34,7 +33,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `loop()` | Drive protocol stack and startup HSM |
 | `dump_config()` | Log current configuration and state |
 | `get_setup_priority()` | Returns `setup_priority::DATA` (600) — after MQTT (50), same as UART |
-| `teardown()` | Clean up HA discovery, bridges, and MQTT adapter |
+| `teardown()` | Clean up bridges and MQTT adapter |
 
 ### 2.2 Configuration Setters (called from `__init__.py` code generation)
 
@@ -47,9 +46,8 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `set_polling_interval(ms)` | Set polling interval (default 10000 ms) |
 | `set_polling_only_publish_on_change(bool)` | Only publish ERD values when they change |
 | `set_appliance_api_parsing(bool)` | Enable feature bit-based ERD filtering (default true) |
-| `set_generate_device_config(bool)` | Enable device config generation |
+| `set_generate_device_config(bool)` | Deprecated, no-op |
 | `add_custom_erd(erd)` | Add a custom ERD to poll |
-| `set_ha_discovery_base_url(url)` | Override the HA discovery JSONL base URL |
 | `set_erd_publish_rate_sensor(sensor)` | Sensor for ERD publish rate |
 | `set_erd_cache_entries_sensor(sensor)` | Sensor for ERD cache entry count |
 | `set_erd_cache_updates_sensor(sensor)` | Sensor for ERD cache update count |
@@ -71,8 +69,6 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `start_custom_erd_polling_()` | Initialize polling for user-configured custom ERDs |
 | `maybe_start_custom_erd_polling_()` | Guarded entry point for custom ERD polling (prevents re-initialization) |
 | `log_poll_state_transitions_()` | Debug: log polling HSM state changes |
-| `on_ha_discovery_erd_seen_(erd)` | Callback invoked when HA discovery publishes an ERD |
-| `on_poll_discovery_complete_()` | Callback from polling bridge when probe phase completes |
 
 ---
 
@@ -83,7 +79,7 @@ The bridge progresses through a linear sequence of phases via the `startup_hsm_`
 ```
 protocol_stack → autodiscovery → device_id → mqtt_client_init
              → feature_bits → bridge_init → subscription_watch
-             → ha_discovery → running
+             → running
 ```
 
 Each phase is driven by the startup HSM, which invokes `IBridgeServices` methods on the bridge to perform work and check completion.
@@ -101,7 +97,6 @@ During `startup_state_bridge_init`, `initialize_erd_bridge_()` runs:
    - **Polling mode:** Initializes `erd_bridge_poll_` with the probe list, known host address, and appliance type.
    - **Subscription mode:** Initializes `erd_bridge_subscribe_` with the known host address.
    - **Write bridge:** Always initialized with the real host address from `autodiscovery_manager_.get_host_address()` (autodiscovery completes before bridge init).
-5. **Defer HA discovery:** If enabled, initializes `ha_discovery_manager_` — it starts when the bridge signals readiness.
 
 ---
 
@@ -137,7 +132,6 @@ Key member variables:
 | `autodiscovery_manager_` | `AutodiscoveryManager` | Appliance discovery |
 | `device_identity_manager_` | `DeviceIdentityManager` | Device ID generation |
 | `feature_bit_manager_` | `FeatureBitManager` | Feature bit reading |
-| `ha_discovery_manager_` | `HaDiscoveryManager` | HA discovery |
 | `timer_group_` | `tiny_timer_group_t` | Shared timer group |
 | `custom_erds_[CUSTOM_ERDS_MAX]` | `tiny_erd_t[64]` | User-configured custom ERDs |
 | `poll_probe_list_[POLLING_LIST_MAX_SIZE]` | `uint16_t[645]` | Pre-built probe list |
@@ -167,7 +161,6 @@ Key member variables:
 | `AutodiscoveryManager` | Appliance discovery |
 | `DeviceIdentityManager` | Device ID generation |
 | `FeatureBitManager` | Feature bit reading |
-| `HaDiscoveryManager` | HA discovery |
 | `esphome_uart_adapter` | UART → i_tiny_uart |
 | `esphome_mqtt_client_adapter` | ESPHome MQTT → i_mqtt_client |
 | `gea2_erd_client_adapter` | GEA2 → GEA3 interface |

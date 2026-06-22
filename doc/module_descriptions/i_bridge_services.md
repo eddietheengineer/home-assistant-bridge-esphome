@@ -66,7 +66,6 @@ Define the contract between the startup state machine and the bridge so the HSM 
 | `check_subscription_activity()` | Check subscription activity and fall back to polling if timed out. |
 | `maybe_start_custom_erd_polling()` | Start custom-ERD polling bridge if conditions are met (idempotent). |
 | `log_poll_state_transitions()` | Log any pending polling-bridge state-name transitions. |
-| `run_ha_discovery()` | Run one tick of the HA discovery manager. |
 | `run_all_managers()` | Run one tick of all managers (autodiscovery, device-ID, feature bits). |
 
 ### ERD Cache MQTT Publisher

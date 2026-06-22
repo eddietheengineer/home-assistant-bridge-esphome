@@ -56,7 +56,6 @@ void GeappliancesBridge::on_poll_discovery_complete_()
   tiny_erd_t erds[ERD_CACHE_CAPACITY];
   uint16_t count = 0;
   erd_cache_to_array(&this->erd_cache_, erds, &count);
-  this->ha_discovery_manager_.set_registered_erds(erds, count);
   tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
 }
 
@@ -270,24 +269,6 @@ void GeappliancesBridge::initialize_erd_bridge_()
 
   this->erd_bridge_initialized_ = true;
   ESP_LOGI(TAG, "ERD bridge initialized successfully");
-
-  // Defer HA device discovery until ERD registration has settled.
-  if (this->generate_device_config_) {
-    tiny_erd_t erds[ERD_CACHE_CAPACITY];
-    uint16_t count = 0;
-    erd_cache_to_array(&this->erd_cache_, erds, &count);
-    this->ha_discovery_manager_.init(
-        this->ha_discovery_base_url_,
-        this->device_identity_manager_.get_device_id(),
-        this->device_identity_manager_.get_model_number(),
-        this->device_identity_manager_.get_serial_number(),
-        erds, count,
-        true);
-    this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
-    ESP_LOGI(TAG, "HA discovery deferred: will publish after ERD discovery completes "
-                  "(polling mode) or %u s quiet window (subscription mode)",
-             HA_DISCOVERY_QUIET_MS / 1000);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -359,7 +340,7 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
   // This gives the subscription bridge time to publish its ERDs, so we can
   // avoid redundant polling of ERDs already covered by subscription.
 
-  if (millis() - this->custom_erd_subscription_last_activity_ < HA_DISCOVERY_QUIET_MS) {
+  if (millis() - this->custom_erd_subscription_last_activity_ < SUBSCRIPTION_TIMEOUT_MS) {
     return;
   }
 

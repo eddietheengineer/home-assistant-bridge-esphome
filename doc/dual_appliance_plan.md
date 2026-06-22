@@ -22,7 +22,6 @@ ESPHome Component (GeappliancesBridge)
 ├── 1× esphome_mqtt_client_adapter_t
 ├── 1× erd_bridge_subscribe_t or erd_bridge_poll_t
 ├── 1× erd_write_bridge_t
-├── 1× HaDiscoveryManager
 ├── 1× startup_hsm_t
 └── 1× IBridgeServices (the bridge itself)
 ```

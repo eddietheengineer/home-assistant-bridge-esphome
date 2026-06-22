@@ -4,7 +4,7 @@
 
 ### 1.1 Purpose
 
-The startup HSM drives the ordered startup sequence of the GE Appliances bridge from protocol initialization through HA discovery to steady-state running. It uses `tiny_hsm` to manage a flat hierarchy of phase states, each of which waits for specific signals or gate conditions before transitioning to the next phase.
+The startup HSM drives the ordered startup sequence of the GE Appliances bridge from protocol initialization to steady-state running. It uses `tiny_hsm` to manage a flat hierarchy of phase states, each of which waits for specific signals or gate conditions before transitioning to the next phase.
 
 ### 1.2 Responsibilities
 
@@ -145,23 +145,14 @@ Initializes the ERD bridge (poll or subscribe). Waits for autodiscovery to be co
 
 In AUTO mode, monitors subscription activity and falls back to polling if no activity is detected. In poll/subscribe modes, this is a pass-through phase.
 
-- **On entry:** If the mode is not `BRIDGE_MODE_AUTO`, calls `svc->maybe_start_custom_erd_polling()` and transitions immediately to `startup_state_ha_discovery`.
+- **On entry:** If the mode is not `BRIDGE_MODE_AUTO`, calls `svc->maybe_start_custom_erd_polling()` and transitions immediately to `startup_state_running`.
 - **On `signal_run_loop`:**
   - If AUTO mode and subscription is active, calls `svc->check_subscription_activity()`.
   - Calls `svc->maybe_start_custom_erd_polling()` and `svc->log_poll_state_transitions()`.
-  - If not AUTO mode or subscription is no longer active, transitions to `startup_state_ha_discovery`.
-- **On `signal_subscription_fallback`:** Transitions to `startup_state_ha_discovery`.
+  - If not AUTO mode or subscription is no longer active, transitions to `startup_state_running`.
+- **On `signal_subscription_fallback`:** Transitions to `startup_state_running`.
 - **On exit:** No action.
 
-#### `startup_state_ha_discovery`
-
-Runs the HaDiscoveryManager to publish Home Assistant entity configurations.
-
-- **On entry:** Logs phase entry.
-- **On `signal_run_loop`:** Calls `svc->run_ha_discovery()` and transitions to `startup_state_running`.
-- **On exit:** No action.
-
-**Note:** HA discovery runs on the first loop iteration and immediately transitions to the running state. Subsequent HA discovery work continues in the running state.
 
 #### `startup_state_running` (terminal)
 
@@ -169,11 +160,10 @@ Steady-state operation. All recurring tasks run every loop iteration.
 
 - **On entry:** Logs that the bridge is in steady-state operation.
 - **On `signal_run_loop`:**
-  - Calls `svc->run_all_managers()` to run all managers (autodiscovery, device identity, feature bits, HA discovery).
+  - Calls `svc->run_all_managers()` to run all managers (autodiscovery, device identity, feature bits).
   - If AUTO mode and subscription is active, calls `svc->check_subscription_activity()`.
   - Calls `svc->maybe_start_custom_erd_polling()`.
   - Calls `svc->log_poll_state_transitions()`.
-  - Calls `svc->run_ha_discovery()`.
 - **On exit:** No action.
 
 ### 4.3 State Diagram
@@ -220,23 +210,17 @@ startup_state_top (root — defers all unhandled signals)
   │    └─ exit: —
   │
   ├─ startup_state_subscription_watch
-  │    ├─ entry: if not AUTO → maybe_start_custom_erd_polling(), → startup_state_ha_discovery
+  │    ├─ entry: if not AUTO → maybe_start_custom_erd_polling(), → startup_state_running
   │    ├─ run_loop: check_subscription_activity() (AUTO),
   │    │            maybe_start_custom_erd_polling(), log_poll_state_transitions();
-  │    │            if not active → startup_state_ha_discovery
-  │    ├─ subscription_fallback: → startup_state_ha_discovery
-  │    └─ exit: —
-  │
-  ├─ startup_state_ha_discovery
-  │    ├─ entry: —
-  │    ├─ run_loop: run_ha_discovery() → startup_state_running
+  │    │            if not active → startup_state_running
+  │    ├─ subscription_fallback: → startup_state_running
   │    └─ exit: —
   │
   └─ startup_state_running (terminal)
        ├─ entry: —
        ├─ run_loop: run_all_managers(), check_subscription_activity() (AUTO),
-       │             maybe_start_custom_erd_polling(), log_poll_state_transitions(),
-       │             run_ha_discovery()
+       │             maybe_start_custom_erd_polling(), log_poll_state_transitions()
        └─ exit: —
 ```
 
@@ -265,7 +249,7 @@ Each state function receives `tiny_hsm_t* hsm`, `tiny_hsm_signal_t signal`, and 
 
 ---
 
-## 7. Invariants
+- **`startup_hsm_state_descriptors[]`**: Array of 10 `tiny_hsm_state_descriptor_t` entries, each mapping a state function to its parent (`startup_state_top`).
 
 1. **Flat hierarchy:** All states are direct children of `startup_state_top`. No intermediate parent states exist. This simplifies signal routing — any unhandled signal bubbles to the top and is deferred.
 
@@ -302,4 +286,3 @@ Each state function receives `tiny_hsm_t* hsm`, `tiny_hsm_signal_t signal`, and 
 
 4. **No timeout for startup delay:** The 5-second startup delay is fixed and not configurable. If the appliance board needs more or less time, this value must be changed at compile time.
 
-5. **HA discovery is a single-shot transition:** The HA discovery phase runs once and immediately transitions to running. Ongoing HA discovery work (e.g., dynamic entity updates) is handled in the running state via `svc->run_ha_discovery()`.

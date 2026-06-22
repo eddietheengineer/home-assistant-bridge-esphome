@@ -21,7 +21,7 @@
 // MODULE GOAL
 // =============================================================================
 // Goal: Drive the ordered startup phase sequence from protocol initialization
-//       through HA discovery to steady-state running.
+//       to steady-state running.
 //
 // Responsibilities:
 //   - Own the tiny_hsm state machine for all startup phases
@@ -96,9 +96,6 @@ tiny_hsm_result_t startup_state_bridge_init(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
 tiny_hsm_result_t startup_state_subscription_watch(
-  tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-
-tiny_hsm_result_t startup_state_ha_discovery(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
 tiny_hsm_result_t startup_state_running(

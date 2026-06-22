@@ -337,7 +337,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       //    on the subscription quiet window, which has not elapsed yet, so
       //    maybe_start_custom_erd_polling() returns early without touching
       //    the polling bridge.
-      // 3. startup_state_ha_discovery entry only logs.
+      // 3. startup_state_running entry only logs.
       // Invariant: the callback must never trigger a path that sends a
       // signal back to the polling HSM while this entry handler runs.
       if (self->on_discovery_complete != nullptr) {

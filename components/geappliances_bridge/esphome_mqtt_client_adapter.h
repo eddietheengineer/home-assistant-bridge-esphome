@@ -12,7 +12,7 @@
 // NOT responsible for:
 //   - Deciding which ERDs to publish (filtering is applied via ErdRegistry)
 //   - Managing bridge lifecycle or startup phases
-//   - HA discovery publishing (HaDiscoveryManager)
+//   - HA discovery publishing
 //
 // Dependencies:
 //   - i_mqtt_client.h (interface implemented here)
