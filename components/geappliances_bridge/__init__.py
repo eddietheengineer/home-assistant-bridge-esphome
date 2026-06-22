@@ -330,6 +330,18 @@ async def to_code(config: dict[str, Any]) -> None:
     # Example: https://github.com/ryanplusplus/tiny#abc1234
     
     var = cg.new_Pvariable(config[CONF_ID])
+    # Deprecation warning for polling_onlypublish_onchange
+    if CONF_POLLING_ONLY_PUBLISH_ON_CHANGE in config:
+        _LOGGER.warning(
+            "polling_onlypublish_onchange is deprecated and will be removed in a future release. "
+            "The component now always publishes only on change."
+        )
+    # Warning for generate_device_config if enabled
+    if config.get(CONF_GENERATE_DEVICE_CONFIG, False):
+        _LOGGER.warning(
+            "generate_device_config is currently disabled and will be re-enabled in a future release. "
+            "Setting it to true has no effect at this time."
+        )
     await cg.register_component(var, config)
 
     # Get optional GEA3 UART component reference
@@ -352,7 +364,6 @@ async def to_code(config: dict[str, Any]) -> None:
     # Set bridge mode configuration (config[CONF_MODE] is now an integer from cv.enum)
     cg.add(var.set_mode(config[CONF_MODE]))
     cg.add(var.set_polling_interval(config[CONF_POLLING_INTERVAL]))
-    cg.add(var.set_polling_only_publish_on_change(config[CONF_POLLING_ONLY_PUBLISH_ON_CHANGE]))
     cg.add(var.set_appliance_api_parsing(config[CONF_APPLIANCE_API_PARSING]))
     cg.add(var.set_generate_device_config(config[CONF_GENERATE_DEVICE_CONFIG]))
     cg.add(var.set_throttle_rate_seconds(config[CONF_THROTTLE_RATE_SECONDS]))

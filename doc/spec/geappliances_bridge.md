@@ -44,7 +44,6 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `set_device_id(id)` | Pre-configure a static device ID |
 | `set_mode(mode)` | Set bridge mode: POLL (0), SUBSCRIBE (1), or AUTO (2) |
 | `set_polling_interval(ms)` | Set polling interval (default 10000 ms) |
-| `set_polling_only_publish_on_change(bool)` | Only publish ERD values when they change |
 | `set_appliance_api_parsing(bool)` | Enable feature bit-based ERD filtering (default true) |
 | `set_generate_device_config(bool)` | Deprecated, no-op |
 | `add_custom_erd(erd)` | Add a custom ERD to poll |

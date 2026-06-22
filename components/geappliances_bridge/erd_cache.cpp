@@ -60,7 +60,6 @@ void erd_cache_init(erd_cache_t* self)
   self->update_count_window = 0;
   self->required_update_count = 0;
   self->required_update_count_window = 0;
-  self->only_publish_onchange = false;
   self->max_cooldown = 0;
   self->initialized = true;
 }
@@ -102,8 +101,8 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
 
     bool data_changed = erd_data_changed(existing, data, data_size);
 
-    /* If data hasn't changed and we only publish on change, skip entirely. */
-    if (!data_changed && self->only_publish_onchange) {
+    /* If data hasn't changed, skip entirely. */
+    if (!data_changed) {
       return false;
     }
 
@@ -114,7 +113,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
       memcpy(existing->inline_data, data, data_size);
     }
 
-    existing->update_required = !self->only_publish_onchange || data_changed;
+    existing->update_required = data_changed;
     if (existing->update_required) {
       self->required_update_count++;
       self->required_update_count_window++;
@@ -176,10 +175,6 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   return true;
 }
 
-void erd_cache_set_only_publish_onchange(erd_cache_t* self, bool only_publish_onchange)
-{
-  self->only_publish_onchange = only_publish_onchange;
-}
 
 void erd_cache_set_throttle_rate_seconds(erd_cache_t* self, uint8_t rate)
 {

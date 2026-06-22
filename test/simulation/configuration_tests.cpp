@@ -513,19 +513,10 @@ TEST(dual_subscription_config, publications_from_one_appliance_not_forwarded_to_
 }
 
 // ============================================================================
-// ONLY_PUBLISH_ON_CHANGE TEST GROUP
-//
-// YAML Config:
-//   geappliances_bridge:
-//     uart_id: gea3_uart
-//     mode: poll
-//     polling_interval: 10000
-//     only_publish_on_change: true   # Added in PR#52
-//
-// Validates PR#52: Polling bridge only sends MQTT update when ERD value changes.
+// Polling bridge initialization tests
 // ============================================================================
 
-TEST_GROUP(only_publish_on_change_config)
+TEST_GROUP(polling_bridge_config)
 {
   enum {
     host_address     = 0xC0,
@@ -559,18 +550,7 @@ TEST_GROUP(only_publish_on_change_config)
     mock().clear();
   }
 
-  void configure_only_publish_on_change()
-  {
-    erd_bridge_poll_init(
-      &bridge,
-      &timer_group.timer_group,
-      &erd_client.interface,
-      polling_interval,
-      0xC0, 0, nullptr, 0,
-      &test_cache);
-  }
-
-  void configure_always_publish()
+  void configure_bridge()
   {
     erd_bridge_poll_init(
       &bridge,
@@ -599,42 +579,28 @@ TEST_GROUP(only_publish_on_change_config)
 };
 
 // ============================================================================
-// ONLY_PUBLISH_ON_CHANGE SCENARIO 1: Polling mode always publishes (default)
-//
-// YAML:
-//   geappliances_bridge:
-//     mode: poll
-//     polling_interval: 10000
-//     # only_publish_on_change defaults to false
+// Polling bridge initializes correctly
 // ============================================================================
 
-TEST(only_publish_on_change_config, config_polling_always_publish_is_default)
+TEST(polling_bridge_config, bridge_initializes_in_polling_state)
 {
-  // Without only_publish_on_change, the polling bridge initializes in
-  // probe state (verifying default behavior builds and runs).
+  // Polling bridge initializes in probe state (verifying it builds and runs).
   mock().disable();
-  configure_always_publish();
+  configure_bridge();
   mock().enable();
 
   CHECK(bridge.current_state == polling_state_polling);
 }
 
 // ============================================================================
-// ONLY_PUBLISH_ON_CHANGE SCENARIO 2: Polling mode with change detection enabled
-//
-// YAML:
-//   geappliances_bridge:
-//     mode: poll
-//     polling_interval: 10000
-//     only_publish_on_change: true
+// Polling bridge initializes with cache
 // ============================================================================
 
-TEST(only_publish_on_change_config, config_polling_with_only_publish_on_change)
+TEST(polling_bridge_config, bridge_initializes_with_cache)
 {
-  // With only_publish_on_change=true, the bridge initializes in
-  // probe state (verifying the option builds and runs).
+  // Bridge initializes in probe state with cache (verifying it builds and runs).
   mock().disable();
-  configure_only_publish_on_change();
+  configure_bridge();
   mock().enable();
 
   CHECK(bridge.current_state == polling_state_polling);

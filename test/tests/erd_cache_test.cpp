@@ -3,7 +3,7 @@
  * @brief Unit tests for the ERD cache (erd_cache.h / erd_cache.cpp).
  *
  * Tests cover: init/destroy, inline vs heap storage, update flow,
- * change detection, only_publish_onchange, iterators, rate counters,
+ * change detection, iterators, rate counters,
  * cache full, size change detection.
  *
  * Note: erd_cache_find() is internal (static in .cpp), so tests use
@@ -50,7 +50,6 @@ TEST(erd_cache, init_zeros_all_entries)
   CHECK_EQUAL(0, cache.update_count_window);
   CHECK_EQUAL(0, cache.required_update_count);
   CHECK_EQUAL(0, cache.required_update_count_window);
-  CHECK_FALSE(cache.only_publish_onchange);
   CHECK_EQUAL(0, erd_cache_get_count(&cache));
 }
 
@@ -168,14 +167,12 @@ TEST(erd_cache, size_change_shrinks_returns_false)
   CHECK_FALSE(result);
 }
 
-TEST(erd_cache, only_publish_onchange_true_unchanged_data)
+TEST(erd_cache, unchanged_data_returns_false)
 {
   uint8_t data[] = { 0x01 };
-  erd_cache_set_only_publish_onchange(&cache, true);
   erd_cache_update(&cache, 0x0001, data, 1);
 
-  // Unchanged data returns false and does NOT clear update_required
-  // (early exit before the update_required assignment at line 116)
+  // Unchanged data returns false (early exit)
   bool result = erd_cache_update(&cache, 0x0001, data, 1);
   CHECK_FALSE(result);
 
@@ -184,12 +181,10 @@ TEST(erd_cache, only_publish_onchange_true_unchanged_data)
   CHECK(NULL != entry);
   CHECK_TRUE(entry->update_required);
 }
-
-TEST(erd_cache, only_publish_onchange_true_changed_data)
+TEST(erd_cache, changed_data_sets_update_required)
 {
   uint8_t data1[] = { 0x01 };
   uint8_t data2[] = { 0x02 };
-  erd_cache_set_only_publish_onchange(&cache, true);
   erd_cache_update(&cache, 0x0001, data1, 1);
 
   bool result = erd_cache_update(&cache, 0x0001, data2, 1);
@@ -199,21 +194,6 @@ TEST(erd_cache, only_publish_onchange_true_changed_data)
   CHECK(NULL != entry);
   CHECK_TRUE(entry->update_required);
 }
-
-TEST(erd_cache, only_publish_onchange_false_always_sets_update_required)
-{
-  uint8_t data[] = { 0x01 };
-  erd_cache_set_only_publish_onchange(&cache, false);
-  erd_cache_update(&cache, 0x0001, data, 1);
-
-  bool result = erd_cache_update(&cache, 0x0001, data, 1);
-  CHECK_TRUE(result);
-
-  erd_cache_entry_t* entry = find_entry(&cache, 0x0001);
-  CHECK(NULL != entry);
-  CHECK_TRUE(entry->update_required);
-}
-
 TEST(erd_cache, get_next_updated_returns_updated_entries)
 {
   uint8_t data1[] = { 0x01 };
@@ -329,11 +309,10 @@ TEST(erd_cache, get_required_update_rate)
   CHECK_EQUAL(0, erd_cache_get_required_update_rate(&cache));
 }
 
-TEST(erd_cache, required_update_rate_with_only_publish_onchange)
+TEST(erd_cache, required_update_rate_with_unchanged_data)
 {
   uint8_t data1[] = { 0x01 };
   uint8_t data2[] = { 0x02 };
-  erd_cache_set_only_publish_onchange(&cache, true);
   erd_cache_update(&cache, 0x0001, data1, 1);
   erd_cache_update(&cache, 0x0001, data1, 1);
 
@@ -393,7 +372,6 @@ TEST(erd_cache, reinit_after_destroy)
 TEST(erd_cache, new_entry_always_sets_update_required)
 {
   uint8_t data[] = { 0x01 };
-  erd_cache_set_only_publish_onchange(&cache, true);
   erd_cache_update(&cache, 0x0001, data, 1);
 
   erd_cache_entry_t* entry = find_entry(&cache, 0x0001);
@@ -439,7 +417,6 @@ TEST(erd_cache, update_count_increments_on_new_entry)
 TEST(erd_cache, unchanged_data_does_not_increment_required_count)
 {
   uint8_t data[] = { 0x01 };
-  erd_cache_set_only_publish_onchange(&cache, true);
   erd_cache_update(&cache, 0x0001, data, 1);
   erd_cache_update(&cache, 0x0001, data, 1);
 
@@ -644,12 +621,10 @@ TEST(erd_cache, rate_limit_tick_noop_when_disabled)
   CHECK(entry != NULL);
   CHECK_EQUAL(0, entry->publish_cooldown);
 }
-
-/* Rate limiting + only_publish_onchange: unchanged data does not reset cooldown */
-TEST(erd_cache, rate_limit_with_only_publish_onchange_unchanged_data)
+/* Rate limiting: unchanged data does not reset cooldown */
+TEST(erd_cache, rate_limit_unchanged_data_does_not_reset_cooldown)
 {
   erd_cache_set_throttle_rate_seconds(&cache, 5);
-  erd_cache_set_only_publish_onchange(&cache, true);
   uint8_t data[] = { 0x01 };
   erd_cache_update(&cache, 0x0001, data, 1);
 
@@ -658,8 +633,7 @@ TEST(erd_cache, rate_limit_with_only_publish_onchange_unchanged_data)
   erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
   CHECK(entry != NULL);
   erd_cache_mark_published(&cache, entry);
-
-  /* Send the same data again — only_publish_onchange skips it. */
+  /* Send the same data again — unchanged data is skipped. */
   erd_cache_update(&cache, 0x0001, data, 1);
 
   /* update_required should not have been set, so cooldown is untouched. */

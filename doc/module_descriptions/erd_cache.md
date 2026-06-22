@@ -10,8 +10,7 @@ Fixed-size ERD cache with inline/heap data storage. Stores the latest data for u
 |----------|-------------|
 | `erd_cache_init(self)` | Initialize the cache (zero all entries, reset counters, free any heap data). |
 | `erd_cache_destroy(self)` | Free any heap-allocated data, reset the cache. |
-| `erd_cache_update(self, erd, data, data_size)` | Update or insert ERD data. Returns `true` if `update_required` was set (or entry was new). Returns `false` if cache is full, data is unchanged with `only_publish_onchange`, or ERD size changed (appliance lost). |
-| `erd_cache_set_only_publish_onchange(self, only_publish_onchange)` | Set whether the cache should only mark ERDs as updated when data changes. Default is `false` (always mark updated). |
+| `erd_cache_update(self, erd, data, data_size)` | Update or insert ERD data. Returns `true` if `update_required` was set (or entry was new). Returns `false` if cache is full, data is unchanged, or ERD size changed (appliance lost). |
 | `erd_cache_set_throttle_rate_seconds(self, rate)` | Set minimum interval (seconds) between publishes per ERD. 0 = disabled. Range: 0–255. |
 | `erd_cache_mark_published(self, entry)` | Mark an ERD entry as published; reloads the publish_cooldown timer. Static inline, zero overhead when rate limiting is disabled. |
 | `erd_cache_tick_cooldowns(self)` | Decrement publish_cooldown for all entries with `update_required = true`. Call once per second. Static inline, no-op when rate limiting is disabled. |
@@ -47,10 +46,10 @@ If a size change is detected on an existing entry, `erd_cache_update()` logs an 
 2. **If found:**
    - Increment `update_count` and `update_count_window`
    - Check if data has changed via `erd_data_changed()` (memcmp only — size is invariant)
-   - If data unchanged and `only_publish_onchange` is true: return `false` (early exit, no storage churn)
+  - If data unchanged: return `false` (early exit, no storage churn)
    - If data size differs from existing: log error, return `false` (appliance lost)
    - In-place `memcpy` into existing buffer (inline or heap — no free or alloc)
-   - Set `update_required = !only_publish_onchange || data_changed`
+  - Set `update_required = data_changed`
 3. **If not found:**
    - Scan `entries[]` for the first slot with `valid == false`
    - If no free slot: return `false` (cache full)
@@ -86,7 +85,6 @@ typedef struct erd_cache_t {
   uint32_t update_count_window;       // updates since last get_update_rate() call
   uint32_t required_update_count;     // total updates setting update_required=true since init
   uint32_t required_update_count_window; // such updates since last get_required_update_rate() call
-  bool only_publish_onchange;         // when true, only mark update_required on data change
   uint8_t max_cooldown;              // configured rate limit in seconds; 0 = disabled
   bool initialized;                   // true after first successful erd_cache_init()
 } erd_cache_t;
@@ -105,7 +103,7 @@ typedef struct erd_cache_t {
 - **Heap for larger ERDs**: ERDs > 4 bytes are allocated on the heap at registration. No pool is needed — with in-place updates there is no per-cycle alloc/free churn to avoid.
 - **In-place updates**: Existing entries are updated with a single `memcpy` into the existing buffer — no free, no alloc. This eliminates all storage churn on every poll cycle.
 - **Size invariance**: ERD data size never changes after registration. A size mismatch is treated as an appliance firmware change — `erd_cache_update()` logs an error and returns `false`, signaling the bridge should reinitialize.
-- **Early exit on unchanged data**: When `only_publish_onchange` is true and data hasn't changed, the update returns immediately without touching storage.
+- **Early exit on unchanged data**: When data hasn't changed, the update returns immediately without touching storage.
 - **Change detection at update time**: `update_required` is set during `erd_cache_update()`, not during iteration. This eliminates per-read `memcmp` overhead in the publisher loop.
 - **Two iterators**: `erd_cache_get_next_updated()` for the publisher (clears `update_required` flag) and `erd_cache_get_next_entry()` for read-only iteration.
 - **Rate counters**: `update_count_window` and `required_update_count_window` accumulate updates and are reset by `get_update_rate()` and `get_required_update_rate()`. The window is determined by the call interval of the consumer (e.g. ~60s if called once per minute).

@@ -220,7 +220,6 @@ void GeappliancesBridge::initialize_erd_bridge_()
       this->poll_probe_list_,
       this->poll_probe_list_count_,
       &this->erd_cache_);
-    erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
     this->polling_bridge_initialized_ = true;
   }
 
@@ -402,7 +401,6 @@ void GeappliancesBridge::handle_subscription_failed()
       this->poll_probe_list_,
       this->poll_probe_list_count_,
       &this->erd_cache_);
-  erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
   this->polling_bridge_initialized_ = true;
 
   // Signal the startup HSM that subscription fallback has occurred.
