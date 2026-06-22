@@ -251,8 +251,16 @@ TEST(erd_bridge_subscribe, should_periodically_retain_an_active_subscription)
 {
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
 
+  // Receive an ERD publication so quiet period transitions to steady (not failed).
+  given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
+
+  // Advance past the quiet period to reach steady state.
   nothing_should_happen();
-  after(subscription_retention_period - 1);
+  after(subscription_quiet_period);
+
+  // Now in steady state; retention should fire.
+  nothing_should_happen();
+  after(subscription_retention_period - subscription_quiet_period - 1);
 
   a_subscription_retention_should_be_requested_for(0xC0);
   after(1);
@@ -303,6 +311,10 @@ TEST(erd_bridge_subscribe, should_transition_to_steady_after_quiet_period_with_n
 {
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
 
+  // Receive at least one ERD publication so the quiet period transitions
+  // to steady (not failed — failed is for when no ERDs are published at all).
+  given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
+
   // Advance to just before the quiet period — nothing should happen.
   nothing_should_happen();
   after(subscription_quiet_period - 1);
@@ -321,6 +333,9 @@ TEST(erd_bridge_subscribe, should_transition_to_steady_after_quiet_period_with_n
 TEST(erd_bridge_subscribe, should_return_to_subscribed_on_new_erd_while_steady)
 {
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
+
+  // Receive an ERD publication so quiet period transitions to steady.
+  given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
 
   // Advance past the quiet period to reach steady state.
   nothing_should_happen();
@@ -341,6 +356,9 @@ TEST(erd_bridge_subscribe, should_retain_subscription_in_steady_state)
 {
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
 
+  // Receive an ERD publication so quiet period transitions to steady.
+  given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
+
   // Advance past the quiet period to reach steady state.
   nothing_should_happen();
   after(subscription_quiet_period);
@@ -353,6 +371,9 @@ TEST(erd_bridge_subscribe, should_retain_subscription_in_steady_state)
 TEST(erd_bridge_subscribe, should_resubscribe_on_host_came_online_from_steady)
 {
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
+
+  // Receive an ERD publication so quiet period transitions to steady.
+  given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
 
   // Advance past the quiet period to reach steady state.
   nothing_should_happen();
@@ -490,8 +511,17 @@ TEST(erd_bridge_subscribe_dual, each_bridge_independently_retains_its_subscripti
   given_both_bridges_are_initialized();
   given_both_subscriptions_are_active();
 
+  // Receive ERD publications so quiet period transitions to steady (not failed).
+  when_an_erd_publication_is_received(address_a, 0xABCD, uint32_t(0x12345678));
+  when_an_erd_publication_is_received(address_b, 0xABCD, uint32_t(0x12345678));
+
+  // Advance past the quiet period for both bridges.
   nothing_should_happen();
-  after(subscription_retention_period - 1);
+  after(subscription_quiet_period);
+
+  // Now both are in steady state; retention should fire for both.
+  nothing_should_happen();
+  after(subscription_retention_period - subscription_quiet_period - 1);
 
   mock()
     .expectOneCall("retain_subscription")
@@ -510,6 +540,14 @@ TEST(erd_bridge_subscribe_dual, resubscribing_one_bridge_does_not_affect_the_oth
 {
   given_both_bridges_are_initialized();
   given_both_subscriptions_are_active();
+
+  // Receive ERD publications so quiet period transitions to steady (not failed).
+  when_an_erd_publication_is_received(address_a, 0xABCD, uint32_t(0x12345678));
+  when_an_erd_publication_is_received(address_b, 0xABCD, uint32_t(0x12345678));
+
+  // Advance past the quiet period for both bridges.
+  nothing_should_happen();
+  after(subscription_quiet_period);
 
   // bridge_b's host comes back online: only bridge_b should resubscribe
   mock()

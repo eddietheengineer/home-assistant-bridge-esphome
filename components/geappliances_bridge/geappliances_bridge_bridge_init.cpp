@@ -204,8 +204,6 @@ void GeappliancesBridge::initialize_erd_bridge_()
   } else if (this->mode_ == BRIDGE_MODE_AUTO) {
     use_polling                          = false;
     mode_name                            = "auto (starting with subscription)";
-    this->subscription_activity_detected_ = false;
-    this->subscription_start_time_       = millis();
   }
 
   (void)mode_name;
@@ -337,10 +335,6 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
   if (sub_state == subscription_state_failed) {
     return;
   }
-  // In AUTO mode, subscription must be confirmed before custom polling.
-  if ((this->mode_ == BRIDGE_MODE_AUTO) && !this->subscription_activity_detected_) {
-    return;
-  }
   // Wait for the subscription bridge to reach steady state before starting
   // custom ERD polling. This gives the subscription bridge time to publish
   // its ERDs, so we can avoid redundant polling of ERDs already covered
@@ -353,23 +347,15 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
 }
 
 // ---------------------------------------------------------------------------
-// AUTO mode: subscription-activity watchdog
+// Subscription failed: fallback to polling
 // ---------------------------------------------------------------------------
 
-void GeappliancesBridge::check_subscription_activity_()
+void GeappliancesBridge::handle_subscription_failed()
 {
-  if (this->subscription_activity_detected_) {
+  // Already in polling mode — nothing to do.
+  if (this->mode_ != BRIDGE_MODE_AUTO) {
     return;
   }
-
-  // Unsigned subtraction wraps correctly on the ~49-day millis() rollover.
-  uint32_t elapsed = millis() - this->subscription_start_time_;
-  if (elapsed < subscription_quiet_period) {
-    return;
-  }
-
-  ESP_LOGW(TAG, "No subscription activity detected after %u seconds, falling back to polling mode",
-           subscription_quiet_period / 1000);
 
   // Tear down the subscription bridge.
   erd_bridge_subscribe_destroy(&this->erd_bridge_subscribe_);

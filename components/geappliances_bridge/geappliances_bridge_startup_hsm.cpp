@@ -375,8 +375,10 @@ tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_sig
       {
         subscription_state_t sub_state = svc->get_subscription_state();
         bool sub_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
-        if (svc->get_mode() == BRIDGE_MODE_AUTO && sub_active) {
-          svc->check_subscription_activity();
+        if (sub_state == subscription_state_failed) {
+          svc->handle_subscription_failed();
+          tiny_hsm_transition(hsm, startup_state_running);
+          break;
         }
         svc->log_poll_state_transitions();
         svc->maybe_start_custom_erd_polling();
@@ -422,9 +424,8 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
       svc->run_all_managers();
       {
         subscription_state_t sub_state = svc->get_subscription_state();
-        bool sub_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
-        if (svc->get_mode() == BRIDGE_MODE_AUTO && sub_active) {
-          svc->check_subscription_activity();
+        if (sub_state == subscription_state_failed) {
+          svc->handle_subscription_failed();
         }
       }
       svc->log_poll_state_transitions();

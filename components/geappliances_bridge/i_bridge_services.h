@@ -87,10 +87,11 @@ class IBridgeServices {
 
   // -- Recurring tasks (called from subscription_watch / running states) ------
 
-  /// Check subscription activity and fall back to polling if timed out.
-  virtual void check_subscription_activity() = 0;
   /// Start custom-ERD polling bridge if conditions are met (idempotent).
   virtual void maybe_start_custom_erd_polling() = 0;
+  /// Called when the subscription bridge enters the failed state; triggers
+  /// fallback to polling mode in AUTO mode.
+  virtual void handle_subscription_failed() = 0;
   /// Log any pending polling-bridge state-name transitions.
   virtual void log_poll_state_transitions() = 0;
   /// Run one tick of all managers (autodiscovery, device-ID, feature bits).

@@ -419,19 +419,11 @@ void GeappliancesBridge::log_poll_state_transitions_()
 }
 
 void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args) {
-  // Subscription publications: track AUTO mode activity.
+  // Subscription publications: track ERDs covered by subscription for
+  // custom ERD polling bridge filtering.
   if (this->erd_bridge_initialized_ &&
       args->address == this->autodiscovery_manager_.get_host_address() &&
       args->type == tiny_gea3_erd_client_activity_type_subscription_publication_received) {
-    subscription_state_t sub_state = this->get_subscription_state();
-    bool sub_active = (sub_state != subscription_state_none) && (sub_state != subscription_state_failed);
-    if (this->mode_ == BRIDGE_MODE_AUTO && sub_active &&
-        !this->subscription_activity_detected_) {
-      ESP_LOGI(TAG, "Subscription activity detected - subscription mode is working");
-      this->subscription_activity_detected_ = true;
-    }
-    // Track seen ERDs for the custom ERD polling bridge to filter out
-    // ERDs already covered by subscription.
     erd_set_insert(&this->custom_erd_subscription_seen_erds_, args->subscription_publication_received.erd);
   }
 
@@ -681,10 +673,6 @@ subscription_state_t GeappliancesBridge::get_subscription_state() const
 
 // -- Recurring tasks ----------------------------------------------------------
 
-void GeappliancesBridge::check_subscription_activity()
-{
-  check_subscription_activity_();
-}
 
 void GeappliancesBridge::maybe_start_custom_erd_polling()
 {

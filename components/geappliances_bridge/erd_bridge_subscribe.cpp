@@ -46,8 +46,13 @@ static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
     } break;
 
     case signal_quiet_period_expired:
-      // Transition to steady state after the quiet period with no new ERDs.
-      tiny_hsm_transition(hsm, state_steady);
+      // If no ERDs were ever published, the appliance doesn't support
+      // subscriptions — transition to failed. Otherwise, go to steady.
+      if (self->erd_set.count == 0) {
+        tiny_hsm_transition(hsm, state_failed);
+      } else {
+        tiny_hsm_transition(hsm, state_steady);
+      }
       break;
 
     case signal_timer_expired:
@@ -201,7 +206,7 @@ static tiny_hsm_result_t state_failed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal,
     case tiny_hsm_signal_entry:
       self->current_state = subscription_state_failed;
       disarm_timer(self);
-      tiny_timer_stop(self->timer_group, &self->quiet_timer);
+      ESP_LOGI(TAG, "Subscription not supported by appliance, falling back to polling");
       break;
 
     case tiny_hsm_signal_exit:

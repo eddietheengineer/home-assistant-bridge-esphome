@@ -93,7 +93,7 @@ The startup HSM holds a pointer to `IBridgeServices` and calls methods through t
 
 | Method | Description |
 |--------|-------------|
-| `check_subscription_activity()` | Check subscription activity and fall back to polling if timed out. |
+| `handle_subscription_failed()` | Called when the subscription bridge enters the failed state; triggers fallback to polling mode in AUTO mode. |
 | `maybe_start_custom_erd_polling()` | Start custom-ERD polling bridge if conditions are met. Idempotent. |
 | `log_poll_state_transitions()` | Log any pending polling-bridge state-name transitions. |
 | `run_all_managers()` | Run one tick of all managers (autodiscovery, device-ID, feature bits). |

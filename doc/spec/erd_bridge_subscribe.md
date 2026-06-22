@@ -79,7 +79,8 @@ Handles signals globally across all child states:
 - If the ERD is **new** (not already in `erd_set`): transitions to `state_subscribed`, restarting the quiet period
 
 **`signal_quiet_period_expired`:**
-- Transitions to `state_steady` (no new ERDs registered for 2 s)
+- If `erd_set.count == 0` (no ERDs were ever published), transitions to `state_failed` — the appliance accepted the subscription but never published anything.
+- Otherwise, transitions to `state_steady` (no new ERDs registered for the quiet period).
 
 **`signal_timer_expired`:**
 - Calls `tiny_gea3_erd_client_retain_subscription()` to keep the appliance publishing
@@ -146,6 +147,7 @@ The `erd_set_t` is a fixed-capacity sorted array (capacity 645). It tracks which
 - **Fixed-capacity ERD set**: Uses `erd_set_t` (sorted array) instead of `std::set` to eliminate heap node allocations.
 - **30-second retention**: The subscription is retained every 30 seconds (`subscription_retention_period`) to keep the appliance publishing ERD values.
 - **2-second quiet period**: After 2 seconds (`subscription_quiet_period`) with no new ERD registrations, the bridge transitions from `state_subscribed` to `state_steady`. This signals to the main bridge that the subscription has settled, allowing custom ERD polling to start.
+- **No-publications fallback**: If the quiet period expires while in `state_subscribed` with zero ERDs in `erd_set`, the bridge transitions to `state_failed` instead of `state_steady`. This handles the case where the appliance accepts the subscription but never publishes any ERD values. The main bridge detects this and falls back to polling.
 - **Failed state after 3 subscribe failures**: If `subscribe()` fails 3 times consecutively, the bridge transitions to `state_failed` and stops retrying. The main bridge detects this via `get_subscription_state()` returning `subscription_state_failed` and falls back to polling.
 - **1-second resubscribe delay**: If `subscribe()` fails, the bridge waits 1 second (`resubscribe_delay`) before retrying.
 - **Retention timer persists across subscribed/steady**: The retention timer is not disarmed when transitioning between `state_subscribed` and `state_steady`, ensuring continuous 30-second retention without gaps.
