@@ -30,6 +30,7 @@ static const char* const TAG __attribute__((unused)) = "erd_bridge_poll";
 static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+static tiny_hsm_result_t state_failed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static void send_poll_read_requests_bounded(erd_bridge_poll_t* self, uint32_t budget_ms);
 static bool send_cycle_reads(erd_bridge_poll_t* self);
 static constexpr uint32_t POLL_YIELD_MS = 50;          // per-batch time budget
@@ -97,6 +98,15 @@ static void on_polling_cycle_complete(erd_bridge_poll_t* self, bool immediate)
   uint32_t now = esphome::millis();
   self->last_cycle_time_ms = (uint32_t)(now - self->cycle_start_ms);
   self->cycle_count++;
+
+  // Track consecutive cycle failures. If any ERD in the cycle failed,
+  // increment the failure counter. On success, reset it.
+  if (self->cycle_has_failure) {
+    self->polling_failure_count++;
+  } else {
+    self->polling_failure_count = 0;
+  }
+  self->cycle_has_failure = false;
 
   if (immediate) {
     self->restart_pending = false;
@@ -351,7 +361,6 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         // Reads are in flight (erd_index reached the end of the list) but
         // not all responses have arrived yet.  Per Phase 3 spec, let the
         // current cycle finish naturally before restarting.  If erd_index
-        // is 0 the cycle has not started; the timer correctly starts it below.
         // Mark restart as pending so the cycle-completion handler kicks off
         // the next cycle as soon as the last ERD responds.
         self->restart_pending = true;
@@ -401,16 +410,50 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       }
       break;
     }
-
     case signal_read_failed: {
       reset_lost_appliance_timer(self);
       ESP_LOGD(TAG, "Read failed for ERD 0x%04x", args->read_failed.erd);
+      self->cycle_has_failure = true;
       self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
         on_polling_cycle_complete(self, self->restart_pending || !self->polling_timer_armed);
+        if (self->polling_failure_count >= 3) {
+          ESP_LOGE(TAG, "Polling bridge failed after %u consecutive failed cycles",
+                   self->polling_failure_count);
+          tiny_hsm_transition(hsm, state_failed);
+        }
       }
       break;
     }
+
+    case tiny_hsm_signal_exit:
+      break;
+
+    default:
+      return tiny_hsm_result_signal_deferred;
+  }
+
+  return tiny_hsm_result_signal_consumed;
+}
+
+static tiny_hsm_result_t state_failed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
+{
+  erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
+  (void)data;
+
+  switch (signal) {
+    case tiny_hsm_signal_entry:
+      self->current_state = polling_state_failed;
+      ESP_LOGE(TAG, "Polling bridge failed after %u consecutive failed cycles",
+               self->polling_failure_count);
+      break;
+
+    case signal_appliance_lost:
+      // Appliance came back — re-probe from scratch.
+      self->erd_host_address = self->known_host_address;
+      self->polling_failure_count = 0;
+      tiny_hsm_transition(hsm, state_probe_list);
+      break;
 
     case tiny_hsm_signal_exit:
       break;
@@ -427,7 +470,8 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
 static const tiny_hsm_state_descriptor_t poll_hsm_state_descriptors[] = {
   { .state = poll_state_top,              .parent = nullptr         },
   { .state = state_probe_list,            .parent = poll_state_top  },
-  { .state = state_polling,               .parent = poll_state_top  }
+  { .state = state_polling,               .parent = poll_state_top  },
+  { .state = state_failed,                .parent = poll_state_top  }
 };
 static const tiny_hsm_configuration_t poll_hsm_configuration = {
   .states      = poll_hsm_state_descriptors,
@@ -472,6 +516,8 @@ static void erd_bridge_poll_init_impl(
   self->cycle_start_ms              = 0;
   self->last_cycle_time_ms          = 0;
   self->cycle_count                 = 0;
+  self->polling_failure_count     = 0;
+  self->cycle_has_failure         = false;
   erd_set_init(&self->erd_set);
   self->erd_cache = cache;
   self->on_discovery_complete        = nullptr;

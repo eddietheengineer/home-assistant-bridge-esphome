@@ -354,23 +354,24 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
 
 void GeappliancesBridge::handle_polling_failed()
 {
-  // Only relevant when we have both bridges active (subscription + custom polling).
-  if (!this->polling_bridge_initialized_ || !this->subscription_bridge_initialized_) {
-    return;
-  }
-
   polling_state_t poll_state = this->get_polling_state();
   if (poll_state != polling_state_failed) {
     return;
   }
 
-  // If the custom ERD polling bridge has failed, destroy it and let
-  // subscription continue handling standard ERDs.  The custom ERDs will
-  // simply not be polled.
-  ESP_LOGW(TAG, "Custom ERD polling bridge failed; continuing with subscription only");
-  erd_bridge_poll_destroy(&this->erd_bridge_poll_);
-  this->polling_bridge_initialized_ = false;
-  this->custom_erd_polling_started_ = false;
+  if (this->subscription_bridge_initialized_) {
+    // Custom ERD polling bridge failed alongside subscription — destroy it
+    // and let subscription continue handling standard ERDs.
+    ESP_LOGW(TAG, "Custom ERD polling bridge failed; continuing with subscription only");
+    erd_bridge_poll_destroy(&this->erd_bridge_poll_);
+    this->polling_bridge_initialized_ = false;
+    this->custom_erd_polling_started_ = false;
+  } else {
+    // Primary polling bridge failed (POLL mode or GEA2). No fallback available.
+    ESP_LOGE(TAG, "Primary polling bridge failed; no data path available");
+    // Leave the bridge in failed state. The appliance_lost handler in
+    // state_failed will re-probe if the appliance comes back.
+  }
   this->last_logged_poll_state_ = polling_state_none;
 }
 
@@ -388,6 +389,7 @@ void GeappliancesBridge::handle_subscription_failed()
   // Tear down the subscription bridge.
   erd_bridge_subscribe_destroy(&this->erd_bridge_subscribe_);
   this->subscription_bridge_initialized_ = false;
+  this->last_logged_poll_state_ = polling_state_none;
 
   // Destroy any existing polling bridge (e.g., from custom ERD polling)
   // before re-initializing to avoid leaking heap allocations.

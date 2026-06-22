@@ -99,6 +99,14 @@ typedef struct {
    * Callers may watch this for state transitions to emit
    * diagnostic log messages without coupling to ESP logging headers. */
   polling_state_t current_state;
+  /* Consecutive cycle failure counter. Incremented on each full cycle where
+   * all ERDs fail. Reset on any successful read. Transitions to state_failed
+   * when this reaches 3, matching the subscription bridge's failure threshold. */
+  uint8_t polling_failure_count;
+  /* True if any ERD in the current polling cycle has failed.
+   * Reset at the start of each cycle; checked on cycle completion
+   * to increment the consecutive failure counter. */
+  bool cycle_has_failure;
   /* Pre-built list of ERDs to probe during discovery.
    * Set by the caller before erd_bridge_poll_init(); the bridge copies
    * successfully-probed ERDs into erd_polling_list during the probe phase. */

@@ -679,6 +679,9 @@ subscription_state_t GeappliancesBridge::get_subscription_state() const
 
 polling_state_t GeappliancesBridge::get_polling_state() const
 {
+  if (!this->polling_bridge_initialized_) {
+    return polling_state_none;
+  }
   return this->erd_bridge_poll_.current_state;
 }
 

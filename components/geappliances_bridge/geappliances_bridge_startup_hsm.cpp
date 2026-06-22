@@ -381,6 +381,7 @@ tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_sig
           break;
         }
         svc->log_poll_state_transitions();
+        svc->handle_polling_failed();
         svc->maybe_start_custom_erd_polling();
 
         if (svc->get_mode() != BRIDGE_MODE_AUTO || !sub_active) {
