@@ -8,6 +8,7 @@
 #include "i_mqtt_client.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
+#include "esphome/components/mqtt/mqtt_client.h"
 
 #include <cstdio>
 #include <string.h>
@@ -173,6 +174,16 @@ void erd_cache_mqtt_publisher_init(
   tiny_event_subscribe(
     mqtt_client_on_mqtt_connect(self->mqtt_client),
     &self->mqtt_connect_subscription);
+
+  /* If MQTT is already connected when we register, fire the event immediately
+   * so mqtt_connected is set correctly.  This mirrors the adapter's pattern:
+   * the adapter fires on_mqtt_connect_event during its init, but the publisher
+   * subscribes after the adapter is already initialized, so it can miss that
+   * initial event. */
+  auto global = esphome::mqtt::global_mqtt_client;
+  if (global != nullptr && global->is_connected()) {
+    erd_cache_mqtt_publisher_on_connected(self);
+  }
 
   ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
 }
