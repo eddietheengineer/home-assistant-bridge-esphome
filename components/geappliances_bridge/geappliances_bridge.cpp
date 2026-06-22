@@ -25,13 +25,13 @@ static const tiny_gea3_erd_client_configuration_t client_configuration = {
   .request_retries = 10
 };
 
-// GEA2 ERD client: no internal retries.  Bridge-level retries
-// (try_read_erd_with_retry_) handle all retry logic with ~500 ms spacing
-// between attempts, giving appliances time to service slow first-access
-// NVRAM lookups.
+// GEA2 ERD client: one internal retry.  With request_timeout=250ms and
+// request_retries=1, each read gets two attempts (500ms total), giving
+// appliances time to service slow first-access NVRAM lookups or transient
+// bus collisions without needing bridge-level retry logic.
 static const tiny_gea2_erd_client_configuration_t gea2_client_configuration = {
   .request_timeout = 250,
-  .request_retries = 0
+  .request_retries = 1
 };
 
 // Tick-counter time source for the GEA2 interface's internal timer group.
