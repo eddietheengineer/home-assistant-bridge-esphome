@@ -45,6 +45,7 @@ typedef struct {
   tiny_hsm_t hsm;
   uint8_t erd_host_address;
   const char* current_state_name;
+  uint8_t subscribe_failure_count;
 } erd_bridge_subscribe_t;
 
 /*!

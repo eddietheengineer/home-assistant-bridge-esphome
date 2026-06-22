@@ -522,3 +522,18 @@ TEST(erd_bridge_subscribe_dual, resubscribing_one_bridge_does_not_affect_the_oth
   args.address = address_b;
   tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
 }
+
+TEST(erd_bridge_subscribe, transitions_to_failed_after_three_consecutive_subscribe_failures)
+{
+  given_that_the_bridge_has_been_initialized();
+
+  // Each subscribe failure triggers a retry subscribe() call that also fails.
+  // After 3 failures, the bridge transitions to state_failed.
+  mock().ignoreOtherCalls();
+
+  when_a_subscribe_failure_is_received_for(0xC0);
+  when_a_subscribe_failure_is_received_for(0xC0);
+  when_a_subscribe_failure_is_received_for(0xC0);
+
+  CHECK(strcmp(self.current_state_name, "failed") == 0);
+}

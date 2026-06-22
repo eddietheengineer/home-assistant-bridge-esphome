@@ -75,8 +75,7 @@ class IBridgeServices {
   // -- Operating mode --------------------------------------------------------
 
   virtual BridgeMode get_mode() const = 0;
-  virtual bool is_subscription_mode_active() const = 0;
-  virtual bool is_subscription_steady() const = 0;
+  virtual const char* get_subscription_state() const = 0;
 
   // -- Startup delay ---------------------------------------------------------
 

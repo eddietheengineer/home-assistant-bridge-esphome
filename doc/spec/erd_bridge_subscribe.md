@@ -39,29 +39,34 @@ typedef struct {
   tiny_hsm_t hsm;
   uint8_t erd_host_address;
   const char* current_state_name;
+  uint8_t subscribe_failure_count;
 } erd_bridge_subscribe_t;
 ```
 
 ## State Machine
-
 ```
 sub_state_top (parent — handles publication signals globally)
   ├─ state_subscribing (initial)
   │    ├─ entry: disarm retention timer; attempt subscribe()
   │    ├─ subscription_host_came_online: clear ERD set, then attempt subscribe()
-  │    ├─ subscription_failed / timer_expired: attempt subscribe()
+  │    ├─ subscription_failed: increment failure counter; on 3rd failure → state_failed; otherwise retry subscribe()
+  │    ├─ timer_expired: attempt subscribe()
   │    ├─ subscription_added_or_retained → state_subscribed
   │    └─ exit: disarm timer
   │
   ├─ state_subscribed
-  │    ├─ entry: arm periodic timer (30 s retention) + quiet timer (10 s)
+  │    ├─ entry: arm periodic timer (30 s retention) + quiet timer (2 s)
   │    ├─ subscription_host_came_online → state_subscribing
   │    └─ exit: disarm quiet timer only (retention timer persists)
   │
-  └─ state_steady
-       ├─ entry: stop quiet timer; current_state_name = "steady"
-       ├─ subscription_host_came_online → state_subscribing
-       └─ exit: no-op (retention timer persists)
+  ├─ state_steady
+  │    ├─ entry: stop quiet timer; current_state_name = "steady"
+  │    ├─ subscription_host_came_online → state_subscribing
+  │    └─ exit: no-op (retention timer persists)
+  │
+  └─ state_failed
+       ├─ entry: disarm all timers; current_state_name = "failed"
+       └─ exit: no-op
 ```
 
 ### `sub_state_top` (Parent)
@@ -84,7 +89,8 @@ Handles signals globally across all child states:
 
 - On entry: disarms the retention timer (to prevent spurious subscribe retries), calls `tiny_gea3_erd_client_subscribe()` with the host address
 - On `signal_subscription_host_came_online`: clears `erd_set` (appliance may have changed its ERD set), then attempts subscribe
-- On `signal_subscription_failed` or `signal_timer_expired`: attempts subscribe with `resubscribe_delay` (1 s) backoff
+- On `signal_subscription_failed`: increments `subscribe_failure_count`. On the 3rd failure, transitions to `state_failed`. On the 1st or 2nd failure, retries subscribe with `resubscribe_delay` (1 s) backoff.
+- On `signal_timer_expired`: attempts subscribe with `resubscribe_delay` (1 s) backoff
 - On `signal_subscription_added_or_retained`: transitions to `state_subscribed`
 - On exit: disarms the retry timer
 
@@ -101,6 +107,12 @@ Handles signals globally across all child states:
 - On `signal_subscription_host_came_online`: transitions to `state_subscribing`
 - On a new ERD publication (handled by `sub_state_top`): transitions back to `state_subscribed`, restarting the quiet period
 - On exit: no-op (retention timer persists if transitioning back to `state_subscribed`)
+
+### `state_failed`
+
+- On entry: disarms all timers (retention and quiet); sets `current_state_name` to `"failed"`
+- Terminal state — no transitions out. The main bridge detects this state and falls back to polling.
+- On exit: no-op
 
 ## Event Subscription
 
@@ -134,6 +146,7 @@ The `erd_set_t` is a fixed-capacity sorted array (capacity 645). It tracks which
 - **Fixed-capacity ERD set**: Uses `erd_set_t` (sorted array) instead of `std::set` to eliminate heap node allocations.
 - **30-second retention**: The subscription is retained every 30 seconds (`subscription_retention_period`) to keep the appliance publishing ERD values.
 - **2-second quiet period**: After 2 seconds (`subscription_quiet_period`) with no new ERD registrations, the bridge transitions from `state_subscribed` to `state_steady`. This signals to the main bridge that the subscription has settled, allowing custom ERD polling to start.
+- **Failed state after 3 subscribe failures**: If `subscribe()` fails 3 times consecutively, the bridge transitions to `state_failed` and stops retrying. The main bridge detects this via `get_subscription_state()` returning `"failed"` and falls back to polling.
 - **1-second resubscribe delay**: If `subscribe()` fails, the bridge waits 1 second (`resubscribe_delay`) before retrying.
 - **Retention timer persists across subscribed/steady**: The retention timer is not disarmed when transitioning between `state_subscribed` and `state_steady`, ensuring continuous 30-second retention without gaps.
 - **New ERD exits steady state**: When a new ERD is published while in `state_steady`, the bridge transitions back to `state_subscribed`, restarting the quiet period.

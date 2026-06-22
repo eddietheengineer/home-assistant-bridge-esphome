@@ -12,6 +12,7 @@
  */
 
 #include "i_bridge_services.h"
+#include <cstring>
 #include "geappliances_bridge_constants.h"
 #include "geappliances_bridge_startup_hsm.h"
 #include "esphome/core/log.h"
@@ -371,14 +372,18 @@ tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_sig
       break;
 
     case signal_run_loop:
-      if (svc->get_mode() == BRIDGE_MODE_AUTO && svc->is_subscription_mode_active()) {
-        svc->check_subscription_activity();
-      }
-      svc->log_poll_state_transitions();
-      svc->maybe_start_custom_erd_polling();
+      {
+        const char* sub_state = svc->get_subscription_state();
+        bool sub_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+        if (svc->get_mode() == BRIDGE_MODE_AUTO && sub_active) {
+          svc->check_subscription_activity();
+        }
+        svc->log_poll_state_transitions();
+        svc->maybe_start_custom_erd_polling();
 
-      if (svc->get_mode() != BRIDGE_MODE_AUTO || !svc->is_subscription_mode_active()) {
-        tiny_hsm_transition(hsm, startup_state_running);
+        if (svc->get_mode() != BRIDGE_MODE_AUTO || !sub_active) {
+          tiny_hsm_transition(hsm, startup_state_running);
+        }
       }
       break;
 
@@ -415,9 +420,12 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
 
     case signal_run_loop:
       svc->run_all_managers();
-
-      if (svc->get_mode() == BRIDGE_MODE_AUTO && svc->is_subscription_mode_active()) {
-        svc->check_subscription_activity();
+      {
+        const char* sub_state = svc->get_subscription_state();
+        bool sub_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+        if (svc->get_mode() == BRIDGE_MODE_AUTO && sub_active) {
+          svc->check_subscription_activity();
+        }
       }
       svc->log_poll_state_transitions();
       svc->maybe_start_custom_erd_polling();

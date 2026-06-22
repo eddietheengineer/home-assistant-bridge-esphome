@@ -84,10 +84,9 @@ class MockBridgeServices : public IBridgeServices {
       mock().actualCall("get_mode").onObject(this)
         .returnIntValueOrDefault(BRIDGE_MODE_AUTO));
   }
-  bool is_subscription_mode_active() const override { return true; }
-  bool is_subscription_steady() const override {
-    return mock().actualCall("is_subscription_steady").onObject(this)
-               .returnBoolValueOrDefault(false);
+  const char* get_subscription_state() const override {
+    return mock().actualCall("get_subscription_state").onObject(this)
+               .returnStringValueOrDefault(nullptr);
   }
 
   // -- Startup delay ----------------------------------------------------------
@@ -289,6 +288,7 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   mock().expectOneCall("get_mode").onObject(&svc).andReturnValue(BRIDGE_MODE_POLL);
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
   /* Phase 7: running run_loop */
+  mock().expectOneCall("get_subscription_state").onObject(&svc).andReturnValue(static_cast<const char*>(nullptr));
   mock().expectOneCall("get_mode").onObject(&svc).andReturnValue(BRIDGE_MODE_POLL);
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
   /* Drive the HSM through all phases. */

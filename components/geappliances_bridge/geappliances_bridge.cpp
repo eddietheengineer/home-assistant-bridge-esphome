@@ -392,9 +392,12 @@ void GeappliancesBridge::log_poll_state_transitions_()
     return;
   }
 
+  const char* sub_state = this->get_subscription_state();
+  bool sub_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+
   // Log polling bridge state changes.
   bool is_poll_mode = !((this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-                        (this->mode_ == BRIDGE_MODE_AUTO && this->subscription_mode_active_));
+                        (this->mode_ == BRIDGE_MODE_AUTO && sub_active));
   if (is_poll_mode) {
     const char* new_state = this->erd_bridge_poll_.current_state_name;
     if (new_state != nullptr && new_state != this->last_logged_poll_state_) {
@@ -406,13 +409,12 @@ void GeappliancesBridge::log_poll_state_transitions_()
 
   // Log subscription bridge state changes.
   bool is_sub_mode = (this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-                     (this->mode_ == BRIDGE_MODE_AUTO && this->subscription_mode_active_);
+                     (this->mode_ == BRIDGE_MODE_AUTO && sub_active);
   if (is_sub_mode) {
-    const char* new_state = this->erd_bridge_subscribe_.current_state_name;
-    if (new_state != nullptr && new_state != this->last_logged_subscribe_state_) {
+    if (sub_state != nullptr && sub_state != this->last_logged_subscribe_state_) {
       ESP_LOGI(TAG, "Subscription bridge state: %s (ERDs cached: %u)",
-               new_state, erd_cache_get_count(&this->erd_cache_));
-      this->last_logged_subscribe_state_ = new_state;
+               sub_state, erd_cache_get_count(&this->erd_cache_));
+      this->last_logged_subscribe_state_ = sub_state;
     }
   }
 }
@@ -422,7 +424,9 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
   if (this->erd_bridge_initialized_ &&
       args->address == this->autodiscovery_manager_.get_host_address() &&
       args->type == tiny_gea3_erd_client_activity_type_subscription_publication_received) {
-    if (this->mode_ == BRIDGE_MODE_AUTO && this->subscription_mode_active_ &&
+    const char* sub_state = this->get_subscription_state();
+    bool sub_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+    if (this->mode_ == BRIDGE_MODE_AUTO && sub_active &&
         !this->subscription_activity_detected_) {
       ESP_LOGI(TAG, "Subscription activity detected - subscription mode is working");
       this->subscription_activity_detected_ = true;
@@ -493,7 +497,9 @@ void GeappliancesBridge::dump_config() {
   } else if (this->mode_ == BRIDGE_MODE_SUBSCRIBE) {
     mode_str = "Subscription";
   } else if (this->mode_ == BRIDGE_MODE_AUTO) {
-    if (this->subscription_mode_active_) {
+    const char* sub_state = this->get_subscription_state();
+    bool sub_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+    if (sub_active) {
       mode_str = "Auto (Subscription)";
     } else {
       mode_str = "Auto (Polling - fallback)";
@@ -501,8 +507,10 @@ void GeappliancesBridge::dump_config() {
   }
   (void)mode_str;
   ESP_LOGCONFIG(TAG, "  Mode: %s", mode_str);
-  
-  if (this->mode_ == BRIDGE_MODE_POLL || !this->subscription_mode_active_) {
+
+  const char* sub_state = this->get_subscription_state();
+  bool sub_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+  if (this->mode_ == BRIDGE_MODE_POLL || !sub_active) {
     ESP_LOGCONFIG(TAG, "  Polling Interval: %u ms", this->polling_interval_ms_);
     ESP_LOGCONFIG(TAG, "  Only Publish On Change: %s", this->polling_only_publish_on_change_ ? "yes" : "no");
   }
@@ -667,15 +675,9 @@ BridgeMode GeappliancesBridge::get_mode() const
   return mode_;
 }
 
-bool GeappliancesBridge::is_subscription_mode_active() const
+const char* GeappliancesBridge::get_subscription_state() const
 {
-  return subscription_mode_active_;
-}
-
-bool GeappliancesBridge::is_subscription_steady() const
-{
-  return this->erd_bridge_subscribe_.current_state_name != nullptr &&
-         strcmp(this->erd_bridge_subscribe_.current_state_name, "steady") == 0;
+  return this->erd_bridge_subscribe_.current_state_name;
 }
 
 // -- Recurring tasks ----------------------------------------------------------

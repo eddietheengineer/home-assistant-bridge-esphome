@@ -118,8 +118,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void initialize_erd_bridge() override;
 
   BridgeMode get_mode() const override;
-  bool is_subscription_mode_active() const override;
-  bool is_subscription_steady() const override;
+  const char* get_subscription_state() const override;
   void check_subscription_activity() override;
   void maybe_start_custom_erd_polling() override;
   void log_poll_state_transitions() override;
@@ -166,7 +165,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   uint16_t custom_erds_count_{0};
 
   // Auto mode fallback tracking
-  bool subscription_mode_active_{false};
   bool subscription_activity_detected_{false};
   uint32_t subscription_start_time_{0};
   // Fixed-capacity set for tracking seen subscription ERDs (replaces std::set).

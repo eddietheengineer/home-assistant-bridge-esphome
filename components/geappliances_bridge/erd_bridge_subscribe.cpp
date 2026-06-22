@@ -21,6 +21,7 @@ static const char* const TAG __attribute__((unused)) = "erd_bridge_subscribe";
 static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_subscribed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_steady(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+static tiny_hsm_result_t state_failed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
 static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
@@ -84,6 +85,12 @@ static tiny_hsm_result_t state_subscribing(tiny_hsm_t* hsm, tiny_hsm_signal_t si
       /* Intentionally fall through to the subscribe case below. */
       __attribute__((fallthrough));
     case signal_subscription_failed:
+      self->subscribe_failure_count++;
+      if (self->subscribe_failure_count >= 3) {
+        tiny_hsm_transition(hsm, state_failed);
+        break;
+      }
+      __attribute__((fallthrough));
     case signal_timer_expired:
       if(!tiny_gea3_erd_client_subscribe(self->erd_client, self->erd_host_address)) {
         arm_timer(self, resubscribe_delay);
@@ -185,11 +192,34 @@ static tiny_hsm_result_t state_steady(tiny_hsm_t* hsm, tiny_hsm_signal_t signal,
   return tiny_hsm_result_signal_consumed;
 }
 
+static tiny_hsm_result_t state_failed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
+{
+  erd_bridge_subscribe_t* self = container_of(erd_bridge_subscribe_t, hsm, hsm);
+  (void)data;
+
+  switch(signal) {
+    case tiny_hsm_signal_entry:
+      self->current_state_name = "failed";
+      disarm_timer(self);
+      tiny_timer_stop(self->timer_group, &self->quiet_timer);
+      break;
+
+    case tiny_hsm_signal_exit:
+      break;
+
+    default:
+      return tiny_hsm_result_signal_deferred;
+  }
+
+  return tiny_hsm_result_signal_consumed;
+}
+
 static const tiny_hsm_state_descriptor_t sub_hsm_state_descriptors[] = {
   { .state = sub_state_top, .parent = nullptr },
   { .state = state_subscribing, .parent = sub_state_top },
   { .state = state_subscribed, .parent = sub_state_top },
-  { .state = state_steady, .parent = sub_state_top }
+  { .state = state_steady, .parent = sub_state_top },
+  { .state = state_failed, .parent = sub_state_top }
 };
 static const tiny_hsm_configuration_t sub_hsm_configuration = {
   .states = sub_hsm_state_descriptors,
@@ -208,6 +238,7 @@ void erd_bridge_subscribe_init(
   self->erd_host_address = address;
   self->erd_cache = cache;
   self->current_state_name = nullptr;
+  self->subscribe_failure_count = 0;
   erd_set_init(&self->erd_set);
 
   tiny_event_subscription_init(
@@ -271,4 +302,5 @@ void erd_bridge_subscribe_destroy(erd_bridge_subscribe_t* self)
   }
 
   /* erd_set is a fixed array embedded in the struct — no heap cleanup needed. */
+  self->current_state_name = nullptr;
 }

@@ -12,7 +12,7 @@
 - Provide phase-transition queries (`is_X_complete`, `is_X_initialized`) so the HSM can check completion without internal state knowledge
 - Provide phase-timing helpers (`record_*_start`, `is_*_elapsed`) for delay-based transitions
 - Group recurring-work dispatch methods so the running state stays clean
-- Expose the current operating mode (`get_mode`, `is_subscription_mode_active`, `is_subscription_steady`)
+- Expose the current operating mode (`get_mode`) and subscription bridge state (`get_subscription_state`)
 
 ### 1.3 Not Responsible For
 
@@ -79,11 +79,8 @@ The startup HSM holds a pointer to `IBridgeServices` and calls methods through t
 
 ### 3.6 Operating Mode
 
-| Method | Description |
-|--------|-------------|
 | `get_mode()` | Returns the current `BridgeMode` (POLL, SUBSCRIBE, or AUTO). |
-| `is_subscription_mode_active()` | Returns `true` if subscription mode is currently active (may differ from configured mode in AUTO when fallback to polling occurs). |
-| `is_subscription_steady()` | Returns `true` if the subscription bridge has reached steady state (no new ERD registrations for `subscription_quiet_period`, 2 s). Used by `maybe_start_custom_erd_polling()` to gate custom ERD polling until the subscription has settled. |
+| `get_subscription_state()` | Returns the current subscription bridge state as a string: `"subscribing"`, `"subscribed"`, `"steady"`, `"failed"`, or `nullptr` (not initialized). Callers derive `is_subscription_mode_active` from this: active when the value is non-null and not `"failed"`. |
 
 ### 3.7 Startup Delay
 

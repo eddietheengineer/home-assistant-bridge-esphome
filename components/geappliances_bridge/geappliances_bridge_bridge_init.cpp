@@ -70,7 +70,10 @@ ErdPollListResult build_poll_list_(GeappliancesBridge* bridge)
   ErdPollListConfig config;
   config.mode = bridge->mode_;
   config.subscription_capable = !bridge->autodiscovery_manager_.is_gea2_protocol();
-  config.subscription_active = bridge->subscription_mode_active_;
+  {
+    const char* sub_state = bridge->get_subscription_state();
+    config.subscription_active = (sub_state != nullptr) && (strcmp(sub_state, "failed") != 0);
+  }
   config.appliance_api_parsing = bridge->appliance_api_parsing_;
   config.feature_bit_valid_erds = bridge->feature_bit_manager_.get_valid_erd_count() ? bridge->feature_bit_manager_.valid_erds_ : nullptr;
   config.feature_bit_valid_erds_count = bridge->feature_bit_manager_.get_valid_erd_count();
@@ -201,7 +204,6 @@ void GeappliancesBridge::initialize_erd_bridge_()
   } else if (this->mode_ == BRIDGE_MODE_AUTO) {
     use_polling                          = false;
     mode_name                            = "auto (starting with subscription)";
-    this->subscription_mode_active_      = true;
     this->subscription_activity_detected_ = false;
     this->subscription_start_time_       = millis();
   }
@@ -327,22 +329,23 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
     return;
   }
 
-  bool in_subscription_mode = (this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-                              (this->mode_ == BRIDGE_MODE_AUTO && this->subscription_mode_active_);
-  if (!in_subscription_mode) {
+  const char* sub_state = this->get_subscription_state();
+  // Custom polling only when subscription mode is active and not failed.
+  if (sub_state == nullptr) {
     return;
   }
-
-  bool subscription_confirmed = (this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-                                this->subscription_activity_detected_;
-  if (!subscription_confirmed) {
+  if (strcmp(sub_state, "failed") == 0) {
+    return;
+  }
+  // In AUTO mode, subscription must be confirmed before custom polling.
+  if ((this->mode_ == BRIDGE_MODE_AUTO) && !this->subscription_activity_detected_) {
     return;
   }
   // Wait for the subscription bridge to reach steady state before starting
   // custom ERD polling. This gives the subscription bridge time to publish
   // its ERDs, so we can avoid redundant polling of ERDs already covered
   // by subscription.
-  if (!this->is_subscription_steady()) {
+  if (strcmp(sub_state, "steady") != 0) {
     return;
   }
 
@@ -388,8 +391,6 @@ void GeappliancesBridge::check_subscription_activity_()
     reinterpret_cast<GeappliancesBridge*>(ctx)->on_poll_discovery_complete_();
   };
   this->erd_bridge_poll_.on_discovery_complete_context = this;
-
-  this->subscription_mode_active_ = false;
 
   auto result = build_poll_list_(this);
   this->poll_probe_list_count_ = result.erds_count;
