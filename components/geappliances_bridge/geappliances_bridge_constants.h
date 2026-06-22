@@ -86,3 +86,8 @@ static inline uint64_t read_be64(const uint8_t* buf, uint8_t size)
   }
   return bits;
 }
+
+// Subscription quiet window — no new ERDs seen for this duration means
+// the subscription burst has settled and the bridge is in steady state.
+// Shared by the bridge steady-state check and HA discovery.
+static constexpr uint32_t SUBSCRIPTION_QUIET_MS = 10000;

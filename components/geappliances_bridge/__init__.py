@@ -34,7 +34,6 @@ CONF_POLLING_ONLY_PUBLISH_ON_CHANGE = "polling_onlypublish_onchange"
 CONF_APPLIANCE_API_PARSING = "appliance_api_parsing"
 CONF_CUSTOM_ERDS = "custom_erds"
 CONF_GENERATE_DEVICE_CONFIG = "generate_device_config"
-CONF_HA_DISCOVERY_BASE_URL = "ha_discovery_base_url"
 CONF_ERD_PUBLISH_RATE_SENSOR = "erd_publish_rate_sensor"
 CONF_ERD_CACHE_ENTRIES_SENSOR = "erd_cache_entries_sensor"
 CONF_ERD_CACHE_UPDATES_SENSOR = "erd_cache_updates_sensor"
@@ -42,12 +41,6 @@ CONF_MQTT_PUBLISH_RATE_SENSOR = "mqtt_publish_rate_sensor"
 
 
 
-# Default base URL for the per-category JSONL files used by runtime HA discovery.
-# Uses HEAD to always resolve against the repository's default branch.
-HA_DISCOVERY_DEFAULT_BASE_URL = (
-    "https://raw.githubusercontent.com/joshualongenecker/"
-    "home-assistant-bridge-esphome/HEAD/ha_discovery"
-)
 
 # Bridge mode options (polling vs subscriptions)
 MODE_POLL = "poll"
@@ -304,8 +297,6 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_CUSTOM_ERDS, default=[]): cv.ensure_list(
             cv.int_range(min=0, max=0xFFFF)
         ),
-        cv.Optional(CONF_HA_DISCOVERY_BASE_URL,
-                    default=HA_DISCOVERY_DEFAULT_BASE_URL): cv.string,
         cv.Optional(CONF_ERD_PUBLISH_RATE_SENSOR): cv.Schema({
             cv.Optional("name", default="ERD Publish Rate"): cv.string,
         }).extend(sensor.sensor_schema(state_class="measurement")),

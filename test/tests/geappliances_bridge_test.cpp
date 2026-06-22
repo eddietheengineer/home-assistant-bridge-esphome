@@ -171,11 +171,6 @@ TEST(geappliances_bridge, teardown_after_custom_erds_filled)
   CHECK_TRUE(result);
 }
 
-TEST(geappliances_bridge, set_ha_discovery_base_url)
-{
-  bridge.set_ha_discovery_base_url("https://example.com/discovery");
-}
-
 TEST(geappliances_bridge, set_gea3_uart_null)
 {
   bridge.set_gea3_uart(nullptr);

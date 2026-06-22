@@ -30,119 +30,35 @@ namespace geappliances_bridge {
 static const char* const TAG __attribute__((unused)) = "ha_discovery";
 static constexpr uint32_t HA_STALE_DISCOVERY_TIMEOUT_MS = 2000;
 
-bool HaDiscoveryManager::contains_erd_(const tiny_erd_t* erds, uint16_t count, tiny_erd_t target) const
-{
-  for (uint16_t i = 0; i < count; i++) {
-    if (erds[i] == target) return true;
-  }
-  return false;
-}
-
-void HaDiscoveryManager::init(const std::string& device_id,
-                              const std::string& model_number,
-                              const std::string& serial_number,
-                              erd_cache_t* erd_cache,
-                              bool generate_device_config)
+void HaDiscoveryManager::configure(const std::string& device_id,
+                                   const std::string& model_number,
+                                   const std::string& serial_number,
+                                   erd_cache_t* erd_cache,
+                                   bool generate_device_config)
 {
   this->device_id_              = device_id;
   this->model_number_           = model_number;
   this->serial_number_          = serial_number;
   this->erd_cache_              = erd_cache;
-  // seen_erds_ removed — on_erd_seen() uses sorted_erds_ directly
   this->generate_device_config_ = generate_device_config;
-  this->state_                  = HA_DISCOVERY_WAITING_FOR_READY;
-  this->last_activity_          = millis();
-  this->start_time_             = millis();
 }
 
-void HaDiscoveryManager::set_registered_erds(const tiny_erd_t* erds, uint16_t count)
+void HaDiscoveryManager::start()
 {
-  // No-op: the fetch task reads the ERD cache directly.
-  // Kept for API compatibility with callers that may still invoke it.
-  (void)erds;
-  (void)count;
-}
+  // Idempotent: if already past IDLE, no-op.
+  if (this->state_ != HA_DISCOVERY_IDLE) return;
 
-void HaDiscoveryManager::on_erd_seen(tiny_erd_t erd)
-{
-  if (this->state_ != HA_DISCOVERY_WAITING_FOR_READY) return;
-  // Use sorted_erds_ for dedup (it gets populated at fetch time;
-  // during WAITING_FOR_READY it acts as a simple seen-set).
-  if (!contains_erd_(this->sorted_erds_, this->sorted_erds_count_, erd)) {
-    if (this->sorted_erds_count_ < HA_DISCOVERY_MAX_ERDS) {
-      this->sorted_erds_[this->sorted_erds_count_++] = erd;
-    }
-    this->last_activity_ = millis();
-  }
-}
-
-void HaDiscoveryManager::set_mqtt_adapter(esphome_mqtt_client_adapter_t* mqtt_adapter)
-{
-  this->mqtt_adapter_ = mqtt_adapter;
-}
-
-void HaDiscoveryManager::cleanup()
-{
-  // Idempotent: if already cleaned up, no-op.
-  if (this->queue_ == nullptr && this->task_stack_ == nullptr) {
-    return;
-  }
-
-  // Mark fetch as done so publish_next_entity_() won't race with us.
-  this->fetch_done_ = true;
-  this->task_handle_ = nullptr;
-
-  // If a fetch task is still running, signal it to stop via the sentinel.
-  if (this->queue_ != nullptr) {
-    uint16_t sentinel = HA_DISCOVERY_ITEM_POOL_SENTINEL;
-    xQueueSend(this->queue_, &sentinel, 0);
-
-    // Drain all remaining indices from the queue (no deletion needed — pool is static).
-    {
-      uint16_t idx;
-      while (xQueueReceive(this->queue_, &idx, 0) == pdTRUE) {
-        // Pool items are reused; no deletion needed.
-      }
-    }
-    // Re-send the sentinel now that space is guaranteed.
-    xQueueSend(this->queue_, &sentinel, 0);
-
-    // Delete the queue before freeing stack/TCB (queue may still be referenced).
-    vQueueDelete(this->queue_);
-    this->queue_ = nullptr;
-  }
-
-  // Free heap-allocated stack and TCB.
-  if (this->task_stack_ != nullptr) {
-    free(this->task_stack_);
-    this->task_stack_ = nullptr;
-  }
-  if (this->task_tcb_ != nullptr) {
-    free(this->task_tcb_);
-    this->task_tcb_ = nullptr;
-  }
-
-  // Reset static topic arrays (no free needed — they are class members).
   this->published_topics_count_ = 0;
   this->stale_topics_count_ = 0;
+  this->sorted_erds_count_ = 0;
+  this->fetch_done_ = false;
+  this->last_publish_ms_ = millis();
+
+  this->publish_ha_discovery_();
 }
 
-void HaDiscoveryManager::run(bool device_steady_state)
+void HaDiscoveryManager::run()
 {
-  if (this->state_ == HA_DISCOVERY_WAITING_FOR_READY) {
-    // Safety cap: if steady state is not reached within the max wait time,
-    // fail rather than waiting forever (e.g., subscription bridge stuck).
-    if (millis() - this->start_time_ > HA_DISCOVERY_MAX_WAIT_MS) {
-      ESP_LOGW(TAG, "HA discovery timed out after %u ms — marking failed",
-               static_cast<unsigned>(HA_DISCOVERY_MAX_WAIT_MS));
-      this->state_ = HA_DISCOVERY_FAILED;
-      return;
-    }
-    if (device_steady_state) {
-      this->publish_ha_discovery_();
-    }
-  }
-
   if (this->state_ == HA_DISCOVERY_PUBLISHING) {
     // Feed the task watchdog — MQTT publish below can block for seconds
     // on the IDF MQTT mutex, starving the main loop WDT.
@@ -331,6 +247,23 @@ static inline void safe_strncpy(char* dst, const char* src, size_t dst_size)
 
 
 #ifdef USE_ESP_IDF_STUBS
+void HaDiscoveryManager::cleanup()
+{
+  this->queue_ = nullptr;
+  this->task_stack_ = nullptr;
+  this->task_handle_ = nullptr;
+  this->task_tcb_ = nullptr;
+  this->fetch_done_ = false;
+  this->published_topics_count_ = 0;
+  this->stale_topics_count_ = 0;
+}
+
+void HaDiscoveryManager::set_mqtt_adapter(esphome_mqtt_client_adapter_t* mqtt_adapter)
+{
+  this->mqtt_adapter_ = mqtt_adapter;
+}
+
+
 // ESP-IDF stubs: no real FreeRTOS or HTTP client in test builds.
 void HaDiscoveryManager::publish_ha_discovery_()
 {
@@ -359,6 +292,57 @@ void HaDiscoveryManager::publish_stale_cleanup_()
   this->state_ = HA_DISCOVERY_IDLE;
 }
 #else  /* !USE_ESP_IDF_STUBS — real ESP-IDF implementation */
+void HaDiscoveryManager::cleanup()
+{
+  // Idempotent: if already cleaned up, no-op.
+  if (this->queue_ == nullptr && this->task_stack_ == nullptr) {
+    return;
+  }
+
+  // Mark fetch as done so publish_next_entity_() won't race with us.
+  this->fetch_done_ = true;
+  this->task_handle_ = nullptr;
+
+  // If a fetch task is still running, signal it to stop via the sentinel.
+  if (this->queue_ != nullptr) {
+    uint16_t sentinel = HA_DISCOVERY_ITEM_POOL_SENTINEL;
+    xQueueSend(this->queue_, &sentinel, 0);
+
+    // Drain all remaining indices from the queue (no deletion needed — pool is static).
+    {
+      uint16_t idx;
+      while (xQueueReceive(this->queue_, &idx, 0) == pdTRUE) {
+        // Pool items are reused; no deletion needed.
+      }
+    }
+    // Re-send the sentinel now that space is guaranteed.
+    xQueueSend(this->queue_, &sentinel, 0);
+
+    // Delete the queue before freeing stack/TCB (queue may still be referenced).
+    vQueueDelete(this->queue_);
+    this->queue_ = nullptr;
+  }
+
+  // Free heap-allocated stack and TCB.
+  if (this->task_stack_ != nullptr) {
+    free(this->task_stack_);
+    this->task_stack_ = nullptr;
+  }
+  if (this->task_tcb_ != nullptr) {
+    free(this->task_tcb_);
+    this->task_tcb_ = nullptr;
+  }
+
+  // Reset static topic arrays (no free needed — they are class members).
+  this->published_topics_count_ = 0;
+  this->stale_topics_count_ = 0;
+}
+
+void HaDiscoveryManager::set_mqtt_adapter(esphome_mqtt_client_adapter_t* mqtt_adapter)
+{
+  this->mqtt_adapter_ = mqtt_adapter;
+}
+
 
 // Minimal zero-allocation JSON string extractor for flat JSON objects.
 // Finds "key":"value" in JSON and returns a pointer to the first character

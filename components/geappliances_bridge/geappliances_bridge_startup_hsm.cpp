@@ -366,7 +366,11 @@ tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_sig
     case tiny_hsm_signal_entry:
       if (svc->get_mode() != BRIDGE_MODE_AUTO) {
         svc->maybe_start_custom_erd_polling();
-        tiny_hsm_transition(hsm, startup_state_ha_discovery);
+        if (svc->is_ha_discovery_enabled()) {
+          tiny_hsm_transition(hsm, startup_state_ha_discovery);
+        } else {
+          tiny_hsm_transition(hsm, startup_state_running);
+        }
       }
       break;
 
@@ -379,12 +383,20 @@ tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_sig
       svc->check_steady_state();
 
       if (svc->is_device_steady_state()) {
-        tiny_hsm_transition(hsm, startup_state_ha_discovery);
+        if (svc->is_ha_discovery_enabled()) {
+          tiny_hsm_transition(hsm, startup_state_ha_discovery);
+        } else {
+          tiny_hsm_transition(hsm, startup_state_running);
+        }
       }
       break;
 
     case signal_subscription_fallback:
-      tiny_hsm_transition(hsm, startup_state_ha_discovery);
+      if (svc->is_ha_discovery_enabled()) {
+        tiny_hsm_transition(hsm, startup_state_ha_discovery);
+      } else {
+        tiny_hsm_transition(hsm, startup_state_running);
+      }
       break;
 
     case tiny_hsm_signal_exit:
@@ -413,20 +425,18 @@ tiny_hsm_result_t startup_state_ha_discovery(tiny_hsm_t* hsm, tiny_hsm_signal_t 
     case tiny_hsm_signal_entry:
       ESP_LOGI(TAG, "Startup: HA discovery phase");
       // Initialize HA discovery now that both subscription and polling are
-      // in steady state. The ERD cache snapshot will include all ERDs
-      // discovered during the subscription burst.
+      // in steady state. The ERD cache includes all ERDs discovered during
+      // the subscription burst.
       svc->init_ha_discovery();
       break;
 
     case signal_run_loop:
-      // If MQTT isn't connected yet, defer until it is. The run_loop signal
-      // will be sent again on the next loop() iteration.
-      if (!svc->is_mqtt_connected()) {
-        ESP_LOGD(TAG, "HA discovery deferred: MQTT not connected yet");
-        break;
-      }
+      // Drive the discovery state machine (publishing/cleanup).
+      // Transitions to running once discovery reaches a terminal state.
       svc->run_ha_discovery();
-      tiny_hsm_transition(hsm, startup_state_running);
+      if (svc->is_ha_discovery_complete()) {
+        tiny_hsm_transition(hsm, startup_state_running);
+      }
       break;
 
     case tiny_hsm_signal_exit:
@@ -464,7 +474,6 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
       }
       svc->maybe_start_custom_erd_polling();
       svc->log_poll_state_transitions();
-      svc->run_ha_discovery();
       break;
 
     case tiny_hsm_signal_exit:

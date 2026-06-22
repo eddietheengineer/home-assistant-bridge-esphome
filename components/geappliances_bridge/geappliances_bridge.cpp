@@ -417,8 +417,7 @@ void GeappliancesBridge::log_poll_state_transitions_()
 }
 
 void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args) {
-  // Subscription publications: track AUTO mode activity and reset the HA
-  // discovery quiet window for both AUTO and SUBSCRIBE modes.
+  // Subscription publications: track AUTO mode activity.
   if (this->erd_bridge_initialized_ &&
       args->address == this->autodiscovery_manager_.get_host_address() &&
       args->type == tiny_gea3_erd_client_activity_type_subscription_publication_received) {
@@ -430,9 +429,6 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
     if (erd_set_insert(&this->custom_erd_subscription_seen_erds_, args->subscription_publication_received.erd)) {
       this->custom_erd_subscription_last_activity_ = millis();
     }
-    // Reset the HA discovery quiet window only for new ERD IDs. Repeated value
-    // updates for already-seen ERDs do not extend the wait.
-    this->on_ha_discovery_erd_seen_(args->subscription_publication_received.erd);
   }
 
   // Device ID reads (after discovery, before bridge init)
@@ -464,11 +460,6 @@ bool GeappliancesBridge::should_route_to_feature_bits_(tiny_erd_t erd)
   FeatureBitState state = this->feature_bit_manager_.get_state();
   bool feature_bit_active = (state != FEATURE_BIT_STATE_COMPLETE);
   return feature_bit_active && is_feature_bit_erd(erd);
-}
-
-void GeappliancesBridge::on_ha_discovery_erd_seen_(tiny_erd_t erd)
-{
-  this->ha_discovery_manager_.on_erd_seen(erd);
 }
 
 void GeappliancesBridge::dump_config() {
@@ -697,12 +688,12 @@ bool GeappliancesBridge::is_subscription_steady_state() const
   }
   // If we've seen subscription activity, check the quiet window.
   if (this->custom_erd_subscription_last_activity_ != 0) {
-    return (millis() - this->custom_erd_subscription_last_activity_) >= HA_DISCOVERY_QUIET_MS;
+    return (millis() - this->custom_erd_subscription_last_activity_) >= SUBSCRIPTION_QUIET_MS;
   }
   // No subscription activity seen yet. Wait for the quiet window from the
   // subscription start time — the initial burst of subscription publications
   // typically arrives within the first few seconds after subscribing.
-  return (millis() - this->subscription_start_time_) >= HA_DISCOVERY_QUIET_MS;
+  return (millis() - this->subscription_start_time_) >= SUBSCRIPTION_QUIET_MS;
 }
 
 bool GeappliancesBridge::is_polling_steady_state() const
@@ -717,6 +708,16 @@ bool GeappliancesBridge::is_polling_steady_state() const
 bool GeappliancesBridge::is_device_steady_state() const
 {
   return is_subscription_steady_state() && is_polling_steady_state();
+}
+
+bool GeappliancesBridge::is_ha_discovery_enabled() const
+{
+  return this->generate_device_config_;
+}
+
+bool GeappliancesBridge::is_ha_discovery_complete() const
+{
+  return ha_discovery_manager_.is_complete() || ha_discovery_manager_.is_failed();
 }
 
 void GeappliancesBridge::check_steady_state()
@@ -759,7 +760,7 @@ void GeappliancesBridge::log_poll_state_transitions()
 
 void GeappliancesBridge::run_ha_discovery()
 {
-  ha_discovery_manager_.run(is_device_steady_state());
+  ha_discovery_manager_.run();
 }
 
 void GeappliancesBridge::init_ha_discovery()
@@ -769,16 +770,19 @@ void GeappliancesBridge::init_ha_discovery()
   // Clear any previously-published HA discovery topics before generating new ones.
   this->ha_discovery_manager_.clear_ha_discovery_sync();
 
-  // Pass the ERD cache pointer directly — the fetch task reads embedded
-  // JSONL from flash, filtered against the live cache.
-  this->ha_discovery_manager_.init(
+  // Configure the manager with device identity and live ERD cache pointer.
+  this->ha_discovery_manager_.configure(
       this->device_identity_manager_.get_device_id(),
       this->device_identity_manager_.get_model_number(),
       this->device_identity_manager_.get_serial_number(),
       &this->erd_cache_,
       true);
   this->ha_discovery_manager_.set_mqtt_adapter(&this->mqtt_client_adapter_);
-  ESP_LOGI(TAG, "HA discovery initialized — will read %u ERDs from cache at fetch time",
+
+  // Start discovery — the bridge has already gated on steady state.
+  this->ha_discovery_manager_.start();
+
+  ESP_LOGI(TAG, "HA discovery started — will read %u ERDs from cache at fetch time",
            static_cast<unsigned>(erd_cache_get_count(&this->erd_cache_)));
 }
 

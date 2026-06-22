@@ -2,12 +2,11 @@
  * @file
  * @brief HaDiscoveryManager – Home Assistant MQTT autodiscovery manager.
  *
- * Extracted from GeappliancesBridge as part of the god class refactoring.
- * Encapsulates the logic for:
- *   - Watching for "ready" signal (quiet window or polling list complete)
- *   - Spawning a FreeRTOS background task to fetch JSONL definitions via HTTPS
- *   - Parsing JSONL lines into MQTT discovery payloads
- *   - Rate-limited publishing of discovery messages to Home Assistant
+ * Modular, fire-and-forget component: the bridge calls configure() to set
+ * device identity, then start() once at steady state to begin discovery.
+ * The manager spawns a FreeRTOS background task to decompress embedded
+ * JSONL definitions, match them against the ERD cache, and publish
+ * discovery payloads at a controlled rate.
  *
  * On non-ESP-IDF builds the fetch is a no-op and a warning is logged.
  */
@@ -19,19 +18,21 @@
 //       bridge has registered at runtime.
 //
 // Responsibilities:
-//   - Wait for a "ready" signal (quiet window or polling cycle complete)
-//   - Spawn a FreeRTOS background task to fetch per-category JSONL definitions
-//   - Parse JSONL lines, match against registered ERDs, build payloads
-//   - Rate-limited publishing of discovery messages to Home Assistant
+//   - Decompress embedded JSONL entity definitions from flash
+//   - Match definitions against the ERD cache via binary search
+//   - Build and rate-limit publish discovery payloads to Home Assistant
+//   - Discover and clean up stale discovery topics from previous configurations
 //
 // NOT responsible for:
-//   - Determining which ERDs are valid (receives registered ERD set externally)
+//   - Determining when to start (the bridge gates on steady state)
+//   - Determining which ERDs are valid (reads the ERD cache directly)
 //   - Managing bridge lifecycle or MQTT connection state
 //   - Any post-discovery entity updates
 //
 // Dependencies:
-//   - EsphomeMqttClientAdapter (debug log publish)
+//   - EsphomeMqttClientAdapter (publish/subscribe)
 //   - FreeRTOS task + queue on ESP-IDF builds (for fetching JSONL)
+//   - erd_cache_t (opaque pointer, forward declared)
 // =============================================================================
 
 #pragma once
@@ -41,7 +42,6 @@
 
 // Include the adapter header for the typed pointer (lightweight — no heavy deps)
 #include "esphome_mqtt_client_adapter.h"
-
 extern "C" {
 #include "erd_cache.h"
 #include "tiny_gea3_erd_client.h"
@@ -63,13 +63,10 @@ extern "C" {
 namespace esphome {
 namespace geappliances_bridge {
 
-static constexpr uint32_t HA_DISCOVERY_QUIET_MS = 10000;
-static constexpr uint32_t HA_DISCOVERY_MAX_WAIT_MS = 30000;  // 30s safety cap
 static constexpr uint32_t HA_ENTITY_PUBLISH_INTERVAL_MS = 50;
 
 enum HaDiscoveryState {
   HA_DISCOVERY_IDLE,
-  HA_DISCOVERY_WAITING_FOR_READY,
   HA_DISCOVERY_PUBLISHING,
   HA_DISCOVERY_COMPLETE,
   HA_DISCOVERY_CLEANING_STALE,  // discovering and cleaning stale topics
@@ -95,19 +92,23 @@ struct HaDiscoveryCategory;
 
 class HaDiscoveryManager {
  public:
-  void init(const std::string& device_id,
-            const std::string& model_number,
-            const std::string& serial_number,
-            erd_cache_t* erd_cache,
-            bool generate_device_config);
+  /// Configure device identity and ERD cache pointer.
+  /// Call once before start(). Does not change state.
+  void configure(const std::string& device_id,
+                 const std::string& model_number,
+                 const std::string& serial_number,
+                 erd_cache_t* erd_cache,
+                 bool generate_device_config);
 
-  void set_registered_erds(const tiny_erd_t* erds, uint16_t count);
+  /// Start the discovery process.
+  /// The bridge must ensure the device is in steady state before calling.
+  /// Transitions to PUBLISHING (or COMPLETE/FAILED on error).
+  /// Idempotent: calling multiple times is safe (no-ops after first start).
+  void start();
 
-  void on_erd_seen(tiny_erd_t erd);
-
-  /// Drive the state machine. Called every loop iteration.
-  /// \param device_steady_state true when all active bridges are settled.
-  void run(bool device_steady_state);
+  /// Drive the state machine for publishing/cleanup phases.
+  /// Called every loop iteration while in PUBLISHING, CLEARING, or CLEANING_STALE.
+  void run();
 
   /// Set the MQTT adapter for async publishing (typed pointer, nullptr = sync fallback)
   void set_mqtt_adapter(esphome_mqtt_client_adapter_t* mqtt_adapter);
@@ -115,7 +116,6 @@ class HaDiscoveryManager {
   bool is_complete() const { return state_ == HA_DISCOVERY_COMPLETE; }
   bool is_failed()   const { return state_ == HA_DISCOVERY_FAILED; }
   bool is_publishing() const { return state_ == HA_DISCOVERY_PUBLISHING; }
-  bool is_ready_to_start() const { return state_ == HA_DISCOVERY_WAITING_FOR_READY; }
 
   HaDiscoveryState get_state() const { return state_; }
 
@@ -151,7 +151,6 @@ class HaDiscoveryManager {
 
   int escape_json_str_(const char* s, char* buf, int buf_size);
   const char* build_device_json_();
-  bool contains_erd_(const tiny_erd_t* erds, uint16_t count, tiny_erd_t target) const;
 
   // Track published discovery topics for clearing later.
   // Fixed-size static array to avoid heap allocation spikes during discovery
@@ -196,9 +195,7 @@ class HaDiscoveryManager {
   tiny_erd_t sorted_erds_[HA_DISCOVERY_MAX_ERDS];
   uint16_t sorted_erds_count_{0};
   bool generate_device_config_{false};
-  uint32_t last_activity_{0};
   uint32_t last_publish_ms_{0};
-  uint32_t start_time_{0};  // millis() when WAITING_FOR_READY state entered
 
   // Pointer to the MQTT adapter for async publishing (typed, set via set_mqtt_adapter)
   esphome_mqtt_client_adapter_t* mqtt_adapter_{nullptr};

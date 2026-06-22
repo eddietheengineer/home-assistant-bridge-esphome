@@ -107,6 +107,10 @@ class IBridgeServices {
   virtual void run_ha_discovery() = 0;
   /// Initialize the HA discovery manager with the current ERD cache snapshot.
   /// Called at the start of the HA discovery phase, after steady state is confirmed.
+  /// Returns true if HA discovery is enabled (generate_device_config is true).
+  virtual bool is_ha_discovery_enabled() const = 0;
+  /// Returns true once HA discovery has completed (or was skipped).
+  virtual bool is_ha_discovery_complete() const = 0;
   virtual void init_ha_discovery() = 0;
   /// Run one tick of all managers (autodiscovery, device-ID, feature bits).
   virtual void run_all_managers() = 0;

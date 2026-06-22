@@ -117,6 +117,14 @@ class MockBridgeServices : public IBridgeServices {
   void run_ha_discovery() override {
     mock().actualCall("run_ha_discovery").onObject(this);
   }
+  bool is_ha_discovery_enabled() const override {
+    return mock().actualCall("is_ha_discovery_enabled").onObject(this)
+               .returnBoolValueOrDefault(false);
+  }
+  bool is_ha_discovery_complete() const override {
+    return mock().actualCall("is_ha_discovery_complete").onObject(this)
+               .returnBoolValueOrDefault(true);
+  }
   void init_ha_discovery() override {
     mock().actualCall("init_ha_discovery").onObject(this);
   }
@@ -295,13 +303,10 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   mock().expectOneCall("is_bridge_initialized").onObject(&svc).andReturnValue(false);
   mock().expectOneCall("is_autodiscovery_complete").onObject(&svc).andReturnValue(true);
   mock().expectOneCall("initialize_erd_bridge").onObject(&svc);
-  /* Phase 6: subscription_watch entry → ha_discovery */
+  /* Phase 6: subscription_watch entry → running (ha_discovery disabled by default) */
   mock().expectOneCall("get_mode").onObject(&svc).andReturnValue(BRIDGE_MODE_POLL);
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
-  /* Phase 7: ha_discovery entry calls init_ha_discovery, then run_loop checks MQTT */
-  mock().expectOneCall("init_ha_discovery").onObject(&svc);
-  mock().expectOneCall("is_mqtt_connected").onObject(&svc).andReturnValue(true);
-  mock().expectOneCall("run_ha_discovery").onObject(&svc);
+  mock().expectOneCall("is_ha_discovery_enabled").onObject(&svc).andReturnValue(false);
 
   /* Drive the HSM through all phases. */
   tiny_hsm_init(&hsm, &startup_hsm_configuration, startup_state_protocol_stack);
@@ -322,10 +327,9 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   tiny_hsm_send_signal(&hsm, signal_bridge_ready, nullptr);
   /* After bridge_ready, we should be in ha_discovery (non-AUTO mode). */
   /* If we're in subscription_watch, get_mode returned AUTO. */
-  /* If we're in bridge_init, the transition didn't happen. */
-  CHECK(hsm.current == startup_state_ha_discovery);
-
-  tiny_hsm_send_signal(&hsm, signal_run_loop, nullptr);
+  tiny_hsm_send_signal(&hsm, signal_bridge_ready, nullptr);
+  /* After bridge_ready in non-AUTO mode with ha_discovery disabled,
+   * subscription_watch transitions directly to running. */
   CHECK(hsm.current == startup_state_running);
 
   mock().checkExpectations();

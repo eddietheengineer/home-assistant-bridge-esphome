@@ -330,7 +330,7 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
   // This gives the subscription bridge time to publish its ERDs, so we can
   // avoid redundant polling of ERDs already covered by subscription.
 
-  if (millis() - this->custom_erd_subscription_last_activity_ < HA_DISCOVERY_QUIET_MS) {
+  if (millis() - this->custom_erd_subscription_last_activity_ < SUBSCRIPTION_QUIET_MS) {
     return;
   }
 

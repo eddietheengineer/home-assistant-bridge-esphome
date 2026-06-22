@@ -91,7 +91,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_polling_only_publish_on_change(bool only_publish_on_change) { this->polling_only_publish_on_change_ = only_publish_on_change; }
   void set_appliance_api_parsing(bool appliance_api_parsing) { this->appliance_api_parsing_ = appliance_api_parsing; }
   void set_generate_device_config(bool generate_device_config) { this->generate_device_config_ = generate_device_config; }
-  void set_ha_discovery_base_url(const std::string& url) { this->ha_discovery_base_url_ = url; }
   void set_erd_publish_rate_sensor(sensor::Sensor* sensor) { this->erd_publish_rate_sensor_ = sensor; }
   void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; }
   void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; }
@@ -127,6 +126,8 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool is_subscription_steady_state() const override;
   bool is_polling_steady_state() const override;
   bool is_device_steady_state() const override;
+  bool is_ha_discovery_enabled() const override;
+  bool is_ha_discovery_complete() const override;
   void check_steady_state();  // Log steady-state transitions once
 
   void check_subscription_activity() override;
@@ -150,7 +151,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void start_feature_bit_reading_();
   void init_erd_cache_publisher_();
   void on_poll_discovery_complete_();
-  void on_ha_discovery_erd_seen_(tiny_erd_t erd);
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 
   // Startup HSM — replaces the manual switch-based phase progression.
@@ -246,14 +246,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // cache and publishes them to MQTT topics each loop().
   erd_cache_mqtt_publisher_t erd_cache_publisher_;
   erd_cache_t erd_cache_;
-
-  // Base URL for the per-category JSONL files.
-  // Can be overridden in YAML via ha_discovery_base_url.
-  // Uses HEAD to always resolve against the repository's default branch.
-  std::string ha_discovery_base_url_{
-    "https://raw.githubusercontent.com/joshualongenecker/"
-    "home-assistant-bridge-esphome/HEAD/ha_discovery"
-  };
 
   // Autodiscovery manager (extracted from god class)
   AutodiscoveryManager autodiscovery_manager_;
