@@ -3,7 +3,7 @@
 **Date:** 2026-06-22
 **Branch:** `plan/code-review-fixes`
 **Source:** `doc/code_review.md`
-**Reviewed by:** MemorySafetyReviewer, ArchitectureReviewer
+**Reviewed by:** MemorySafetyReviewer, ArchitectureReviewer, ImplDetailReviewer, TestStrategyReviewer
 
 ---
 
@@ -77,27 +77,27 @@ No timeout — if no appliance is present, the bridge loops forever in the autod
 
 **Fix location:** The fix belongs in the **startup HSM**, not the manager. `AutodiscoveryManager` is designed to "retry indefinitely" (per `autodiscovery_manager.h:7-8`) — its job is to find a board. The startup HSM is the orchestrator and should decide when to give up.
 
+**⚠️ Design decision required:** The startup HSM has no `timer_group` and no timer infrastructure. Two options:
+
+1. **Add `is_autodiscovery_timed_out()` to `IBridgeServices`** — matches the existing `is_startup_delay_elapsed()` pattern. The bridge tracks the timer; the HSM just polls the predicate. This is the least invasive option.
+2. **Add `timer_group` to the HSM API** — more flexible but requires API changes to `tiny_hsm_init()` and all state functions.
+
+**Recommendation:** Option 1 — add `is_autodiscovery_timed_out()` to `IBridgeServices`. The bridge records the start time in `startup_state_autodiscovery` entry and checks elapsed time in `signal_run_loop`.
+
 **Fix:**
-- Add a 60s timeout timer to `startup_state_autodiscovery`
-- On timeout, transition to a new `startup_state_failed` state
+- Add `is_autodiscovery_timed_out()` to `IBridgeServices` interface
+- In `startup_state_autodiscovery` entry, record the start time
+- In `signal_run_loop`, check `is_autodiscovery_timed_out()` (60s threshold) and transition to `startup_state_failed`
 - Add `startup_state_failed` as a terminal state with a `signal_restart` handler for recovery
 - Log a clear error message so users know no appliance was found
 
-**Test:** Verify timeout fires after 60s with no appliance, and that `signal_restart` recovers when one appears.
-
+**Test:** Add `is_autodiscovery_timed_out()` to `MockBridgeServices`. Mock `is_autodiscovery_complete()` false and `is_autodiscovery_timed_out()` true. Verify transition to `startup_state_failed`. Test `signal_restart` recovery to `protocol_stack`.
 ---
 
 ### 7. Synchronize write payload buffer 🔴 P1
+**⚠️ Test gap:** The MQTT subscribe callback path (`esphome_mqtt_client_adapter.cpp:150-178`) is **completely untested** — the existing test `subscribe_write_topic_is_noop` is a no-op because `global_mqtt_client` is null in tests. The race condition is untestable in single-threaded unit tests. Verification relies on code inspection of `tiny_event_publish()` synchronous delivery (confirmed: `tiny_event_subscription.c` calls subscriber callback synchronously before returning).
 
-**File:** `esphome_mqtt_client_adapter.cpp:150-178`
-
-The MQTT subscribe callback (running on the IDF MQTT task) writes to `write_payload_buffer_` (lines 162-170), then publishes an event with `args.value = self->write_payload_buffer_` (line 175). The write bridge reads `args->value` on the main loop task. This is a real data race — if the MQTT callback fires again before the consumer reads, the buffer is overwritten with a torn read.
-
-**Fix:** Copy the decoded payload to a stack buffer in the callback and set `args.value` to point to it. Since `tiny_event_publish()` delivers synchronously (the subscriber callback runs to completion before `publish()` returns), the stack buffer is safe — it lives for the duration of the callback.
-
-**Test:** Simulate rapid successive MQTT messages and verify no corruption.
-
----
+**Test:** Add test wiring `MqttTestDouble` as `global_mqtt_client` to exercise the subscribe callback. Simulate rapid successive messages and verify first message data is intact. This requires new test infrastructure.
 
 ## Newly Identified Issues
 
@@ -157,6 +157,29 @@ The 100ms budget is enforced and the function returns false to arm a resume time
 
 ---
 
+## Test Infrastructure Assessment
+
+### Framework
+CppUTest with CppUMock. Strengths: `tiny_timer_group_double_t` with `elapse_time()`, `mqtt_client_double_t` with trigger methods, `tiny_gea3_erd_client_double_t` with mockable read/write, `esphome_hal_double` with controllable `millis()`, `MockBridgeServices` comprehensive mock.
+
+### Weaknesses
+| Gap | Severity | Impact |
+|-----|----------|--------|
+| MQTT subscribe callback path untested | HIGH | P1#7 fix cannot be stress-tested |
+| No GEA2/GEA3 tight loop tests | MEDIUM | P2#M2 re-init fix hard to verify |
+| No re-init tests | MEDIUM | P2#M2 cannot verify reset behavior |
+| No startup HSM failure/recovery tests | MEDIUM | P1#6 `startup_state_failed` needs new tests |
+| Race conditions untestable in single-threaded tests | MEDIUM | P1#7 verification relies on code inspection |
+
+### Test Recommendations by Fix
+| Fix | Feasibility | Notes |
+|-----|-----------|-------|
+| P1#5 Write bridge timeout | HIGH | Timer double well-established; pattern used in `erd_bridge_poll_test.cpp` |
+| P1#6 Autodiscovery timeout | MEDIUM | Requires `is_autodiscovery_timed_out()` in `MockBridgeServices`; new `startup_state_failed` tests |
+| P1#7 Write payload buffer sync | LOW-MEDIUM | Requires new `MqttTestDouble` infrastructure; race untestable in single-threaded tests |
+| P2#M1 Remove global | HIGH | All 10 `startup_hsm_test.cpp` tests need mechanical update; `MockBridgeServices` works unchanged |
+| P2#M2 GEA2 global reset | MEDIUM | No `loop()` tests exist; needs structural member-check test or full GEA2 mock |
+| P2#M3 Feature bit threshold | HIGH | Existing `read_failed` patterns in `feature_bit_manager_test.cpp` provide exact structure needed |
 ## Summary
 
 | # | Fix | Severity | Priority | Files | Status |
