@@ -4,6 +4,7 @@
  */
 
 #include "erd_cache_mqtt_publisher.h"
+#include "erd_cache.h"
 #include "i_mqtt_client.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
@@ -91,6 +92,9 @@ static void mqtt_publisher_task(void* arg)
       if (elapsed >= 1000) {
         ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
       }
+
+      /* Reload the publish cooldown after successful MQTT publish. */
+      erd_cache_mark_published(self->cache, entry);
 
       // Update stats under mutex to prevent torn writes from the main loop.
       if (self->state_mutex) {
@@ -340,6 +344,9 @@ uint16_t erd_cache_mqtt_publisher_loop(
     if (elapsed >= 1000) {
       ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
     }
+
+    /* Reload the publish cooldown after successful MQTT publish. */
+    erd_cache_mark_published(self->cache, entry);
 
     self->total_published++;
     self->publish_count_window++;

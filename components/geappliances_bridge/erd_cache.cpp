@@ -53,14 +53,15 @@ void erd_cache_init(erd_cache_t* self)
     e->data_size = 0;
     e->uses_heap = false;
     e->update_required = false;
+    e->publish_cooldown = 0;
     e->valid = false;
-    e->ext_data = NULL;
   }
   self->update_count = 0;
   self->update_count_window = 0;
   self->required_update_count = 0;
   self->required_update_count_window = 0;
   self->only_publish_onchange = false;
+  self->max_cooldown = 0;
   self->initialized = true;
 }
 
@@ -149,7 +150,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   slot->uses_heap = false;
   slot->valid = true;
   slot->update_required = true;
-  slot->ext_data = NULL;
+  slot->publish_cooldown = 0;
 
   if (data_size <= ERD_CACHE_INLINE_DATA_SIZE) {
     memcpy(slot->inline_data, data, data_size);
@@ -180,15 +181,27 @@ void erd_cache_set_only_publish_onchange(erd_cache_t* self, bool only_publish_on
   self->only_publish_onchange = only_publish_onchange;
 }
 
+void erd_cache_set_update_fastest_rate(erd_cache_t* self, uint8_t rate)
+{
+  self->max_cooldown = rate;
+}
+
 erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* iterator)
 {
   for (uint16_t i = *iterator; i < ERD_CACHE_CAPACITY; i++) {
     erd_cache_entry_t* e = &self->entries[i];
-    if (e->valid && e->update_required) {
-      e->update_required = false;
-      *iterator = i + 1;
-      return e;
+    if (!e->valid || !e->update_required) continue;
+
+    /* Rate limit: skip if cooldown has not expired. */
+    if (self->max_cooldown > 0 && e->publish_cooldown > 0) {
+      continue;  /* keep update_required=true, retry next loop */
     }
+
+    /* Eligible — clear flag, return entry.
+     * Cooldown reload happens in erd_cache_mark_published() after successful MQTT publish. */
+    e->update_required = false;
+    *iterator = i + 1;
+    return e;
   }
   *iterator = 0; /* Reset iterator for next pass */
   return nullptr;

@@ -445,3 +445,202 @@ TEST(erd_cache, unchanged_data_does_not_increment_required_count)
 
   CHECK_EQUAL(1, cache.required_update_count);
 }
+
+/* --- Rate limiting tests --- */
+
+TEST(erd_cache, rate_limit_disabled_allows_immediate_publish)
+{
+  /* max_cooldown=0 (default) — every update publishes immediately. */
+  uint8_t data[] = { 0x01 };
+  erd_cache_update(&cache, 0x0001, data, 1);
+
+  uint16_t iter = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(0x0001, entry->erd);
+}
+
+TEST(erd_cache, rate_limit_first_entry_publishes_immediately)
+{
+  /* New entries always publish immediately, even with rate limiting enabled. */
+  erd_cache_set_update_fastest_rate(&cache, 5);
+  uint8_t data[] = { 0x01 };
+  erd_cache_update(&cache, 0x0001, data, 1);
+
+  uint16_t iter = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(0x0001, entry->erd);
+
+  /* After publish, cooldown is reloaded to max_cooldown. */
+  erd_cache_mark_published(&cache, entry);
+  iter = 0;
+  entry = erd_cache_get_next_entry(&cache, &iter);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(5, entry->publish_cooldown);
+}
+
+TEST(erd_cache, rate_limit_blocks_republish_until_cooldown_expires)
+{
+  erd_cache_set_update_fastest_rate(&cache, 5);
+  uint8_t data[] = { 0x01 };
+  erd_cache_update(&cache, 0x0001, data, 1);
+
+  /* First publish — immediate. */
+  uint16_t iter = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
+  CHECK(entry != NULL);
+  erd_cache_mark_published(&cache, entry);
+
+  /* Update again — should be blocked by cooldown. */
+  uint8_t data2[] = { 0x02 };
+  erd_cache_update(&cache, 0x0001, data2, 1);
+
+  /* get_next_updated should skip the rate-limited entry. */
+  iter = 0;
+  CHECK(NULL == erd_cache_get_next_updated(&cache, &iter));
+
+  /* Tick 4 times — cooldown goes from 5 to 1, still blocked. */
+  for (int i = 0; i < 4; i++) {
+    erd_cache_tick_cooldowns(&cache);
+  }
+  iter = 0;
+  entry = erd_cache_get_next_entry(&cache, &iter);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(1, entry->publish_cooldown);
+  CHECK(NULL == erd_cache_get_next_updated(&cache, &iter));
+
+  /* Tick once more — cooldown reaches 0, now eligible. */
+  erd_cache_tick_cooldowns(&cache);
+  iter = 0;
+  entry = erd_cache_get_next_entry(&cache, &iter);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(0, entry->publish_cooldown);
+
+  iter = 0;
+  entry = erd_cache_get_next_updated(&cache, &iter);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(0x0001, entry->erd);
+}
+
+TEST(erd_cache, rate_limit_reload_after_publish)
+{
+  erd_cache_set_update_fastest_rate(&cache, 3);
+  uint8_t data[] = { 0x01 };
+  erd_cache_update(&cache, 0x0001, data, 1);
+
+  uint16_t iter = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
+  CHECK(entry != NULL);
+  erd_cache_mark_published(&cache, entry);
+
+  uint16_t iter2 = 0;
+  entry = erd_cache_get_next_entry(&cache, &iter2);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(3, entry->publish_cooldown);
+}
+
+TEST(erd_cache, rate_limit_tick_only_decrements_when_update_required)
+{
+  erd_cache_set_update_fastest_rate(&cache, 5);
+  uint8_t data[] = { 0x01 };
+  erd_cache_update(&cache, 0x0001, data, 1);
+
+  uint16_t iter = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
+  CHECK(entry != NULL);
+  erd_cache_mark_published(&cache, entry);
+
+  /* Cooldown is 5, but update_required is false — tick should not decrement. */
+  erd_cache_tick_cooldowns(&cache);
+  iter = 0;
+  entry = erd_cache_get_next_entry(&cache, &iter);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(5, entry->publish_cooldown);  /* unchanged */
+}
+
+TEST(erd_cache, rate_limit_multiple_erds_independent)
+{
+  erd_cache_set_update_fastest_rate(&cache, 3);
+  uint8_t data1[] = { 0x01 };
+  uint8_t data2[] = { 0x02 };
+  erd_cache_update(&cache, 0x0001, data1, 1);
+  erd_cache_update(&cache, 0x0002, data2, 1);
+
+  /* Both publish immediately (first time). */
+  uint16_t iter = 0;
+  erd_cache_entry_t* e1 = erd_cache_get_next_updated(&cache, &iter);
+  CHECK(e1 != NULL);
+  erd_cache_mark_published(&cache, e1);
+
+  erd_cache_entry_t* e2 = erd_cache_get_next_updated(&cache, &iter);
+  CHECK(e2 != NULL);
+  erd_cache_mark_published(&cache, e2);
+
+  /* Update only ERD 0x0001. */
+  uint8_t data3[] = { 0x03 };
+  erd_cache_update(&cache, 0x0001, data3, 1);
+
+  /* 0x0001 is rate-limited, 0x0002 has no pending update. */
+  iter = 0;
+  CHECK(NULL == erd_cache_get_next_updated(&cache, &iter));
+
+  /* Tick twice — 0x0001 cooldown goes from 3 to 1. */
+  erd_cache_tick_cooldowns(&cache);
+  erd_cache_tick_cooldowns(&cache);
+
+  /* Update ERD 0x0002 — should publish immediately (cooldown was 3, tick brought it to 1, but update_required was false so it stayed at 3... wait, tick only decrements when update_required=true). */
+  /* Actually 0x0002 has update_required=false, so its cooldown stayed at 3.
+   * But new updates set update_required=true, and the cooldown check is > 0.
+   * So 0x0002 should also be blocked. Let me reconsider... */
+  /* The cooldown for 0x0002 is still 3 (tick skipped it because update_required was false).
+   * Now we update it, setting update_required=true. Its cooldown is 3 > 0, so it's blocked. */
+  uint8_t data4[] = { 0x04 };
+  erd_cache_update(&cache, 0x0002, data4, 1);
+  iter = 0;
+  CHECK(NULL == erd_cache_get_next_updated(&cache, &iter));
+}
+
+TEST(erd_cache, rate_limit_disabled_via_zero)
+{
+  erd_cache_set_update_fastest_rate(&cache, 0);
+  uint8_t data[] = { 0x01 };
+  erd_cache_update(&cache, 0x0001, data, 1);
+
+  uint16_t iter = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
+  CHECK(entry != NULL);
+  erd_cache_mark_published(&cache, entry);
+
+  /* With max_cooldown=0, mark_published sets cooldown to 0. */
+  iter = 0;
+  entry = erd_cache_get_next_entry(&cache, &iter);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(0, entry->publish_cooldown);
+
+  /* Update again — should publish immediately. */
+  uint8_t data2[] = { 0x02 };
+  erd_cache_update(&cache, 0x0001, data2, 1);
+  iter = 0;
+  entry = erd_cache_get_next_updated(&cache, &iter);
+  CHECK(entry != NULL);
+}
+
+TEST(erd_cache, rate_limit_tick_noop_when_disabled)
+{
+  erd_cache_set_update_fastest_rate(&cache, 0);
+  uint8_t data[] = { 0x01 };
+  erd_cache_update(&cache, 0x0001, data, 1);
+
+  uint16_t iter = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
+  CHECK(entry != NULL);
+  erd_cache_mark_published(&cache, entry);
+
+  /* Tick should be a no-op when max_cooldown=0. */
+  erd_cache_tick_cooldowns(&cache);
+  iter = 0;
+  entry = erd_cache_get_next_entry(&cache, &iter);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(0, entry->publish_cooldown);
+}

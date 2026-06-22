@@ -185,6 +185,16 @@ void GeappliancesBridge::loop() {
   // ESP32 variants where a blocking MQTT call can delay response
   // processing past the appliance's timeout window.
   this->run_protocol_stack_();
+
+  /* Tick ERD publish cooldowns once per second. */
+  if (this->update_fastest_rate_ > 0) {
+    static uint32_t last_cooldown_tick = 0;
+    uint32_t now = esphome::millis();
+    if (now - last_cooldown_tick >= 1000) {
+      last_cooldown_tick = now;
+      erd_cache_tick_cooldowns(&this->erd_cache_);
+    }
+  }
 #ifdef USE_ESP32
   // Feed the task watchdog after the protocol stack — the GEA2 tight loop
   // can run for 200 ms wall-clock time, exceeding the default TWDT timeout.
@@ -729,6 +739,9 @@ void GeappliancesBridge::init_erd_cache_publisher_()
 #ifdef USE_ESP_IDF
   erd_cache_mqtt_publisher_start(&this->erd_cache_publisher_);
 #endif
+
+  /* Apply rate limit configuration. */
+  erd_cache_set_update_fastest_rate(&this->erd_cache_, this->update_fastest_rate_);
 
   ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
 }

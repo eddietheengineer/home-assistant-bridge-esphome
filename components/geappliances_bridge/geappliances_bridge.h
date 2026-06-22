@@ -93,6 +93,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; }
   void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; }
   void set_mqtt_publish_rate_sensor(sensor::Sensor* sensor) { this->mqtt_publish_rate_sensor_ = sensor; }
+  void set_update_fastest_rate(uint8_t rate) { this->update_fastest_rate_ = rate; }
   void add_custom_erd(tiny_erd_t erd);
 
  protected:
@@ -158,6 +159,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool polling_only_publish_on_change_{false};
   bool appliance_api_parsing_{true};
   bool generate_device_config_{false};
+  uint8_t update_fastest_rate_{0};
   // User-configured custom ERDs to poll in addition to the standard list.
   // Populated by add_custom_erd() calls generated from the YAML custom_erds option.
   // Fixed-capacity array to avoid heap allocation.
