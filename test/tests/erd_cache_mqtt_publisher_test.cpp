@@ -709,3 +709,64 @@ TEST(erd_cache_mqtt_publisher, loop_no_publish_after_reconnect_when_no_changes)
   published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
   CHECK_EQUAL(0u, published);
 }
+
+/* Rate limiting: publisher reloads cooldown after successful publish */
+TEST(erd_cache_mqtt_publisher, loop_reloads_cooldown_after_publish)
+{
+  erd_cache_set_throttle_rate_seconds(&cache, 5);
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  uint8_t data = 0x42;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
+
+  /* First publish — immediate (new entry, cooldown=0). */
+  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(1u, published);
+
+  /* Verify cooldown was reloaded to max_cooldown. */
+  uint16_t iter = 0;
+  erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iter);
+  CHECK(entry != NULL);
+  CHECK_EQUAL(5, entry->publish_cooldown);
+}
+
+/* Rate limiting: publisher skips entries whose cooldown has not expired */
+TEST(erd_cache_mqtt_publisher, loop_skips_rate_limited_entries)
+{
+  erd_cache_set_throttle_rate_seconds(&cache, 5);
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  uint8_t data = 0x42;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
+
+  /* First publish — immediate. */
+  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(1u, published);
+
+  /* Update again — cooldown is 5, should be blocked. */
+  uint8_t data2 = 0x99;
+  erd_cache_update(&cache, 0x1001, &data2, sizeof(data2));
+
+  /* Loop should publish nothing (rate-limited). */
+  published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(0u, published);
+
+  /* Tick cooldown to 0. */
+  for (int i = 0; i < 5; i++) {
+    erd_cache_tick_cooldowns(&cache);
+  }
+
+  /* Now the loop should publish. */
+  published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(1u, published);
+}

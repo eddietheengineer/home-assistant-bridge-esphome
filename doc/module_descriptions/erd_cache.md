@@ -12,7 +12,10 @@ Fixed-size ERD cache with inline/heap data storage. Stores the latest data for u
 | `erd_cache_destroy(self)` | Free any heap-allocated data, reset the cache. |
 | `erd_cache_update(self, erd, data, data_size)` | Update or insert ERD data. Returns `true` if `update_required` was set (or entry was new). Returns `false` if cache is full, data is unchanged with `only_publish_onchange`, or ERD size changed (appliance lost). |
 | `erd_cache_set_only_publish_onchange(self, only_publish_onchange)` | Set whether the cache should only mark ERDs as updated when data changes. Default is `false` (always mark updated). |
-| `erd_cache_get_next_updated(self, iterator)` | Returns the next entry with `update_required = true`, then clears the flag. Caller provides an iterator (`uint16_t`) initialized to 0. Returns `NULL` when no more updated entries remain. |
+| `erd_cache_set_throttle_rate_seconds(self, rate)` | Set minimum interval (seconds) between publishes per ERD. 0 = disabled. Range: 0–255. |
+| `erd_cache_mark_published(self, entry)` | Mark an ERD entry as published; reloads the publish_cooldown timer. Static inline, zero overhead when rate limiting is disabled. |
+| `erd_cache_tick_cooldowns(self)` | Decrement publish_cooldown for all entries with `update_required = true`. Call once per second. Static inline, no-op when rate limiting is disabled. |
+| `erd_cache_get_next_updated(self, iterator)` | Returns the next entry with `update_required = true` and `publish_cooldown = 0`, then clears `update_required`. Skips entries still in cooldown, keeping `update_required = true` for retry. Caller provides an iterator (`uint16_t`) initialized to 0. Returns `NULL` when no more updated entries remain. |
 | `erd_cache_get_count(self)` | Returns the number of valid entries currently in the cache. |
 | `erd_cache_get_next_entry(self, iterator)` | Returns the next valid entry in the cache, iterating all entries. Does NOT require `update_required = true` and does NOT clear any flags — it is a read-only iteration. Resets iterator to 0 when exhausted. |
 | `erd_cache_get_update_rate(self)` | Returns the number of cache updates since the last call, then resets the window counter. |
@@ -69,7 +72,7 @@ typedef struct {
   };
   uint8_t data_size;
   bool uses_heap;       // true if ext_data is a heap allocation
-  bool update_required;
+  uint8_t publish_cooldown;  // counts down from max_cooldown to 0; 0 = eligible
   bool valid;
 } erd_cache_entry_t;
 ```
@@ -84,6 +87,7 @@ typedef struct erd_cache_t {
   uint32_t required_update_count;     // total updates setting update_required=true since init
   uint32_t required_update_count_window; // such updates since last get_required_update_rate() call
   bool only_publish_onchange;         // when true, only mark update_required on data change
+  uint8_t max_cooldown;              // configured rate limit in seconds; 0 = disabled
   bool initialized;                   // true after first successful erd_cache_init()
 } erd_cache_t;
 ```

@@ -29,6 +29,7 @@ typedef struct {
   uint8_t data_size;
   bool uses_heap;       /* true if ext_data is a heap allocation */
   bool update_required;
+  uint8_t publish_cooldown;  /* counts down from max_cooldown to 0; 0 = eligible */
   bool valid;
 } erd_cache_entry_t;
 
@@ -39,6 +40,7 @@ typedef struct erd_cache_t {
   uint32_t required_update_count;     /* total updates setting update_required=true since init */
   uint32_t required_update_count_window; /* such updates since last get_required_update_rate() call */
   bool only_publish_onchange;         /* when true, only mark update_required on data change */
+  uint8_t max_cooldown;              /* configured rate limit in seconds; 0 = disabled */
   bool initialized;                   /* true after first successful erd_cache_init() */
 } erd_cache_t;
 
@@ -61,6 +63,38 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
 /* Set whether the cache should only mark ERDs as updated when data changes.
  * Default is false (always mark updated). */
 void erd_cache_set_only_publish_onchange(erd_cache_t* self, bool only_publish_onchange);
+/* Set the minimum interval (in seconds) between publishes for any ERD.
+ * 0 = disabled (publish on every update). Range: 0–255. */
+void erd_cache_set_throttle_rate_seconds(erd_cache_t* self, uint8_t rate);
+
+/* Mark an ERD entry as successfully published to MQTT.
+ * Reloads the publish_cooldown timer. Call after mqtt_client_publish_raw() succeeds.
+ * Static inline — zero overhead when max_cooldown is 0 (early return).
+ *
+ * Thread safety: on ESP-IDF this is called from the background MQTT publisher
+ * task while tick_cooldowns() runs from the main loop.  On single-core ESP32
+ * uint8_t access is atomic and the tick→signal_work ordering in loop() ensures
+ * the tick always runs before the task drains, so no additional locking is needed. */
+static inline void erd_cache_mark_published(erd_cache_t* self, erd_cache_entry_t* entry) {
+  if (self->max_cooldown == 0 || entry == NULL) return;
+  entry->publish_cooldown = self->max_cooldown;
+}
+
+/* Decrement publish_cooldown for all entries with update_required=true.
+ * Call once per second. Static inline — zero overhead when max_cooldown is 0.
+ *
+ * Thread safety: see erd_cache_mark_published() above.  This only touches
+ * entries with update_required=true; mark_published() only touches entries
+ * whose update_required was just cleared, so they operate on disjoint sets. */
+static inline void erd_cache_tick_cooldowns(erd_cache_t* self) {
+  if (self->max_cooldown == 0) return;
+  for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
+    erd_cache_entry_t* e = &self->entries[i];
+    if (e->valid && e->update_required && e->publish_cooldown > 0) {
+      e->publish_cooldown--;
+    }
+  }
+}
 
 /* Returns the next entry with update_required=true, then clears the flag.
  * Caller provides an iterator (uint16_t) initialized to 0.

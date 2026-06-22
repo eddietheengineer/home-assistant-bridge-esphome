@@ -48,11 +48,12 @@ On non-ESP-IDF platforms, `erd_cache_mqtt_publisher_loop()` is called directly f
 ## Publishing Flow
 
 1. Iterate cache entries with `update_required = true` via `erd_cache_get_next_updated()`
-2. For each entry, determine the data pointer (inline, pool, or heap)
-3. Build the MQTT topic: `geappliances/{device_id}/erd/0x{ERD:04x}/value`
-4. Convert the binary data to a hex string
-5. Publish via `mqtt_client_publish_raw()` with `retain = true`
-6. Update stats (`total_published`, `publish_count_window`)
+2. `get_next_updated()` skips entries whose `publish_cooldown > 0` (rate limited), keeping `update_required = true` for retry
+3. For each eligible entry, determine the data pointer (inline, pool, or heap)
+4. Build the MQTT topic: `geappliances/{device_id}/erd/0x{ERD:04x}/value`
+5. Convert the binary data to a hex string
+6. Publish via `mqtt_client_publish_raw()` with `retain = true`
+7. Call `erd_cache_mark_published()` to reload the publish cooldown timer
 
 ## MQTT Connect/Disconnect Handling
 
