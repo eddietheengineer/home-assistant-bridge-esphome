@@ -34,7 +34,6 @@ static tiny_hsm_result_t state_failed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal,
 static void send_poll_read_requests_bounded(erd_bridge_poll_t* self, uint32_t budget_ms);
 static bool send_cycle_reads(erd_bridge_poll_t* self);
 static constexpr uint32_t POLL_YIELD_MS = 50;          // per-batch time budget
-static constexpr uint32_t POLL_PROBE_TIMEOUT_MS = 30000; // max time for probe phase before forcing steady state
 static constexpr uint32_t POLL_CYCLE_SEND_BUDGET_MS = 100;  // max time per send invocation
 static constexpr uint32_t POLL_CYCLE_RESUME_MS = 100;   // timer interval when send budget exceeded
 
@@ -273,19 +272,6 @@ static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
 {
   erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
 
-  // Safety net: if the probe phase has been running too long (e.g., unsupported
-  // ERDs with many retries), force-transition to state_polling with whatever
-  // ERDs were discovered. This prevents the device from getting stuck forever.
-  if (self->current_state == polling_state_probing && self->probe_start_ms != 0) {
-    uint32_t elapsed = esphome::millis() - self->probe_start_ms;
-    if (elapsed >= POLL_PROBE_TIMEOUT_MS) {
-      ESP_LOGW(TAG, "Probe timeout (%ums), forcing transition to steady state with %u ERDs",
-               elapsed, self->polling_list_count);
-      tiny_hsm_transition(hsm, state_polling);
-      return tiny_hsm_result_signal_consumed;
-    }
-  }
-
   switch (signal) {
     case signal_appliance_lost:
       // Restore the known host address and re-probe from scratch.
@@ -310,7 +296,6 @@ static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
 
   if (signal == tiny_hsm_signal_entry) {
     self->current_state = polling_state_probing;
-    self->probe_start_ms = esphome::millis();
     self->appliance_erd_list = self->probe_list;
     self->appliance_erd_list_count = self->probe_list_count;
     self->erd_index = (uint16_t)-1;
@@ -333,6 +318,10 @@ static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
   // permanently excludes the ERD from the Phase 3 polling list.
   if (signal == signal_read_failed) {
     erd_set_insert(&self->erd_set, args->read_failed.erd);
+    if (args->read_failed.reason == tiny_gea3_erd_client_read_failure_reason_retries_exhausted) {
+      ESP_LOGD(TAG, "Probe: ERD 0x%04x timed out after all retries, excluded from polling list",
+               args->read_failed.erd);
+    }
     if (!send_next_read_request(self)) {
       tiny_hsm_transition(hsm, state_polling);
     }
@@ -534,7 +523,6 @@ static void erd_bridge_poll_init_impl(
   self->cycle_start_ms              = 0;
   self->last_cycle_time_ms          = 0;
   self->cycle_count                 = 0;
-  self->probe_start_ms              = 0;
   self->polling_failure_count     = 0;
   self->cycle_has_failure         = false;
   erd_set_init(&self->erd_set);

@@ -136,10 +136,6 @@ typedef struct {
    * When set, the polling timer handler resumes sending instead of starting
    * a new cycle.  Cleared once all ERD reads for the cycle are queued. */
   bool cycle_sending_in_progress;
-  /* Millis() when the probe phase started. Used to detect a hung probe
-   * (e.g., unsupported ERDs with many retries) and force-transition
-   * to state_polling with whatever was discovered. */
-  uint32_t probe_start_ms;
   /* Called once when the HSM enters state_polling (discovery complete).
    * The callback may send a signal to the startup HSM to transition to the
    * next phase.  Set after erd_bridge_poll_init() and before the HSM
