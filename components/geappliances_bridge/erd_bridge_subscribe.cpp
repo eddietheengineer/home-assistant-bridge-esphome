@@ -145,6 +145,7 @@ static tiny_hsm_result_t state_subscribed(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
   switch(signal) {
     case tiny_hsm_signal_entry:
       self->current_state = subscription_state_subscribed;
+      self->subscribe_failure_count = 0;
       arm_periodic_timer(self, subscription_retention_period);
       arm_quiet_timer(self, subscription_quiet_period);
       break;

@@ -318,7 +318,7 @@ void GeappliancesBridge::run_protocol_stack_()
         break;
       }
 #ifdef USE_ESP32
-      // Feed the task watchdog inside the tight loop — 200 ms exceeds the
+      // Feed the task watchdog inside the tight loop — 100 ms exceeds the
       // default TWDT timeout (usually 3-10 s depending on config, but
       // ESPHome's component watchdog is 30 ms).
       esp_task_wdt_reset();

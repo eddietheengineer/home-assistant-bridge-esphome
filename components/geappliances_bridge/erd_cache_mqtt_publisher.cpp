@@ -34,16 +34,18 @@ static void mqtt_publisher_task(void* arg)
       // Work was signalled — drain all available updates.
     }
 
-    // Acquire mutex to safely read shared state (mqtt_connected, cache pointers).
-    // These fields can be modified by the main loop during context switches.
+    // Acquire mutex to safely read shared state (mqtt_connected, cache pointers,
+    // publish_index) and protect the entire drain loop. These fields can be
+    // modified by the main loop during context switches.
     bool connected = false;
     bool has_deps = false;
+    bool mutex_held = false;
     if (self->state_mutex) {
       if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        mutex_held = true;
         connected = self->mqtt_connected;
         has_deps = self->cache != NULL && self->mqtt_client != NULL &&
                    self->device_id != NULL && self->get_time_ms != NULL;
-        xSemaphoreGive(self->state_mutex);
       }
     } else {
       // Fallback when mutex creation failed — read without protection.
@@ -51,11 +53,16 @@ static void mqtt_publisher_task(void* arg)
       has_deps = self->cache != NULL && self->mqtt_client != NULL &&
                  self->device_id != NULL && self->get_time_ms != NULL;
     }
+
     if (!connected || !has_deps) {
+      if (mutex_held) {
+        xSemaphoreGive(self->state_mutex);
+      }
       continue;
     }
 
     // Drain all available updates — no per-loop budget in background task.
+    // The mutex is held throughout to protect publish_index and cache access.
     while (1) {
       erd_cache_entry_t* entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
       if (!entry) break;
@@ -96,17 +103,13 @@ static void mqtt_publisher_task(void* arg)
       /* Reload the publish cooldown after successful MQTT publish. */
       erd_cache_mark_published(self->cache, entry);
 
-      // Update stats under mutex to prevent torn writes from the main loop.
-      if (self->state_mutex) {
-        if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-          self->total_published++;
-          self->publish_count_window++;
-          xSemaphoreGive(self->state_mutex);
-        }
-      } else {
-        self->total_published++;
-        self->publish_count_window++;
-      }
+      // Update stats — already protected by the outer mutex hold.
+      self->total_published++;
+      self->publish_count_window++;
+    }
+
+    if (mutex_held) {
+      xSemaphoreGive(self->state_mutex);
     }
   }
 
@@ -129,7 +132,7 @@ void erd_cache_mqtt_publisher_init(
   self->mqtt_client = mqtt_client;
   self->device_id = device_id;
   self->publish_index = 0;
-  self->mqtt_connected = true;
+  self->mqtt_connected = false;
   self->get_time_ms = esphome::millis;
 
 #ifdef USE_ESP_IDF

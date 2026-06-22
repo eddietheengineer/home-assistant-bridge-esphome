@@ -34,7 +34,7 @@ static tiny_hsm_result_t state_failed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal,
 static void send_poll_read_requests_bounded(erd_bridge_poll_t* self, uint32_t budget_ms);
 static bool send_cycle_reads(erd_bridge_poll_t* self);
 static constexpr uint32_t POLL_YIELD_MS = 50;          // per-batch time budget
-static constexpr uint32_t POLL_CYCLE_SEND_BUDGET_MS = 500;  // max time per send invocation
+static constexpr uint32_t POLL_CYCLE_SEND_BUDGET_MS = 100;  // max time per send invocation
 static constexpr uint32_t POLL_CYCLE_RESUME_MS = 100;   // timer interval when send budget exceeded
 
 // ============================================================================
@@ -303,6 +303,7 @@ static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
     if (self->polling_list_count > 0) {
       clear_discovery_state(self);
     }
+    ESP_LOGI(TAG, "Probe phase started: %u ERDs to verify", self->probe_list_count);
     if (self->probe_list_count > 0) {
       send_next_read_request(self);
     } else {
@@ -317,6 +318,10 @@ static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
   // permanently excludes the ERD from the Phase 3 polling list.
   if (signal == signal_read_failed) {
     erd_set_insert(&self->erd_set, args->read_failed.erd);
+    if (args->read_failed.reason == tiny_gea3_erd_client_read_failure_reason_retries_exhausted) {
+      ESP_LOGD(TAG, "Probe: ERD 0x%04x timed out after all retries, excluded from polling list",
+               args->read_failed.erd);
+    }
     if (!send_next_read_request(self)) {
       tiny_hsm_transition(hsm, state_polling);
     }
@@ -339,6 +344,8 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       arm_polling_timer(self, self->polling_interval_ms);
       self->polling_list_complete = true;
       self->current_state = polling_state_polling;
+      ESP_LOGI(TAG, "Entered steady-state polling: %u ERDs, interval %u ms",
+               self->polling_list_count, self->polling_interval_ms);
       // Notify startup HSM that discovery is complete.  Safe to call
       // synchronously from inside the polling HSM's state entry because:
       // 1. The callback sends a signal to the *startup* HSM (a different
