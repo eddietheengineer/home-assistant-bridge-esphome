@@ -32,54 +32,75 @@ typedef struct {
   tiny_timer_group_t* timer_group;
   i_tiny_gea3_erd_client_t* erd_client;
   tiny_timer_t timer;
+  tiny_timer_t quiet_timer;
   tiny_event_subscription_t erd_client_activity_subscription;
   erd_set_t erd_set;
   erd_cache_t* erd_cache;
   tiny_hsm_t hsm;
   uint8_t erd_host_address;
+  const char* current_state_name;
 } erd_bridge_subscribe_t;
 ```
-
-All members are stack-allocated or embedded — no heap allocation.
 
 ## State Machine
 
 ```
 sub_state_top (parent — handles publication signals globally)
   ├─ state_subscribing (initial)
-  │    ├─ entry: attempt subscribe()
+  │    ├─ entry: disarm retention timer; attempt subscribe()
   │    ├─ subscription_host_came_online: clear ERD set, then attempt subscribe()
   │    ├─ subscription_failed / timer_expired: attempt subscribe()
   │    ├─ subscription_added_or_retained → state_subscribed
   │    └─ exit: disarm timer
   │
-  └─ state_subscribed
-       ├─ entry: arm periodic timer (30 s retention)
-       ├─ timer_expired: retain subscription
+  ├─ state_subscribed
+  │    ├─ entry: arm periodic timer (30 s retention) + quiet timer (10 s)
+  │    ├─ subscription_host_came_online → state_subscribing
+  │    └─ exit: disarm quiet timer only (retention timer persists)
+  │
+  └─ state_steady
+       ├─ entry: stop quiet timer; current_state_name = "steady"
        ├─ subscription_host_came_online → state_subscribing
-       └─ exit: disarm timer
+       └─ exit: no-op (retention timer persists)
 ```
 
 ### `sub_state_top` (Parent)
 
-Handles `signal_subscription_publication_received` globally across all child states:
+Handles signals globally across all child states:
+
+**`signal_subscription_publication_received`:**
 - Inserts the ERD into `erd_set` (if not already present)
 - Updates the ERD cache with the received data
+- If the ERD is **new** (not already in `erd_set`): transitions to `state_subscribed`, restarting the quiet period
+
+**`signal_quiet_period_expired`:**
+- Transitions to `state_steady` (no new ERDs registered for 10 s)
+
+**`signal_timer_expired`:**
+- Calls `tiny_gea3_erd_client_retain_subscription()` to keep the appliance publishing
+- Fires in both `state_subscribed` and `state_steady` (the retention timer is not disarmed when transitioning between them)
 
 ### `state_subscribing` (Initial)
 
-- On entry: calls `tiny_gea3_erd_client_subscribe()` with the host address
+- On entry: disarms the retention timer (to prevent spurious subscribe retries), calls `tiny_gea3_erd_client_subscribe()` with the host address
 - On `signal_subscription_host_came_online`: clears `erd_set` (appliance may have changed its ERD set), then attempts subscribe
 - On `signal_subscription_failed` or `signal_timer_expired`: attempts subscribe with `resubscribe_delay` (1 s) backoff
 - On `signal_subscription_added_or_retained`: transitions to `state_subscribed`
 - On exit: disarms the retry timer
 
-### `state_subscribed` (Steady State)
+### `state_subscribed`
 
-- On entry: arms a periodic retention timer at `subscription_retention_period` (30 s)
-- On `signal_timer_expired`: calls `tiny_gea3_erd_client_retain_subscription()` to keep the appliance publishing
-- On `signal_subscription_host_came_online`: transitions back to `state_subscribing`
-- On exit: disarms the retention timer
+- On entry: arms a periodic retention timer at `subscription_retention_period` (30 s) and a one-shot quiet timer at `subscription_quiet_period` (10 s); sets `current_state_name` to `"subscribed"`
+- On `signal_subscription_host_came_online`: transitions to `state_subscribing`
+- On exit: disarms the quiet timer only; the retention timer persists across transitions to `state_steady`
+
+### `state_steady`
+
+- On entry: stops the quiet timer (belt-and-suspenders; it was already stopped on `state_subscribed` exit); sets `current_state_name` to `"steady"`
+- The retention timer continues firing every 30 s (it was not disarmed on the transition from `state_subscribed`)
+- On `signal_subscription_host_came_online`: transitions to `state_subscribing`
+- On a new ERD publication (handled by `sub_state_top`): transitions back to `state_subscribed`, restarting the quiet period
+- On exit: no-op (retention timer persists if transitioning back to `state_subscribed`)
 
 ## Event Subscription
 
@@ -112,10 +133,14 @@ The `erd_set_t` is a fixed-capacity sorted array (capacity 645). It tracks which
 - **No `signal_write_requested`**: Write request handling has been extracted to `erd_write_bridge`.
 - **Fixed-capacity ERD set**: Uses `erd_set_t` (sorted array) instead of `std::set` to eliminate heap node allocations.
 - **30-second retention**: The subscription is retained every 30 seconds (`subscription_retention_period`) to keep the appliance publishing ERD values.
+- **10-second quiet period**: After 10 seconds (`subscription_quiet_period`) with no new ERD registrations, the bridge transitions from `state_subscribed` to `state_steady`. This signals to the main bridge that the subscription has settled, allowing custom ERD polling to start.
 - **1-second resubscribe delay**: If `subscribe()` fails, the bridge waits 1 second (`resubscribe_delay`) before retrying.
+- **Retention timer persists across subscribed/steady**: The retention timer is not disarmed when transitioning between `state_subscribed` and `state_steady`, ensuring continuous 30-second retention without gaps.
+- **New ERD exits steady state**: When a new ERD is published while in `state_steady`, the bridge transitions back to `state_subscribed`, restarting the quiet period.
+- **Retention timer disarmed in subscribing**: The retention timer is disarmed on entry to `state_subscribing` to prevent spurious subscribe retries (where `signal_timer_expired` triggers a subscribe attempt).
 - **Clean destroy**: The event subscription is unsubscribed before the struct is freed, preventing use-after-free if events fire after destroy.
 - **Cache NOT cleared on host restart**: The ERD cache is not reset during `signal_subscription_host_came_online`. The cache may be shared with the polling bridge; stale entries are overwritten when new data arrives.
 
 ## Testing
 
-Covered by unit tests in `test/tests/erd_bridge_subscribe_test.cpp` and integration tests through the full bridge subscription flow. The state machine transitions are tested with simulated ERD client activity events.
+Covered by unit tests in `test/tests/erd_bridge_subscribe_test.cpp` and integration tests through the full bridge subscription flow. The state machine transitions are tested with simulated ERD client activity events, including steady-state transitions and retention timer behavior across state changes.
