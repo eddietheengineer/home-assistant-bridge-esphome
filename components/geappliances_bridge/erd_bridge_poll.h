@@ -140,6 +140,10 @@ typedef struct {
    * The callback may send a signal to the startup HSM to transition to the
    * next phase.  Set after erd_bridge_poll_init() and before the HSM
    * processes its first signal.  NULL means no callback. */
+  /* Millis() when the probe phase started. Used to detect a hung probe
+   * (e.g., unsupported ERDs with many retries) and force-transition
+   * to state_polling with whatever was discovered. */
+  uint32_t probe_start_ms;
   void (*on_discovery_complete)(void* context);
   void* on_discovery_complete_context;
 } erd_bridge_poll_t;
