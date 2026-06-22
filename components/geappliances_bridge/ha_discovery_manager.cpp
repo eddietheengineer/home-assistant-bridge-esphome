@@ -1057,6 +1057,8 @@ void HaDiscoveryManager::stale_topic_callback_(const char* topic, const char* pa
       ESP_LOGD(TAG, "Found stale HA topic: %s", topic);
     }
   }
+}
+
 void HaDiscoveryManager::publish_stale_cleanup_()
 {
   if (this->stale_cleanup_index_ >= this->stale_topics_count_) {
