@@ -324,7 +324,7 @@ async def to_code(config: dict[str, Any]) -> None:
     # silent breakage from upstream branch movement)
     cg.add_library("https://github.com/ryanplusplus/tiny#3747b6ff65eec4b38367c3c8fa94e6ed2a1ccf35", None)
     cg.add_library("https://github.com/geappliances/tiny-gea-api#4fa8fee8297e24baa91bfe4a464088a73e7c6a5a", None)
-    cg.add_library("https://github.com/geappliances/public-appliance-api-documentation#a70e9c9e437ed3ef3a1ccd1830620373bb48ff7a", None)
+    cg.add_library("https://github.com/geappliances/public-appliance-api-documentation#6f567e49c84bec838bf84036d0915398f0c2eb63", None)
     
     var = cg.new_Pvariable(config[CONF_ID])
     # Deprecation warning for polling_onlypublish_onchange
