@@ -15,7 +15,7 @@ Fixed-size ERD cache with inline/heap data storage. Stores the latest data for u
 | `erd_cache_set_throttle_rate_seconds(self, rate)` | Set minimum interval (seconds) between publishes per ERD. 0 = disabled. Range: 0–255. |
 | `erd_cache_mark_published(self, entry)` | Mark an ERD entry as published; reloads the publish_cooldown timer. Static inline, zero overhead when rate limiting is disabled. |
 | `erd_cache_tick_cooldowns(self)` | Decrement publish_cooldown for all entries with `update_required = true`. Call once per second. Static inline, no-op when rate limiting is disabled. |
-| `erd_cache_get_next_updated(self, iterator)` | Returns the next entry with `update_required = true`, then clears the flag. Caller provides an iterator (`uint16_t`) initialized to 0. Returns `NULL` when no more updated entries remain. |
+| `erd_cache_get_next_updated(self, iterator)` | Returns the next entry with `update_required = true` and `publish_cooldown = 0`, then clears `update_required`. Skips entries still in cooldown, keeping `update_required = true` for retry. Caller provides an iterator (`uint16_t`) initialized to 0. Returns `NULL` when no more updated entries remain. |
 | `erd_cache_get_count(self)` | Returns the number of valid entries currently in the cache. |
 | `erd_cache_get_next_entry(self, iterator)` | Returns the next valid entry in the cache, iterating all entries. Does NOT require `update_required = true` and does NOT clear any flags — it is a read-only iteration. Resets iterator to 0 when exhausted. |
 | `erd_cache_get_update_rate(self)` | Returns the number of cache updates since the last call, then resets the window counter. |
