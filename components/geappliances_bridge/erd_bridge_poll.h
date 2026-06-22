@@ -95,10 +95,18 @@ typedef struct {
    * discovery phases have completed). Reset to false on appliance loss/
    * reconnect. */
   bool polling_list_complete;
-  /* Updated at each state entry with a human-readable name of the current HSM
-   * state. Initialized to nullptr; callers may watch this for changes to emit
-   * debug log messages without coupling erd_bridge_subscribe.cpp to ESP logging headers. */
-  const char* current_state_name;
+  /* Current HSM state as an enum (see polling_state_t).
+   * Callers may watch this for state transitions to emit
+   * diagnostic log messages without coupling to ESP logging headers. */
+  polling_state_t current_state;
+  /* Consecutive cycle failure counter. Incremented on each full cycle where
+   * all ERDs fail. Reset on any successful read. Transitions to state_failed
+   * when this reaches 3, matching the subscription bridge's failure threshold. */
+  uint8_t polling_failure_count;
+  /* True if any ERD in the current polling cycle has failed.
+   * Reset at the start of each cycle; checked on cycle completion
+   * to increment the consecutive failure counter. */
+  bool cycle_has_failure;
   /* Pre-built list of ERDs to probe during discovery.
    * Set by the caller before erd_bridge_poll_init(); the bridge copies
    * successfully-probed ERDs into erd_polling_list during the probe phase. */

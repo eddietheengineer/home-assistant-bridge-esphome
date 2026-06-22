@@ -147,9 +147,9 @@ In AUTO mode, monitors subscription activity and falls back to polling if no act
 
 - **On entry:** If the mode is not `BRIDGE_MODE_AUTO`, calls `svc->maybe_start_custom_erd_polling()` and transitions immediately to `startup_state_running`.
 - **On `signal_run_loop`:**
-  - If AUTO mode and subscription is active, calls `svc->check_subscription_activity()`.
-  - Calls `svc->maybe_start_custom_erd_polling()` and `svc->log_poll_state_transitions()`.
-  - If not AUTO mode or subscription is no longer active, transitions to `startup_state_running`.
+  - Checks `svc->get_subscription_state()`. If `subscription_state_failed`, calls `svc->handle_subscription_failed()` and transitions to `startup_state_running`.
+  - Calls `svc->log_poll_state_transitions()`, `svc->handle_polling_failed()`, and `svc->maybe_start_custom_erd_polling()`.
+  - If not AUTO mode or subscription is not active, transitions to `startup_state_running`.
 - **On `signal_subscription_fallback`:** Transitions to `startup_state_running`.
 - **On exit:** No action.
 
@@ -161,9 +161,8 @@ Steady-state operation. All recurring tasks run every loop iteration.
 - **On entry:** Logs that the bridge is in steady-state operation.
 - **On `signal_run_loop`:**
   - Calls `svc->run_all_managers()` to run all managers (autodiscovery, device identity, feature bits).
-  - If AUTO mode and subscription is active, calls `svc->check_subscription_activity()`.
-  - Calls `svc->maybe_start_custom_erd_polling()`.
-  - Calls `svc->log_poll_state_transitions()`.
+  - Checks `svc->get_subscription_state()`. If `subscription_state_failed`, calls `svc->handle_subscription_failed()`.
+  - Calls `svc->handle_polling_failed()`, `svc->log_poll_state_transitions()`, and `svc->maybe_start_custom_erd_polling()`.
 - **On exit:** No action.
 
 ### 4.3 State Diagram
@@ -211,16 +210,17 @@ startup_state_top (root — defers all unhandled signals)
   │
   ├─ startup_state_subscription_watch
   │    ├─ entry: if not AUTO → maybe_start_custom_erd_polling(), → startup_state_running
-  │    ├─ run_loop: check_subscription_activity() (AUTO),
-  │    │            maybe_start_custom_erd_polling(), log_poll_state_transitions();
-  │    │            if not active → startup_state_running
+  │    ├─ run_loop: if failed → handle_subscription_failed() → running;
+  │    │            log_poll_state_transitions(), handle_polling_failed(),
+  │    │            maybe_start_custom_erd_polling(); if not active → running
   │    ├─ subscription_fallback: → startup_state_running
   │    └─ exit: —
   │
   └─ startup_state_running (terminal)
        ├─ entry: —
-       ├─ run_loop: run_all_managers(), check_subscription_activity() (AUTO),
-       │             maybe_start_custom_erd_polling(), log_poll_state_transitions()
+       ├─ run_loop: run_all_managers(), if failed → handle_subscription_failed();
+       │             handle_polling_failed(), log_poll_state_transitions(),
+       │             maybe_start_custom_erd_polling()
        └─ exit: —
 ```
 

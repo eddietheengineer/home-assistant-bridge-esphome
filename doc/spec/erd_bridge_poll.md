@@ -69,7 +69,7 @@ After init, the caller may set `self->on_discovery_complete` and `self->on_disco
 
 ## 3. State Machine
 
-The polling bridge uses a hierarchical state machine (`tiny_hsm`) with a parent state (`poll_state_top`) and two child states.
+The polling bridge uses a hierarchical state machine (`tiny_hsm`) with a parent state (`poll_state_top`) and three child states.
 
 ### 3.1 Parent State: `poll_state_top`
 
@@ -105,6 +105,10 @@ Probes each ERD in the pre-built probe list to verify support before adding to t
 
 Steady-state polling. See §5.
 
+#### `state_failed`
+
+Terminal state entered after 3 consecutive failed polling cycles. See §5.4.
+
 ### 3.3 State Diagram
 
 ```
@@ -115,12 +119,18 @@ poll_state_top (parent — handles appliance_lost globally)
   │    ├─ read_completed: add to polling list + cache → next ERD or state_polling
   │    └─ read_failed: exclude from polling list → next ERD or state_polling
   │
-  └─ state_polling (steady state)
-       ├─ entry: arm polling timer, set polling_list_complete, fire callback
-       ├─ polling_timer_expired: start cycle (or set restart_pending)
-       ├─ read_completed: update cache, count completion, maybe restart cycle
-       ├─ read_failed: count completion, maybe restart cycle
-       └─ appliance_lost → state_probe_list
+  ├─ state_polling (steady state)
+  │    ├─ entry: arm polling timer, set polling_list_complete, fire callback
+  │    ├─ polling_timer_expired: start cycle (or set restart_pending)
+  │    ├─ read_completed: update cache, count completion, maybe restart cycle
+  │    ├─ read_failed: track failure, count completion, maybe restart cycle;
+  │    │               if 3 consecutive failed cycles → state_failed
+  │    └─ appliance_lost → state_probe_list
+  │
+  └─ state_failed
+       ├─ entry: set current_state = polling_state_failed
+       ├─ appliance_lost: reset failure count → state_probe_list
+       └─ (terminal — no timer or cycle activity)
 ```
 
 ---
@@ -156,7 +166,6 @@ The `handle_discovery_list_signals()` function handles `signal_read_completed` a
 If a probe read response arrives while `state_polling` is active (e.g., the appliance responded slower than expected), the polling state handles it via `signal_read_completed`: the ERD is added to the polling list (if not already present) and the cache is updated.
 
 ---
-
 ## 5. Steady-State Polling
 
 ### 5.1 Entry
@@ -165,6 +174,7 @@ On entering `state_polling`:
 - Resets `erd_index = 0`, `cycle_completed_count = 0`, `restart_pending = false`.
 - Arms the polling timer for `polling_interval_ms`.
 - Sets `polling_list_complete = true`.
+- Sets `current_state = polling_state_polling`.
 - Calls `on_discovery_complete` callback if set.
 
 ### 5.2 Cycle Semantics
@@ -179,6 +189,7 @@ A polling cycle consists of sending reads for all ERDs in `erd_polling_list` and
 **Cycle completion:**
 - `cycle_completed_count` increments on each `signal_read_completed` and `signal_read_failed`.
 - When `cycle_completed_count >= polling_list_count`, the cycle is complete.
+- `on_polling_cycle_complete()` tracks consecutive failures: if `cycle_has_failure` is true, `polling_failure_count` is incremented; otherwise it is reset to 0. `cycle_has_failure` is then cleared.
 - `on_polling_cycle_complete()` is called with `immediate = restart_pending || !polling_timer_armed`:
   - If `immediate`: starts the next cycle immediately, arms the polling timer.
   - If not `immediate` and `polling_timer_armed` is false: arms the polling timer (next cycle starts on timer expiry).
@@ -200,9 +211,26 @@ A polling cycle consists of sending reads for all ERDs in `erd_polling_list` and
 
 **On `signal_read_failed`:**
 - Resets the appliance-lost timer.
+- Sets `cycle_has_failure = true` to mark the current cycle as having at least one failure.
 - Logs the failed ERD at debug level.
 - Increments `cycle_completed_count`; if cycle is complete, calls `on_polling_cycle_complete()`.
+- After `on_polling_cycle_complete()`, if `polling_failure_count >= 3`, transitions to `state_failed`.
 - **Does not remove the ERD from the polling list.** Failed ERDs remain in the list and are retried each cycle.
+
+### 5.4 Failed State
+
+After 3 consecutive polling cycles where at least one ERD in each cycle failed, the bridge transitions to `state_failed`.
+
+**On entry:**
+- Sets `current_state = polling_state_failed`.
+- Logs an error with the failure count.
+
+**On `signal_appliance_lost`:**
+- Restores `erd_host_address` to `known_host_address`.
+- Resets `polling_failure_count = 0`.
+- Transitions back to `state_probe_list` for re-probing (appliance came back online).
+
+**No other signals are handled.** The state is terminal until the appliance-loss timer fires, which triggers recovery. No polling timers are armed in this state.
 
 ---
 
@@ -237,6 +265,12 @@ The polling bridge does not own the publish-on-change setting — it is controll
 - `last_cycle_time_ms`: duration of the last completed cycle in milliseconds.
 - `cycle_count`: total number of completed cycles since init.
 
+### 6.7 State Tracking
+
+- `current_state`: `polling_state_t` enum (`polling_state_none`, `polling_state_probing`, `polling_state_polling`, `polling_state_failed`). Updated on each state entry so callers can monitor bridge health without coupling to ESP logging headers.
+- `polling_failure_count`: consecutive cycle failure counter. Incremented when a cycle completes with `cycle_has_failure = true`; reset to 0 on a successful cycle. Triggers transition to `state_failed` when reaching 3.
+- `cycle_has_failure`: set to `true` when any ERD in the current cycle fails; reset at cycle completion in `on_polling_cycle_complete()`.
+
 ---
 
 ## 7. Timing Constants
@@ -260,6 +294,7 @@ The polling bridge does not own the publish-on-change setting — it is controll
 5. **Cache NOT cleared on probe re-entry:** The ERD cache is not reset during `state_probe_list` entry or on appliance-loss re-discovery. The cache may be shared with the subscription bridge; stale entries are overwritten when new data arrives.
 6. **Known host address preserved:** The bridge stores the host address in `known_host_address`. On appliance loss, this address is restored and re-probing begins at the same address.
 7. **No heap allocation:** All data structures are fixed-capacity arrays embedded in the struct. No `new`/`malloc`/`std::set`/`void*` casting.
+8. **Failure detection after 3 consecutive failed cycles:** When `polling_failure_count` reaches 3, the bridge transitions to `state_failed` and stops polling. Recovery is triggered by `signal_appliance_lost`, which resets the failure counter and re-probes from scratch.
 
 ---
 

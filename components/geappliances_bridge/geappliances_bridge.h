@@ -118,9 +118,10 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void initialize_erd_bridge() override;
 
   BridgeMode get_mode() const override;
-  bool is_subscription_mode_active() const override;
-
-  void check_subscription_activity() override;
+  subscription_state_t get_subscription_state() const override;
+  polling_state_t get_polling_state() const override;
+  void handle_subscription_failed() override;
+  void handle_polling_failed() override;
   void maybe_start_custom_erd_polling() override;
   void log_poll_state_transitions() override;
   void initialize_erd_cache_publisher() override;
@@ -132,7 +133,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void initialize_erd_bridge_();
   void start_custom_erd_polling_();
   void maybe_start_custom_erd_polling_();
-  void check_subscription_activity_();
   void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
   void start_feature_bit_reading_();
@@ -165,11 +165,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   tiny_erd_t custom_erds_[CUSTOM_ERDS_MAX];
   uint16_t custom_erds_count_{0};
 
-  // Auto mode fallback tracking
-  bool subscription_mode_active_{false};
-  bool subscription_activity_detected_{false};
-  uint32_t subscription_start_time_{0};
-  uint32_t custom_erd_subscription_last_activity_{0};
   // Fixed-capacity set for tracking seen subscription ERDs (replaces std::set).
   erd_set_t custom_erd_subscription_seen_erds_;
   // Pre-built ERD probe list for the polling bridge.
@@ -177,7 +172,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   uint16_t poll_probe_list_[POLLING_LIST_MAX_SIZE];
   uint16_t poll_probe_list_count_{0};
   bool custom_erd_polling_started_{false};  // Guard to prevent re-initialization
-  static constexpr uint32_t SUBSCRIPTION_TIMEOUT_MS = 10000; // 10 seconds
 
   // Startup phase delay tracking
   uint32_t startup_delay_start_ms_{0};
@@ -202,7 +196,8 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // Feature bit reading state machine (runs after autodiscovery, before device ID gen)
   // The FeatureBitManager owns the valid ERD list and ready flag; use its getters directly.
 
-  const char* last_logged_poll_state_{nullptr};
+  polling_state_t last_logged_poll_state_{polling_state_none};
+  subscription_state_t last_logged_subscribe_state_{subscription_state_none};
 
   // ERD publish rate sensor: counts ERD updates per ~60s window and
   // publishes to Home Assistant.

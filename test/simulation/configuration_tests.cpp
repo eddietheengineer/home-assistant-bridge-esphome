@@ -241,8 +241,7 @@ TEST(configuration_based_tests, config_polling_mode_default_interval)
 
   // Bridge should be in probe state after init.
   mock().enable();
-  CHECK(erd_bridge_poll.current_state_name != nullptr);
-  CHECK(strcmp(erd_bridge_poll.current_state_name, "polling") == 0);
+  CHECK(erd_bridge_poll.current_state == polling_state_polling);
 }
 
 // ============================================================================
@@ -262,8 +261,7 @@ TEST(configuration_based_tests, config_polling_mode_fast_interval)
 
   // Bridge should be in probe state after init.
   mock().enable();
-  CHECK(erd_bridge_poll.current_state_name != nullptr);
-  CHECK(strcmp(erd_bridge_poll.current_state_name, "polling") == 0);
+  CHECK(erd_bridge_poll.current_state == polling_state_polling);
 }
 
 // ============================================================================
@@ -283,8 +281,7 @@ TEST(configuration_based_tests, config_polling_mode_slow_interval)
 
   // Bridge should be in probe state after init.
   mock().enable();
-  CHECK(erd_bridge_poll.current_state_name != nullptr);
-  CHECK(strcmp(erd_bridge_poll.current_state_name, "polling") == 0);
+  CHECK(erd_bridge_poll.current_state == polling_state_polling);
 }
 
 // ============================================================================
@@ -619,8 +616,7 @@ TEST(only_publish_on_change_config, config_polling_always_publish_is_default)
   configure_always_publish();
   mock().enable();
 
-  CHECK(bridge.current_state_name != nullptr);
-  CHECK(strcmp(bridge.current_state_name, "polling") == 0);
+  CHECK(bridge.current_state == polling_state_polling);
 }
 
 // ============================================================================
@@ -641,6 +637,5 @@ TEST(only_publish_on_change_config, config_polling_with_only_publish_on_change)
   configure_only_publish_on_change();
   mock().enable();
 
-  CHECK(bridge.current_state_name != nullptr);
-  CHECK(strcmp(bridge.current_state_name, "polling") == 0);
+  CHECK(bridge.current_state == polling_state_polling);
 }

@@ -20,11 +20,11 @@
  * (built from feature bit results), selects the operating mode
  * (poll / subscribe / auto), and initializes the appropriate bridge HSMs.
  *
- * check_subscription_activity_() runs every loop() iteration in AUTO mode
- * and falls back to polling if no subscription publications arrive within
- * the timeout window.
+ * handle_subscription_failed() / handle_polling_failed() are called from the
+ * startup HSM to handle bridge failures and trigger fallback to polling.
  */
 
+#include <cstring>
 #include "geappliances_bridge.h"
 #include "appliance_api_feature_lists.h"
 #include "geappliances_bridge_constants.h"
@@ -33,29 +33,16 @@
 #include "tiny_gea_constants.h"
 #include "erd_poll_list_builder.h"
 #include "erd_cache.h"
-#include <cstring>
+#include "erd_bridge_common.h"
 
 namespace esphome {
 namespace geappliances_bridge {
-static void erd_cache_to_array(erd_cache_t* cache, tiny_erd_t* out, uint16_t* count)
-{
-  *count = 0;
-  uint16_t iterator = 0;
-  while (*count < ERD_CACHE_CAPACITY) {
-    erd_cache_entry_t* entry = erd_cache_get_next_entry(cache, &iterator);
-    if (!entry) break;
-    out[(*count)++] = entry->erd;
-  }
-}
 // ---------------------------------------------------------------------------
 // Polling bridge discovery-complete callback (shared by all three init paths)
 // ---------------------------------------------------------------------------
 
 void GeappliancesBridge::on_poll_discovery_complete_()
 {
-  tiny_erd_t erds[ERD_CACHE_CAPACITY];
-  uint16_t count = 0;
-  erd_cache_to_array(&this->erd_cache_, erds, &count);
   tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
 }
 
@@ -69,7 +56,10 @@ ErdPollListResult build_poll_list_(GeappliancesBridge* bridge)
   ErdPollListConfig config;
   config.mode = bridge->mode_;
   config.subscription_capable = !bridge->autodiscovery_manager_.is_gea2_protocol();
-  config.subscription_active = bridge->subscription_mode_active_;
+  {
+    subscription_state_t sub_state = bridge->get_subscription_state();
+    config.subscription_active = subscription_is_active(sub_state);
+  }
   config.appliance_api_parsing = bridge->appliance_api_parsing_;
   config.feature_bit_valid_erds = bridge->feature_bit_manager_.get_valid_erd_count() ? bridge->feature_bit_manager_.valid_erds_ : nullptr;
   config.feature_bit_valid_erds_count = bridge->feature_bit_manager_.get_valid_erd_count();
@@ -200,9 +190,6 @@ void GeappliancesBridge::initialize_erd_bridge_()
   } else if (this->mode_ == BRIDGE_MODE_AUTO) {
     use_polling                          = false;
     mode_name                            = "auto (starting with subscription)";
-    this->subscription_mode_active_      = true;
-    this->subscription_activity_detected_ = false;
-    this->subscription_start_time_       = millis();
   }
 
   (void)mode_name;
@@ -234,12 +221,14 @@ void GeappliancesBridge::initialize_erd_bridge_()
       this->poll_probe_list_count_,
       &this->erd_cache_);
     erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
+    this->polling_bridge_initialized_ = true;
   }
 
   // Initialize the subscription bridge for non-polling modes (subscribe, auto).
   // In polling mode (GEA2 or explicit poll), subscriptions are not used, but
   // the bridge is still initialized above for custom ERD subscription support.
   if (!use_polling) {
+
     erd_bridge_subscribe_init(
       &this->erd_bridge_subscribe_,
       &this->timer_group_,
@@ -325,22 +314,12 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
     return;
   }
 
-  bool in_subscription_mode = (this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-                              (this->mode_ == BRIDGE_MODE_AUTO && this->subscription_mode_active_);
-  if (!in_subscription_mode) {
-    return;
-  }
-
-  bool subscription_confirmed = (this->mode_ == BRIDGE_MODE_SUBSCRIBE) ||
-                                this->subscription_activity_detected_;
-  if (!subscription_confirmed) {
-    return;
-  }
-  // Wait for the quiet window to elapse before starting custom ERD polling.
-  // This gives the subscription bridge time to publish its ERDs, so we can
-  // avoid redundant polling of ERDs already covered by subscription.
-
-  if (millis() - this->custom_erd_subscription_last_activity_ < SUBSCRIPTION_TIMEOUT_MS) {
+  subscription_state_t sub_state = this->get_subscription_state();
+  // Wait for the subscription bridge to reach steady state before starting
+  // custom ERD polling. This gives the subscription bridge time to publish
+  // its ERDs, so we can avoid redundant polling of ERDs already covered
+  // by subscription.
+  if (sub_state != subscription_state_steady) {
     return;
   }
 
@@ -348,27 +327,49 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
 }
 
 // ---------------------------------------------------------------------------
-// AUTO mode: subscription-activity watchdog
+// Check if the polling bridge (running alongside subscription) has failed,
+// and if so, transition to full polling mode.
 // ---------------------------------------------------------------------------
 
-void GeappliancesBridge::check_subscription_activity_()
+void GeappliancesBridge::handle_polling_failed()
 {
-  if (this->subscription_activity_detected_) {
+  polling_state_t poll_state = this->get_polling_state();
+  if (poll_state != polling_state_failed) {
     return;
   }
 
-  // Unsigned subtraction wraps correctly on the ~49-day millis() rollover.
-  uint32_t elapsed = millis() - this->subscription_start_time_;
-  if (elapsed < SUBSCRIPTION_TIMEOUT_MS) {
+  if (this->subscription_bridge_initialized_) {
+    // Custom ERD polling bridge failed alongside subscription — destroy it
+    // and let subscription continue handling standard ERDs.
+    ESP_LOGW(TAG, "Custom ERD polling bridge failed; continuing with subscription only");
+    erd_bridge_poll_destroy(&this->erd_bridge_poll_);
+    this->polling_bridge_initialized_ = false;
+    this->custom_erd_polling_started_ = false;
+  } else {
+    // Primary polling bridge failed (POLL mode or GEA2). No fallback available.
+    ESP_LOGE(TAG, "Primary polling bridge failed; no data path available");
+    // Leave the bridge in failed state. The appliance_lost handler in
+    // state_failed will re-probe if the appliance comes back.
+  }
+  this->last_logged_poll_state_ = polling_state_none;
+}
+
+// ---------------------------------------------------------------------------
+// Subscription failed: fallback to polling
+// ---------------------------------------------------------------------------
+
+void GeappliancesBridge::handle_subscription_failed()
+{
+  // Already in polling mode — nothing to do.
+  if (this->mode_ != BRIDGE_MODE_AUTO) {
     return;
   }
-
-  ESP_LOGW(TAG, "No subscription activity detected after %u seconds, falling back to polling mode",
-           SUBSCRIPTION_TIMEOUT_MS / 1000);
 
   // Tear down the subscription bridge.
   erd_bridge_subscribe_destroy(&this->erd_bridge_subscribe_);
   this->subscription_bridge_initialized_ = false;
+  this->last_logged_poll_state_ = polling_state_none;
+  this->last_logged_subscribe_state_ = subscription_state_none;
 
   // Destroy any existing polling bridge (e.g., from custom ERD polling)
   // before re-initializing to avoid leaking heap allocations.
@@ -387,8 +388,6 @@ void GeappliancesBridge::check_subscription_activity_()
   };
   this->erd_bridge_poll_.on_discovery_complete_context = this;
 
-  this->subscription_mode_active_ = false;
-
   auto result = build_poll_list_(this);
   this->poll_probe_list_count_ = result.erds_count;
   std::memcpy(this->poll_probe_list_, result.erds, result.erds_count * sizeof(uint16_t));
@@ -404,6 +403,7 @@ void GeappliancesBridge::check_subscription_activity_()
       this->poll_probe_list_count_,
       &this->erd_cache_);
   erd_cache_set_only_publish_onchange(&this->erd_cache_, this->polling_only_publish_on_change_);
+  this->polling_bridge_initialized_ = true;
 
   // Signal the startup HSM that subscription fallback has occurred.
   tiny_hsm_send_signal(&this->startup_hsm_, signal_subscription_fallback, nullptr);

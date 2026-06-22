@@ -12,7 +12,7 @@
 - Provide phase-transition queries (`is_X_complete`, `is_X_initialized`) so the HSM can check completion without internal state knowledge
 - Provide phase-timing helpers (`record_*_start`, `is_*_elapsed`) for delay-based transitions
 - Group recurring-work dispatch methods so the running state stays clean
-- Expose the current operating mode (`get_mode`, `is_subscription_mode_active`)
+- Expose the current operating mode (`get_mode`) and subscription bridge state (`get_subscription_state`)
 
 ### 1.3 Not Responsible For
 
@@ -79,10 +79,8 @@ The startup HSM holds a pointer to `IBridgeServices` and calls methods through t
 
 ### 3.6 Operating Mode
 
-| Method | Description |
-|--------|-------------|
 | `get_mode()` | Returns the current `BridgeMode` (POLL, SUBSCRIBE, or AUTO). |
-| `is_subscription_mode_active()` | Returns `true` if subscription mode is currently active (may differ from configured mode in AUTO when fallback to polling occurs). |
+| `get_subscription_state()` | Returns the current subscription bridge state as a `subscription_state_t` enum: `subscription_state_none`, `subscription_state_subscribing`, `subscription_state_subscribed`, `subscription_state_steady`, or `subscription_state_failed`. Callers derive `is_subscription_mode_active` from this: active when the value is not `subscription_state_none` and not `subscription_state_failed`. |
 
 ### 3.7 Startup Delay
 
@@ -95,7 +93,8 @@ The startup HSM holds a pointer to `IBridgeServices` and calls methods through t
 
 | Method | Description |
 |--------|-------------|
-| `check_subscription_activity()` | Check subscription activity and fall back to polling if timed out. |
+| `handle_subscription_failed()` | Called when the subscription bridge enters the failed state; triggers fallback to polling mode in AUTO mode. |
+| `handle_polling_failed()` | Called when the polling bridge enters the failed state; cleans up the polling bridge in dual-bridge mode or logs in POLL-only mode. |
 | `maybe_start_custom_erd_polling()` | Start custom-ERD polling bridge if conditions are met. Idempotent. |
 | `log_poll_state_transitions()` | Log any pending polling-bridge state-name transitions. |
 | `run_all_managers()` | Run one tick of all managers (autodiscovery, device-ID, feature bits). |

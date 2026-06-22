@@ -25,6 +25,7 @@
 #include <cstdint>
 
 #include "bridge_mode.h"
+#include "erd_bridge_common.h"
 
 namespace esphome {
 namespace geappliances_bridge {
@@ -75,7 +76,8 @@ class IBridgeServices {
   // -- Operating mode --------------------------------------------------------
 
   virtual BridgeMode get_mode() const = 0;
-  virtual bool is_subscription_mode_active() const = 0;
+  virtual subscription_state_t get_subscription_state() const = 0;
+  virtual polling_state_t get_polling_state() const = 0;
 
   // -- Startup delay ---------------------------------------------------------
 
@@ -86,10 +88,14 @@ class IBridgeServices {
 
   // -- Recurring tasks (called from subscription_watch / running states) ------
 
-  /// Check subscription activity and fall back to polling if timed out.
-  virtual void check_subscription_activity() = 0;
   /// Start custom-ERD polling bridge if conditions are met (idempotent).
   virtual void maybe_start_custom_erd_polling() = 0;
+  /// Called when the subscription bridge enters the failed state; triggers
+  /// fallback to polling mode in AUTO mode.
+  virtual void handle_subscription_failed() = 0;
+  /// Called when the polling bridge enters the failed state while running
+  /// alongside a subscription bridge; cleans up the polling bridge.
+  virtual void handle_polling_failed() = 0;
   /// Log any pending polling-bridge state-name transitions.
   virtual void log_poll_state_transitions() = 0;
   /// Run one tick of all managers (autodiscovery, device-ID, feature bits).

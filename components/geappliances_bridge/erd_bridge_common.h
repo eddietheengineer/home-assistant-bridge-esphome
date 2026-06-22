@@ -48,9 +48,39 @@ extern "C" {
 enum {
   resubscribe_delay = 1000,
   subscription_retention_period = 30 * 1000,
+  subscription_quiet_period = 2 * 1000,
   retry_delay = 100,
   appliance_lost_timeout = 60000
 };
+
+// ============================================================================
+// Subscription state machine states
+// ============================================================================
+
+typedef enum {
+  subscription_state_none,
+  subscription_state_subscribing,
+  subscription_state_subscribed,
+  subscription_state_steady,
+  subscription_state_failed
+} subscription_state_t;
+
+static inline const char* subscription_state_name(subscription_state_t state)
+{
+  switch(state) {
+    case subscription_state_none: return nullptr;
+    case subscription_state_subscribing: return "subscribing";
+    case subscription_state_subscribed: return "subscribed";
+    case subscription_state_steady: return "steady";
+    case subscription_state_failed: return "failed";
+    default: return "unknown";
+  }
+}
+
+static inline bool subscription_is_active(subscription_state_t state)
+{
+  return (state != subscription_state_none) && (state != subscription_state_failed);
+}
 
 // ============================================================================
 // Shared signal identifiers
@@ -63,6 +93,7 @@ enum {
   signal_subscription_added_or_retained,
   signal_subscription_host_came_online,
   signal_subscription_publication_received,
+  signal_quiet_period_expired,
   signal_read_failed,
   signal_read_completed,
   signal_appliance_lost
@@ -156,4 +187,25 @@ template<typename T>
 static erd_set_t& erd_set(T* self)
 {
   return self->erd_set;
+}
+// ============================================================================
+// Polling state machine states
+// ============================================================================
+
+typedef enum {
+  polling_state_none,
+  polling_state_probing,
+  polling_state_polling,
+  polling_state_failed
+} polling_state_t;
+
+static inline const char* polling_state_name(polling_state_t state)
+{
+  switch(state) {
+    case polling_state_none: return nullptr;
+    case polling_state_probing: return "probing";
+    case polling_state_polling: return "polling";
+    case polling_state_failed: return "failed";
+    default: return "unknown";
+  }
 }
