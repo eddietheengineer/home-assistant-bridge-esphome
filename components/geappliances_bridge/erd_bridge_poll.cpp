@@ -34,7 +34,7 @@ static tiny_hsm_result_t state_failed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal,
 static void send_poll_read_requests_bounded(erd_bridge_poll_t* self, uint32_t budget_ms);
 static bool send_cycle_reads(erd_bridge_poll_t* self);
 static constexpr uint32_t POLL_YIELD_MS = 50;          // per-batch time budget
-static constexpr uint32_t POLL_CYCLE_SEND_BUDGET_MS = 500;  // max time per send invocation
+static constexpr uint32_t POLL_CYCLE_SEND_BUDGET_MS = 100;  // max time per send invocation
 static constexpr uint32_t POLL_CYCLE_RESUME_MS = 100;   // timer interval when send budget exceeded
 
 // ============================================================================

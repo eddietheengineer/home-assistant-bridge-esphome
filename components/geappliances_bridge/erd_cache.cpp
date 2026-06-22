@@ -67,6 +67,14 @@ void erd_cache_init(erd_cache_t* self)
 void erd_cache_destroy(erd_cache_t* self)
 {
   if (!self->initialized) return;
+  for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
+    erd_cache_entry_t* e = &self->entries[i];
+    if (e->valid && e->uses_heap) {
+      delete[] e->ext_data;
+      e->ext_data = nullptr;
+      e->uses_heap = false;
+    }
+  }
   erd_cache_init(self);
   self->initialized = false;
 }
@@ -163,12 +171,11 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
       slot->data_size = data_size;
       ESP_LOGD(TAG, "ERD 0x%04X added to cache (%u bytes, heap)", erd, data_size);
     } else {
-      /* Heap failed — truncate to inline. */
-      ESP_LOGW(TAG, "ERD 0x%04X heap alloc failed, truncating to %u bytes",
-               erd, ERD_CACHE_INLINE_DATA_SIZE);
-      uint8_t inline_size = ERD_CACHE_INLINE_DATA_SIZE;
-      memcpy(slot->inline_data, data, inline_size);
-      slot->data_size = inline_size;
+      /* Heap failed — mark entry invalid so truncated data is not published. */
+      ESP_LOGW(TAG, "ERD 0x%04X heap alloc failed, entry marked invalid (data too large for inline)",
+               erd);
+      slot->valid = false;
+      slot->update_required = false;
     }
   }
 

@@ -58,13 +58,13 @@ TEST(erd_cache_mqtt_publisher, init_sets_cache_pointer)
 
   CHECK(publisher.cache != nullptr);
   CHECK_EQUAL(0u, publisher.publish_index);
-  CHECK(publisher.mqtt_connected);
+  CHECK(!publisher.mqtt_connected);  // Initially disconnected; set via on_connected
   CHECK_EQUAL(0u, publisher.total_published);
   CHECK_EQUAL(0u, publisher.missed_loops);
   CHECK(strncmp(publisher.device_id, "my_device", 8) == 0);
 }
 
-TEST(erd_cache_mqtt_publisher, init_sets_mqtt_connected_true)
+TEST(erd_cache_mqtt_publisher, init_sets_mqtt_connected_false)
 {
   erd_cache_mqtt_publisher_init(
     &publisher,
@@ -72,7 +72,7 @@ TEST(erd_cache_mqtt_publisher, init_sets_mqtt_connected_true)
     &adapter.interface,
     "device");
 
-  CHECK(publisher.mqtt_connected);
+  CHECK(!publisher.mqtt_connected);  // Starts disconnected; on_connected sets true
 }
 
 TEST(erd_cache_mqtt_publisher, destroy_unsubscribes_events)
@@ -105,7 +105,7 @@ TEST(erd_cache_mqtt_publisher, init_handles_null_mqtt_client_gracefully)
   /* Should not crash; fields set before the null guard are still valid. */
   CHECK(publisher.cache != nullptr);
   CHECK_EQUAL(0u, publisher.publish_index);
-  CHECK(publisher.mqtt_connected);
+  CHECK(!publisher.mqtt_connected);  // Initially disconnected
 }
 
 TEST(erd_cache_mqtt_publisher, destroy_after_init_with_null_mqtt_client)
@@ -287,8 +287,8 @@ TEST(erd_cache_mqtt_publisher, on_disconnected_sets_flag)
     &cache,
     &adapter.interface,
     "device");
-  // Initially connected by default
-  CHECK(publisher.mqtt_connected);
+  // Initially disconnected by default
+  CHECK(!publisher.mqtt_connected);
 
   // Disconnect, then reconnect
   erd_cache_mqtt_publisher_on_disconnected(&publisher);
@@ -305,8 +305,8 @@ TEST(erd_cache_mqtt_publisher, on_disconnected_then_connected_toggles_flag)
     &adapter.interface,
     "device");
 
-  // Initially connected by default
-  CHECK(publisher.mqtt_connected);
+  // Initially disconnected by default
+  CHECK(!publisher.mqtt_connected);
   erd_cache_mqtt_publisher_on_disconnected(&publisher);
   CHECK(!publisher.mqtt_connected);
   erd_cache_mqtt_publisher_on_connected(&publisher);
@@ -324,7 +324,7 @@ TEST(erd_cache_mqtt_publisher, disconnect_event_triggers_callback)
     &adapter.interface,
     "device");
 
-  // Already connected from init; disconnect event should set flag to false
+  // Start disconnected; disconnect event is a no-op, flag stays false
 
   // Trigger disconnect through the adapter
   esphome_mqtt_client_adapter_notify_disconnected(&adapter);

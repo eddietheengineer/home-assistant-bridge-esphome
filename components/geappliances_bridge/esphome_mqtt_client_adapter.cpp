@@ -92,6 +92,12 @@ extern "C" void esphome_mqtt_client_adapter_init(
   esphome_mqtt_client_adapter_t* self,
   const char* device_id)
 {
+  // Free previous device_id to prevent leak on re-init
+  if (self->device_id != nullptr) {
+    delete self->device_id;
+    self->device_id = nullptr;
+  }
+
   self->interface.api = &api;
   self->device_id = new std::string(device_id);
   self->erd_registry = nullptr;
