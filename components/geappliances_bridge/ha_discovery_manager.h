@@ -151,33 +151,41 @@ class HaDiscoveryManager {
 
   int escape_json_str_(const char* s, char* buf, int buf_size);
   const char* build_device_json_();
-  // Dynamic array growth helpers — allocate in small increments to avoid
-  // large contiguous heap blocks on memory-constrained devices.
-  bool grow_published_topics_(uint16_t min_cap);
-  bool grow_stale_topics_(uint16_t min_cap);
-
   bool contains_erd_(const tiny_erd_t* erds, uint16_t count, tiny_erd_t target) const;
 
   // Track published discovery topics for clearing later.
-  // Heap-allocated on demand during fetch; freed after publishing completes.
+  // Fixed-size static array to avoid heap allocation spikes during discovery
+  #ifdef USE_ESP_IDF_STUBS
   struct PublishedTopic {
     char component[32];  // e.g. "sensor", "switch", "binary_sensor"
     char erd_hex[32];    // e.g. "0002", "2001"
   };
-  PublishedTopic* published_topics_{nullptr};
-  uint16_t published_topics_cap_{0};  // allocated capacity
+  PublishedTopic published_topics_[HA_DISCOVERY_MAX_PUBLISHED_TOPICS];
+  #else
+  // On real ESP32, use a smaller fixed array to save BSS;
+  // excess entities are published but not tracked for clearing.
+  struct PublishedTopic {
+    char component[32];
+    char erd_hex[32];
+  };
+  static constexpr uint16_t HA_DISCOVERY_PUBLISHED_TOPICS_CAP = 256;
+  PublishedTopic published_topics_[HA_DISCOVERY_PUBLISHED_TOPICS_CAP];
+  #endif
   uint16_t published_topics_count_{0};
   uint16_t clear_index_{0};
 
-  // Stale topic cleanup — heap-allocated on demand
+  // Stale topic cleanup — fixed-size static array
   mqtt_subscription_handle_t stale_subscription_handle_{0};
   uint16_t stale_cleanup_index_{0};
   struct StaleTopic { char topic[128]; };
-  StaleTopic* stale_topics_{nullptr};
-  uint16_t stale_topics_cap_{0};  // allocated capacity
+  #ifdef USE_ESP_IDF_STUBS
+  StaleTopic stale_topics_[HA_DISCOVERY_MAX_PUBLISHED_TOPICS];
+  #else
+  static constexpr uint16_t HA_DISCOVERY_STALE_TOPICS_CAP = 64;
+  StaleTopic stale_topics_[HA_DISCOVERY_STALE_TOPICS_CAP];
+  #endif
   uint16_t stale_topics_count_{0};
   uint32_t stale_discovery_start_ms_{0};
-
   HaDiscoveryState state_{HA_DISCOVERY_IDLE};
   std::string device_id_;
   std::string model_number_;

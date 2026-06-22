@@ -122,12 +122,8 @@ void HaDiscoveryManager::cleanup()
     this->task_tcb_ = nullptr;
   }
 
-  // Free heap-allocated topic arrays.
-  free(this->published_topics_);
-  this->published_topics_ = nullptr;
+  // Reset static topic arrays (no free needed — they are class members).
   this->published_topics_count_ = 0;
-  free(this->stale_topics_);
-  this->stale_topics_ = nullptr;
   this->stale_topics_count_ = 0;
 }
 
@@ -205,7 +201,7 @@ void HaDiscoveryManager::run(bool device_steady_state)
 
 void HaDiscoveryManager::clear_ha_discovery_sync()
 {
-  if (this->published_topics_ == nullptr || this->published_topics_count_ == 0) {
+  if (this->published_topics_count_ == 0) {
     return;
   }
   ESP_LOGI(TAG, "Clearing %u HA discovery topics (sync)", this->published_topics_count_);
@@ -218,9 +214,9 @@ void HaDiscoveryManager::clear_ha_discovery_sync()
       esphome_mqtt_client_adapter_publish(this->mqtt_adapter_, topic_buf, "", true);
     }
     // Feed the task watchdog — with many topics, this loop can run for seconds.
-#ifdef USE_ESP32
+    #ifdef USE_ESP32
     esp_task_wdt_reset();
-#endif
+    #endif
   }
   this->published_topics_count_ = 0;
   this->clear_index_ = 0;
@@ -333,41 +329,6 @@ static inline void safe_strncpy(char* dst, const char* src, size_t dst_size)
   dst[dst_size - 1] = '\0';
 }
 
-bool HaDiscoveryManager::grow_published_topics_(uint16_t min_cap)
-{
-  if (this->published_topics_cap_ >= min_cap) return true;
-  uint16_t new_cap = this->published_topics_cap_ ? this->published_topics_cap_ * 2 : min_cap;
-  if (new_cap < min_cap) new_cap = min_cap;
-  if (new_cap > HA_DISCOVERY_MAX_PUBLISHED_TOPICS) new_cap = HA_DISCOVERY_MAX_PUBLISHED_TOPICS;
-
-  auto* tmp = static_cast<PublishedTopic*>(malloc(new_cap * sizeof(PublishedTopic)));
-  if (!tmp) return false;
-  if (this->published_topics_) {
-    memcpy(tmp, this->published_topics_, this->published_topics_count_ * sizeof(PublishedTopic));
-    free(this->published_topics_);
-  }
-  this->published_topics_ = tmp;
-  this->published_topics_cap_ = new_cap;
-  return true;
-}
-
-bool HaDiscoveryManager::grow_stale_topics_(uint16_t min_cap)
-{
-  if (this->stale_topics_cap_ >= min_cap) return true;
-  uint16_t new_cap = this->stale_topics_cap_ ? this->stale_topics_cap_ * 2 : min_cap;
-  if (new_cap < min_cap) new_cap = min_cap;
-  if (new_cap > HA_DISCOVERY_MAX_PUBLISHED_TOPICS) new_cap = HA_DISCOVERY_MAX_PUBLISHED_TOPICS;
-
-  auto* tmp = static_cast<StaleTopic*>(malloc(new_cap * sizeof(StaleTopic)));
-  if (!tmp) return false;
-  if (this->stale_topics_) {
-    memcpy(tmp, this->stale_topics_, this->stale_topics_count_ * sizeof(StaleTopic));
-    free(this->stale_topics_);
-  }
-  this->stale_topics_ = tmp;
-  this->stale_topics_cap_ = new_cap;
-  return true;
-}
 
 #ifdef USE_ESP_IDF_STUBS
 // ESP-IDF stubs: no real FreeRTOS or HTTP client in test builds.
@@ -647,13 +608,8 @@ bool HaDiscoveryManager::process_category_(const HaDiscoveryCategory* cat,
 
 void HaDiscoveryManager::publish_ha_discovery_()
 {
-  // Try to allocate resources incrementally; skip gracefully on OOM.
-  // Start with small capacity; grow incrementally as entities are found.
-  if (!grow_published_topics_(8)) {
-    ESP_LOGW(TAG, "Skipping HA discovery: unable to allocate published_topics_");
-    this->state_ = HA_DISCOVERY_COMPLETE;
-    return;
-  }
+  // published_topics_ is now a fixed static array — no heap allocation needed.
+  this->published_topics_count_ = 0;
 
   // Allocate the static queue storage and TCB.
   this->queue_ = xQueueCreateStatic(HA_DISCOVERY_ITEM_POOL_SIZE, sizeof(uint16_t),
@@ -661,8 +617,6 @@ void HaDiscoveryManager::publish_ha_discovery_()
       static_cast<StaticQueue_t*>(heap_caps_malloc(sizeof(StaticQueue_t), MALLOC_CAP_8BIT)));
   if (!this->queue_) {
     ESP_LOGW(TAG, "Skipping HA discovery: unable to allocate queue");
-    free(this->published_topics_); this->published_topics_ = nullptr;
-    this->published_topics_cap_ = 0; this->published_topics_count_ = 0;
     this->state_ = HA_DISCOVERY_COMPLETE;
     return;
   }
@@ -687,8 +641,6 @@ void HaDiscoveryManager::publish_ha_discovery_()
     if (this->task_stack_) { free(this->task_stack_); this->task_stack_ = nullptr; }
     if (this->task_tcb_) { free(this->task_tcb_); this->task_tcb_ = nullptr; }
     vQueueDelete(this->queue_); this->queue_ = nullptr;
-    free(this->published_topics_); this->published_topics_ = nullptr;
-    this->published_topics_cap_ = 0; this->published_topics_count_ = 0;
     this->state_ = HA_DISCOVERY_COMPLETE;
     return;
   }
@@ -699,8 +651,6 @@ void HaDiscoveryManager::publish_ha_discovery_()
     vQueueDelete(this->queue_); this->queue_ = nullptr;
     free(this->task_stack_); free(this->task_tcb_);
     this->task_stack_ = nullptr; this->task_tcb_ = nullptr;
-    free(this->published_topics_); this->published_topics_ = nullptr;
-    this->published_topics_cap_ = 0; this->published_topics_count_ = 0;
     ESP_LOGW(TAG, "Skipping HA discovery: xTaskCreateStatic failed");
     this->state_ = HA_DISCOVERY_COMPLETE;
     return;
@@ -947,25 +897,26 @@ bool HaDiscoveryManager::process_jsonl_line_(const char* line,
       "homeassistant/%s/%s/%s/config", comp, device_id.c_str(), unique_suffix);
 
   // Insert in sorted order (by component, then erd_hex) for binary search.
-  if (this->published_topics_ && this->published_topics_count_ < HA_DISCOVERY_MAX_PUBLISHED_TOPICS) {
-    if (!grow_published_topics_(this->published_topics_count_ + 1)) {
-      ESP_LOGW(TAG, "HA fetch: unable to grow published_topics_ for ERD %s", erd_hex);
-    } else {
-      auto& t = this->published_topics_[this->published_topics_count_];
-      safe_strncpy(t.component, comp, sizeof(t.component));
-      safe_strncpy(t.erd_hex, unique_suffix, sizeof(t.erd_hex));
-      // Shift elements to maintain sorted order (insertion sort on append).
-      int insert_idx = this->published_topics_count_;
-      while (insert_idx > 0) {
-        int cmp = strcmp(this->published_topics_[insert_idx - 1].component, t.component);
-        if (cmp < 0 || (cmp == 0 && strcmp(this->published_topics_[insert_idx - 1].erd_hex, t.erd_hex) < 0))
-          break;
-        this->published_topics_[insert_idx] = this->published_topics_[insert_idx - 1];
-        insert_idx--;
-      }
-      this->published_topics_[insert_idx] = t;
-      this->published_topics_count_++;
+  #ifdef USE_ESP_IDF_STUBS
+  const uint16_t max_topics = HA_DISCOVERY_MAX_PUBLISHED_TOPICS;
+  #else
+  const uint16_t max_topics = HA_DISCOVERY_PUBLISHED_TOPICS_CAP;
+  #endif
+  if (this->published_topics_count_ < max_topics) {
+    auto& t = this->published_topics_[this->published_topics_count_];
+    safe_strncpy(t.component, comp, sizeof(t.component));
+    safe_strncpy(t.erd_hex, unique_suffix, sizeof(t.erd_hex));
+    // Shift elements to maintain sorted order (insertion sort on append).
+    int insert_idx = this->published_topics_count_;
+    while (insert_idx > 0) {
+      int cmp = strcmp(this->published_topics_[insert_idx - 1].component, t.component);
+      if (cmp < 0 || (cmp == 0 && strcmp(this->published_topics_[insert_idx - 1].erd_hex, t.erd_hex) < 0))
+        break;
+      this->published_topics_[insert_idx] = this->published_topics_[insert_idx - 1];
+      insert_idx--;
     }
+    this->published_topics_[insert_idx] = t;
+    this->published_topics_count_++;
   }
 
   // Get a slot from the pre-allocated pool (round-robin).
@@ -980,9 +931,9 @@ bool HaDiscoveryManager::process_jsonl_line_(const char* line,
     // The main loop publishes at 50ms intervals, so this won't spin long.
     while (xQueueSend(this->queue_, &idx, 0) != pdTRUE) {
       vTaskDelay(1);
-#ifdef USE_ESP32
+      #ifdef USE_ESP32
       esp_task_wdt_reset();
-#endif
+      #endif
     }
   }
 
@@ -991,26 +942,13 @@ bool HaDiscoveryManager::process_jsonl_line_(const char* line,
 
 void HaDiscoveryManager::discover_stale_topics_()
 {
-  // Free published_topics_ — no longer needed after all entities are published.
-  // This reclaims ~40KB before the stale discovery phase.
-  free(this->published_topics_);
-  this->published_topics_ = nullptr;
-  this->published_topics_cap_ = 0;
-  this->published_topics_count_ = 0;
-
+  // published_topics_ is a static array — keep it for stale topic comparison.
   // Reset stale topic collection.
   this->stale_topics_count_ = 0;
   this->stale_cleanup_index_ = 0;
 
   if (!this->mqtt_adapter_) {
     ESP_LOGW(TAG, "No MQTT adapter, skipping stale topic discovery");
-    this->state_ = HA_DISCOVERY_IDLE;
-    return;
-  }
-
-  // Allocate stale_topics_ lazily — only if we actually need it.
-  if (!grow_stale_topics_(8)) {
-    ESP_LOGW(TAG, "Failed to allocate stale_topics_ — skipping stale discovery");
     this->state_ = HA_DISCOVERY_IDLE;
     return;
   }
@@ -1071,7 +1009,7 @@ void HaDiscoveryManager::stale_topic_callback_(const char* topic, const char* pa
 
   // Binary search in sorted published_topics_ (sorted by component, then erd_hex).
   bool found = false;
-  if (self->published_topics_) {
+  {
     uint16_t lo = 0, hi = self->published_topics_count_;
     while (lo < hi) {
       uint16_t mid = lo + (hi - lo) / 2;
@@ -1086,7 +1024,13 @@ void HaDiscoveryManager::stale_topic_callback_(const char* topic, const char* pa
     }
   }
 
-  if (!found && self->stale_topics_ && self->stale_subscription_handle_) {
+  #ifdef USE_ESP_IDF_STUBS
+  const uint16_t max_stale = HA_DISCOVERY_MAX_PUBLISHED_TOPICS;
+  #else
+  const uint16_t max_stale = HA_DISCOVERY_STALE_TOPICS_CAP;
+  #endif
+
+  if (!found && self->stale_subscription_handle_ && self->stale_topics_count_ < max_stale) {
     // This is a stale topic — add to cleanup list if not already present.
     // Use binary search since stale_topics_ is maintained in sorted order.
     bool already_in_list = false;
@@ -1100,35 +1044,25 @@ void HaDiscoveryManager::stale_topic_callback_(const char* topic, const char* pa
         else { already_in_list = true; break; }
       }
     }
-    if (!already_in_list && self->stale_topics_count_ < HA_DISCOVERY_MAX_PUBLISHED_TOPICS) {
-      if (!self->grow_stale_topics_(self->stale_topics_count_ + 1)) {
-        ESP_LOGW(TAG, "HA fetch: unable to grow stale_topics_ for topic %s", topic);
-      } else {
-        // Insert in sorted order.
-        uint16_t insert_idx = self->stale_topics_count_;
-        while (insert_idx > 0 && strcmp(self->stale_topics_[insert_idx - 1].topic, topic) > 0) {
-          self->stale_topics_[insert_idx] = self->stale_topics_[insert_idx - 1];
-          insert_idx--;
-        }
-        snprintf(self->stale_topics_[insert_idx].topic,
-                 sizeof(self->stale_topics_[0].topic), "%s", topic);
-        self->stale_topics_count_++;
-        ESP_LOGD(TAG, "Found stale HA topic: %s", topic);
+    if (!already_in_list) {
+      // Insert in sorted order.
+      uint16_t insert_idx = self->stale_topics_count_;
+      while (insert_idx > 0 && strcmp(self->stale_topics_[insert_idx - 1].topic, topic) > 0) {
+        self->stale_topics_[insert_idx] = self->stale_topics_[insert_idx - 1];
+        insert_idx--;
       }
+      snprintf(self->stale_topics_[insert_idx].topic,
+               sizeof(self->stale_topics_[0].topic), "%s", topic);
+      self->stale_topics_count_++;
+      ESP_LOGD(TAG, "Found stale HA topic: %s", topic);
     }
   }
-}
-
 void HaDiscoveryManager::publish_stale_cleanup_()
 {
-  if (this->stale_topics_ == nullptr || this->stale_cleanup_index_ >= this->stale_topics_count_) {
-    // All stale topics cleaned up (or no stale topics array).
+  if (this->stale_cleanup_index_ >= this->stale_topics_count_) {
+    // All stale topics cleaned up.
     ESP_LOGI(TAG, "Stale topic cleanup complete — removed %u topics",
              static_cast<unsigned>(this->stale_topics_count_));
-    // Free stale_topics_ — no longer needed.
-    free(this->stale_topics_);
-    this->stale_topics_ = nullptr;
-    this->stale_topics_cap_ = 0;
     this->stale_topics_count_ = 0;
     this->stale_cleanup_index_ = 0;
     this->state_ = HA_DISCOVERY_IDLE;
