@@ -84,8 +84,8 @@ Each line in a category JSONL file is a compact JSON object defining one entity:
 | dc | Optional | device_class |
 | sc | Optional | state_class (e.g., "total", "measurement") |
 | fi | Optional | Field ID for sub-fields within a multi-byte ERD. Creates a separate entity with _ suffix in topic key and unique_id |
-| p | Optional | Paired ERD ID (hex string). For request/status pairs: the "request" entity reads from the paired ERD's value topic |
-| r | Optional | Role: "request" or "status". Determines which ERD's value topic is used for state vs command |
+| p | Optional | Paired ERD ID (hex string). For request/status pairs that form a single HA entity (switch, select) |
+| r | Optional | Role: "request" or "status". The **request** ERD maps to the HA discovery `command_topic` (writing to `geappliances/<device_id>/erd/0x<request_erd>/write`). The **status** ERD maps to the HA discovery `state_topic` (reading from `geappliances/<device_id>/erd/0x<status_erd>/value`) |
 | o | Optional | JSON array of options (for select domain) |
 | dt | Optional | Data type for number domain: int8, uint8, int16, uint16, int24, uint24, int32, uint32 |
 | sf | Optional | Scale factor for number domain (integer >= 1) |
@@ -256,7 +256,7 @@ Modified: `Makefile` — Add `ha_discovery/` JSONL files and `components/geappli
 
 ## Entity Filtering
 
-Only entities whose ERD ID (or paired ERD ID for request entities) is present in the device's registered ERD set are published. This ensures entities are only created for ERDs the connected appliance actually supports.
+Only entities whose ERD ID is present in the device's registered ERD set are published. For paired request/status entities, **both** the request ERD and the status ERD must be registered for the entity to be published — the appliance must support both the command and the state feedback.
 
 ## Files Summary
 
