@@ -195,7 +195,7 @@ Modified: `components/geappliances_bridge/geappliances_bridge.h`
 
 Modified: `components/geappliances_bridge/geappliances_bridge.cpp`
 
-- In `loop()`, trigger discovery start once steady state is reached. Note: `check_steady_state()` returns `true` only on the first transition (it short-circuits on `!steady_state_reached_`), so the `ha_discovery_started_` guard is the durable check:
+- In `loop()`, trigger discovery start once steady state is reached. `check_steady_state()` is called from the startup HSM (not `loop()`), and returns `true` only on the first transition by short-circuiting on `!steady_state_reached_`. After the HSM transitions to `startup_state_running`, `check_steady_state()` is never called again. The `loop()` code checks `steady_state_reached_` directly, guarded by `ha_discovery_started_` for durability:
 
   ```cpp
     if (this->steady_state_reached_ && !this->ha_discovery_started_ && this->generate_device_config_) {
