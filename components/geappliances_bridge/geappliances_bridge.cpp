@@ -703,34 +703,22 @@ polling_state_t GeappliancesBridge::get_polling_state() const
 }
 bool GeappliancesBridge::check_steady_state()
 {
-  // Already logged — return false to suppress repeated messages.
-  if (this->steady_state_reached_) {
-    return false;
+  // Steady when: not already reached, subscription bridge is steady (if
+  // initialized), polling bridge is polling (if initialized), and at least
+  // one bridge has been initialized.
+  bool steady = !this->steady_state_reached_ &&
+    (!this->subscription_bridge_initialized_ ||
+     this->erd_bridge_subscribe_.current_state == subscription_state_steady) &&
+    (!this->polling_bridge_initialized_ ||
+     this->erd_bridge_poll_.current_state == polling_state_polling) &&
+    this->erd_bridge_initialized_;
+
+  if (steady) {
+    this->steady_state_reached_ = true;
+    ESP_LOGI(TAG, "Appliance Bridge is in steady state");
   }
 
-  // Subscription bridge must be steady if initialized.
-  if (this->subscription_bridge_initialized_) {
-    if (this->erd_bridge_subscribe_.current_state != subscription_state_steady) {
-      return false;
-    }
-  }
-
-  // Polling bridge must be in polling state if initialized.
-  if (this->polling_bridge_initialized_) {
-    if (this->erd_bridge_poll_.current_state != polling_state_polling) {
-      return false;
-    }
-  }
-
-  // At least one bridge must be initialized.
-  if (!this->erd_bridge_initialized_) {
-    return false;
-  }
-
-  // All conditions met — mark as reached and log.
-  this->steady_state_reached_ = true;
-  ESP_LOGI(TAG, "Appliance Bridge is in steady state");
-  return true;
+  return steady;
 }
 
 
