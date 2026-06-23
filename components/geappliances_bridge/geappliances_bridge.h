@@ -124,6 +124,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void handle_subscription_failed() override;
   void handle_polling_failed() override;
   void maybe_start_custom_erd_polling() override;
+  bool check_steady_state() override;
   void log_poll_state_transitions() override;
   void initialize_erd_cache_publisher() override;
   bool is_erd_cache_publisher_initialized() const override;
@@ -183,6 +184,10 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   static constexpr uint32_t GEA2_LOOP_DURATION_MS = 100;
   static constexpr uint32_t GEA3_LOOP_DURATION_MS = 10;
   bool gea2_protocol_active_{false}; // fallback for manual device_id when autodiscovery is skipped
+
+  // True once the appliance-side data path (subscription and/or polling
+  // bridge) has reached steady-state operation.  Set once; never cleared.
+  bool steady_state_reached_{false};
 
   // Device identity manager (extracted from god class)
   DeviceIdentityManager device_identity_manager_;

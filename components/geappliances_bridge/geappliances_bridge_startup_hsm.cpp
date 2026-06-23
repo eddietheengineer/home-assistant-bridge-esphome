@@ -386,7 +386,8 @@ tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_sig
         svc->handle_polling_failed();
         svc->maybe_start_custom_erd_polling();
 
-        if (svc->get_mode() != BRIDGE_MODE_AUTO || !subscription_is_active(sub_state)) {
+        // Check if the appliance bridge has reached steady state.
+        if (svc->check_steady_state()) {
           tiny_hsm_transition(hsm, startup_state_running);
         }
       }
@@ -420,7 +421,6 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
 
   switch (signal) {
     case tiny_hsm_signal_entry:
-      ESP_LOGI(TAG, "Bridge is now in steady-state operation");
       break;
 
     case signal_run_loop:
@@ -434,6 +434,9 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
       svc->handle_polling_failed();
       svc->log_poll_state_transitions();
       svc->maybe_start_custom_erd_polling();
+
+      // Check and log once when the appliance bridge first reaches steady state.
+      svc->check_steady_state();
       break;
 
     case tiny_hsm_signal_exit:
