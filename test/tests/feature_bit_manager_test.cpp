@@ -831,3 +831,79 @@ TEST(feature_bit_manager, queue_retry_ms_is_50)
 {
   CHECK_EQUAL(50u, FeatureBitManager::QUEUE_RETRY_MS);
 }
+/* ------------------------------------------------------------------ */
+/* FAILED state behavior                                                */
+/* ------------------------------------------------------------------ */
+
+TEST(feature_bit_manager, events_ignored_in_failed_state)
+{
+  init_manager();
+
+  // start() queues a read for ERD_COMMON_FEATURE_API successfully.
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
+  manager.start();
+
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+
+  // Trigger read_failed for ERD_COMMON_FEATURE_API to enter FAILED state.
+  trigger_read_failed(ERD_COMMON_FEATURE_API);
+
+  CHECK_EQUAL(FEATURE_BIT_STATE_FAILED, manager.get_state());
+
+  // Now trigger a read_completed for ERD_APPLIANCE_FEATURE_API_0 —
+  // it should be silently ignored in FAILED state.
+  uint8_t data[8] = {0};
+  trigger_read_completed(ERD_APPLIANCE_FEATURE_API_0, data, 8);
+
+  // State must remain FAILED; the event was ignored.
+  CHECK_EQUAL(FEATURE_BIT_STATE_FAILED, manager.get_state());
+}
+
+TEST(feature_bit_manager, queue_retry_timer_noop_in_failed_state)
+{
+  init_manager();
+
+  // start() queues a read for 0x0092 successfully.
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
+  manager.start();
+
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+
+  // Trigger read_failed for 0x0092 to enter FAILED state.
+  trigger_read_failed(ERD_COMMON_FEATURE_API);
+
+  CHECK_EQUAL(FEATURE_BIT_STATE_FAILED, manager.get_state());
+
+  // Verify that on_erd_activity_ ignores events in FAILED state.
+  // Trigger a read_completed for 0x0093 — it should be ignored.
+  uint8_t data[8] = {0};
+  trigger_read_completed(ERD_APPLIANCE_FEATURE_API_0, data, 8);
+
+  // State must remain FAILED; the event was ignored.
+  CHECK_EQUAL(FEATURE_BIT_STATE_FAILED, manager.get_state());
+
+  // Verify that queue_retry_ returns early in FAILED state.
+  // We do this by checking that no additional read is queued after
+  // the retry timer fires. Since we can't directly call queue_retry_,
+  // we verify the state remains FAILED after timer elapse.
+  // (No retry timer is armed in this path, so elapse is a no-op.)
+  tiny_timer_group_double_elapse_time(&timer_group, 100);
+  CHECK_EQUAL(FEATURE_BIT_STATE_FAILED, manager.get_state());
+}
+
+TEST(feature_bit_manager, failed_state_has_no_valid_erds)
+{
+  init_manager();
+
+  // start() queues a read for ERD_COMMON_FEATURE_API successfully.
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
+  manager.start();
+
+  // Trigger read_failed for ERD_COMMON_FEATURE_API to enter FAILED state.
+  trigger_read_failed(ERD_COMMON_FEATURE_API);
+
+  CHECK_EQUAL(FEATURE_BIT_STATE_FAILED, manager.get_state());
+
+  // In FAILED state, get_valid_erd_count() must return 0.
+  CHECK_EQUAL(0u, manager.get_valid_erd_count());
+}

@@ -322,3 +322,54 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
 
   mock().checkExpectations();
 }
+
+// =============================================================================
+// container_of / services_from_hsm — pointer recovery
+// =============================================================================
+
+TEST(startup_hsm, services_from_hsm_returns_correct_pointer)
+{
+  mock().expectOneCall("record_startup_delay_start").onObject(&svc);
+  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_protocol_stack);
+  // protocol_stack entry transitions to startup_delay which calls record_startup_delay_start.
+
+  IBridgeServices* recovered = services_from_hsm(&wrapper.hsm);
+
+  CHECK(recovered == &svc);
+  CHECK(recovered == wrapper.services);
+}
+
+// =============================================================================
+// Wrapper destroy — nulls services pointer
+// =============================================================================
+
+TEST(startup_hsm, wrapper_destroy_nulls_services)
+{
+  mock().expectOneCall("record_startup_delay_start").onObject(&svc);
+  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_protocol_stack);
+
+  CHECK(wrapper.services == &svc);
+
+  startup_hsm_wrapper_destroy(&wrapper);
+
+  CHECK(wrapper.services == nullptr);
+}
+
+// =============================================================================
+// Feature bits FAILED path — is_feature_bits_complete returns true
+// =============================================================================
+
+TEST(startup_hsm, feature_bits_failed_transitions_to_bridge_init)
+{
+  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_feature_bits);
+
+  mock()
+    .expectOneCall("is_feature_bits_complete")
+    .onObject(&svc)
+    .andReturnValue(true);
+
+  tiny_hsm_send_signal(&wrapper.hsm, signal_run_loop, nullptr);
+
+  CHECK(wrapper.hsm.current == startup_state_bridge_init);
+  mock().checkExpectations();
+}

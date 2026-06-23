@@ -105,6 +105,8 @@ tiny_hsm_result_t startup_state_subscription_watch(
 
 tiny_hsm_result_t startup_state_running(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
+/// Recover the IBridgeServices pointer from the embedded HSM using container_of.
+IBridgeServices* services_from_hsm(tiny_hsm_t* hsm);
 
 /// Initialize the startup HSM wrapper with the given bridge services and initial state.
 void startup_hsm_wrapper_init(startup_hsm_wrapper_t* self, IBridgeServices* services,
