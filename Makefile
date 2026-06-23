@@ -91,7 +91,15 @@ $(ERD_LISTS_HEADER) $(APPLIANCE_API_FEATURE_LISTS_HEADER): $(ERD_DEFINITIONS_JSO
 	@echo Generating ERD lists and feature API lists...
 	@python3 scripts/generate_erd_lists.py
 
-BUILD_DEPS += $(ERD_LISTS_HEADER) $(APPLIANCE_API_FEATURE_LISTS_HEADER)
+# Generate ha_discovery_data.h from JSONL files before building
+HA_DISCOVERY_DATA_HEADER := components/geappliances_bridge/ha_discovery_data.h
+HA_DISCOVERY_JSONL := $(wildcard ha_discovery/*.jsonl)
+
+$(HA_DISCOVERY_DATA_HEADER): $(ERD_LISTS_HEADER) $(HA_DISCOVERY_JSONL) scripts/compress_ha_discovery.py
+	@echo Generating HA discovery compressed data...
+	@python3 scripts/compress_ha_discovery.py
+
+BUILD_DEPS += $(ERD_LISTS_HEADER) $(APPLIANCE_API_FEATURE_LISTS_HEADER) $(HA_DISCOVERY_DATA_HEADER)
 
 .PHONY: test
 test: $(BUILD_DIR)/$(TARGET)

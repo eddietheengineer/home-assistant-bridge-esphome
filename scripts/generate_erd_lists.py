@@ -15,6 +15,7 @@ Generates the following files:
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, List, Set
@@ -520,6 +521,14 @@ def main():
     with open(api_output_file, 'w') as f:
         f.write(api_header_content)
 
+
+    # Generate HA discovery JSONL files
+    ha_discovery_script = script_dir / 'generate_ha_discovery.py'
+    if ha_discovery_script.exists():
+        print(f"\nGenerating HA discovery JSONL files...")
+        subprocess.run([sys.executable, str(ha_discovery_script)], check=True)
+    else:
+        print(f"\nWarning: {ha_discovery_script} not found, skipping HA discovery generation", file=sys.stderr)
 
     print("Done!")
 
