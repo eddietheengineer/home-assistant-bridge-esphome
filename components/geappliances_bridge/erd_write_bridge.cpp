@@ -97,8 +97,12 @@ static tiny_hsm_result_t state_writing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       break;
 
     case tiny_hsm_signal_exit:
-      // Disarm timeout on any exit (completion, failure, or timeout)
-      tiny_timer_stop(self->timer_group, &self->write_timeout_timer);
+      // Disarm timeout on any exit (completion, failure, or timeout).
+      // Set expired=false so the timer group skips it on the next tick.
+      // tiny_timer_stop() is not used here because it calls tiny_list_remove()
+      // which is not compiled by the remote tiny library at the pinned commit.
+      self->write_timeout_timer.expired = false;
+      self->write_timeout_timer.periodic = false;
       break;
 
     case signal_write_requested: {
