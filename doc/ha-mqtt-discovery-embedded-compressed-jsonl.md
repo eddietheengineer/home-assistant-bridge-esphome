@@ -131,7 +131,12 @@ New file: `scripts/generate_ha_discovery.py`
 
 **Unique ID**: The `unique_id` is not stored in the JSONL — it is assembled at runtime by the discovery manager from the device ID and ERD ID: `<device_id>_erd_<erd_id>` (e.g., `Dishwasher_ZL4200ABC_12345678_erd_0008`). For multi-field ERDs, the field ID is appended: `<device_id>_erd_<erd_id>_<field_id>` (e.g., `Dishwasher_ZL4200ABC_12345678_erd_0005_hours`). The optional `uid` key in the JSONL can override this default if needed.
 
-- `d` (HA domain): Uses `ha_domain` from JSON when present. For ERDs where `ha_domain` is `sensor` but the ERD is writable with enum values, derive `select` or `switch` from the `operations` array and data type.
+- `d` (HA domain): Uses `ha_domain` from JSON when present. For ERDs where `ha_domain` is `sensor` but the ERD is writable with enum values, derive `select` or `switch` from the `operations` array and data type. Domain can also be overridden by `device_class` (see `dc` below).
+
+- `dc` (device class): Uses `device_class` from JSON when present, but must validate against HA's allowed values for the target domain. Invalid values are omitted:
+  - `device_class: "enum"` — not a valid HA device class for any domain. Omit from discovery payload.
+  - `device_class: "restart"` — valid only for the **button** domain. If the ERD's `ha_domain` is `sensor` but `device_class` is `restart`, change the domain to `button` and keep the device class.
+  - All other `device_class` values are passed through as-is.
 - `vt` (value template): Derived from the data field's `type` and metadata. The generator must handle these cases:
 
   - **u8/u16/u24/u32**: Raw hex payload decoded as little-endian integer. If `scaling_factor` is present, divide: `{{ value_json / scaling_factor }}`.
