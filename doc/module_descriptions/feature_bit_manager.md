@@ -24,7 +24,10 @@ FEATURE_BIT_STATE_READING_0092  (common feature API)
             → FEATURE_BIT_STATE_COMPLETE
                 → valid_list_ready_ = true
 
-Any read failure → skip to next ERD in sequence
+ERD 0x0092 failure → FEATURE_BIT_STATE_FAILED
+  → bridge falls back to full polling (no feature filtering)
+
+Any other read failure → skip to next ERD in sequence
 ```
 
 ### Self-Driving Architecture
@@ -35,10 +38,11 @@ The manager is fully self-driving with no polling from the bridge:
 2. **`start()`** queues the first ERD read (0x0092, Common Feature API). Uses `read_queued_` guard for idempotency - calling `start()` multiple times before the first read completes does not double-queue.
 3. **Event handler `on_erd_activity_()`** drives the read sequence:
    - Filters events by `address == host_address_` to ignore responses for other appliances
-   - Ignores all events once in PARSING or COMPLETE state to prevent state machine corruption
+   - Ignores all events once in PARSING, COMPLETE, or FAILED state to prevent state machine corruption
    - If `read_queued_` is false (queue was full on last attempt), retries `queue_erd_read_()` immediately
    - On `read_completed`: stores ERD data, advances state, queues next read via `queue_erd_read_()`
    - On `read_failed`: calls `skip_to_next_erd_()` to advance state and queue next read
+   - If ERD 0x0092 fails: transitions to `FEATURE_BIT_STATE_FAILED` (no further reads)
    - Each completed or failed read immediately triggers the next read in the sequence
 4. **After last ERD (0x010D)**: transitions to `FEATURE_BIT_STATE_PARSING` and arms a periodic timer (5ms interval) for incremental parsing
 5. **Timer callback `parse_next_step_()`** drives incremental parsing:
@@ -46,7 +50,7 @@ The manager is fully self-driving with no polling from the bridge:
    - Next ticks: processes common feature descriptors (4 per tick via `COMMON_PARSE_PER_CALL`)
    - Next ticks: processes one appliance ERD (0x0093-0x010D) per tick
    - Final tick: adds mandatory ERDs, builds valid_erds_vec_, sets `valid_list_ready_ = true`, stops timer, transitions to COMPLETE
-6. **Bridge polls `get_state()`** to check progress (HSM checks for COMPLETE)
+6. **Bridge polls `get_state()`** to check progress (HSM checks for COMPLETE or FAILED)
 
 ### Parsing Details
 
@@ -61,8 +65,9 @@ The manager is fully self-driving with no polling from the bridge:
 - **No MQTT dependency**: Removed `i_mqtt_client` dependency. The manager only needs the ERD client and timer group.
 - **No `run()` method**: The manager is fully event-driven and timer-driven. The bridge does not poll `run()`.
 - **Read failure**: Each ERD read that fails is skipped (not retried). The manager advances to the next ERD in the sequence.
+- **Common Feature API failure**: If ERD 0x0092 fails, the manager transitions to `FEATURE_BIT_STATE_FAILED` instead of continuing. The bridge falls back to full polling (no feature filtering). `is_feature_bits_complete()` returns true for FAILED, allowing the HSM to transition past the feature_bits phase.
 - **Queue full retry**: If `tiny_gea3_erd_client_read()` returns false (queue full), the manager arms a one-shot retry timer (50ms). If an ERD activity event arrives before the timer fires and queues the read, the timer becomes a no-op. This prevents indefinite stalling when the queue is persistently full with no other activity.
-- **Event filtering**: `on_erd_activity_()` filters by `address == host_address_` AND verifies the event's ERD matches the one the current READING state expects. Unrelated reads (e.g., from the polling bridge) are ignored. Events in PARSING/COMPLETE states are also ignored to prevent state machine corruption.
+- **Event filtering**: `on_erd_activity_()` filters by `address == host_address_` AND verifies the event's ERD matches the one the current READING state expects. Unrelated reads (e.g., from the polling bridge) are ignored. Events in PARSING, COMPLETE, or FAILED states are also ignored to prevent state machine corruption.
 - **Incremental parsing**: Uses `tiny_timer` with 5ms interval to spread heap allocations across multiple ticks, avoiding the ESP32 Task Watchdog Timer.
 - **Idempotent start**: `read_queued_` flag ensures `start()` can be called multiple times safely (e.g., from HSM entry + bridge loop).
 
@@ -75,4 +80,4 @@ The manager is fully self-driving with no polling from the bridge:
 
 ## Testing
 
-Covered by dedicated unit tests in `test/tests/feature_bit_manager_test.cpp` (20+ tests covering initialization, start idempotency, event-driven read sequencing, failure handling, timer-driven incremental parsing, and valid ERD list generation). Also covered by integration tests through the full startup sequence.
+Covered by dedicated unit tests in `test/tests/feature_bit_manager_test.cpp` (20+ tests covering initialization, start idempotency, event-driven read sequencing, failure handling, timer-driven incremental parsing, valid ERD list generation, and FAILED state transitions). Also covered by integration tests through the full startup sequence.

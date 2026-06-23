@@ -8,8 +8,9 @@ Hierarchical state machine that drives the linear startup sequence of the GE App
 
 | Function | Description |
 |----------|-------------|
-| `set_bridge_services(services)` | Set the `IBridgeServices` back-pointer used by all HSM state functions |
-| `services_from_hsm(hsm)` | Retrieve the `IBridgeServices` pointer from an HSM pointer |
+| `startup_hsm_wrapper_init(wrapper, services, initial)` | Initialize the wrapper struct with bridge services and initial state |
+| `services_from_hsm(hsm)` | Retrieve the `IBridgeServices` pointer from an HSM pointer via `container_of` |
+| `startup_hsm_wrapper_destroy(wrapper)` | Null the services pointer in the wrapper |
 
 ## Signals
 
@@ -32,28 +33,32 @@ Flat hierarchy — all states defer unhandled signals to `startup_state_top`.
 startup_state_top (root — handles entry/exit, defers all other signals)
   │
   ├─ startup_state_protocol_stack
-  │    └─ entry → immediately transition to autodiscovery
+  │    └─ entry → immediately transition to startup_delay
+  │
+  ├─ startup_state_startup_delay
+  │    ├─ entry: record_startup_delay_start()
+  │    └─ run_loop: if delay elapsed → autodiscovery
   │
   ├─ startup_state_autodiscovery
   │    ├─ run_loop: run AutodiscoveryManager (retries indefinitely)
   │    └─ complete/signal → device_id
   │
   ├─ startup_state_device_id
-  │    ├─ entry: init DeviceIdentityManager, start timeout timer
-  │    ├─ run_loop: run manager, check timeout (30 s)
-  │    └─ complete/failed/signal → mqtt_client_init
+  │    ├─ entry: init DeviceIdentityManager
+  │    ├─ run_loop: check device ID complete
+  │    └─ complete/signal → mqtt_client_init
   │
   ├─ startup_state_mqtt_client_init
-  │    └─ entry: init MQTT adapter, start feature bit reading → feature_bits
+  │    └─ entry: init MQTT adapter, init ERD cache publisher, start feature bit reading → feature_bits
   │
   ├─ startup_state_feature_bits
-  │    ├─ run_loop: run FeatureBitManager, check both feature bits AND MQTT connected
-  │    ├─ timeout: 60 s — continue without feature filtering
-  │    └─ feature_bits_complete + mqtt_connected → bridge_init
+  │    ├─ run_loop: check feature bits complete (COMPLETE or FAILED) → bridge_init
+  │    ├─ mqtt_connected: check feature bits complete → bridge_init
+  │    └─ feature_bits_complete: → bridge_init
   │
   ├─ startup_state_bridge_init
-  │    ├─ run_loop: if MQTT connected + autodiscovery complete, init bridge
-  │    └─ mqtt_connected/signal → subscription_watch
+  │    ├─ run_loop: if autodiscovery complete, init bridge
+  │    └─ bridge_ready → subscription_watch
   │
   ├─ startup_state_subscription_watch
   ├─ non-AUTO modes: skip to running
@@ -75,11 +80,10 @@ startup_state_top (root — handles entry/exit, defers all other signals)
 
 ## Key Design Decisions
 
-- **Back-pointer instead of container_of**: The bridge is a non-POD C++ class (virtual methods, inheritance), so `offsetof` is conditionally-supported. A static global pointer (`g_bridge_instance`) is used instead.
+- **container_of instead of global back-pointer**: The HSM is embedded in `startup_hsm_wrapper_t` alongside the `IBridgeServices*` pointer. `services_from_hsm()` uses `container_of` to recover the wrapper from the HSM pointer, making the HSM reentrant and testable. Same pattern as `erd_write_bridge_t` and `erd_bridge_poll_t`.
 - **Flat hierarchy**: All states are children of `startup_state_top` with no intermediate parent states. This simplifies signal routing — any unhandled signal bubbles to the top and is deferred.
 - **Signal-driven transitions**: Each state waits for specific signals from its manager rather than polling for completion. This allows the `run_loop` signal to drive ongoing work while signals trigger transitions.
-- **Phase timeouts**: Device ID (30 s) and feature bits (60 s) phases have timeouts to prevent indefinite stalls. On timeout, the bridge continues with fallback values.
-- **Feature bits + MQTT gate**: The `feature_bits` state waits for BOTH feature bit completion AND MQTT connection before transitioning to `bridge_init`. Either signal alone can trigger the check.
+- **Feature bits completion gate**: The `feature_bits` state transitions on `is_feature_bits_complete()` returning true, which covers both `FEATURE_BIT_STATE_COMPLETE` (feature filtering succeeded) and `FEATURE_BIT_STATE_FAILED` (falls back to full polling).
 
 ## Testing
 

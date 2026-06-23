@@ -62,14 +62,18 @@ If `tiny_gea3_erd_client_read()` returns false (queue full):
 
 The `on_erd_activity_()` handler MUST filter events by:
 1. **Address**: Only process events where `address == host_address_`.
-2. **State**: Ignore all events when in `FEATURE_BIT_STATE_PARSING` or `FEATURE_BIT_STATE_COMPLETE`.
+2. **State**: Ignore all events when in `FEATURE_BIT_STATE_PARSING`, `FEATURE_BIT_STATE_COMPLETE`, or `FEATURE_BIT_STATE_FAILED`.
 3. **Expected ERD**: Only process `read_completed` or `read_failed` events for the ERD that the current READING state is waiting for (as returned by `get_expected_erd_()`).
 
 This prevents unrelated reads (e.g., from the polling bridge) from corrupting the read sequence.
 
+### Requirement 1.8: Common Feature API Failure
+
+If ERD 0x0092 (Common Feature API) fails or returns null data, the manager MUST transition to `FEATURE_BIT_STATE_FAILED` instead of continuing the read sequence. The Common Feature API is the foundation for all feature filtering — without it, there is no way to determine which ERDs are supported. When the manager enters `FEATURE_BIT_STATE_FAILED`, the bridge falls back to full polling (no feature filtering).
+
 ### Implementation
 
-The state machine has one state per ERD in the sequence (`FEATURE_BIT_STATE_READING_0092` through `FEATURE_BIT_STATE_READING_010D`), plus `FEATURE_BIT_STATE_PARSING` and `FEATURE_BIT_STATE_COMPLETE`. The `queue_erd_read_()` and `get_expected_erd_()` methods map each state to its corresponding ERD. The `skip_to_next_erd_()` method advances state on failure.
+The state machine has one state per ERD in the sequence (`FEATURE_BIT_STATE_READING_0092` through `FEATURE_BIT_STATE_READING_010D`), plus `FEATURE_BIT_STATE_PARSING`, `FEATURE_BIT_STATE_COMPLETE`, and `FEATURE_BIT_STATE_FAILED`. The `queue_erd_read_()` and `get_expected_erd_()` methods map each state to its corresponding ERD. The `skip_to_next_erd_()` method advances state on failure, or transitions to `FEATURE_BIT_STATE_FAILED` if the failed ERD is 0x0092.
 
 ### Prohibited
 
@@ -77,11 +81,11 @@ The state machine has one state per ERD in the sequence (`FEATURE_BIT_STATE_READ
 - Advancing the read sequence via timers (only event-driven).
 - Retrying failed ERD reads.
 - Processing events for ERDs other than the one the current state expects.
-- Processing events in PARSING or COMPLETE state.
+- Processing events in PARSING, COMPLETE, or FAILED state.
 
 ### Verification
 
-Tests must verify that the read sequence progresses only through event callbacks, that failed reads advance to the next ERD without retry, and that unrelated events are ignored.
+Tests must verify that the read sequence progresses only through event callbacks, that failed reads advance to the next ERD without retry, that unrelated events are ignored, and that ERD 0x0092 failure transitions to FAILED state.
 
 ---
 
@@ -157,11 +161,11 @@ Tests must verify that parsing completes within the expected number of timer tic
 
 ### Requirement 3.1: State Reporting
 
-The `get_state()` method MUST return the current `FeatureBitState`. The bridge startup HSM polls this to determine when to transition past the feature_bits phase (waits for `FEATURE_BIT_STATE_COMPLETE`).
+The `get_state()` method MUST return the current `FeatureBitState`. The bridge startup HSM polls this to determine when to transition past the feature_bits phase. `is_feature_bits_complete()` returns true for both `FEATURE_BIT_STATE_COMPLETE` and `FEATURE_BIT_STATE_FAILED` — the former means feature filtering succeeded, the latter means the bridge falls back to full polling.
 
 ### Requirement 3.2: Valid ERD Set
 
-The `get_valid_erds()` method returns a `const std::set<tiny_erd_t>&` of all valid ERDs. Before parsing completes, the set is empty. After parsing completes, it contains the mandatory ERDs plus any ERDs indicated by the feature bits.
+The `get_valid_erds()` method returns a `const std::set<tiny_erd_t>&` of all valid ERDs. Before parsing completes, the set is empty. After parsing completes, it contains the mandatory ERDs plus any ERDs indicated by the feature bits. When in `FEATURE_BIT_STATE_FAILED`, the valid ERD set is empty (no feature filtering is applied).
 
 ### Requirement 3.3: Valid ERD Vector
 
@@ -169,7 +173,7 @@ The `get_valid_erds_vec()` method returns a `const std::vector<tiny_erd_t>&` tha
 
 ### Requirement 3.4: List Readiness
 
-The `valid_list_ready_` flag MUST be false until parsing completes and the mandatory ERDs have been added. Callers MUST NOT read `valid_erds_` or `valid_erds_vec_` until `valid_list_ready_` is true.
+The `valid_list_ready_` flag MUST be false until parsing completes and the mandatory ERDs have been added. Callers MUST NOT read `valid_erds_` or `valid_erds_vec_` until `valid_list_ready_` is true. When in `FEATURE_BIT_STATE_FAILED`, `valid_list_ready_` is false.
 
 ### Prohibited
 
@@ -198,6 +202,14 @@ The `valid_list_ready_` flag MUST be false until parsing completes and the manda
 ### Requirement 4.3: No Timeout
 
 The feature bits phase has no timeout. If the appliance is lost during the read sequence, the manager remains in the current READING state indefinitely. The startup HSM handles appliance loss via its own timeout mechanism.
+
+### Requirement 4.4: Failed State Exit
+
+When the manager enters `FEATURE_BIT_STATE_FAILED` (due to ERD 0x0092 failure):
+- The manager MUST NOT continue the read sequence.
+- The manager MUST ignore subsequent ERD activity events (same as PARSING/COMPLETE).
+- The retry timer callback MUST be a no-op when in FAILED state.
+- The bridge treats FAILED as a terminal state equivalent to COMPLETE for HSM transition purposes.
 
 ### Prohibited
 

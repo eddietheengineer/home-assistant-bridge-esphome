@@ -26,20 +26,23 @@ namespace esphome {
 namespace geappliances_bridge {
 
 
-// Back-pointer to the bridge services, set during HSM init.
-// This allows HSM state functions to invoke bridge operations through a
-// stable interface without a compile-time dependency on GeappliancesBridge.
-static IBridgeServices* g_bridge_services = nullptr;
 
 IBridgeServices* services_from_hsm(tiny_hsm_t* hsm)
 {
-  (void)hsm;
-  return g_bridge_services;
+  startup_hsm_wrapper_t* wrapper = container_of(startup_hsm_wrapper_t, hsm, hsm);
+  return wrapper->services;
 }
 
-void set_bridge_services(IBridgeServices* services)
+void startup_hsm_wrapper_init(startup_hsm_wrapper_t* self, IBridgeServices* services,
+  tiny_hsm_state_t initial)
 {
-  g_bridge_services = services;
+  self->services = services;
+  tiny_hsm_init(&self->hsm, &startup_hsm_configuration, initial);
+}
+
+void startup_hsm_wrapper_destroy(startup_hsm_wrapper_t* self)
+{
+  self->services = nullptr;
 }
 
 
@@ -457,7 +460,7 @@ static const tiny_hsm_state_descriptor_t startup_hsm_state_descriptors[] = {
   { .state = startup_state_feature_bits,     .parent = startup_state_top },
   { .state = startup_state_bridge_init,      .parent = startup_state_top },
   { .state = startup_state_subscription_watch, .parent = startup_state_top },
-  { .state = startup_state_running,          .parent = startup_state_top },
+  { .state = startup_state_running,          .parent = startup_state_top }
 };
 
 const tiny_hsm_configuration_t startup_hsm_configuration = {

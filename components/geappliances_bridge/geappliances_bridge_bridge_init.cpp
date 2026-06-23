@@ -43,7 +43,7 @@ namespace geappliances_bridge {
 
 void GeappliancesBridge::on_poll_discovery_complete_()
 {
-  tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
+  tiny_hsm_send_signal(&this->startup_hsm_wrapper_.hsm, signal_bridge_ready, nullptr);
 }
 
 
@@ -238,7 +238,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
 
     // Subscription bridge has no discovery phase — signal the startup HSM
     // immediately so it can transition to subscription_watch.
-    tiny_hsm_send_signal(&this->startup_hsm_, signal_bridge_ready, nullptr);
+    tiny_hsm_send_signal(&this->startup_hsm_wrapper_.hsm, signal_bridge_ready, nullptr);
   }
   // Initialize the write bridge. Autodiscovery is complete by this point,
   // so we have the real host address from the broadcast FF 0x0008 response.
@@ -404,7 +404,7 @@ void GeappliancesBridge::handle_subscription_failed()
   this->polling_bridge_initialized_ = true;
 
   // Signal the startup HSM that subscription fallback has occurred.
-  tiny_hsm_send_signal(&this->startup_hsm_, signal_subscription_fallback, nullptr);
+  tiny_hsm_send_signal(&this->startup_hsm_wrapper_.hsm, signal_subscription_fallback, nullptr);
 
   ESP_LOGI(TAG, "Successfully switched to polling mode");
 }

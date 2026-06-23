@@ -134,9 +134,10 @@ void FeatureBitManager::on_erd_activity_(const void* args)
     return;
   }
 
-  /* Ignore events once we're done reading (PARSING or COMPLETE).
+  /* Ignore events once we're done reading (PARSING, COMPLETE, or FAILED).
    * The parse timer handles the PARSING phase independently. */
-  if (this->state_ == FEATURE_BIT_STATE_PARSING || this->state_ == FEATURE_BIT_STATE_COMPLETE) {
+  if (this->state_ == FEATURE_BIT_STATE_PARSING || this->state_ == FEATURE_BIT_STATE_COMPLETE ||
+      this->state_ == FEATURE_BIT_STATE_FAILED) {
     return;
   }
 
@@ -341,7 +342,8 @@ void FeatureBitManager::queue_retry_()
 {
   /* Don't retry if we've moved past the READING state (e.g., an event
    * arrived and completed the read before the timer fired). */
-  if (this->state_ == FEATURE_BIT_STATE_PARSING || this->state_ == FEATURE_BIT_STATE_COMPLETE) {
+  if (this->state_ == FEATURE_BIT_STATE_PARSING || this->state_ == FEATURE_BIT_STATE_COMPLETE ||
+      this->state_ == FEATURE_BIT_STATE_FAILED) {
     return;
   }
   if (this->read_queued_) {
@@ -362,7 +364,13 @@ void FeatureBitManager::skip_to_next_erd_(tiny_erd_t failed_erd)
   ESP_LOGD(TAG, "Feature bit ERD 0x%04X failed or not supported, skipping", failed_erd);
 
   switch (failed_erd) {
-    case ERD_COMMON_FEATURE_API:      this->state_ = FEATURE_BIT_STATE_READING_0093; break;
+    case ERD_COMMON_FEATURE_API:
+      /* ERD 0x0092 (common feature API) is the foundation for all feature
+       * filtering. Without it, we have no way to know which ERDs are
+       * supported. Mark as failed so the bridge falls back to full polling. */
+      ESP_LOGW(TAG, "Common feature API (0x0092) not supported; feature bit filtering disabled");
+      this->state_ = FEATURE_BIT_STATE_FAILED;
+      return;
     case ERD_APPLIANCE_FEATURE_API_0: this->state_ = FEATURE_BIT_STATE_READING_0094; break;
     case ERD_APPLIANCE_FEATURE_API_1: this->state_ = FEATURE_BIT_STATE_READING_0095; break;
     case ERD_APPLIANCE_FEATURE_API_2: this->state_ = FEATURE_BIT_STATE_READING_0096; break;

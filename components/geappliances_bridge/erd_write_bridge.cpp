@@ -183,7 +183,6 @@ void erd_write_bridge_destroy(erd_write_bridge_t* self)
     return;
   }
 
-  // Remove all event subscriptions before freeing state.
   // Guard against partial init where mqtt_client or erd_client may be null.
   if (self->mqtt_client) {
     tiny_event_unsubscribe(mqtt_client_on_write_request(self->mqtt_client),
