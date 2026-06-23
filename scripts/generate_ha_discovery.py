@@ -371,26 +371,84 @@ def write_jsonl(output_dir: Path, entities: List[Dict[str, Any]], filename: str)
     return len(entities)
 
 
+def find_erd_definitions_json() -> Optional[Path]:
+    """Find the ERD definitions JSON using multiple search paths.
+    
+    Mirrors the search strategy in __init__.py::load_appliance_types().
+    Returns the path if found, or None.
+    """
+    json_filename = "appliance_api_erd_definitions.json"
+    script_dir = Path(__file__).parent
+    repo_root = script_dir.parent
+    seen_paths = set()
+    
+    search_paths = [
+        # Local submodule (for development with checked out repo)
+        repo_root / 'lib' / 'public-appliance-api-documentation' / json_filename,
+        # ESPHome library cache in user's home directory
+        Path.home() / '.esphome' / 'external_files' / 'libraries' / 'public-appliance-api-documentation' / json_filename,
+        # ESPHome library cache in /config (Home Assistant add-on)
+        Path('/config/.esphome/external_files/libraries/public-appliance-api-documentation/' + json_filename),
+        # ESPHome library cache relative to component (build directory)
+        repo_root / '.esphome' / 'external_files' / 'libraries' / 'public-appliance-api-documentation' / json_filename,
+        # Parent library path (external_components layout)
+        repo_root / 'lib' / 'public-appliance-api-documentation' / json_filename,
+    ]
+    
+    for p in search_paths:
+        norm = str(p.resolve())
+        if norm in seen_paths:
+            continue
+        seen_paths.add(norm)
+        if p.exists():
+            return p
+    
+    return None
+
+
+def fetch_erd_definitions_from_github() -> Optional[dict]:
+    """Fetch ERD definitions from GitHub as fallback."""
+    import urllib.request as urllib
+    url = "https://raw.githubusercontent.com/geappliances/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
+    print(f"Fetching ERD definitions from GitHub: {url}", file=sys.stderr)
+    try:
+        with urllib.urlopen(url, timeout=10) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except Exception as e:
+        print(f"Failed to fetch from GitHub: {e}", file=sys.stderr)
+        return None
+
+
 def main():
     """Main entry point for the script."""
     script_dir = Path(__file__).parent
     repo_root = script_dir.parent
-
-    json_file = repo_root / 'lib' / 'public-appliance-api-documentation' / 'appliance_api_erd_definitions.json'
     output_dir = repo_root / 'ha_discovery'
 
-    if not json_file.exists():
-        print(f"Error: Could not find {json_file}", file=sys.stderr)
-        print("Make sure git submodules are initialized: git submodule update --init --recursive", file=sys.stderr)
-        sys.exit(1)
+    # Try to find the JSON file locally
+    json_file = find_erd_definitions_json()
+    data = None
+    
+    if json_file is not None:
+        print(f"Reading ERD definitions from {json_file}", file=sys.stderr)
+        try:
+            with open(json_file, 'r') as f:
+                data = json.load(f)
+        except Exception as e:
+            print(f"Failed to read {json_file}: {e}", file=sys.stderr)
+    else:
+        print("Local ERD definitions not found, trying GitHub fallback...", file=sys.stderr)
 
-    # Read and parse JSON
-    print(f"Reading ERD definitions from {json_file}")
-    with open(json_file, 'r') as f:
-        data = json.load(f)
+    # Fallback to GitHub
+    if data is None:
+        data = fetch_erd_definitions_from_github()
+        if data is None:
+            print("Error: Could not find appliance_api_erd_definitions.json", file=sys.stderr)
+            print("Tried local paths and GitHub. Check your network and git submodules.", file=sys.stderr)
+            sys.exit(1)
 
     erds = data.get('erds', [])
-    print(f"Found {len(erds)} ERD definitions")
+    print(f"Found {len(erds)} ERD definitions", file=sys.stderr)
 
     # Create output directory
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -403,11 +461,11 @@ def main():
         filename = f"{category}.jsonl"
         count = write_jsonl(output_dir, entities, filename)
         total_entities += count
-        print(f"  {category}: {count} entities -> {filename}")
+        print(f"  {category}: {count} entities -> {filename}", file=sys.stderr)
 
-    print(f"\nTotal entities generated: {total_entities}")
-    print(f"Output directory: {output_dir}")
-    print("Done!")
+    print(f"\nTotal entities generated: {total_entities}", file=sys.stderr)
+    print(f"Output directory: {output_dir}", file=sys.stderr)
+    print("Done!", file=sys.stderr)
 
 
 if __name__ == '__main__':
