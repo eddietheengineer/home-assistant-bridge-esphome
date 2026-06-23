@@ -74,7 +74,7 @@ Each line in a category JSONL file is a compact JSON object defining one entity:
 
 | Key | Required | Description |
 |-----|----------|-------------|
-| uid | Optional | Unique ID override. If absent, derived as `<device_id>_erd_<erd_id>` or `<device_id>_erd_<erd_id>_<field_id>` for multi-field ERDs |
+| uid | Optional | Unique ID suffix override. Replaces the default `erd_<id>[_<field>]` suffix in the runtime-assembled unique_id. E.g., `uid: "power_state"` produces `<device_id>_power_state` instead of `<device_id>_erd_0008` |
 | i | Yes | ERD ID as lowercase hex string (e.g., "0008") |
 | n | Yes | Entity name (human-readable) |
 | d | Yes | HA domain: sensor, binary_sensor, switch, select, number, button |
@@ -103,6 +103,8 @@ Each line in a category JSONL file is a compact JSON object defining one entity:
 | range.jsonl | 0x5000–0x5FFF |
 | airconditioning.jsonl | 0x7000–0x7FFF |
 | waterfilter.jsonl | 0x8000–0x8FFF |
+| smallappliance.jsonl | 0x9000–0x9FFF |
+| energy.jsonl | 0xD000–0xDFFF (always included) |
 
 ## Phase 1: Build-Time JSONL Generation
 
@@ -127,9 +129,7 @@ New file: `scripts/generate_ha_discovery.py`
   - dt: Data type (for number entities)
   - sf: Scale factor
 
-**Field sources**: Fields read directly from the JSON (`ha_domain`, `device_class`, `unit_of_measurement`, `state_class`, `scaling_factor`, `paired_erd`, `pair_role`) use the existing values in `appliance_api_erd_definitions.json`. Fields that must be *derived* include:
-
-**Unique ID**: The `unique_id` is not stored in the JSONL — it is assembled at runtime by the discovery manager from the device ID and ERD ID: `<device_id>_erd_<erd_id>` (e.g., `Dishwasher_ZL4200ABC_12345678_erd_0008`). For multi-field ERDs, the field ID is appended: `<device_id>_erd_<erd_id>_<field_id>` (e.g., `Dishwasher_ZL4200ABC_12345678_erd_0005_hours`). The optional `uid` key in the JSONL can override this default if needed.
+**Unique ID**: The `unique_id` is not stored in the JSONL — it is assembled at runtime by the discovery manager from the device ID and ERD ID: `<device_id>_erd_<erd_id>` (e.g., `Dishwasher_ZL4200ABC_12345678_erd_0008`). For multi-field ERDs, the field ID is appended: `<device_id>_erd_<erd_id>_<field_id>` (e.g., `Dishwasher_ZL4200ABC_12345678_erd_0005_hours`). The optional `uid` key in the JSONL replaces the entire `erd_<id>[_<field>]` suffix with the given string (e.g., `uid: "power_state"` produces `<device_id>_power_state`).
 
 - `d` (HA domain): Uses `ha_domain` from JSON when present. For ERDs where `ha_domain` is `sensor` but the ERD is writable with enum values, derive `select` or `switch` from the `operations` array and data type. Domain can also be overridden by `device_class` (see `dc` below).
 
@@ -188,7 +188,7 @@ Based on eddie's implementation, simplified:
 
 **Two-task design** (mirrors `erd_cache_mqtt_publisher`):
 
-1. **Decompress/parse task**: Spawns once during `start()`, decompresses the embedded JSONL byte arrays, parses JSONL, filters against ERD cache via binary search, queues discovery payloads into a pre-allocated ring buffer, then terminates.
+1. **Decompress/parse task**: Spawns once during `start()`, decompresses the embedded JSONL byte arrays, parses JSONL, filters against ERD cache via `erd_cache_find()` (linear scan), queues discovery payloads into a pre-allocated ring buffer, then terminates.
 2. **MQTT publish task**: Long-lived background task that drains the ring buffer and publishes discovery payloads to MQTT at 50ms intervals. Signaled from `loop()` via `signal_work()`. This avoids blocking the main `loop()` on the IDF MQTT mutex, preventing TWDT timeouts. On non-ESP-IDF platforms, falls back to inline draining from `loop()`.
 
 All FreeRTOS task code is guarded with `#ifdef USE_ESP_IDF` for simulator/test build compatibility.
@@ -196,7 +196,7 @@ All FreeRTOS task code is guarded with `#ifdef USE_ESP_IDF` for simulator/test b
 Key design decisions:
 
 - Pre-allocated item pool (no heap allocation during decompress)
-- Binary search against sorted ERD cache for filtering
+- Linear scan via `erd_cache_find()` against the ERD cache for filtering. The cache stores the first N entries as `valid=true` (registered ERDs), remaining entries are `valid=false` (empty). `erd_cache_find()` scans for a matching ERD ID — O(N) where N ≤ 200, trivial on ESP32.
 - Zero-allocation JSON parser (custom `json_get_str`)
 - All buffers on stack or pre-allocated members
 - No TLS/HTTPS dependency — data is embedded at build time
@@ -220,34 +220,37 @@ Modified: `components/geappliances_bridge/geappliances_bridge.cpp`
         this->device_identity_manager_.get_model_number(),
         this->device_identity_manager_.get_serial_number(),
         &this->erd_cache_,
-        &this->mqtt_client_adapter_,
-        this->generate_device_config_
+        &this->mqtt_client_adapter_
       );
       this->ha_discovery_manager_.start();
     }
   ```
 
-- In `loop()`, while `ha_discovery_manager_` is in PUBLISHING state, signal the background task:
+- In `loop()`, place the discovery manager signal **after** the existing `erd_cache_publisher_` signal block. Guard on the discovery manager's state to avoid signaling before it has entered PUBLISHING:
 
   ```cpp
+  // Place after erd_cache_mqtt_publisher_signal_work block
+  if (ha_discovery_manager_.is_publishing()) {
   #ifdef USE_ESP_IDF
     ha_discovery_manager_.signal_work();
   #else
     ha_discovery_manager_.run();  // inline drain for non-ESP-IDF
   #endif
+  }
   ```
 
-- In `teardown()`, call `ha_discovery_manager_.cleanup()` **before** `erd_cache_destroy()` and `esphome_mqtt_client_adapter_destroy()`, as the discovery manager holds pointers to both.
+- In `teardown()`, call `ha_discovery_manager_.cleanup()` **before** `erd_cache_mqtt_publisher_destroy()`. Insert it after the bridge destroys and before the ERD cache publisher destroy. The discovery manager holds pointers to both `erd_cache_` and `mqtt_client_adapter_`, which are destroyed later in the teardown sequence.
 - Wire `mqtt_client_adapter_` to the discovery manager via `configure()`.
 
 Modified: `components/geappliances_bridge/__init__.py`
 
 - Remove the deprecation warning for `generate_device_config`
-- Run `generate_ha_discovery.py` during build
+- In `to_code()`, run `generate_ha_discovery.py` and `compress_ha_discovery.py` as subprocesses to produce `ha_discovery_data.h` before ESPHome compiles. This follows the same pattern as `load_appliance_types()` which reads JSON and generates C++ inline, but uses subprocesses since the generation pipeline is multi-step (JSON → JSONL → compressed C header).
+- Fallback: if subprocess approach proves unreliable in ESPHome's build sandbox, the header can be pre-generated and committed, with a manual `make` step to regenerate.
 
 ## Phase 5: Build System Integration
 
-Modified: `Makefile` — Add `ha_discovery/` JSONL files and `components/geappliances_bridge/ha_discovery_data.h` as build dependencies, following the existing pattern for `erd_lists.h` and `appliance_api_feature_lists.h` (lines 82–94). The generated files depend on `appliance_api_erd_definitions.json`, `scripts/generate_ha_discovery.py`, and `scripts/compress_ha_discovery.py`.
+Modified: `Makefile` — Add `ha_discovery_data.h` as a build dependency, following the existing pattern for `erd_lists.h` and `appliance_api_feature_lists.h` (lines 82–94). The rule runs `generate_ha_discovery.py` then `compress_ha_discovery.py`. Dependencies: `appliance_api_erd_definitions.json`, `scripts/generate_ha_discovery.py`, `scripts/compress_ha_discovery.py`.
 
 ## Publishing Flow
 
