@@ -111,6 +111,14 @@ The 100ms budget is enforced and the function returns false to arm a resume time
 **Verdict:** No change needed.
 
 ---
+### ~~9. Queue write requests~~ ❌ REJECTED
+
+**Status:** Out of scope for this bridge. The write bridge is a thin relay — its job is to forward a single write request to the ERD client and report the result. The GEA3 ERD client already has its own internal queue and retry logic. Adding a write queue at the bridge layer duplicates queuing that the client already owns, adds complexity (ordering, cancellation, memory), and provides no benefit for the single-appliance use case.
+
+**Verdict:** No action needed. The current single-write-at-a-time design is correct.
+
+---
+
 
 ## Test Infrastructure Assessment
 
@@ -144,5 +152,5 @@ CppUTest with CppUMock. Strengths: `tiny_timer_group_double_t` with `elapse_time
 | ~~M3~~ | ~~Feature bit minimum threshold~~ | ~~🟡 MEDIUM~~ | ~~🟡 P2~~ | ~~`feature_bit_manager.cpp`~~ | ✅ DONE |
 | M4 | Main loop blocking | 🟠 HIGH | 🔵 P3 | `geappliances_bridge.cpp` | No change needed |
 | M5 | Polling budget enforcement | 🔵 LOW | 🔵 P3 | `erd_bridge_poll.cpp` | No change needed |
-| ~~9~~ | Queue write requests | 🟡 MEDIUM | 🔵 P3 | `erd_write_bridge.cpp` | |
+| ~~9~~ | ~~Queue write requests~~ | ~~🟡 MEDIUM~~ | ~~🔵 P3~~ | ~~`erd_write_bridge.cpp`~~ | ❌ REJECTED |
 | ~~10~~ | Diagnostic sensors | 🔵 LOW | 🔵 P3 | multiple | |
