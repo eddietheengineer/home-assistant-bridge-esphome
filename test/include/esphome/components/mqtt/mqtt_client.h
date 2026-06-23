@@ -26,7 +26,9 @@ class MQTTClientComponent {
  public:
   virtual ~MQTTClientComponent() {}
   virtual bool is_connected() = 0;
-  virtual void publish(const std::string& topic, const std::string& payload,
+  virtual bool publish(const std::string& topic, const std::string& payload,
+                       uint8_t qos, bool retain) = 0;
+  virtual bool publish(const char* topic, const char* payload, size_t payload_length,
                        uint8_t qos, bool retain) = 0;
   virtual void subscribe(const std::string& topic,
                          std::function<void(const std::string&, const std::string&)> callback,

@@ -32,8 +32,11 @@ class MqttTestDouble : public MQTTClientComponent {
 
   bool is_connected() override { return connected_; }
 
-  void publish(const std::string& /*topic*/, const std::string& /*payload*/,
-               uint8_t /*qos*/, bool /*retain*/) override {}
+  bool publish(const std::string& /*topic*/, const std::string& /*payload*/,
+               uint8_t /*qos*/, bool /*retain*/) override { return true; }
+
+  bool publish(const char* /*topic*/, const char* /*payload*/, size_t /*payload_length*/,
+               uint8_t /*qos*/, bool /*retain*/) override { return true; }
 
   void subscribe(const std::string& /*topic*/,
                  std::function<void(const std::string&, const std::string&)> callback,
