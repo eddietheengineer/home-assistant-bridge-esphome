@@ -6,7 +6,7 @@
   ┌─────────────────────────────────────────────────────────────┐
   │  Build-Time:                                                │
   │  generate_ha_discovery.py → ha_discovery/*.jsonl            │
-  │    → Makefile runs compress_ha_discovery.py → ha_discovery_data.h (byte arrays)   │
+  │    → Makefile runs compress_ha_discovery.py → components/geappliances_bridge/ha_discovery_data.h   │
   │                                                             │
   │  Runtime (C++ on ESP32):                                    │
   │  loop() → check_steady_state() → true (one-shot)            │
@@ -135,7 +135,7 @@ New file: `scripts/generate_ha_discovery.py`
 
 **Multi-field ERD handling**: ERDs with multiple data fields (e.g., Clock Time with Hours/Minutes/Seconds) generate one JSONL line *per field*, each with a distinct `fi` (field ID) and a suffixed entity name (e.g., `clock_time_hours`, `clock_time_minutes`). Each field becomes a separate HA discovery payload.
 
-The generated JSONL files are written to `ha_discovery/` and compressed at build time into `ha_discovery_data.h` — embedded as C byte arrays in the firmware binary. No runtime network fetch is needed.
+The generated JSONL files are written to `ha_discovery/` and compressed at build time into `components/geappliances_bridge/ha_discovery_data.h` — embedded as C byte arrays in the firmware binary. No runtime network fetch is needed.
 
 Modified: `scripts/generate_erd_lists.py` — calls the new script at the end of `main()`.
 
@@ -145,7 +145,7 @@ Modified: `components/geappliances_bridge/__init__.py` — runs `generate_ha_dis
 
 Modified: `Makefile`
 
-- Add a build dependency rule (following the existing pattern for `erd_lists.h` and `appliance_api_feature_lists.h` at lines 82–94) that runs `compress_ha_discovery.py` on the generated JSONL files to produce `ha_discovery_data.h`
+- Add a build dependency rule (following the existing pattern for `erd_lists.h` and `appliance_api_feature_lists.h` at lines 82–94) that runs `compress_ha_discovery.py` on the generated JSONL files to produce `components/geappliances_bridge/ha_discovery_data.h`
 - Each category file is compressed (e.g., zlib) and turned into a C `const uint8_t` array with a length constant
 - The header declares each category as `const uint8_t ha_discovery_<category>[]` and `const size_t ha_discovery_<category>_len`
 
@@ -153,7 +153,7 @@ New file: `scripts/compress_ha_discovery.py`
 
 - Reads each JSONL file from `ha_discovery/`
 - Compresses with zlib
-- Outputs `ha_discovery_data.h` with C arrays
+- Outputs `components/geappliances_bridge/ha_discovery_data.h` with C arrays
 
 ## Phase 3: HaDiscoveryManager (C++)
 
@@ -232,7 +232,7 @@ Modified: `components/geappliances_bridge/__init__.py`
 
 ## Phase 5: Build System Integration
 
-Modified: `Makefile` — Add `ha_discovery/` JSONL files and `ha_discovery_data.h` as build dependencies, following the existing pattern for `erd_lists.h` and `appliance_api_feature_lists.h` (lines 82–94). The generated files depend on `appliance_api_erd_definitions.json`, `scripts/generate_ha_discovery.py`, and `scripts/compress_ha_discovery.py`.
+Modified: `Makefile` — Add `ha_discovery/` JSONL files and `components/geappliances_bridge/ha_discovery_data.h` as build dependencies, following the existing pattern for `erd_lists.h` and `appliance_api_feature_lists.h` (lines 82–94). The generated files depend on `appliance_api_erd_definitions.json`, `scripts/generate_ha_discovery.py`, and `scripts/compress_ha_discovery.py`.
 
 ## Publishing Flow
 
@@ -258,7 +258,7 @@ Only entities whose ERD ID (or paired ERD ID for request entities) is present in
 | `scripts/generate_ha_discovery.py` | New — JSONL generation |
 | `scripts/compress_ha_discovery.py` | New — Compress JSONL to C byte arrays |
 | `ha_discovery/*.jsonl` | Generated — Entity definitions (intermediate, not committed) |
-| `ha_discovery_data.h` | Generated — Compressed byte arrays embedded in firmware |
+| `components/geappliances_bridge/ha_discovery_data.h` | Generated — Compressed byte arrays embedded in firmware |
 | `components/geappliances_bridge/ha_discovery_manager.h` | New — Manager header |
 | `components/geappliances_bridge/ha_discovery_manager.cpp` | New — Manager implementation |
 | `components/geappliances_bridge/geappliances_bridge.h` | Modified — Add manager member |
