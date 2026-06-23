@@ -5,6 +5,8 @@ import json
 import logging
 import os
 import re
+import subprocess
+import sys
 import urllib.error
 import urllib.request
 from typing import Any
@@ -332,13 +334,37 @@ async def to_code(config: dict[str, Any]) -> None:
         _LOGGER.warning(
             "polling_onlypublish_onchange is deprecated and will be removed in a future release. "
             "The component now always publishes only on change."
-        )
-    # Warning for generate_device_config if enabled
+)
+    # Generate HA discovery data when enabled
     if config.get(CONF_GENERATE_DEVICE_CONFIG, False):
-        _LOGGER.warning(
-            "generate_device_config is currently disabled and will be re-enabled in a future release. "
-            "Setting it to true has no effect at this time."
-        )
+        _LOGGER.info("Generating HA MQTT discovery data...")
+        component_dir = os.path.dirname(os.path.abspath(__file__))
+        repo_root = os.path.dirname(component_dir)
+        scripts_dir = os.path.join(repo_root, "scripts")
+        try:
+            subprocess.run(
+                [sys.executable, os.path.join(scripts_dir, "generate_ha_discovery.py")],
+                cwd=repo_root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                [sys.executable, os.path.join(scripts_dir, "compress_ha_discovery.py")],
+                cwd=repo_root,
+                check=True,
+                capture_output=True,
+            )
+            _LOGGER.info("HA MQTT discovery data generated successfully")
+        except subprocess.CalledProcessError as e:
+            _LOGGER.warning(
+                "HA discovery generation failed: %s. "
+                "Discovery will not be available.", e.stderr.decode() if e.stderr else str(e)
+            )
+        except FileNotFoundError as e:
+            _LOGGER.warning(
+                "HA discovery generation scripts not found: %s. "
+                "Discovery will not be available.", str(e)
+            )
     await cg.register_component(var, config)
 
     # Get optional GEA3 UART component reference
