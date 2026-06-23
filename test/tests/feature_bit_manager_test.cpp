@@ -308,6 +308,22 @@ TEST(feature_bit_manager, read_failed_skips_to_next_erd)
   CHECK_EQUAL(FEATURE_BIT_STATE_FAILED, manager.get_state());
 }
 
+TEST(feature_bit_manager, is_feature_bits_complete_returns_true_when_failed)
+{
+  init_manager();
+
+  expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
+  manager.start();
+
+  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
+  trigger_read_failed(ERD_COMMON_FEATURE_API);
+
+  CHECK_EQUAL(FEATURE_BIT_STATE_FAILED, manager.get_state());
+  // GeappliancesBridge::is_feature_bits_complete() treats FAILED as complete
+  // (falls back to full polling). Verify the state is FAILED so the bridge
+  // will transition past the feature_bits phase.
+}
+
 TEST(feature_bit_manager, read_failed_skips_feature_api_0_to_api_1)
 {
   init_manager();

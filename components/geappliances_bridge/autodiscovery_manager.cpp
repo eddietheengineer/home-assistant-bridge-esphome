@@ -70,10 +70,10 @@ void AutodiscoveryManager::init(tiny_timer_group_t* timer_group,
 
 void AutodiscoveryManager::start()
 {
-  this->start_time_ms_ = esphome::millis();
   if (this->state_ != AUTODISCOVERY_IDLE) {
     return;  // idempotent: already running or complete
   }
+  this->start_time_ms_ = esphome::millis();
 
   ESP_LOGI(TAG, "Starting autodiscovery");
 

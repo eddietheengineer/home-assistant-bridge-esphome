@@ -11,6 +11,7 @@
 #include "esphome/core/log.h"
 #include "tiny_gea_constants.h"
 #include "erd_bridge_common.h"
+#include <cstdint>
 
 // Write bridge-specific HSM signals (not shared with other bridges)
 enum {
@@ -95,14 +96,15 @@ static tiny_hsm_result_t state_writing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
                          tiny_hsm_send_signal(&self->hsm, signal_write_timeout, nullptr);
                        });
       break;
-
     case tiny_hsm_signal_exit:
       // Disarm timeout on any exit (completion, failure, or timeout).
-      // Set expired=false so the timer group skips it on the next tick.
-      // tiny_timer_stop() is not used here because it calls tiny_list_remove()
+      // tiny_timer_stop() is not used because it calls tiny_list_remove()
       // which is not compiled by the remote tiny library at the pinned commit.
+      // Set expiration_ticks to UINT32_MAX so the timer group never re-expires
+      // it on the next tick. The timer stays in the list until re-armed.
       self->write_timeout_timer.expired = false;
       self->write_timeout_timer.periodic = false;
+      self->write_timeout_timer.expiration_ticks = UINT32_MAX;
       break;
 
     case signal_write_requested: {
@@ -220,6 +222,11 @@ void erd_write_bridge_destroy(erd_write_bridge_t* self)
   }
 
   // Remove all event subscriptions before freeing state.
+  // Disarm write timeout timer to prevent dangling-pointer callback.
+  self->write_timeout_timer.expired = false;
+  self->write_timeout_timer.periodic = false;
+  self->write_timeout_timer.expiration_ticks = UINT32_MAX;
+
   // Guard against partial init where mqtt_client or erd_client may be null.
   if (self->mqtt_client) {
     tiny_event_unsubscribe(mqtt_client_on_write_request(self->mqtt_client),

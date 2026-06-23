@@ -541,6 +541,7 @@ void GeappliancesBridge::dump_config() {
   else if (this->startup_hsm_wrapper_.hsm.current == startup_state_bridge_init)      phase_str = "Bridge Init";
   else if (this->startup_hsm_wrapper_.hsm.current == startup_state_subscription_watch) phase_str = "Subscription Watch";
   else if (this->startup_hsm_wrapper_.hsm.current == startup_state_running)          phase_str = "Running";
+  else if (this->startup_hsm_wrapper_.hsm.current == startup_state_failed)         phase_str = "Failed";
   (void)phase_str;
   ESP_LOGCONFIG(TAG, "  Startup State: %s", phase_str);
 }

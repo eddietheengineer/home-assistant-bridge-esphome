@@ -134,9 +134,10 @@ void FeatureBitManager::on_erd_activity_(const void* args)
     return;
   }
 
-  /* Ignore events once we're done reading (PARSING or COMPLETE).
+  /* Ignore events once we're done reading (PARSING, COMPLETE, or FAILED).
    * The parse timer handles the PARSING phase independently. */
-  if (this->state_ == FEATURE_BIT_STATE_PARSING || this->state_ == FEATURE_BIT_STATE_COMPLETE) {
+  if (this->state_ == FEATURE_BIT_STATE_PARSING || this->state_ == FEATURE_BIT_STATE_COMPLETE ||
+      this->state_ == FEATURE_BIT_STATE_FAILED) {
     return;
   }
 
@@ -341,7 +342,8 @@ void FeatureBitManager::queue_retry_()
 {
   /* Don't retry if we've moved past the READING state (e.g., an event
    * arrived and completed the read before the timer fired). */
-  if (this->state_ == FEATURE_BIT_STATE_PARSING || this->state_ == FEATURE_BIT_STATE_COMPLETE) {
+  if (this->state_ == FEATURE_BIT_STATE_PARSING || this->state_ == FEATURE_BIT_STATE_COMPLETE ||
+      this->state_ == FEATURE_BIT_STATE_FAILED) {
     return;
   }
   if (this->read_queued_) {
