@@ -239,6 +239,28 @@ void GeappliancesBridge::loop() {
 #endif
   }
 
+  // Start HA discovery once steady state is reached and generate_device_config is enabled.
+  if (this->steady_state_reached_ && !this->ha_discovery_started_ && this->generate_device_config_) {
+    this->ha_discovery_started_ = true;
+    ha_discovery_manager_configure(
+      &this->ha_discovery_manager_,
+      this->device_identity_manager_.get_device_id().c_str(),
+      this->device_identity_manager_.get_model_number().c_str(),
+      this->device_identity_manager_.get_serial_number().c_str(),
+      &this->erd_cache_,
+      &this->mqtt_client_adapter_.interface);
+    ha_discovery_manager_start(&this->ha_discovery_manager_);
+  }
+
+  // Signal the discovery manager publish task (after erd_cache_publisher_).
+  if (ha_discovery_manager_is_publishing(&this->ha_discovery_manager_)) {
+#ifdef USE_ESP_IDF
+    ha_discovery_manager_signal_work(&this->ha_discovery_manager_);
+#else
+    ha_discovery_manager_run(&this->ha_discovery_manager_, 5);
+#endif
+  }
+
   // Publish ERD/MQTT publish rate + cache stats sensors every ~60 seconds.
   if (this->erd_publish_rate_sensor_ != nullptr || this->mqtt_publish_rate_sensor_ != nullptr) {
     uint32_t now = esphome::millis();
@@ -573,6 +595,11 @@ bool GeappliancesBridge::teardown() {
 
   // Destroy the shared ERD cache after bridges are torn down.
 
+  // Clean up the HA discovery manager before the ERD cache publisher.
+  // The discovery manager holds pointers to erd_cache_ and mqtt_client_adapter_
+  // which are destroyed later in the teardown sequence.
+  ha_discovery_manager_cleanup(&this->ha_discovery_manager_);
+
   // Destroy the ERD cache publisher before the adapter is destroyed.
   if (this->erd_cache_publisher_.cache) {
     erd_cache_mqtt_publisher_destroy(&this->erd_cache_publisher_);
@@ -770,6 +797,9 @@ void GeappliancesBridge::init_erd_cache_publisher_()
 #ifdef USE_ESP_IDF
   erd_cache_mqtt_publisher_start(&this->erd_cache_publisher_);
 #endif
+
+  // Initialize the HA discovery manager (lazy-started on steady state).
+  ha_discovery_manager_init(&this->ha_discovery_manager_);
 
   ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
 }

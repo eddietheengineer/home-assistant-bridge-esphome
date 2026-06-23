@@ -41,6 +41,7 @@ extern "C" {
 #include "tiny_timer.h"
 #include "tiny_hsm.h"
 #include "erd_cache_mqtt_publisher.h"
+#include "ha_discovery_manager.h"
 }
 
 #include "erd_bridge_subscribe.h"
@@ -228,6 +229,11 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // cache and publishes them to MQTT topics each loop().
   erd_cache_mqtt_publisher_t erd_cache_publisher_;
   erd_cache_t erd_cache_;
+
+  // HA discovery manager: publishes one-shot HA MQTT discovery payloads
+  // after steady state is reached.
+  ha_discovery_manager_t ha_discovery_manager_;
+  bool ha_discovery_started_{false};
 
   // Autodiscovery manager (extracted from god class)
   AutodiscoveryManager autodiscovery_manager_;
