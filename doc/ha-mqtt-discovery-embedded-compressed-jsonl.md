@@ -74,6 +74,7 @@ Each line in a category JSONL file is a compact JSON object defining one entity:
 
 | Key | Required | Description |
 |-----|----------|-------------|
+| uid | Optional | Unique ID override. If absent, derived as `<device_id>_erd_<erd_id>` or `<device_id>_erd_<erd_id>_<field_id>` for multi-field ERDs |
 | i | Yes | ERD ID as lowercase hex string (e.g., "0008") |
 | n | Yes | Entity name (human-readable) |
 | d | Yes | HA domain: sensor, binary_sensor, switch, select, number, button |
@@ -127,6 +128,8 @@ New file: `scripts/generate_ha_discovery.py`
   - sf: Scale factor
 
 **Field sources**: Fields read directly from the JSON (`ha_domain`, `device_class`, `unit_of_measurement`, `state_class`, `scaling_factor`, `paired_erd`, `pair_role`) use the existing values in `appliance_api_erd_definitions.json`. Fields that must be *derived* include:
+
+**Unique ID**: The `unique_id` is not stored in the JSONL — it is assembled at runtime by the discovery manager from the device ID and ERD ID: `<device_id>_erd_<erd_id>` (e.g., `Dishwasher_ZL4200ABC_12345678_erd_0008`). For multi-field ERDs, the field ID is appended: `<device_id>_erd_<erd_id>_<field_id>` (e.g., `Dishwasher_ZL4200ABC_12345678_erd_0005_hours`). The optional `uid` key in the JSONL can override this default if needed.
 
 - `d` (HA domain): Uses `ha_domain` from JSON when present. For ERDs where `ha_domain` is `sensor` but the ERD is writable with enum values, derive `select` or `switch` from the `operations` array and data type.
 - `vt` (value template): Derived from the data field's `type` and metadata. The generator must handle these cases:
