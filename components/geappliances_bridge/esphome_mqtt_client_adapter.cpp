@@ -53,10 +53,9 @@ static void update_erd_write_result(
 
   // Use a stack buffer to avoid heap allocation.
   // Max error payload: "{\"error\":\"retries_exhausted\"}" = 28 chars + null.
-  char payload[32];
+  char payload[32] = {0};
   if (success) {
-    memcpy(payload, "ok", 2);
-    payload[2] = '\0';
+    strcpy(payload, "ok");
   } else {
     const char* reason = write_failure_reason_to_string(failure_reason);
     int len = snprintf(payload, sizeof(payload), "{\"error\":\"%s\"}", reason);
