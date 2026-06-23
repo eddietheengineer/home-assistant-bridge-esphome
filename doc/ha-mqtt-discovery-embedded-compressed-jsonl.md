@@ -129,7 +129,14 @@ New file: `scripts/generate_ha_discovery.py`
 **Field sources**: Fields read directly from the JSON (`ha_domain`, `device_class`, `unit_of_measurement`, `state_class`, `scaling_factor`, `paired_erd`, `pair_role`) use the existing values in `appliance_api_erd_definitions.json`. Fields that must be *derived* include:
 
 - `d` (HA domain): Uses `ha_domain` from JSON when present. For ERDs where `ha_domain` is `sensor` but the ERD is writable with enum values, derive `select` or `switch` from the `operations` array and data type.
-- `vt` (value template): Derived from the first data field's `type` (u8, u16, string, enum, etc.).
+- `vt` (value template): Derived from the data field's `type` and metadata. The generator must handle these cases:
+
+  - **u8/u16/u24/u32**: Raw hex payload decoded as little-endian integer. If `scaling_factor` is present, divide: `{{ value_json / scaling_factor }}`.
+  - **string**: Each byte pair decoded as ASCII with 0x20 offset (per GE API spec), trailing `_` (0x5F) padding stripped. Example ERDs: 0x0001 (Model Number), 0x0002 (Serial Number).
+
+  - **enum**: Raw byte mapped to human-readable label via the `values` map in the data field definition. The template embeds the mapping as a Jinja2 dict lookup.
+  - **Multi-field ERDs**: Each field generates its own entity with a template that extracts the byte at that field's `offset`. For example, Clock Time (0x0005) produces three entities — hours extracts byte 0, minutes extracts byte 1, seconds extracts byte 2.
+  - **Version ERDs** (4-byte u8 sequences like 0x0019): Template formats as `major.minor.patch.build` from the four hex byte pairs.
 - `ct` (command template): Derived for writable ERDs based on data type and size.
 - `o` (options): Derived from enum `values` map in the data field definition.
 
