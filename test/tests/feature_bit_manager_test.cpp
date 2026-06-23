@@ -300,9 +300,8 @@ TEST(feature_bit_manager, read_failed_skips_to_next_erd)
   expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  // skip_to_next_erd_ calls queue_erd_read_ after setting the state,
-  // so we must expect the next read BEFORE triggering the failure.
-  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
+  // ERD_COMMON_FEATURE_API failure transitions to FAILED (terminal state),
+  // so no next read is queued.
   trigger_read_failed(ERD_COMMON_FEATURE_API);
 
   CHECK_EQUAL(FEATURE_BIT_STATE_FAILED, manager.get_state());
@@ -315,7 +314,6 @@ TEST(feature_bit_manager, is_feature_bits_complete_returns_true_when_failed)
   expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
   trigger_read_failed(ERD_COMMON_FEATURE_API);
 
   CHECK_EQUAL(FEATURE_BIT_STATE_FAILED, manager.get_state());
@@ -651,7 +649,6 @@ TEST(feature_bit_manager, read_completed_with_null_data_skips_erd)
   expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
   trigger_read_completed(ERD_COMMON_FEATURE_API, nullptr, 0);
 
   // Null data should skip to next ERD.

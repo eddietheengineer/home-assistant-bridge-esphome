@@ -465,7 +465,8 @@ void GeappliancesBridge::handle_erd_client_activity_(const tiny_gea3_erd_client_
 bool GeappliancesBridge::should_route_to_feature_bits_(tiny_erd_t erd)
 {
   FeatureBitState state = this->feature_bit_manager_.get_state();
-  bool feature_bit_active = (state != FEATURE_BIT_STATE_COMPLETE);
+  bool feature_bit_active = (state != FEATURE_BIT_STATE_COMPLETE &&
+                            state != FEATURE_BIT_STATE_FAILED);
   return feature_bit_active && is_feature_bit_erd(erd);
 }
 
