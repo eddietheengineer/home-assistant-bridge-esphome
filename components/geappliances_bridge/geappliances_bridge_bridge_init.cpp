@@ -221,6 +221,10 @@ void GeappliancesBridge::initialize_erd_bridge_()
       this->poll_probe_list_count_,
       &this->erd_cache_);
     this->polling_bridge_initialized_ = true;
+    // Mark bridge initialized BEFORE the probe phase starts, so that if
+    // the probe completes synchronously and fires signal_bridge_ready,
+    // check_steady_state() in the running entry can see the flag.
+    this->erd_bridge_initialized_ = true;
   }
 
   // Initialize the subscription bridge for non-polling modes (subscribe, auto).
@@ -235,6 +239,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
       this->autodiscovery_manager_.get_host_address(),
       &this->erd_cache_);
     this->subscription_bridge_initialized_ = true;
+    this->erd_bridge_initialized_ = true;
 
     // Subscription bridge has no discovery phase — signal the startup HSM
     // immediately so it can transition to subscription_watch.
@@ -254,9 +259,6 @@ void GeappliancesBridge::initialize_erd_bridge_()
   // Subscribe to the wildcard write topic so incoming write commands from
   // Home Assistant are routed to the write bridge via on_write_request_event.
   esphome_mqtt_client_adapter_subscribe_write_topic(&this->mqtt_client_adapter_);
-
-  this->erd_bridge_initialized_ = true;
-  ESP_LOGI(TAG, "ERD bridge initialized successfully");
 }
 
 // ---------------------------------------------------------------------------
