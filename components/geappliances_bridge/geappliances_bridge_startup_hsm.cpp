@@ -421,6 +421,11 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
 
   switch (signal) {
     case tiny_hsm_signal_entry:
+      ESP_LOGI(TAG, "Startup: entered running state");
+      // Check steady state immediately on entry so the log fires even if
+      // subsequent loop() calls are delayed by the long probe phase that
+      // triggered the transition.
+      svc->check_steady_state();
       break;
 
     case signal_run_loop:

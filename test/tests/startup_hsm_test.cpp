@@ -301,6 +301,8 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   /* Phase 6: subscription_watch entry -> running (POLL mode) */
   mock().expectOneCall("get_mode").onObject(&svc).andReturnValue(BRIDGE_MODE_POLL);
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
+  /* Phase 7: running entry checks steady state */
+  mock().expectOneCall("check_steady_state").onObject(&svc).andReturnValue(false);
   /* Phase 7: running run_loop */
   mock().expectOneCall("run_all_managers").onObject(&svc);
   mock().expectOneCall("get_subscription_state").onObject(&svc).andReturnValue(static_cast<subscription_state_t>(subscription_state_none));

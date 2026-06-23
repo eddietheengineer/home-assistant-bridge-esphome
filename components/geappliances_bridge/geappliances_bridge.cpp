@@ -733,8 +733,6 @@ bool GeappliancesBridge::check_steady_state()
   return true;
 }
 
-// -- Recurring tasks ----------------------------------------------------------
-
 
 void GeappliancesBridge::maybe_start_custom_erd_polling()
 {
