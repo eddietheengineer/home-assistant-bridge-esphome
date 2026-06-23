@@ -8,6 +8,7 @@ extern "C" {
 }
 
 #include <cstdio>
+#include <cstring>
 #include <string>
 
 static const char *const TAG __attribute__((unused)) = "geappliances_bridge.mqtt";
@@ -50,15 +51,21 @@ static void update_erd_write_result(
   snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/write_result",
            self->device_id->c_str(), erd);
 
-  std::string payload;
+  // Use a stack buffer to avoid heap allocation.
+  // Max error payload: "{\"error\":\"retries_exhausted\"}" = 28 chars + null.
+  char payload[32] = {0};
   if (success) {
-    payload = "ok";
+    strcpy(payload, "ok");
   } else {
-    payload = "{\"error\":\"" + std::string(write_failure_reason_to_string(failure_reason)) + "\"}";
+    const char* reason = write_failure_reason_to_string(failure_reason);
+    int len = snprintf(payload, sizeof(payload), "{\"error\":\"%s\"}", reason);
+    if (len < 0 || (size_t)len >= sizeof(payload)) {
+      ESP_LOGW(TAG, "Write result payload truncated for ERD 0x%04X", erd);
+    }
   }
 
-  ESP_LOGD(TAG, "Write result for ERD 0x%04X: %s", erd, payload.c_str());
-  mqtt_client->publish(topic, payload, 0, true);
+  ESP_LOGD(TAG, "Write result for ERD 0x%04X: %s", erd, payload);
+  mqtt_client->publish(topic, payload, strlen(payload), 0, true);
 }
 
 static i_tiny_event_t* on_write_request(i_mqtt_client_t* _self)
@@ -214,7 +221,7 @@ extern "C" void esphome_mqtt_client_adapter_publish(
   (void)self;
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client != nullptr && mqtt_client->is_connected()) {
-    mqtt_client->publish(topic, payload, 0, retain);
+    mqtt_client->publish(topic.c_str(), payload.c_str(), payload.size(), 0, retain);
   }
 }
 extern "C" void esphome_mqtt_client_adapter_publish_raw(
@@ -227,7 +234,7 @@ extern "C" void esphome_mqtt_client_adapter_publish_raw(
   (void)_self;
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client != nullptr && mqtt_client->is_connected()) {
-    mqtt_client->publish(topic, std::string(payload, payload_len), 0, retain);
+    mqtt_client->publish(topic, payload, payload_len, 0, retain);
   }
 }
 
