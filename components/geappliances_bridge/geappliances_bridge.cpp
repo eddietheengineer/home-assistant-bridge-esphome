@@ -619,11 +619,6 @@ bool GeappliancesBridge::is_discovered_gea2_protocol() const
   return autodiscovery_manager_.is_gea2_protocol();
 }
 
-bool GeappliancesBridge::is_autodiscovery_timed_out() const
-{
-  return autodiscovery_manager_.is_timed_out();
-}
-
 // -- Device ID ----------------------------------------------------------------
 
 void GeappliancesBridge::init_device_id_reading()

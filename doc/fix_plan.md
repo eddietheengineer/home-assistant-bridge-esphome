@@ -53,46 +53,19 @@
 
 ---
 
-### 5. Add write bridge timeout 🔴 P1
+### ~~5. Add write bridge timeout~~ ❌ REJECTED
 
-**File:** `erd_write_bridge.cpp:76-115`, `erd_write_bridge.h:43-54`
+**Status:** Already handled at the `tiny-gea-api` level. The GEA client has `request_retries=10` with `request_timeout=250ms` per attempt. A write that reaches `signal_write_failed` has already exhausted all retries — the appliance genuinely didn't respond. Adding a bridge-level timeout duplicates retry logic that the client already owns.
 
-Once a write is queued, the bridge stays in `state_writing` until `signal_write_completed` or `signal_write_failed`. If the appliance becomes unresponsive, neither signal arrives and the bridge is permanently stuck, blocking all future writes.
-
-**Fix:**
-- Add `tiny_timer_t write_timeout_timer` to `erd_write_bridge_t` struct
-- Arm a 5s timeout timer in `state_writing` entry (reasonable given GEA client's internal retry budget: 250ms × 10 = 2.5s max)
-- Add `signal_write_timeout` handler that transitions to `state_ready` with a failure report
-- Disarm timer in `state_writing` exit and on completion/failure
-
-**Test:** Queue a write, never send completion, verify timeout recovery and failure report to MQTT.
+**Verdict:** No action needed. The tiny-gea-api retry mechanism is the correct layer for handling unresponsive appliances.
 
 ---
 
-### 6. Add autodiscovery timeout 🔴 P1
+### ~~6. Add autodiscovery timeout~~ ❌ REJECTED
 
-**File:** `geappliances_bridge_startup_hsm.cpp:146-184` (NOT `autodiscovery_manager.cpp`)
+**Status:** Infinite retry is the correct behavior. If the adapter can't communicate with an appliance, nothing else matters — the bridge has no purpose without a discovered device. A timeout would give up on a transient condition that might resolve moments later (e.g., appliance powering on, network flap). The `AutodiscoveryManager` is explicitly designed to retry indefinitely (`autodiscovery_manager.h:7-8`), and that design is correct.
 
-No timeout — if no appliance is present, the bridge loops forever in the autodiscovery phase with no user feedback.
-
-**Fix location:** The fix belongs in the **startup HSM**, not the manager. `AutodiscoveryManager` is designed to "retry indefinitely" (per `autodiscovery_manager.h:7-8`) — its job is to find a board. The startup HSM is the orchestrator and should decide when to give up.
-
-**⚠️ Design decision required:** The startup HSM has no `timer_group` and no timer infrastructure. Two options:
-
-1. **Add `is_autodiscovery_timed_out()` to `IBridgeServices`** — matches the existing `is_startup_delay_elapsed()` pattern. The bridge tracks the timer; the HSM just polls the predicate. This is the least invasive option.
-2. **Add `timer_group` to the HSM API** — more flexible but requires API changes to `tiny_hsm_init()` and all state functions.
-
-**Recommendation:** Option 1 — add `is_autodiscovery_timed_out()` to `IBridgeServices`. The bridge records the start time in `startup_state_autodiscovery` entry and checks elapsed time in `signal_run_loop`.
-
-**Fix:**
-- Add `signal_restart` to the startup HSM signal enum (`geappliances_bridge_startup_hsm.h:55-63`) — **does not exist yet**
-- Add `is_autodiscovery_timed_out()` to `IBridgeServices` interface
-- In `startup_state_autodiscovery` entry, record the start time
-- In `signal_run_loop`, check `is_autodiscovery_timed_out()` (60s threshold) and transition to `startup_state_failed`
-- Add `startup_state_failed` as a new terminal state — **does not exist yet** — with `signal_restart` handler that transitions back to `startup_state_protocol_stack`
-- Log a clear error message so users know no appliance was found
-
-**Test:** Add `is_autodiscovery_timed_out()` to `MockBridgeServices`. Mock `is_autodiscovery_complete()` false and `is_autodiscovery_timed_out()` true. Verify transition to `startup_state_failed`. Test `signal_restart` recovery to `startup_state_protocol_stack`.
+**Verdict:** No action needed. The current infinite retry behavior is the right approach.
 ---
 
 ### 7. Synchronize write payload buffer 🔴 P1
@@ -173,14 +146,10 @@ CppUTest with CppUMock. Strengths: `tiny_timer_group_double_t` with `elapse_time
 | MQTT subscribe callback path untested | HIGH | P1#7 fix cannot be stress-tested |
 | No GEA2/GEA3 tight loop tests | MEDIUM | P2#M2 re-init fix hard to verify |
 | No re-init tests | MEDIUM | P2#M2 cannot verify reset behavior |
-| No startup HSM failure/recovery tests | MEDIUM | P1#6 `startup_state_failed` needs new tests |
 | Race conditions untestable in single-threaded tests | MEDIUM | P1#7 verification relies on code inspection |
 
 ### Test Recommendations by Fix
 | Fix | Feasibility | Notes |
-|-----|-----------|-------|
-| P1#5 Write bridge timeout | HIGH | Timer double well-established; pattern used in `erd_bridge_poll_test.cpp` |
-| P1#6 Autodiscovery timeout | MEDIUM | Requires `is_autodiscovery_timed_out()` in `MockBridgeServices`; new `startup_state_failed` tests |
 | P1#7 Write payload buffer sync | LOW-MEDIUM | Requires new `MqttTestDouble` infrastructure; race untestable in single-threaded tests |
 | P2#M1 Remove global | HIGH | All 10 `startup_hsm_test.cpp` tests need mechanical update; `MockBridgeServices` works unchanged |
 | P2#M2 GEA2 global reset | MEDIUM | No `loop()` tests exist; needs structural member-check test or full GEA2 mock |
@@ -193,8 +162,8 @@ CppUTest with CppUMock. Strengths: `tiny_timer_group_double_t` with `elapse_time
 | ~~2~~ | ~~Pin library dependencies~~ | ~~🟠 HIGH~~ | ~~P1~~ | ~~`__init__.py`~~ | ✅ DONE |
 | ~~3~~ | ~~Reset `subscribe_failure_count`~~ | ~~🟡 MEDIUM~~ | ~~P1~~ | ~~`erd_bridge_subscribe.cpp`~~ | ✅ DONE |
 | ~~4~~ | ~~Feature bit read retry~~ | ~~🟡 MEDIUM~~ | ~~P2~~ | ~~`feature_bit_manager.cpp`~~ | ❌ REJECTED |
-| 5 | Write bridge timeout | 🟡 MEDIUM | 🔴 P1 | `erd_write_bridge.cpp`, `erd_write_bridge.h` | |
-| 6 | Autodiscovery timeout | 🟡 MEDIUM | 🔴 P1 | `geappliances_bridge_startup_hsm.cpp` | |
+| ~~5~~ | ~~Write bridge timeout~~ | ~~🟡 MEDIUM~~ | ~~🔴 P1~~ | ~~`erd_write_bridge.cpp`, `erd_write_bridge.h`~~ | ❌ REJECTED |
+| ~~6~~ | ~~Autodiscovery timeout~~ | ~~🟡 MEDIUM~~ | ~~🔴 P1~~ | ~~`geappliances_bridge_startup_hsm.cpp`~~ | ❌ REJECTED |
 | 7 | Write payload buffer sync | 🟡 MEDIUM | 🔴 P1 | `esphome_mqtt_client_adapter.cpp` | |
 | M1 | Remove global `g_bridge_services` | 🟡 MEDIUM | 🟡 P2 | `geappliances_bridge_startup_hsm.cpp` | |
 | M2 | Reset GEA2 global state on re-init | 🟡 MEDIUM | 🟡 P2 | `geappliances_bridge.cpp` | |

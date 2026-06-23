@@ -59,8 +59,7 @@ enum {
   signal_mqtt_connected,                          // MQTT broker connection established
   signal_feature_bits_complete,                   // All feature bit ERDs read and parsed
   signal_bridge_ready,                            // ERD bridge (poll/subscribe) initialized
-  signal_subscription_fallback,                   // AUTO mode: subscription timed out, fell back to polling
-  signal_restart,                                 // Restart startup sequence from protocol_stack
+  signal_subscription_fallback                   // AUTO mode: subscription timed out, fell back to polling
 };
 
 // ============================================================================
@@ -105,9 +104,6 @@ tiny_hsm_result_t startup_state_subscription_watch(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
 tiny_hsm_result_t startup_state_running(
-  tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-
-tiny_hsm_result_t startup_state_failed(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
 /// Initialize the startup HSM wrapper with the given bridge services and initial state.

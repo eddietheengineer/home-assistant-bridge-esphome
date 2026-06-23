@@ -159,15 +159,12 @@ tiny_hsm_result_t startup_state_autodiscovery(tiny_hsm_t* hsm, tiny_hsm_signal_t
       break;
 
     case signal_run_loop:
-      // Manager is self-driving — check for completion or timeout.
+      // Manager is self-driving — just check if it completed.
       if (svc->is_autodiscovery_complete()) {
         ESP_LOGI(TAG, "Autodiscovery complete (host=0x%02X, protocol=%s)",
                  svc->get_discovered_host_address(),
                  svc->is_discovered_gea2_protocol() ? "GEA2" : "GEA3");
         tiny_hsm_transition(hsm, startup_state_device_id);
-      } else if (svc->is_autodiscovery_timed_out()) {
-        ESP_LOGE(TAG, "Autodiscovery timed out: no appliance found on the bus");
-        tiny_hsm_transition(hsm, startup_state_failed);
       }
       break;
 
@@ -450,36 +447,6 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
 }
 
 // ============================================================================
-// Failed — terminal state for startup failures (e.g., autodiscovery timeout)
-//
-// Waits for signal_restart to re-enter the startup sequence from protocol_stack.
-// ============================================================================
-
-tiny_hsm_result_t startup_state_failed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
-{
-  (void)data;
-
-  switch (signal) {
-    case tiny_hsm_signal_entry:
-      ESP_LOGE(TAG, "Startup failed. Waiting for restart signal...");
-      break;
-
-    case signal_restart:
-      ESP_LOGI(TAG, "Restarting startup sequence");
-      tiny_hsm_transition(hsm, startup_state_protocol_stack);
-      break;
-
-    case tiny_hsm_signal_exit:
-      break;
-
-    default:
-      return tiny_hsm_result_signal_deferred;
-  }
-
-  return tiny_hsm_result_signal_consumed;
-}
-
-// ============================================================================
 // HSM configuration — state descriptors with parent hierarchy
 // ============================================================================
 
@@ -493,8 +460,7 @@ static const tiny_hsm_state_descriptor_t startup_hsm_state_descriptors[] = {
   { .state = startup_state_feature_bits,     .parent = startup_state_top },
   { .state = startup_state_bridge_init,      .parent = startup_state_top },
   { .state = startup_state_subscription_watch, .parent = startup_state_top },
-  { .state = startup_state_running,          .parent = startup_state_top },
-  { .state = startup_state_failed,           .parent = startup_state_top },
+  { .state = startup_state_running,          .parent = startup_state_top }
 };
 
 const tiny_hsm_configuration_t startup_hsm_configuration = {

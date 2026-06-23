@@ -102,7 +102,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool is_autodiscovery_complete() const override;
   uint8_t get_discovered_host_address() const override;
   bool is_discovered_gea2_protocol() const override;
-  bool is_autodiscovery_timed_out() const override;
 
   void init_device_id_reading() override;
   bool is_device_id_complete() const override;

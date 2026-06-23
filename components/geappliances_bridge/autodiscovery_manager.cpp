@@ -10,7 +10,6 @@
 #include "autodiscovery_manager.h"
 #include "geappliances_bridge_constants.h"
 #include "esphome/core/log.h"
-#include "esphome/core/hal.h"
 
 namespace esphome {
 namespace geappliances_bridge {
@@ -73,7 +72,6 @@ void AutodiscoveryManager::start()
   if (this->state_ != AUTODISCOVERY_IDLE) {
     return;  // idempotent: already running or complete
   }
-  this->start_time_ms_ = esphome::millis();
 
   ESP_LOGI(TAG, "Starting autodiscovery");
 
@@ -260,18 +258,6 @@ void AutodiscoveryManager::run()
       // Terminal state -- nothing to do.
       break;
   }
-}
-
-bool AutodiscoveryManager::is_timed_out() const
-{
-  if (this->state_ == AUTODISCOVERY_COMPLETE) {
-    return false;  // Already found an appliance, no timeout
-  }
-  if (this->start_time_ms_ == 0) {
-    return false;  // Not yet started
-  }
-  uint32_t now = esphome::millis();
-  return (now - this->start_time_ms_) >= AUTODISCOVERY_TIMEOUT_MS;
 }
 
 }  // namespace geappliances_bridge

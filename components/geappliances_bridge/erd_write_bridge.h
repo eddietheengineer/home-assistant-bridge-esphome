@@ -51,9 +51,8 @@ typedef struct {
   // Pending write state (one write at a time)
   tiny_gea3_erd_client_request_id_t pending_request_id;
   tiny_erd_t pending_erd;
-  // Timeout for in-flight writes (prevents permanent stuck state)
-  tiny_timer_t write_timeout_timer;
 } erd_write_bridge_t;
+
 /*!
  * Initialize the ERD write bridge.
  */

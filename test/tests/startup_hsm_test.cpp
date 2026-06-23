@@ -41,10 +41,6 @@ class MockBridgeServices : public IBridgeServices {
     return mock().actualCall("is_discovered_gea2_protocol").onObject(this)
                .returnBoolValueOrDefault(false);
   }
-  bool is_autodiscovery_timed_out() const override {
-    return mock().actualCall("is_autodiscovery_timed_out").onObject(this)
-               .returnBoolValueOrDefault(false);
-  }
 
   // -- Device ID --------------------------------------------------------------
   void init_device_id_reading() override {
@@ -324,58 +320,5 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   tiny_hsm_send_signal(&wrapper.hsm, signal_run_loop, nullptr);
   CHECK(wrapper.hsm.current == startup_state_running);
 
-  mock().checkExpectations();
-}
-// =============================================================================
-// Autodiscovery timeout transitions to startup_state_failed
-// =============================================================================
-
-TEST(startup_hsm, autodiscovery_timeout_transitions_to_failed)
-{
-  mock().expectOneCall("record_startup_delay_start").onObject(&svc);
-  mock().expectOneCall("is_startup_delay_elapsed").onObject(&svc).andReturnValue(true);
-  mock().expectOneCall("run_autodiscovery").onObject(&svc);
-  mock().expectOneCall("is_autodiscovery_complete").onObject(&svc).andReturnValue(false);
-  mock().expectOneCall("is_autodiscovery_timed_out").onObject(&svc).andReturnValue(true);
-
-  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_protocol_stack);
-  CHECK(wrapper.hsm.current == startup_state_startup_delay);
-
-  tiny_hsm_send_signal(&wrapper.hsm, signal_run_loop, nullptr);
-  CHECK(wrapper.hsm.current == startup_state_autodiscovery);
-
-  tiny_hsm_send_signal(&wrapper.hsm, signal_run_loop, nullptr);
-
-  CHECK(wrapper.hsm.current == startup_state_failed);
-  mock().checkExpectations();
-}
-
-// =============================================================================
-// signal_restart recovers from startup_state_failed back to protocol_stack
-// =============================================================================
-
-TEST(startup_hsm, signal_restart_recovers_from_failed)
-{
-  mock().expectOneCall("record_startup_delay_start").onObject(&svc);
-  mock().expectOneCall("is_startup_delay_elapsed").onObject(&svc).andReturnValue(true);
-  mock().expectOneCall("run_autodiscovery").onObject(&svc);
-  mock().expectOneCall("is_autodiscovery_complete").onObject(&svc).andReturnValue(false);
-  mock().expectOneCall("is_autodiscovery_timed_out").onObject(&svc).andReturnValue(true);
-
-  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_protocol_stack);
-  CHECK(wrapper.hsm.current == startup_state_startup_delay);
-
-  tiny_hsm_send_signal(&wrapper.hsm, signal_run_loop, nullptr);
-  CHECK(wrapper.hsm.current == startup_state_autodiscovery);
-
-  tiny_hsm_send_signal(&wrapper.hsm, signal_run_loop, nullptr);
-  CHECK(wrapper.hsm.current == startup_state_failed);
-
-  // Restart from failed state
-  mock().expectOneCall("record_startup_delay_start").onObject(&svc);
-
-  tiny_hsm_send_signal(&wrapper.hsm, signal_restart, nullptr);
-
-  CHECK(wrapper.hsm.current == startup_state_startup_delay);
   mock().checkExpectations();
 }

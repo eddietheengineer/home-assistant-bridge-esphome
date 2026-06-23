@@ -50,7 +50,6 @@ namespace esphome {
 namespace geappliances_bridge {
 
 static constexpr uint32_t AUTODISCOVERY_BROADCAST_WINDOW_MS = 5000;
-static constexpr uint32_t AUTODISCOVERY_TIMEOUT_MS = 60000;
 
 enum AutodiscoveryState {
   AUTODISCOVERY_IDLE,
@@ -77,8 +76,6 @@ class AutodiscoveryManager {
   i_tiny_gea3_erd_client_t* get_active_erd_client() const { return active_erd_client_; }
   bool     is_gea2_protocol()       const { return gea2_protocol_active_; }
   AutodiscoveryState get_state()    const { return state_; }
-  /// Returns true if autodiscovery has been running longer than AUTODISCOVERY_TIMEOUT_MS.
-  bool     is_timed_out()           const;
 
  private:
   /// Drive the state machine forward (called from timer callbacks).
@@ -109,7 +106,6 @@ class AutodiscoveryManager {
 
   AutodiscoveryState state_ = AUTODISCOVERY_IDLE;
   tiny_timer_t broadcast_window_timer_;
-  uint32_t start_time_ms_ = 0;
 
   uint8_t  host_address_       = 0;
   i_tiny_gea3_erd_client_t* active_erd_client_ = nullptr;
