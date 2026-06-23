@@ -339,7 +339,7 @@ async def to_code(config: dict[str, Any]) -> None:
     if config.get(CONF_GENERATE_DEVICE_CONFIG, False):
         _LOGGER.info("Generating HA MQTT discovery data...")
         component_dir = os.path.dirname(os.path.abspath(__file__))
-        repo_root = os.path.dirname(component_dir)
+        repo_root = os.path.normpath(os.path.join(component_dir, "..", ".."))
         scripts_dir = os.path.join(repo_root, "scripts")
         try:
             subprocess.run(

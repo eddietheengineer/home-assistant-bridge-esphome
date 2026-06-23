@@ -21,9 +21,16 @@
 #ifdef USE_ESP_IDF_STUBS
 #include "esp-idf/zlib_stub.h"
 #else
-#include "zlib.h"
+/* Use miniz for decompression on ESP-IDF (no zlib in ESP-IDF 5.x).
+ * MINIZ_NO_ARCHIVE_APIS: we only need inflate.
+ * MINIZ_NO_ZLIB_COMPATIBLE_NAMES: avoid conflicts if zlib is present.
+ * MINIZ_NO_STDIO: no file I/O needed. */
+#define MINIZ_NO_ARCHIVE_APIS
+#define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
+#define MINIZ_NO_STDIO
+#include "miniz.h"
 #endif
-#endif
+#endif /* USE_ESP_IDF */
 
 
 static const char* const TAG = "ha_discovery_manager";
@@ -142,27 +149,12 @@ static int zlib_decompress(const uint8_t* compressed, size_t compressed_len,
     (void)output_len;
     return -1;
 #else
-    z_stream strm;
-    memset(&strm, 0, sizeof(strm));
-    strm.next_in = (Bytef*)compressed;
-    strm.avail_in = (uInt)compressed_len;
-    strm.next_out = output;
-    strm.avail_out = (uInt)*output_len;
-
-    if (inflateInit2(&strm, 31 + 15) != Z_OK) {
-        return -1;
-    }
-
-    int ret = inflate(&strm, Z_FINISH);
-    *output_len = strm.total_out;
-
-    if (ret != Z_STREAM_END && ret != Z_OK) {
-        inflateEnd(&strm);
-        return -1;
-    }
-
-    inflateEnd(&strm);
-    return 0;
+    /* Python's zlib.compress() produces zlib-wrapped data (with header/checksum).
+     * Use mz_uncompress which handles the zlib wrapper. */
+    int ret = mz_uncompress(
+        (unsigned char*)output, (mz_ulong*)output_len,
+        (const unsigned char*)compressed, (mz_ulong)compressed_len);
+    return (ret == MZ_OK) ? 0 : -1;
 #endif
 }
 #endif
