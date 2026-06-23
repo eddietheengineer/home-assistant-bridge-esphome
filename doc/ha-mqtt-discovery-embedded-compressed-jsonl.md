@@ -6,7 +6,7 @@
   ┌─────────────────────────────────────────────────────────────┐
   │  Build-Time:                                                │
   │  generate_ha_discovery.py → ha_discovery/*.jsonl            │
-  │    → CMake compresses → ha_discovery_data.h (byte arrays)   │
+  │    → Makefile runs compress_ha_discovery.py → ha_discovery_data.h (byte arrays)   │
   │                                                             │
   │  Runtime (C++ on ESP32):                                    │
   │  loop() → check_steady_state() → true (one-shot)            │
@@ -143,9 +143,9 @@ Modified: `components/geappliances_bridge/__init__.py` — runs `generate_ha_dis
 
 ## Phase 2: Build-Time Compression
 
-Modified: `components/geappliances_bridge/CMakeLists.txt`
+Modified: `Makefile`
 
-- Add a custom command that runs a compression script on the generated JSONL files to produce `ha_discovery_data.h`
+- Add a build dependency rule (following the existing pattern for `erd_lists.h` and `appliance_api_feature_lists.h` at lines 82–94) that runs `compress_ha_discovery.py` on the generated JSONL files to produce `ha_discovery_data.h`
 - Each category file is compressed (e.g., zlib) and turned into a C `const uint8_t` array with a length constant
 - The header declares each category as `const uint8_t ha_discovery_<category>[]` and `const size_t ha_discovery_<category>_len`
 
@@ -234,8 +234,6 @@ Modified: `components/geappliances_bridge/__init__.py`
 
 Modified: `Makefile` — Add `ha_discovery/` JSONL files and `ha_discovery_data.h` as build dependencies, following the existing pattern for `erd_lists.h` and `appliance_api_feature_lists.h` (lines 82–94). The generated files depend on `appliance_api_erd_definitions.json`, `scripts/generate_ha_discovery.py`, and `scripts/compress_ha_discovery.py`.
 
-Modified: `components/geappliances_bridge/CMakeLists.txt` — Add compression step to produce `ha_discovery_data.h` from JSONL files.
-
 ## Publishing Flow
 
 1. Bridge waits for ERD registration to settle (10s quiet window in subscription mode, or polling list complete in polling mode)
@@ -266,9 +264,8 @@ Only entities whose ERD ID (or paired ERD ID for request entities) is present in
 | `components/geappliances_bridge/geappliances_bridge.h` | Modified — Add manager member |
 | `components/geappliances_bridge/geappliances_bridge.cpp` | Modified — Wire into loop and teardown |
 | `components/geappliances_bridge/__init__.py` | Modified — Build integration |
-| `components/geappliances_bridge/CMakeLists.txt` | Modified — Add compression step |
 | `scripts/generate_erd_lists.py` | Modified — Call generate_ha_discovery |
-| `Makefile` | Modified — Add regeneration target |
+| `Makefile` | Modified — Add build dependency for JSONL generation and compression |
 
 ## Risks & Mitigations
 
