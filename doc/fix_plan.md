@@ -68,53 +68,30 @@
 **Verdict:** No action needed. The current infinite retry behavior is the right approach.
 ---
 
-### 7. Synchronize write payload buffer 🔴 P1
-**⚠️ Test gap:** The MQTT subscribe callback path (`esphome_mqtt_client_adapter.cpp:150-178`) is **completely untested** — the existing test `subscribe_write_topic_is_noop` is a no-op because `global_mqtt_client` is null in tests. The race condition is untestable in single-threaded unit tests. Verification relies on code inspection of `tiny_event_publish()` synchronous delivery (confirmed: `tiny_event_subscription.c` calls subscriber callback synchronously before returning).
+### ~~7. Synchronize write payload buffer~~ ✅ DONE
 
-**Test:** Add test wiring `MqttTestDouble` as `global_mqtt_client` to exercise the subscribe callback. Simulate rapid successive messages and verify first message data is intact. This requires new test infrastructure.
+**Status:** Fixed in commit `e58e301`. The MQTT subscribe callback now decodes the hex payload into a local stack buffer (`uint8_t local_buffer[32]`) instead of the shared `write_payload_buffer_` member, preventing a race when rapid successive messages arrive. Verified: `tiny_event_publish()` is synchronous (subscriber callback runs to completion before return), so the stack buffer remains valid for the duration of event delivery.
+
+**Verdict:** No further action needed.
 
 ## Newly Identified Issues
 
-### M1. Global `g_bridge_services` in startup HSM 🟡 P2
+### ~~M1. Global `g_bridge_services` in startup HSM~~ ✅ DONE
 
-**File:** `geappliances_bridge_startup_hsm.cpp:32`
+**Status:** Fixed in commit `e58e301`. Replaced file-scope static `g_bridge_services` with `startup_hsm_wrapper_t` struct embedding `tiny_hsm_t hsm` and `IBridgeServices* services`, using `container_of` in `services_from_hsm()`. Same pattern used by `erd_write_bridge_t` and `erd_bridge_poll_t`. All call sites updated to use `startup_hsm_wrapper_init()` and `wrapper.hsm`.
 
-File-scope static global `g_bridge_services` makes the HSM non-reentrant and non-testable. Breaks if multiple bridge instances ever exist or if the HSM is used before `set_bridge_services()` is called.
+**Verdict:** No further action needed.
 
-**⚠️ Implementation constraint:** `tiny_hsm_t` (`lib/tiny/include/tiny_hsm.h:103-106`) has **no `user_data` field** — only `configuration` and `current`. The proposed "pass through HSM's user_data field" is infeasible. Two alternatives:
+### ~~M2. Global GEA2 state not reset on re-init~~ ✅ DONE
 
-1. **Embed the HSM in a wrapper struct** that holds both the `tiny_hsm_t` and the `IBridgeServices*` pointer, using `container_of` to recover the wrapper from the HSM pointer (same pattern used by `erd_bridge_poll_t` and `erd_write_bridge_t`).
-2. **Keep the global but make it safer** — add a null-check in `services_from_hsm()` and log an error if called before `set_bridge_services()`.
+**Status:** Fixed in commit `e58e301`. Moved `s_gea2_last_ms` and `s_gea2_tick_count` from file-scope statics to class members (`gea2_last_ms_` and `gea2_tick_count_`) with zero initialization, so they reset on re-init (deep sleep wake, ESPHome reconfiguration). Added `friend` declaration for `gea2_tick_ticks()` accessor.
 
-**Recommendation:** Option 1 — create a `startup_hsm_wrapper_t` struct embedding `tiny_hsm_t hsm` and `IBridgeServices* services`, using `container_of` in `services_from_hsm()`. This is the same pattern used throughout the codebase.
+**Verdict:** No further action needed.
+### ~~M3. Feature bit manager has no failure threshold~~ ✅ DONE
 
-**Regression risk:** Low — only one bridge instance exists in practice. Requires updating all `services_from_hsm()` call sites.
----
+**Status:** Fixed in commit `e58e301`. Added `FEATURE_BIT_STATE_FAILED` enum value. The manager now requires at least `ERD_COMMON_FEATURE_API` (0x0092) to succeed before transitioning to PARSING. If it fails, enters FAILED state and falls back to full ERD list polling (no feature filtering). `is_feature_bits_complete()` returns true for FAILED state.
 
-### M2. Global GEA2 state not reset on re-init 🟡 P2
-
-**File:** `geappliances_bridge.cpp:43-47, 304-305`
-
-`s_gea2_last_ms` is a file-scope static initialized to 0 as a sentinel. If the bridge re-initializes (deep sleep wake, ESPHome reconfiguration), `s_gea2_last_ms` retains its old value. The sentinel check (`if (s_gea2_last_ms == 0)`) fails, and the msec catchup loop could fire a burst of backlogged interrupts.
-
-**Fix:** Move `s_gea2_last_ms` and `s_gea2_tick_count` to class members and reset in `setup()`.
-
-**Regression risk:** Low — affects edge cases (deep sleep, reconfiguration).
-
----
-
-### M3. Feature bit manager has no failure threshold 🟡 P2
-
-**File:** `feature_bit_manager.cpp:375-379`
-
-If all 11 feature ERD reads fail, the manager transitions to PARSING with empty buffers. The bridge proceeds to polling with no feature knowledge, potentially polling unsupported ERDs.
-
-**Fix:** Require at least `ERD_COMMON_FEATURE_API` (0x0092) to succeed before transitioning to PARSING. If it fails, enter a FAILED state and fall back to full ERD list polling (no feature filtering).
-
-**Regression risk:** Low — only affects appliances that don't support any feature ERDs.
-
----
-
+**Verdict:** No further action needed.
 ### M4. Main loop blocking — no structural change needed 🔵 P3
 
 **File:** `geappliances_bridge.cpp:300-354` (GEA2 tight loop), `erd_bridge_poll.cpp:206-224`
@@ -143,17 +120,14 @@ CppUTest with CppUMock. Strengths: `tiny_timer_group_double_t` with `elapse_time
 ### Weaknesses
 | Gap | Severity | Impact |
 |-----|----------|--------|
-| MQTT subscribe callback path untested | HIGH | P1#7 fix cannot be stress-tested |
-| No GEA2/GEA3 tight loop tests | MEDIUM | P2#M2 re-init fix hard to verify |
-| No re-init tests | MEDIUM | P2#M2 cannot verify reset behavior |
-| Race conditions untestable in single-threaded tests | MEDIUM | P1#7 verification relies on code inspection |
+| MQTT subscribe callback path untested | HIGH | P1#7 fix verified by code inspection only; `tiny_event_publish()` synchronous delivery confirmed |
+| No GEA2/GEA3 tight loop tests | MEDIUM | P2#M2 re-init fix verified by code inspection only |
+| No re-init tests | MEDIUM | P2#M2 cannot verify reset behavior in tests |
 
 ### Test Recommendations by Fix
 | Fix | Feasibility | Notes |
-| P1#7 Write payload buffer sync | LOW-MEDIUM | Requires new `MqttTestDouble` infrastructure; race untestable in single-threaded tests |
-| P2#M1 Remove global | HIGH | All 10 `startup_hsm_test.cpp` tests need mechanical update; `MockBridgeServices` works unchanged |
+|-----|-----------|-------|
 | P2#M2 GEA2 global reset | MEDIUM | No `loop()` tests exist; needs structural member-check test or full GEA2 mock |
-| P2#M3 Feature bit threshold | HIGH | Existing `read_failed` patterns in `feature_bit_manager_test.cpp` provide exact structure needed |
 ## Summary
 
 | # | Fix | Severity | Priority | Files | Status |
@@ -164,10 +138,10 @@ CppUTest with CppUMock. Strengths: `tiny_timer_group_double_t` with `elapse_time
 | ~~4~~ | ~~Feature bit read retry~~ | ~~🟡 MEDIUM~~ | ~~P2~~ | ~~`feature_bit_manager.cpp`~~ | ❌ REJECTED |
 | ~~5~~ | ~~Write bridge timeout~~ | ~~🟡 MEDIUM~~ | ~~🔴 P1~~ | ~~`erd_write_bridge.cpp`, `erd_write_bridge.h`~~ | ❌ REJECTED |
 | ~~6~~ | ~~Autodiscovery timeout~~ | ~~🟡 MEDIUM~~ | ~~🔴 P1~~ | ~~`geappliances_bridge_startup_hsm.cpp`~~ | ❌ REJECTED |
-| 7 | Write payload buffer sync | 🟡 MEDIUM | 🔴 P1 | `esphome_mqtt_client_adapter.cpp` | |
-| M1 | Remove global `g_bridge_services` | 🟡 MEDIUM | 🟡 P2 | `geappliances_bridge_startup_hsm.cpp` | |
-| M2 | Reset GEA2 global state on re-init | 🟡 MEDIUM | 🟡 P2 | `geappliances_bridge.cpp` | |
-| M3 | Feature bit minimum threshold | 🟡 MEDIUM | 🟡 P2 | `feature_bit_manager.cpp` | |
+| ~~7~~ | ~~Write payload buffer sync~~ | ~~🟡 MEDIUM~~ | ~~🔴 P1~~ | ~~`esphome_mqtt_client_adapter.cpp`~~ | ✅ DONE |
+| ~~M1~~ | ~~Remove global `g_bridge_services`~~ | ~~🟡 MEDIUM~~ | ~~🟡 P2~~ | ~~`geappliances_bridge_startup_hsm.cpp`~~ | ✅ DONE |
+| ~~M2~~ | ~~Reset GEA2 global state on re-init~~ | ~~🟡 MEDIUM~~ | ~~🟡 P2~~ | ~~`geappliances_bridge.cpp`~~ | ✅ DONE |
+| ~~M3~~ | ~~Feature bit minimum threshold~~ | ~~🟡 MEDIUM~~ | ~~🟡 P2~~ | ~~`feature_bit_manager.cpp`~~ | ✅ DONE |
 | M4 | Main loop blocking | 🟠 HIGH | 🔵 P3 | `geappliances_bridge.cpp` | No change needed |
 | M5 | Polling budget enforcement | 🔵 LOW | 🔵 P3 | `erd_bridge_poll.cpp` | No change needed |
 | ~~9~~ | Queue write requests | 🟡 MEDIUM | 🔵 P3 | `erd_write_bridge.cpp` | |
