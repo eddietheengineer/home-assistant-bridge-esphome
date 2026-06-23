@@ -527,8 +527,11 @@ static void erd_bridge_poll_init_impl(
   self->cycle_has_failure         = false;
   erd_set_init(&self->erd_set);
   self->erd_cache = cache;
-  self->on_discovery_complete        = nullptr;
-  self->on_discovery_complete_context = nullptr;
+  // Preserve a pre-set callback (e.g., from the bridge wiring it before
+  // init to avoid a race when discovery completes synchronously).
+  if (self->on_discovery_complete == nullptr) {
+    self->on_discovery_complete_context = nullptr;
+  }
 
   tiny_event_subscription_init(
     &self->erd_client_activity_subscription, self, +[](void* context, const void* _args) {

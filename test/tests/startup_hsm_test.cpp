@@ -121,8 +121,16 @@ class MockBridgeServices : public IBridgeServices {
     return mock().actualCall("is_erd_cache_publisher_initialized").onObject(this)
                .returnBoolValueOrDefault(false);
   }
-  void log_poll_state_transitions() override {}
-  void run_all_managers() override {}
+  void log_poll_state_transitions() override {
+    mock().actualCall("log_poll_state_transitions").onObject(this);
+  }
+  bool check_steady_state() override {
+    return mock().actualCall("check_steady_state").onObject(this)
+               .returnBoolValueOrDefault(false);
+  }
+  void run_all_managers() override {
+    mock().actualCall("run_all_managers").onObject(this);
+  }
 };
 
 TEST_GROUP(startup_hsm)
@@ -293,10 +301,15 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   /* Phase 6: subscription_watch entry -> running (POLL mode) */
   mock().expectOneCall("get_mode").onObject(&svc).andReturnValue(BRIDGE_MODE_POLL);
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
+  /* Phase 7: running entry checks steady state */
+  mock().expectOneCall("check_steady_state").onObject(&svc).andReturnValue(false);
   /* Phase 7: running run_loop */
+  mock().expectOneCall("run_all_managers").onObject(&svc);
   mock().expectOneCall("get_subscription_state").onObject(&svc).andReturnValue(static_cast<subscription_state_t>(subscription_state_none));
   mock().expectOneCall("handle_polling_failed").onObject(&svc);
+  mock().expectOneCall("log_poll_state_transitions").onObject(&svc);
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
+  mock().expectOneCall("check_steady_state").onObject(&svc).andReturnValue(false);
   /* Drive the HSM through all phases. */
   startup_hsm_wrapper_init(&wrapper, &svc, startup_state_protocol_stack);
   CHECK(wrapper.hsm.current == startup_state_startup_delay);

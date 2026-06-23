@@ -701,8 +701,25 @@ polling_state_t GeappliancesBridge::get_polling_state() const
   }
   return this->erd_bridge_poll_.current_state;
 }
+bool GeappliancesBridge::check_steady_state()
+{
+  // Steady when: not already reached, subscription bridge is steady (if
+  // initialized), polling bridge is polling (if initialized), and at least
+  // one bridge has been initialized.
+  bool steady = !this->steady_state_reached_ &&
+    (!this->subscription_bridge_initialized_ ||
+     this->erd_bridge_subscribe_.current_state == subscription_state_steady) &&
+    (!this->polling_bridge_initialized_ ||
+     this->erd_bridge_poll_.current_state == polling_state_polling) &&
+    this->erd_bridge_initialized_;
 
-// -- Recurring tasks ----------------------------------------------------------
+  if (steady) {
+    this->steady_state_reached_ = true;
+    ESP_LOGI(TAG, "Appliance Bridge is in steady state");
+  }
+
+  return steady;
+}
 
 
 void GeappliancesBridge::maybe_start_custom_erd_polling()

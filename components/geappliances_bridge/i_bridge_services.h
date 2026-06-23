@@ -98,6 +98,10 @@ class IBridgeServices {
   virtual void handle_polling_failed() = 0;
   /// Log any pending polling-bridge state-name transitions.
   virtual void log_poll_state_transitions() = 0;
+  /// Check if the appliance-side data path has reached steady-state operation.
+  /// Non-const: sets the steady-state flag and logs on first transition.
+  /// Returns true only on the first call that detects steady state.
+  virtual bool check_steady_state() = 0;
   /// Run one tick of all managers (autodiscovery, device-ID, feature bits).
   virtual void run_all_managers() = 0;
 
