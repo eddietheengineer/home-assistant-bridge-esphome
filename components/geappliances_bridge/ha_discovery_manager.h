@@ -2,18 +2,12 @@
  * @file
  * @brief Home Assistant MQTT Discovery manager.
  *
- * Serialized producer-consumer design:
- *   Producer (background task): decompresses embedded JSONL entity definitions,
- *   builds one discovery topic/payload at a time in a shared buffer, then
- *   signals the consumer via a binary semaphore.
+ * Sequential design: decompresses one chunk at a time into the shared buffer,
+ * parses each line, and publishes valid entities with rate limiting. Once all
+ * valid entities from a chunk are published, it decompresses the next chunk
+ * into the same memory space.
  *
- *   Consumer (main loop run()): receives the semaphore, publishes the payload
- *   to MQTT, releases the semaphore, and the producer continues.
- *
- *   This eliminates the item pool entirely — only one payload is in flight at
- *   any time, minimizing RAM usage.
- *
- * States: IDLE -> FETCHING -> PUBLISHING -> COMPLETE / FAILED
+ * States: IDLE -> BUILDING -> DISCOVERING -> COMPLETE / FAILED
  *
  * All FreeRTOS task code is guarded with #ifdef USE_ESP_IDF for
  * simulator/test build compatibility.
@@ -46,8 +40,8 @@ extern "C" {
 /* Discovery manager states */
 typedef enum {
   ha_discovery_state_idle,
-  ha_discovery_state_fetching,    // fetch task running
-  ha_discovery_state_publishing,  // main loop publishing
+  ha_discovery_state_building,     // building sorted ERD list
+  ha_discovery_state_discovering,  // main loop decompressing/publishing
   ha_discovery_state_complete,
   ha_discovery_state_failed
 } ha_discovery_state_t;
@@ -64,7 +58,7 @@ typedef enum {
 /* Line buffer size for JSONL parsing (max line is ~14KB). */
 #define HA_DISCOVERY_LINE_BUF_SIZE 16384
 
-/* Shared payload buffer (single item in flight). */
+/* Payload buffer for building discovery payloads. */
 #define HA_DISCOVERY_PAYLOAD_BUF_SIZE 16384
 
 /*!
@@ -93,44 +87,37 @@ typedef struct {
   uint32_t (*get_time_ms)(void);
 
 #ifdef USE_ESP_IDF
-  /* Fetch task resources (heap-allocated for stack/TCB). */
+  /* Task resources for initial ERD list build (heap-allocated). */
   TaskHandle_t    task_handle;
-  StackType_t*    task_stack;      // heap-allocated (8KB or 4KB fallback)
-  StaticTask_t*   task_tcb;        // heap-allocated
+  StackType_t*    task_stack;
+  StaticTask_t*   task_tcb;
   bool task_running;
 
-  /* Serialized producer-consumer sync.
-   * publish_sem: binary semaphore. Producer takes before building payload,
-   *   gives after. Consumer takes to claim the payload, gives after publishing.
-   * done_sem: given by producer when all categories are processed.
-   */
-  SemaphoreHandle_t publish_sem;
+  /* Done semaphore: given by build task when sorted ERD list is ready. */
   SemaphoreHandle_t done_sem;
 
-  /* Fetch state. */
-  bool fetch_done;                 // true once fetch task terminates
+  /* Build state. */
+  bool build_done;
 
-  /* Sorted ERD array for binary search during fetch. */
+  /* Sorted ERD array for binary search during discovery. */
   uint16_t sorted_erds[HA_DISCOVERY_MAX_ERDS];
   uint16_t sorted_erds_count;
 
-  /* Decompression state (direct member, no raw buffer cast). */
+  /* Decompression state. */
   tinfl_decompressor decomp_state;
   uint8_t decomp_buf[HA_DISCOVERY_DECOMP_BUF_SIZE];
 
   /* Line parsing buffer. */
   char line_buf[HA_DISCOVERY_LINE_BUF_SIZE];
 
-  /* Shared payload buffer: producer builds, consumer reads.
-   * payload_valid indicates the buffer contains a valid entity to publish. */
-  bool payload_valid;
+  /* Payload buffer for building discovery payloads. */
   char topic_buf[128];
   char payload_buf[HA_DISCOVERY_PAYLOAD_BUF_SIZE];
 
-  /* Rate limiting for consumer. */
+  /* Rate limiting. */
   uint32_t last_publish_ms;
 
-  /* Device JSON built once at fetch start. */
+  /* Device JSON built once at start. */
   char device_json_buf[512];
 
   /* Entity field buffers (used by process_jsonl_line to avoid stack overflow).
@@ -153,6 +140,12 @@ typedef struct {
   char command_topic_buf[128];
   char actual_state_topic_buf[128];
   char actual_command_topic_buf[128];
+
+  /* Discovery progress tracking. */
+  uint16_t current_category;       // Index into ha_discovery_categories[]
+  uint16_t current_chunk;          // Index into current category's chunks
+  uint32_t current_offset;         // Byte offset within decompressed chunk
+  uint32_t current_decomp_size;    // Size of current decompressed chunk
 #endif
 } ha_discovery_manager_t;
 
@@ -177,15 +170,15 @@ void ha_discovery_manager_configure(
 
 /*!
  * Start the discovery process.
- * On ESP-IDF, spawns a background fetch task and transitions to FETCHING.
+ * On ESP-IDF, spawns a background build task for the sorted ERD list.
  * On non-ESP-IDF, marks complete immediately.
  */
 void ha_discovery_manager_start(ha_discovery_manager_t* self);
 
 /*!
- * Drive the consumer: wait for payload from producer, publish to MQTT.
- * Call from the main loop while the manager is in FETCHING or PUBLISHING state.
- * Transitions to COMPLETE when all items are published.
+ * Drive the discovery: decompress chunks and publish entities.
+ * Call from the main loop while the manager is in BUILDING or DISCOVERING state.
+ * Transitions to COMPLETE when all entities are published.
  */
 void ha_discovery_manager_run(ha_discovery_manager_t* self);
 
@@ -196,7 +189,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self);
 void ha_discovery_manager_cleanup(ha_discovery_manager_t* self);
 
 /*!
- * Returns true if the manager is currently processing (fetching or publishing).
+ * Returns true if the manager is currently processing (building or discovering).
  */
 bool ha_discovery_manager_is_processing(ha_discovery_manager_t* self);
 

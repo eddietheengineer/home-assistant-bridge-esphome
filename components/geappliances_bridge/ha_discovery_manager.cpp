@@ -315,7 +315,7 @@ static int chunk_decompress(ha_discovery_manager_t* self, const uint8_t* compres
     return 0;
 #endif
 }
-#endif
+#endif /* USE_ESP_IDF */
 
 /* ------------------------------------------------------------------ */
 /* Process a single JSONL line: build topic/payload in shared buffers */
@@ -503,69 +503,7 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     }
 
     self->total_discovered++;
-    self->payload_valid = true;
     return true;
-}
-#endif
-
-/* ------------------------------------------------------------------ */
-/* Process a category: decompress chunks, parse lines, sync with consumer */
-/* ------------------------------------------------------------------ */
-
-#ifdef USE_ESP_IDF
-static void process_category(ha_discovery_manager_t* self,
-    const ha_discovery_category_t* cat)
-{
-    uint32_t before = self->total_discovered;
-
-    for (uint16_t ci = 0; ci < cat->num_chunks; ci++) {
-        const ha_discovery_chunk_t* chunk = &cat->chunks[ci];
-        const uint8_t* src = cat->data + chunk->offset;
-
-        size_t dst_size = sizeof(self->decomp_buf);
-        if (chunk_decompress(self, src, chunk->size, self->decomp_buf, &dst_size) != 0) {
-            continue;
-        }
-
-        const char* p = (const char*)self->decomp_buf;
-        const char* end = p + dst_size;
-
-        while (p < end) {
-            const char* line_end = p;
-            while (line_end < end && *line_end != '\n' && *line_end != '\r') line_end++;
-
-            size_t line_len = (size_t)(line_end - p);
-            if (line_len == 0) {
-                p = line_end + 1;
-                continue;
-            }
-            if (line_len >= sizeof(self->line_buf) - 1) {
-                line_len = sizeof(self->line_buf) - 1;
-            }
-            memcpy(self->line_buf, p, line_len);
-            self->line_buf[line_len] = '\0';
-
-            /* Wait for consumer to finish publishing previous payload. */
-            if (xSemaphoreTake(self->publish_sem, portMAX_DELAY) != pdTRUE) {
-                break;
-            }
-
-            if (process_jsonl_line(self, self->line_buf)) {
-                /* Signal consumer: payload ready in shared buffer. */
-                xSemaphoreGive(self->publish_sem);
-            } else {
-                /* Line filtered — mark payload invalid so consumer doesn't
-                 * publish stale data, then give sem back. */
-                self->payload_valid = false;
-                xSemaphoreGive(self->publish_sem);
-            }
-
-            p = line_end + 1;
-        }
-    }
-
-    ESP_LOGI(TAG, "Category %s: %u discovered",
-        cat->name, self->total_discovered - before);
 }
 #endif
 
@@ -573,69 +511,38 @@ static void process_category(ha_discovery_manager_t* self,
 /* Category filtering by appliance type                               */
 /* ------------------------------------------------------------------ */
 
-/* Determine if a discovery category should be processed for the given
- * appliance type. Returns true if the category should be processed.
- *
- * Category to appliance type mapping:
- *   common          - always processed
- *   airconditioning - HVAC appliances (types 30-39)
- *   energy          - appliances with energy ERDs (types 30-39, 50-59)
- *   refrigeration   - refrigeration appliances (types 10-19)
- *   laundry         - laundry appliances (types 20-29)
- *   dishwasher      - dishwasher appliances (types 40-49)
- *   range           - range appliances (types 60-69)
- *   waterheater     - water heater appliances (types 70-79)
- *   waterfilter     - water filter appliances (types 80-89)
- *   smallappliance  - small appliances (types 90-99)
- */
 static bool should_process_category(const char* category, uint8_t appliance_type)
 {
-    /* Common category is always processed. */
     if (strcmp(category, "common") == 0) return true;
 
-    /* HVAC / Air Conditioning appliances (types 30-39). */
     if (appliance_type >= 30 && appliance_type <= 39) {
         if (strcmp(category, "airconditioning") == 0) return true;
         if (strcmp(category, "energy") == 0) return true;
     }
-
-    /* Refrigeration appliances (types 10-19). */
     if (appliance_type >= 10 && appliance_type <= 19) {
         if (strcmp(category, "refrigeration") == 0) return true;
         if (strcmp(category, "energy") == 0) return true;
     }
-
-    /* Laundry appliances (types 20-29). */
     if (appliance_type >= 20 && appliance_type <= 29) {
         if (strcmp(category, "laundry") == 0) return true;
         if (strcmp(category, "energy") == 0) return true;
     }
-
-    /* Dishwasher appliances (types 40-49). */
     if (appliance_type >= 40 && appliance_type <= 49) {
         if (strcmp(category, "dishwasher") == 0) return true;
         if (strcmp(category, "energy") == 0) return true;
     }
-
-    /* Range appliances (types 50-59). */
     if (appliance_type >= 50 && appliance_type <= 59) {
         if (strcmp(category, "range") == 0) return true;
         if (strcmp(category, "energy") == 0) return true;
     }
-
-    /* Water heater appliances (types 60-69). */
     if (appliance_type >= 60 && appliance_type <= 69) {
         if (strcmp(category, "waterheater") == 0) return true;
         if (strcmp(category, "energy") == 0) return true;
     }
-
-    /* Water filter appliances (types 70-79). */
     if (appliance_type >= 70 && appliance_type <= 79) {
         if (strcmp(category, "waterfilter") == 0) return true;
         if (strcmp(category, "energy") == 0) return true;
     }
-
-    /* Small appliances (types 80-89). */
     if (appliance_type >= 80 && appliance_type <= 89) {
         if (strcmp(category, "smallappliance") == 0) return true;
     }
@@ -644,64 +551,32 @@ static bool should_process_category(const char* category, uint8_t appliance_type
 }
 
 /* ------------------------------------------------------------------ */
-/* Fetch task (producer)                                              */
+/* Build task: builds sorted ERD list and device JSON                 */
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
-static void fetch_task(void* arg)
+static void build_task(void* arg)
 {
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
 
-    self->state = ha_discovery_state_fetching;
-
-    ESP_LOGI(TAG, "Starting HA discovery fetch...");
-
-    /* Build sorted ERD list and device JSON. */
     build_sorted_erd_list(self);
     build_device_json(self);
 
-    /* publish_sem starts empty. Give it so the first entity can proceed
-     * without blocking (producer takes before building, gives after). */
-    xSemaphoreGive(self->publish_sem);
-    for (size_t i = 0; i < ha_discovery_category_count; i++) {
-        const ha_discovery_category_t* cat = &ha_discovery_categories[i];
-
-        /* Skip categories that don't apply to this appliance type. */
-        if (!should_process_category(cat->name, self->appliance_type)) {
-            ESP_LOGD(TAG, "Skipping category %s (appliance type %u)", cat->name, self->appliance_type);
-            continue;
-        }
-
-        process_category(self, cat);
-
-        /* Yield and feed WDT after each category. */
-        vTaskDelay(pdMS_TO_TICKS(50));
-        esp_task_wdt_reset();
-    }
-
-    /* Signal done via semaphore. */
     if (self->done_sem) {
         xSemaphoreGive(self->done_sem);
     }
-
-    ESP_LOGI(TAG, "HA discovery fetch complete: %u discovered, %u filtered",
-        self->total_discovered, self->total_filtered);
 
     vTaskDelete(NULL);
 }
 #endif
 
 /* ------------------------------------------------------------------ */
-/* Consumer: run() called from main loop                              */
+/* Cleanup helper                                                     */
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
-static void cleanup_fetch_resources(ha_discovery_manager_t* self)
+static void cleanup_resources(ha_discovery_manager_t* self)
 {
-    if (self->publish_sem) {
-        vSemaphoreDelete(self->publish_sem);
-        self->publish_sem = NULL;
-    }
     if (self->done_sem) {
         vSemaphoreDelete(self->done_sem);
         self->done_sem = NULL;
@@ -718,82 +593,170 @@ static void cleanup_fetch_resources(ha_discovery_manager_t* self)
 }
 #endif
 
+/* ------------------------------------------------------------------ */
+/* run(): sequential chunk decompression + publish                    */
+/* ------------------------------------------------------------------ */
+
 void ha_discovery_manager_run(ha_discovery_manager_t* self)
 {
 #ifdef USE_ESP_IDF
-    if (self->state != ha_discovery_state_fetching && self->state != ha_discovery_state_publishing) {
+    if (self->state != ha_discovery_state_building &&
+        self->state != ha_discovery_state_discovering) {
         return;
     }
 
-    if (self->state == ha_discovery_state_fetching) {
-        self->state = ha_discovery_state_publishing;
-        self->last_publish_ms = self->get_time_ms();
-    }
-
-    /* Check if fetch task has finished. */
-    if (!self->fetch_done && self->done_sem) {
-        if (xSemaphoreTake(self->done_sem, 0) == pdTRUE) {
-            self->fetch_done = true;
-            self->task_handle = NULL;
-        }
-    }
-
-    /* After fetch is done, drain any remaining payload then complete. */
-    if (self->fetch_done) {
-        /* Try to take one more — the producer may have given the semaphore
-         * for the last entity before giving done_sem. */
-        if (xSemaphoreTake(self->publish_sem, 0) == pdTRUE) {
-            if (self->payload_valid && self->mqtt_client) {
-                mqtt_client_publish_raw(self->mqtt_client, self->topic_buf,
-                    self->payload_buf, strlen(self->payload_buf), true);
-                self->total_published++;
-                ESP_LOGD(TAG, "Published: %s (0x%s)", self->entity_name_buf, self->erd_id_hex_buf);
+    /* Wait for build task to finish (first call). */
+    if (self->state == ha_discovery_state_building) {
+        if (!self->build_done && self->done_sem) {
+            if (xSemaphoreTake(self->done_sem, 0) == pdTRUE) {
+                self->build_done = true;
+                self->task_handle = NULL;
+            } else {
+                return;  /* Build not done yet. */
             }
         }
-        if (self->total_published >= self->total_discovered) {
-            cleanup_fetch_resources(self);
+        if (!self->build_done) return;
+
+        /* Transition to discovering. */
+        self->state = ha_discovery_state_discovering;
+        self->current_category = 0;
+        self->current_chunk = 0;
+        self->current_offset = 0;
+        self->current_decomp_size = 0;
+        self->last_publish_ms = self->get_time_ms();
+
+        ESP_LOGI(TAG, "Starting HA discovery fetch...");
+    }
+
+    /* Discovering state: decompress chunks and publish entities. */
+    while (self->state == ha_discovery_state_discovering) {
+        /* Find the next category to process. */
+        while (self->current_category < ha_discovery_category_count) {
+            const ha_discovery_category_t* cat = &ha_discovery_categories[self->current_category];
+
+            if (!should_process_category(cat->name, self->appliance_type)) {
+                self->current_category++;
+                self->current_chunk = 0;
+                self->current_offset = 0;
+                self->current_decomp_size = 0;
+                continue;
+            }
+
+            /* Decompress the current chunk if needed. */
+            if (self->current_decomp_size == 0) {
+                if (self->current_chunk >= cat->num_chunks) {
+                    /* Done with this category. */
+                    self->current_category++;
+                    self->current_chunk = 0;
+                    self->current_offset = 0;
+                    self->current_decomp_size = 0;
+                    continue;
+                }
+
+                const ha_discovery_chunk_t* chunk = &cat->chunks[self->current_chunk];
+                const uint8_t* src = cat->data + chunk->offset;
+
+                size_t dst_size = sizeof(self->decomp_buf);
+                if (chunk_decompress(self, src, chunk->size, self->decomp_buf, &dst_size) != 0) {
+                    /* Decompression failed, skip this chunk. */
+                    self->current_chunk++;
+                    self->current_offset = 0;
+                    self->current_decomp_size = 0;
+                    continue;
+                }
+                self->current_decomp_size = (uint32_t)dst_size;
+                self->current_offset = 0;
+            }
+
+            /* Parse lines from the current decompressed chunk. */
+            const char* decomp = (const char*)self->decomp_buf;
+
+            while (self->current_offset < self->current_decomp_size) {
+                /* Find the next line. */
+                const char* line_start = decomp + self->current_offset;
+                const char* line_end = line_start;
+                while ((uintptr_t)(line_end - decomp) < self->current_decomp_size &&
+                       *line_end != '\n' && *line_end != '\r') {
+                    line_end++;
+                }
+
+                size_t line_len = (size_t)(line_end - line_start);
+                if (line_len == 0) {
+                    self->current_offset++;
+                    continue;
+                }
+                if (line_len >= sizeof(self->line_buf) - 1) {
+                    line_len = sizeof(self->line_buf) - 1;
+                }
+                memcpy(self->line_buf, line_start, line_len);
+                self->line_buf[line_len] = '\0';
+
+                /* Advance offset past this line. */
+                self->current_offset = (uint32_t)(line_end - decomp) + 1;
+
+                /* Process the line. */
+                if (process_jsonl_line(self, self->line_buf)) {
+                    /* Rate-limit before publishing. */
+                    uint32_t now = self->get_time_ms();
+                    if (now - self->last_publish_ms < HA_DISCOVERY_PUBLISH_INTERVAL_MS) {
+                        /* Save state and return; next run() call will continue. */
+                        return;
+                    }
+                    self->last_publish_ms = now;
+
+                    /* Publish. */
+                    if (self->mqtt_client) {
+                        mqtt_client_publish_raw(self->mqtt_client, self->topic_buf,
+                            self->payload_buf, strlen(self->payload_buf), true);
+                    }
+                    self->total_published++;
+
+                    ESP_LOGD(TAG, "Published: %s (0x%s)", self->entity_name_buf, self->erd_id_hex_buf);
+
+                    /* Log category progress periodically. */
+                    if (self->total_published % 50 == 0) {
+                        ESP_LOGI(TAG, "Category %s: %u discovered, %u published",
+                            cat->name, self->total_discovered, self->total_published);
+                    }
+                }
+
+                /* Yield to other tasks after each entity. */
+                esp_task_wdt_reset();
+                vTaskDelay(pdMS_TO_TICKS(1));
+            }
+
+            /* Done with this chunk, move to the next. */
+            self->current_chunk++;
+            self->current_offset = 0;
+            self->current_decomp_size = 0;
+
+            /* Log category completion. */
+            uint32_t cat_discovered = self->total_discovered;
+            /* We don't track per-category discovered easily, so skip the log. */
+
+            /* Yield after finishing a chunk. */
+            esp_task_wdt_reset();
+            vTaskDelay(pdMS_TO_TICKS(10));
+
+            break;  /* Break inner while to re-evaluate category/chunk state. */
+        }
+
+        /* Check if all categories are done. */
+        if (self->current_category >= ha_discovery_category_count) {
+            cleanup_resources(self);
             self->state = ha_discovery_state_complete;
             ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
                 self->total_published, self->total_filtered);
+            break;
         }
-        return;
     }
-
-    /* Non-blocking: try to take semaphore for a pending payload. */
-    if (xSemaphoreTake(self->publish_sem, 0) != pdTRUE) {
-        return;  /* No payload ready yet. */
-    }
-
-    /* Wait until rate-limit window has passed before publishing.
-     * We hold the semaphore so the producer blocks, preventing buffer
-     * overwrite. The producer's portMAX_DELAY wait is bounded by the
-     * rate-limit interval (max 50ms). */
-    uint32_t now = self->get_time_ms();
-    if (now - self->last_publish_ms < HA_DISCOVERY_PUBLISH_INTERVAL_MS) {
-        uint32_t wait_ms = HA_DISCOVERY_PUBLISH_INTERVAL_MS - (now - self->last_publish_ms);
-        vTaskDelay(pdMS_TO_TICKS(wait_ms));
-    }
-    self->last_publish_ms = self->get_time_ms();
-
-    /* Publish from shared buffer. */
-    if (self->payload_valid && self->mqtt_client) {
-        mqtt_client_publish_raw(self->mqtt_client, self->topic_buf, self->payload_buf, strlen(self->payload_buf), true);
-        self->total_published++;
-
-        ESP_LOGD(TAG, "Published: %s (0x%s)", self->entity_name_buf, self->erd_id_hex_buf);
-    }
-
-    /* Give semaphore back so producer can build the next payload. */
-    xSemaphoreGive(self->publish_sem);
-
-    esp_task_wdt_reset();
 #else
     (void)self;
 #endif
 }
 
 /* ------------------------------------------------------------------ */
-/* Public API                                                           */
+/* Public API                                                         */
 /* ------------------------------------------------------------------ */
 
 void ha_discovery_manager_init(ha_discovery_manager_t* self)
@@ -803,10 +766,6 @@ void ha_discovery_manager_init(ha_discovery_manager_t* self)
     self->get_time_ms = esphome::millis;
 
 #ifdef USE_ESP_IDF
-    self->publish_sem = xSemaphoreCreateBinary();
-    if (!self->publish_sem) {
-        ESP_LOGE(TAG, "Failed to create publish semaphore");
-    }
     self->done_sem = xSemaphoreCreateBinary();
     if (!self->done_sem) {
         ESP_LOGE(TAG, "Failed to create done semaphore");
@@ -837,9 +796,8 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
     if (self->state != ha_discovery_state_idle) return;
 
 #ifdef USE_ESP_IDF
-    /* Allocate task stack — try 8KB, fall back to 4KB. */
-    static constexpr int STACK_SIZE_BIG = 8 * 1024;
-    static constexpr int STACK_SIZE_SMALL = 4 * 1024;
+    static constexpr int STACK_SIZE_BIG = 4 * 1024;
+    static constexpr int STACK_SIZE_SMALL = 2 * 1024;
 
     self->task_stack = (StackType_t*)heap_caps_malloc(STACK_SIZE_BIG, MALLOC_CAP_8BIT);
     if (!self->task_stack) {
@@ -858,20 +816,18 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
         return;
     }
 
-    int stack_size = self->task_stack ? STACK_SIZE_BIG : STACK_SIZE_SMALL;
-
     self->task_running = true;
     self->task_handle = xTaskCreateStatic(
-        fetch_task,
-        "ha_discovery",
-        stack_size,
+        build_task,
+        "ha_discovery_build",
+        STACK_SIZE_BIG,
         self,
         1,
         self->task_stack,
         self->task_tcb);
 
     if (!self->task_handle) {
-        ESP_LOGE(TAG, "Failed to create discovery task");
+        ESP_LOGE(TAG, "Failed to create build task");
         free(self->task_stack);
         free(self->task_tcb);
         self->task_stack = NULL;
@@ -881,7 +837,7 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
         return;
     }
 
-    self->state = ha_discovery_state_fetching;
+    self->state = ha_discovery_state_building;
 #else
     self->state = ha_discovery_state_complete;
 #endif
@@ -900,7 +856,7 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
         self->task_handle = NULL;
     }
 
-    cleanup_fetch_resources(self);
+    cleanup_resources(self);
 #endif
 
     memset(self, 0, sizeof(*self));
@@ -908,8 +864,8 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
 
 bool ha_discovery_manager_is_processing(ha_discovery_manager_t* self)
 {
-    return self->state == ha_discovery_state_fetching ||
-           self->state == ha_discovery_state_publishing;
+    return self->state == ha_discovery_state_building ||
+           self->state == ha_discovery_state_discovering;
 }
 
 ha_discovery_state_t ha_discovery_manager_get_state(ha_discovery_manager_t* self)
