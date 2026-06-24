@@ -86,15 +86,24 @@ def build_value_template(field: Dict, erd_data: List[Dict], erd_id_hex: str) -> 
     Build a Jinja2 value_template for decoding the hex payload.
 
     The payload is a hex-encoded string of raw ERD bytes.
+    Uses regex_findall('(..)') which returns a list of lists
+    (each match is a list of capture groups), so we flatten with
+    map('first') | list to get a flat list of hex byte strings.
     """
     ftype = field['type']
     foffset = field.get('offset', 0)
     fsize = field.get('size', 1)
 
+    # Helper: split hex payload into individual byte strings
+    # regex_findall('(..)') on "0a0b" -> [["0a"],["0b"]]
+    # map('first') | list -> ["0a","0b"]
+    def _bytes() -> str:
+        return "value | regex_findall('(..)') | map('first') | list"
+
     if ftype == 'string':
         # Each byte pair decoded as ASCII with 0x20 offset, trailing '_' stripped
         return (
-            "{{ value | regex_findall_index('(..)') | "
+            "{{ " + _bytes() + " | "
             "join(' ') | regex_replace('.*', "
             "{{ value.split(' ') | map("
             "  (item) -> (int(item, 16) - 0x20) | chr | default('', true)"
@@ -109,27 +118,27 @@ def build_value_template(field: Dict, erd_data: List[Dict], erd_id_hex: str) -> 
         pairs = ', '.join(f'"{k}": "{v}"' for k, v in values.items())
         if fsize == 1 and foffset == 0:
             # Single-byte enum at offset 0
-            return f"{{{{ value | regex_findall_index('(..)') | first | default('') | regex_replace('.*', {{{{ {pairs} }}}}[\\1]]) }}}}"
+            return f"{{{{ {_bytes()} | first | default('') | regex_replace('.*', {{{{ {pairs} }}}}[\\1]]) }}}}"
         else:
             # Enum at a specific byte offset within the ERD
             byte_idx = foffset  # each byte is a pair of hex chars
             return (
-                "{{ value | regex_findall_index('(..)') | "
+                "{{ " + _bytes() + " | "
                 f"selectattr('index', 'equalto', {byte_idx}) | first | "
                 f"default('') | regex_replace('.*', {{{{ {pairs} }}}}[\\1]]) }}"
             )
 
     if ftype == 'bool':
         # Bool: single byte, 0 or 1
-        return "{{ value | regex_findall_index('(..)') | first | int(0, 16) }}"
+        return "{{ " + _bytes() + " | first | int(0, 16) }}"
 
     if ftype in ('u8', 'i8'):
         if foffset == 0 and fsize == 1:
-            return "{{{{ value | regex_findall_index('(..)') | first | int(0, 16) }}}}"
+            return "{{{{ " + _bytes() + " | first | int(0, 16) }}}}"
         else:
             byte_idx = foffset
             return (
-                "{{ value | regex_findall_index('(..)') | "
+                "{{ " + _bytes() + " | "
                 f"selectattr('index', 'equalto', {byte_idx}) | first | "
                 "int(0, 16) }}"
             )
@@ -139,19 +148,19 @@ def build_value_template(field: Dict, erd_data: List[Dict], erd_id_hex: str) -> 
         byte_lo = foffset
         byte_hi = foffset + 1
         return (
-            "{{ (value | regex_findall_index('(..)') | "
+            "{{ (" + _bytes() + " | "
             f"selectattr('index', 'equalto', {byte_hi}) | first | int(0, 16) * 256 + "
-            f"(value | regex_findall_index('(..)') | selectattr('index', 'equalto', {byte_lo}) | first | int(0, 16)) }}"
+            f"(" + _bytes() + " | selectattr('index', 'equalto', {byte_lo}) | first | int(0, 16)) }}"
         )
 
     if ftype in ('u32', 'i32'):
         # Little-endian 32-bit
         return (
-            "{{ (value | regex_findall_index('(..)') | "
+            "{{ (" + _bytes() + " | "
             f"selectattr('index', 'equalto', {foffset + 3}) | first | int(0, 16) * 16777216 + "
-            f"(value | regex_findall_index('(..)') | selectattr('index', 'equalto', {foffset + 2}) | first | int(0, 16) * 65536 + "
-            f"(value | regex_findall_index('(..)') | selectattr('index', 'equalto', {foffset + 1}) | first | int(0, 16) * 256 + "
-            f"(value | regex_findall_index('(..)') | selectattr('index', 'equalto', {foffset}) | first | int(0, 16))) }}"
+            f"(" + _bytes() + " | selectattr('index', 'equalto', {foffset + 2}) | first | int(0, 16) * 65536 + "
+            f"(" + _bytes() + " | selectattr('index', 'equalto', {foffset + 1}) | first | int(0, 16) * 256 + "
+            f"(" + _bytes() + " | selectattr('index', 'equalto', {foffset}) | first | int(0, 16))) }}"
         )
 
     if ftype == 'raw':
