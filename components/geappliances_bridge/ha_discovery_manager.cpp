@@ -16,6 +16,7 @@
 #include "esphome/core/hal.h"
 
 #ifdef USE_ESP_IDF
+#include "esp_attr.h"
 #include "esp_task_wdt.h"
 #include "esp_log.h"
 #ifdef USE_ESP_IDF_STUBS
@@ -123,7 +124,7 @@ static const size_t num_categories = ha_discovery_category_count;
 #ifdef USE_ESP_IDF
 /* Decompress a single chunk using tinfl (raw deflate, no zlib header).
  * Returns 0 on success, -1 on failure. */
-static int chunk_decompress(const uint8_t* compressed, size_t compressed_len,
+static int IRAM_ATTR chunk_decompress(const uint8_t* compressed, size_t compressed_len,
                            uint8_t* output, size_t* output_len)
 {
 #ifdef USE_ESP_IDF_STUBS
@@ -547,7 +548,7 @@ static void process_entity_line(ha_discovery_manager_t* self, const char* line)
 
 #ifdef USE_ESP_IDF
 /* Process a single chunk: decompress and parse lines. */
-static void process_chunk(ha_discovery_manager_t* self,
+static void IRAM_ATTR process_chunk(ha_discovery_manager_t* self,
                           const uint8_t* compressed, size_t compressed_len)
 {
     size_t dst_size = sizeof(self->decompress_buf);
@@ -587,7 +588,7 @@ static void process_chunk(ha_discovery_manager_t* self,
     }
 }
 
-static void decompress_and_parse_category(ha_discovery_manager_t* self,
+static void IRAM_ATTR decompress_and_parse_category(ha_discovery_manager_t* self,
                                            const ha_discovery_category_t* cat)
 {
     /* Process each chunk independently, reusing the small decompress buffer. */
