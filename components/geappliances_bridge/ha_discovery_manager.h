@@ -80,6 +80,7 @@ typedef struct {
   const char* device_id;           // Device ID string for topic construction
   const char* model_number;        // Model number for device info
   const char* serial_number;       // Serial number for device info
+  uint8_t appliance_type;          // Appliance type for category filtering
 
   ha_discovery_state_t state;
 
@@ -120,7 +121,9 @@ typedef struct {
   /* Line parsing buffer. */
   char line_buf[HA_DISCOVERY_LINE_BUF_SIZE];
 
-  /* Shared payload buffer: producer builds, consumer reads. */
+  /* Shared payload buffer: producer builds, consumer reads.
+   * payload_valid indicates the buffer contains a valid entity to publish. */
+  bool payload_valid;
   char topic_buf[128];
   char payload_buf[HA_DISCOVERY_PAYLOAD_BUF_SIZE];
 
@@ -168,6 +171,7 @@ void ha_discovery_manager_configure(
   const char* device_id,
   const char* model_number,
   const char* serial_number,
+  uint8_t appliance_type,
   erd_cache_t* cache,
   i_mqtt_client_t* mqtt_client);
 

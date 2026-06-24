@@ -503,6 +503,7 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     }
 
     self->total_discovered++;
+    self->payload_valid = true;
     return true;
 }
 #endif
@@ -553,7 +554,9 @@ static void process_category(ha_discovery_manager_t* self,
                 /* Signal consumer: payload ready in shared buffer. */
                 xSemaphoreGive(self->publish_sem);
             } else {
-                /* Line filtered — give sem back so producer can continue. */
+                /* Line filtered — mark payload invalid so consumer doesn't
+                 * publish stale data, then give sem back. */
+                self->payload_valid = false;
                 xSemaphoreGive(self->publish_sem);
             }
 
@@ -565,6 +568,80 @@ static void process_category(ha_discovery_manager_t* self,
         cat->name, self->total_discovered - before);
 }
 #endif
+
+/* ------------------------------------------------------------------ */
+/* Category filtering by appliance type                               */
+/* ------------------------------------------------------------------ */
+
+/* Determine if a discovery category should be processed for the given
+ * appliance type. Returns true if the category should be processed.
+ *
+ * Category to appliance type mapping:
+ *   common          - always processed
+ *   airconditioning - HVAC appliances (types 30-39)
+ *   energy          - appliances with energy ERDs (types 30-39, 50-59)
+ *   refrigeration   - refrigeration appliances (types 10-19)
+ *   laundry         - laundry appliances (types 20-29)
+ *   dishwasher      - dishwasher appliances (types 40-49)
+ *   range           - range appliances (types 60-69)
+ *   waterheater     - water heater appliances (types 70-79)
+ *   waterfilter     - water filter appliances (types 80-89)
+ *   smallappliance  - small appliances (types 90-99)
+ */
+static bool should_process_category(const char* category, uint8_t appliance_type)
+{
+    /* Common category is always processed. */
+    if (strcmp(category, "common") == 0) return true;
+
+    /* HVAC / Air Conditioning appliances (types 30-39). */
+    if (appliance_type >= 30 && appliance_type <= 39) {
+        if (strcmp(category, "airconditioning") == 0) return true;
+        if (strcmp(category, "energy") == 0) return true;
+    }
+
+    /* Refrigeration appliances (types 10-19). */
+    if (appliance_type >= 10 && appliance_type <= 19) {
+        if (strcmp(category, "refrigeration") == 0) return true;
+        if (strcmp(category, "energy") == 0) return true;
+    }
+
+    /* Laundry appliances (types 20-29). */
+    if (appliance_type >= 20 && appliance_type <= 29) {
+        if (strcmp(category, "laundry") == 0) return true;
+        if (strcmp(category, "energy") == 0) return true;
+    }
+
+    /* Dishwasher appliances (types 40-49). */
+    if (appliance_type >= 40 && appliance_type <= 49) {
+        if (strcmp(category, "dishwasher") == 0) return true;
+        if (strcmp(category, "energy") == 0) return true;
+    }
+
+    /* Range appliances (types 50-59). */
+    if (appliance_type >= 50 && appliance_type <= 59) {
+        if (strcmp(category, "range") == 0) return true;
+        if (strcmp(category, "energy") == 0) return true;
+    }
+
+    /* Water heater appliances (types 60-69). */
+    if (appliance_type >= 60 && appliance_type <= 69) {
+        if (strcmp(category, "waterheater") == 0) return true;
+        if (strcmp(category, "energy") == 0) return true;
+    }
+
+    /* Water filter appliances (types 70-79). */
+    if (appliance_type >= 70 && appliance_type <= 79) {
+        if (strcmp(category, "waterfilter") == 0) return true;
+        if (strcmp(category, "energy") == 0) return true;
+    }
+
+    /* Small appliances (types 80-89). */
+    if (appliance_type >= 80 && appliance_type <= 89) {
+        if (strcmp(category, "smallappliance") == 0) return true;
+    }
+
+    return false;
+}
 
 /* ------------------------------------------------------------------ */
 /* Fetch task (producer)                                              */
@@ -587,7 +664,15 @@ static void fetch_task(void* arg)
      * without blocking (producer takes before building, gives after). */
     xSemaphoreGive(self->publish_sem);
     for (size_t i = 0; i < ha_discovery_category_count; i++) {
-        process_category(self, &ha_discovery_categories[i]);
+        const ha_discovery_category_t* cat = &ha_discovery_categories[i];
+
+        /* Skip categories that don't apply to this appliance type. */
+        if (!should_process_category(cat->name, self->appliance_type)) {
+            ESP_LOGD(TAG, "Skipping category %s (appliance type %u)", cat->name, self->appliance_type);
+            continue;
+        }
+
+        process_category(self, cat);
 
         /* Yield and feed WDT after each category. */
         vTaskDelay(pdMS_TO_TICKS(50));
@@ -658,12 +743,12 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         /* Try to take one more — the producer may have given the semaphore
          * for the last entity before giving done_sem. */
         if (xSemaphoreTake(self->publish_sem, 0) == pdTRUE) {
-            if (self->mqtt_client) {
+            if (self->payload_valid && self->mqtt_client) {
                 mqtt_client_publish_raw(self->mqtt_client, self->topic_buf,
                     self->payload_buf, strlen(self->payload_buf), true);
+                self->total_published++;
+                ESP_LOGD(TAG, "Published: %s (0x%s)", self->entity_name_buf, self->erd_id_hex_buf);
             }
-            self->total_published++;
-            ESP_LOGD(TAG, "Published: %s (0x%s)", self->entity_name_buf, self->erd_id_hex_buf);
         }
         if (self->total_published >= self->total_discovered) {
             cleanup_fetch_resources(self);
@@ -685,12 +770,12 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
     self->last_publish_ms = now;
 
     /* Publish from shared buffer. */
-    if (self->mqtt_client) {
+    if (self->payload_valid && self->mqtt_client) {
         mqtt_client_publish_raw(self->mqtt_client, self->topic_buf, self->payload_buf, strlen(self->payload_buf), true);
-    }
-    self->total_published++;
+        self->total_published++;
 
-    ESP_LOGD(TAG, "Published: %s (0x%s)", self->entity_name_buf, self->erd_id_hex_buf);
+        ESP_LOGD(TAG, "Published: %s (0x%s)", self->entity_name_buf, self->erd_id_hex_buf);
+    }
 
     /* Give semaphore back so producer can build the next payload. */
     xSemaphoreGive(self->publish_sem);
@@ -729,12 +814,14 @@ void ha_discovery_manager_configure(
     const char* device_id,
     const char* model_number,
     const char* serial_number,
+    uint8_t appliance_type,
     erd_cache_t* cache,
     i_mqtt_client_t* mqtt_client)
 {
     self->device_id = device_id;
     self->model_number = model_number;
     self->serial_number = serial_number;
+    self->appliance_type = appliance_type;
     self->cache = cache;
     self->mqtt_client = mqtt_client;
 }
