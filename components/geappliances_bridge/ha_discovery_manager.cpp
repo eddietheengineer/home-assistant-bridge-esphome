@@ -59,8 +59,8 @@ static const char* json_get_str(const char* json, const char* key,
             if (*p == '"') {
                 *out_value = p + 1;
                 const char* end = p + 1;
-                while (*end && *end != '"' && *end != ',' && *end != '}') {
-                    if (*end == '\\') end++;
+                while (*end && *end != '"') {
+                    if (*end == '\\') end++;  /* skip escaped char */
                     end++;
                 }
                 *out_len = (size_t)(end - *out_value);
