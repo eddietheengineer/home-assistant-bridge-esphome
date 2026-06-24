@@ -653,24 +653,23 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         }
     }
 
-    /* Try to take the publish semaphore (non-blocking).
-     * If taken, the producer has built a payload for us to publish. */
-    if (xSemaphoreTake(self->publish_sem, 0) != pdTRUE) {
-        /* No payload ready yet. */
-        if (self->fetch_done) {
-            /* Fetch is done and no pending payload. But we need to ensure
-             * the last entity was published. The producer gives publish_sem
-             * for each entity then takes it back. If fetch_done and sem is
-             * not available, either: (a) the last entity is still being
-             * published by us (sem taken, not yet given back), or
-             * (b) all entities are published. Check if we've published
-             * as many as were discovered. */
-            if (self->total_published >= self->total_discovered) {
-                cleanup_fetch_resources(self);
-                self->state = ha_discovery_state_complete;
-                ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
-                    self->total_published, self->total_filtered);
+    /* After fetch is done, drain any remaining payload then complete. */
+    if (self->fetch_done) {
+        /* Try to take one more — the producer may have given the semaphore
+         * for the last entity before giving done_sem. */
+        if (xSemaphoreTake(self->publish_sem, 0) == pdTRUE) {
+            if (self->mqtt_client) {
+                mqtt_client_publish_raw(self->mqtt_client, self->topic_buf,
+                    self->payload_buf, strlen(self->payload_buf), true);
             }
+            self->total_published++;
+            ESP_LOGD(TAG, "Published: %s (0x%s)", self->entity_name_buf, self->erd_id_hex_buf);
+        }
+        if (self->total_published >= self->total_discovered) {
+            cleanup_fetch_resources(self);
+            self->state = ha_discovery_state_complete;
+            ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
+                self->total_published, self->total_filtered);
         }
         return;
     }
