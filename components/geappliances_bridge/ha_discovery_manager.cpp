@@ -329,10 +329,10 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
 
     /* Required fields */
     if (!json_get_str(line, "i", &val, &len)) return false;
-    char erd_id_hex[8];
-    if (len >= sizeof(erd_id_hex)) len = sizeof(erd_id_hex) - 1;
-    memcpy(erd_id_hex, val, len);
-    erd_id_hex[len] = '\0';
+    if (len >= sizeof(self->erd_id_hex_buf)) len = sizeof(self->erd_id_hex_buf) - 1;
+    memcpy(self->erd_id_hex_buf, val, len);
+    self->erd_id_hex_buf[len] = '\0';
+    const char* erd_id_hex = self->erd_id_hex_buf;
 
     if (!json_get_str(line, "n", &val, &len)) return false;
     json_unescape(val, len, self->entity_name_buf, sizeof(self->entity_name_buf));
@@ -691,7 +691,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
     }
     self->total_published++;
 
-    ESP_LOGD(TAG, "Published: %s", self->entity_name_buf);
+    ESP_LOGD(TAG, "Published: %s (0x%s)", self->entity_name_buf, self->erd_id_hex_buf);
 
     /* Give semaphore back so producer can build the next payload. */
     xSemaphoreGive(self->publish_sem);

@@ -134,6 +134,7 @@ typedef struct {
    * Templates are NOT stored here — they are embedded directly from the raw
    * JSONL line into the payload buffer with proper re-escaping. */
   char entity_name_buf[128];
+  char erd_id_hex_buf[8];
   char domain_buf[32];
   char field_id_buf[16];
   char paired_erd_buf[8];
