@@ -159,7 +159,7 @@ def generate_header(input_dir: Path) -> str:
         lines.append(f'static const ha_discovery_chunk_t ha_discovery_chunk_{cpp_name}[] = {{')
         for i, (offset, size) in enumerate(info['chunks']):
             comma = ',' if i + 1 < info['num_chunks'] else ''
-            lines.append(f'  {{{{ {offset}, {size} }}}}{comma}')
+            lines.append(f'  {{ {offset}, {size} }}{comma}')
         lines.append('};')
         lines.append('')
         
@@ -173,10 +173,10 @@ def generate_header(input_dir: Path) -> str:
     lines.append('/* Category table */')
     lines.append('static const ha_discovery_category_t ha_discovery_categories[] = {')
     for cpp_name, info in category_data.items():
-        lines.append(f'  {{{{ "{info["category"]}", ha_discovery_data_{cpp_name},')
+        lines.append(f'  {{ "{info["category"]}", ha_discovery_data_{cpp_name},')
         lines.append(f'     ha_discovery_chunk_{cpp_name},')
         lines.append(f'     {info["num_chunks"]},')
-        lines.append(f'     {info["max_decompressed"]} }}}},')
+        lines.append(f'     {info["max_decompressed"]} }},')
     lines.append('};')
     lines.append('')
     lines.append(f'static const uint16_t ha_discovery_category_count = {len(category_data)};')
