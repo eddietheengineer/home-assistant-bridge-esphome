@@ -691,6 +691,8 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
     }
     self->total_published++;
 
+    ESP_LOGD(TAG, "Published: %s", self->entity_name_buf);
+
     /* Give semaphore back so producer can build the next payload. */
     xSemaphoreGive(self->publish_sem);
 
