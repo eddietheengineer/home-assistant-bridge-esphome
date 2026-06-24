@@ -109,6 +109,10 @@ typedef struct {
   char unique_id_buf[128];
   /* Buffer for chunked decompression. Sized for the largest single JSONL
    * line (~14KB for range.jsonl select entities with many options). */
+  // tinfl_decompressor is an opaque type (miniz), stored as raw bytes.
+  // sizeof(tinfl_decompressor) ~3196; use 3200 for alignment.
+  static const uint16_t DECOMPRESSOR_BUF_SIZE = 3200;
+  uint8_t decompressor_buf[DECOMPRESSOR_BUF_SIZE];
   uint8_t decompress_buf[16384];
 #endif
 } ha_discovery_manager_t;

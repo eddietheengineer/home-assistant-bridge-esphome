@@ -114,21 +114,21 @@ static const size_t num_categories = ha_discovery_category_count;
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
-static int IRAM_ATTR chunk_decompress(const uint8_t* compressed, size_t compressed_len,
+static int IRAM_ATTR chunk_decompress(ha_discovery_manager_t* self, const uint8_t* compressed, size_t compressed_len,
                            uint8_t* output, size_t* output_len)
 {
 #ifdef USE_ESP_IDF_STUBS
     (void)compressed; (void)compressed_len; (void)output; (void)output_len;
     return -1;
 #else
-    tinfl_decompressor decomp;
-    tinfl_init(&decomp);
+    tinfl_decompressor* decomp = (tinfl_decompressor*)self->decompressor_buf;
+    tinfl_init(decomp);
 
     size_t src_size = compressed_len;
     size_t dst_size = *output_len;
 
     tinfl_status status = tinfl_decompress(
-        &decomp,
+        decomp,
         compressed, &src_size,
         output, output, &dst_size,
         TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
@@ -472,7 +472,7 @@ static void IRAM_ATTR process_chunk_streaming(ha_discovery_manager_t* self,
 {
     size_t dst_size = sizeof(self->decompress_buf);
 
-    if (chunk_decompress(compressed, compressed_len,
+    if (chunk_decompress(self, compressed, compressed_len,
                          self->decompress_buf, &dst_size) != 0) {
         return;
     }
@@ -497,6 +497,10 @@ static void IRAM_ATTR process_chunk_streaming(ha_discovery_manager_t* self,
         self->line_buf[line_len] = '\0';
 
         publish_entity(self, self->line_buf);
+
+        /* Feed the task watchdog — publish_entity() can block for
+         * seconds on the IDF MQTT mutex. */
+        esp_task_wdt_reset();
 
         p = line_end + 1;
     }
@@ -534,6 +538,10 @@ static void discovery_task(void* arg)
 
     for (size_t i = 0; i < num_categories; i++) {
         process_category_streaming(self, &ha_discovery_categories[i]);
+
+        /* Feed the task watchdog — MQTT publish below can block for
+         * seconds on the IDF MQTT mutex, starving the main loop WDT. */
+        esp_task_wdt_reset();
 
         /* Yield after each category so the main loop and other tasks
          * can run.  Prevents starving the ESPHome framework watchdog. */
