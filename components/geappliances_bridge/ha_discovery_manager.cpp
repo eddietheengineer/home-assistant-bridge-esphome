@@ -2,20 +2,17 @@
  * @file
  * @brief Home Assistant MQTT Discovery manager implementation.
  *
- * Streaming design: decompresses embedded JSONL entity definitions one chunk
- * at a time, publishes each entity's discovery payload to MQTT immediately,
- * then discards the chunk before moving to the next.  No large queue is
- * needed — peak memory is the decompress buffer plus pre-allocated buffers
- * in the struct.
+ * Producer-consumer design:
+ *   Producer (background task): decompresses embedded JSONL entity definitions,
+ *   builds discovery topic/payload pairs, and queues item indices via a FreeRTOS
+ *   queue.  Uses a pre-allocated item pool to avoid heap allocation.
  *
- * Single-task design: one background FreeRTOS task walks categories → chunks
- * → lines, publishing each entity inline.  It yields (vTaskDelay 0) after
- * every chunk so the main loop and other tasks are never starved.
+ *   Consumer (main loop run()): drains the queue at 50 ms intervals, publishes
+ *   each entity to MQTT, and feeds the WDT.
  */
 
 #include "ha_discovery_manager.h"
 #include "ha_discovery_data.h"
-#include "i_tiny_event.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -28,13 +25,8 @@
 #include "esp_attr.h"
 #include "esp_task_wdt.h"
 #include "esp_log.h"
-#ifdef USE_ESP_IDF_STUBS
-#include "esp-idf/zlib_stub.h"
-#else
-/* Use miniz for decompression on ESP-IDF (no zlib in ESP-IDF 5.x).
- * MINIZ_NO_ARCHIVE_APIS: we only need inflate.
- * MINIZ_NO_ZLIB_COMPATIBLE_NAMES: avoid conflicts if zlib is present.
- * MINIZ_NO_STDIO: no file I/O needed. */
+#include "esp_heap_caps.h"
+#ifndef USE_ESP_IDF_STUBS
 #define MINIZ_NO_ARCHIVE_APIS
 #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
 #define MINIZ_NO_STDIO
@@ -48,6 +40,10 @@ static const char* const TAG = "ha_discovery_manager";
 /* Zero-allocation JSON parser helpers                                */
 /* ------------------------------------------------------------------ */
 
+/* Extract a JSON string value for the given key.
+ * Returns a pointer to the first character of the value (after opening quote)
+ * and sets *out_len to the length (not including closing quote).
+ * Returns NULL if key not found or value is not a string. */
 static const char* json_get_str(const char* json, const char* key,
                                  const char** out_value, size_t* out_len)
 {
@@ -55,13 +51,9 @@ static const char* json_get_str(const char* json, const char* key,
     const char* p = json;
 
     while ((p = strstr(p, "\"")) != NULL) {
-        if (strncmp(p, "\"", 1) == 0 &&
-            strncmp(p + 1, key, key_len) == 0 &&
-            p[key_len + 1] == '\"') {
+        if (strncmp(p + 1, key, key_len) == 0 && p[key_len + 1] == '\"') {
             p = p + key_len + 3;
-
             while (*p == ' ' || *p == '\t') p++;
-
             if (*p == '"') {
                 *out_value = p + 1;
                 const char* end = p + 1;
@@ -99,36 +91,152 @@ static const char* json_get_str(const char* json, const char* key,
         }
         p++;
     }
-
     return NULL;
 }
 
+/* Unescape a JSON string value into out (max out_size bytes including null). */
+static void json_unescape(const char* src, size_t src_len, char* out, int out_size)
+{
+    int i = 0;
+    const char* p = src;
+    const char* end = src + src_len;
+    while (p < end && i < out_size - 1) {
+        if (*p == '\\' && p + 1 < end) {
+            p++;
+            switch (*p) {
+                case '"':  out[i++] = '"'; break;
+                case '\\': out[i++] = '\\'; break;
+                case '/':  out[i++] = '/'; break;
+                case 'n':  out[i++] = '\n'; break;
+                case 'r':  out[i++] = '\r'; break;
+                case 't':  out[i++] = '\t'; break;
+                case 'u':  /* skip \uXXXX */ p += 4; break;
+                default:   out[i++] = *p; break;
+            }
+        } else {
+            out[i++] = *p;
+        }
+        p++;
+    }
+    out[i] = '\0';
+}
+
 /* ------------------------------------------------------------------ */
-/* Embedded category data declarations                                  */
+/* ERD cache lookup (binary search on sorted array)                    */
 /* ------------------------------------------------------------------ */
 
-static const size_t num_categories = ha_discovery_category_count;
+static bool erd_is_registered_sorted(const ha_discovery_manager_t* self, uint16_t erd_id)
+{
+    uint16_t lo = 0, hi = self->sorted_erds_count;
+    while (lo < hi) {
+        uint16_t mid = lo + (hi - lo) / 2;
+        if (self->sorted_erds[mid] < erd_id) lo = mid + 1;
+        else if (self->sorted_erds[mid] > erd_id) hi = mid;
+        else return true;
+    }
+    return false;
+}
+
+/* Build sorted ERD array from cache for binary search. */
+static void build_sorted_erd_list(ha_discovery_manager_t* self)
+{
+    self->sorted_erds_count = 0;
+    uint16_t iterator = 0;
+    while (true) {
+        erd_cache_entry_t* entry = erd_cache_get_next_entry(self->cache, &iterator);
+        if (!entry) break;
+        if (self->sorted_erds_count >= HA_DISCOVERY_MAX_ERDS) break;
+        /* Dedup */
+        bool already = false;
+        for (uint16_t k = 0; k < self->sorted_erds_count; k++) {
+            if (self->sorted_erds[k] == entry->erd) { already = true; break; }
+        }
+        if (!already) {
+            self->sorted_erds[self->sorted_erds_count++] = entry->erd;
+        }
+    }
+    /* Insertion sort (small N). */
+    for (uint16_t i = 1; i < self->sorted_erds_count; i++) {
+        uint16_t key = self->sorted_erds[i];
+        uint16_t j = i;
+        while (j > 0 && self->sorted_erds[j - 1] > key) {
+            self->sorted_erds[j] = self->sorted_erds[j - 1];
+            j--;
+        }
+        self->sorted_erds[j] = key;
+    }
+}
 
 /* ------------------------------------------------------------------ */
-/* Decompression helpers                                                */
+/* Device JSON builder                                                */
+/* ------------------------------------------------------------------ */
+
+static void build_device_json(ha_discovery_manager_t* self)
+{
+    int pos = snprintf(self->device_json_buf, sizeof(self->device_json_buf),
+        "{\"identifiers\":[\"%s\"],\"name\":\"", self->device_id);
+
+    /* Escape device_id */
+    for (const char* p = self->device_id; *p && pos < (int)sizeof(self->device_json_buf) - 8; p++) {
+        unsigned char c = (unsigned char)*p;
+        if (c == '"') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\"");
+        else if (c == '\\') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\\");
+        else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F)) pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\u%04x", c);
+        else { self->device_json_buf[pos++] = (char)c; }
+    }
+
+    if (pos < (int)sizeof(self->device_json_buf) - 64) {
+        pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+            "\",\"manufacturer\":\"GE Appliances\"");
+    }
+
+    if (self->model_number && self->model_number[0] && pos < (int)sizeof(self->device_json_buf) - 128) {
+        pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, ",\"model\":\"");
+        for (const char* p = self->model_number; *p && pos < (int)sizeof(self->device_json_buf) - 8; p++) {
+            unsigned char c = (unsigned char)*p;
+            if (c == '"') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\"");
+            else if (c == '\\') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\\");
+            else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F)) pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\u%04x", c);
+            else { self->device_json_buf[pos++] = (char)c; }
+        }
+        if (pos < (int)sizeof(self->device_json_buf) - 2) self->device_json_buf[pos++] = '"';
+    }
+
+    if (self->serial_number && self->serial_number[0] && pos < (int)sizeof(self->device_json_buf) - 128) {
+        pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, ",\"serial_number\":\"");
+        for (const char* p = self->serial_number; *p && pos < (int)sizeof(self->device_json_buf) - 8; p++) {
+            unsigned char c = (unsigned char)*p;
+            if (c == '"') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\"");
+            else if (c == '\\') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\\");
+            else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F)) pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\u%04x", c);
+            else { self->device_json_buf[pos++] = (char)c; }
+        }
+        if (pos < (int)sizeof(self->device_json_buf) - 2) self->device_json_buf[pos++] = '"';
+    }
+
+    if (pos < (int)sizeof(self->device_json_buf) - 2) self->device_json_buf[pos++] = '}';
+    self->device_json_buf[pos] = '\0';
+}
+
+/* ------------------------------------------------------------------ */
+/* Decompression helper                                               */
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
-static int IRAM_ATTR chunk_decompress(ha_discovery_manager_t* self, const uint8_t* compressed, size_t compressed_len,
+static int chunk_decompress(ha_discovery_manager_t* self, const uint8_t* compressed, size_t compressed_len,
                            uint8_t* output, size_t* output_len)
 {
 #ifdef USE_ESP_IDF_STUBS
     (void)compressed; (void)compressed_len; (void)output; (void)output_len;
     return -1;
 #else
-    tinfl_decompressor* decomp = (tinfl_decompressor*)self->decompressor_buf;
-    tinfl_init(decomp);
+    tinfl_init(&self->decomp_state);
 
     size_t src_size = compressed_len;
     size_t dst_size = *output_len;
 
     tinfl_status status = tinfl_decompress(
-        decomp,
+        &self->decomp_state,
         compressed, &src_size,
         output, output, &dst_size,
         TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
@@ -144,224 +252,29 @@ static int IRAM_ATTR chunk_decompress(ha_discovery_manager_t* self, const uint8_
 #endif
 
 /* ------------------------------------------------------------------ */
-/* ERD cache lookup                                                     */
+/* Process a single JSONL line: build topic/payload, queue index      */
 /* ------------------------------------------------------------------ */
 
-static bool erd_is_registered(const ha_discovery_manager_t* self, uint16_t erd_id)
-{
-    if (!self->cache) return false;
-
-    for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
-        erd_cache_entry_t* e = &self->cache->entries[i];
-        if (e->valid && e->erd == erd_id) {
-            return true;
-        }
-    }
-    return false;
-}
-
-/* ------------------------------------------------------------------ */
-/* Discovery topic builder                                              */
-/* ------------------------------------------------------------------ */
-
-static int build_discovery_topic(char* buf, size_t buf_size,
-                                  const char* domain,
-                                  const char* device_id,
-                                  const char* erd_id_hex,
-                                  const char* field_suffix)
-{
-    if (field_suffix && field_suffix[0]) {
-        return snprintf(buf, buf_size,
-            "homeassistant/%s/%s/%s_%s/config",
-            domain, device_id, erd_id_hex, field_suffix);
-    } else {
-        return snprintf(buf, buf_size,
-            "homeassistant/%s/%s/%s/config",
-            domain, device_id, erd_id_hex);
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/* Discovery payload builder                                            */
-/* ------------------------------------------------------------------ */
-/*
- * All intermediate buffers are pre-allocated in the struct to avoid
- * stack overflow in the discovery task.  The caller passes pointers
- * to these buffers via the self->* fields.
- */
-static int build_discovery_payload(ha_discovery_manager_t* self,
-                                    char* buf, size_t buf_size,
-                                    const char* erd_id_hex,
-                                    const char* entity_name,
-                                    const char* field_id,
-                                    const char* paired_erd,
-                                    const char* role,
-                                    const char* value_template,
-                                    const char* command_template,
-                                    const char* unit,
-                                    const char* device_class,
-                                    const char* state_class,
-                                    const char* options,
-                                    const char* data_type,
-                                    const char* scale_factor)
-{
-    /* Build unique_id in pre-allocated buffer */
-    if (field_id && field_id[0]) {
-        snprintf(self->unique_id_buf, sizeof(self->unique_id_buf),
-            "%s_erd_%s_%s", self->device_id, erd_id_hex, field_id);
-    } else {
-        snprintf(self->unique_id_buf, sizeof(self->unique_id_buf),
-            "%s_erd_%s", self->device_id, erd_id_hex);
-    }
-
-    /* Build state_topic and command_topic in pre-allocated buffers */
-    snprintf(self->state_topic_buf, sizeof(self->state_topic_buf),
-        "geappliances/%s/erd/0x%s/value", self->device_id, erd_id_hex);
-
-    snprintf(self->command_topic_buf, sizeof(self->command_topic_buf),
-        "geappliances/%s/erd/0x%s/write", self->device_id, erd_id_hex);
-
-    /* For paired entities, swap state/command topics */
-    if (paired_erd && paired_erd[0]) {
-        if (role && strcmp(role, "request") == 0) {
-            snprintf(self->actual_command_topic_buf, sizeof(self->actual_command_topic_buf),
-                "geappliances/%s/erd/0x%s/write", self->device_id, erd_id_hex);
-            snprintf(self->actual_state_topic_buf, sizeof(self->actual_state_topic_buf),
-                "geappliances/%s/erd/0x%s/value", self->device_id, paired_erd);
-        } else {
-            snprintf(self->actual_state_topic_buf, sizeof(self->actual_state_topic_buf),
-                "geappliances/%s/erd/0x%s/value", self->device_id, erd_id_hex);
-            snprintf(self->actual_command_topic_buf, sizeof(self->actual_command_topic_buf),
-                "geappliances/%s/erd/0x%s/write", self->device_id, paired_erd);
-        }
-    } else {
-        strncpy(self->actual_state_topic_buf, self->state_topic_buf, sizeof(self->actual_state_topic_buf));
-        strncpy(self->actual_command_topic_buf, self->command_topic_buf, sizeof(self->actual_command_topic_buf));
-    }
-
-    /* Build the JSON payload */
-    int offset = 0;
-    offset += snprintf(buf + offset, buf_size - (size_t)offset,
-        "{\"name\":\"%s\",\"unique_id\":\"%s\",\"device\":{\"identifiers\":[\"%s\"],",
-        entity_name, self->unique_id_buf, self->device_id);
-
-    if (self->model_number && self->model_number[0]) {
-        offset += snprintf(buf + offset, buf_size - (size_t)offset,
-            "\"model\":\"%s\",", self->model_number);
-    }
-
-    if (self->serial_number && self->serial_number[0]) {
-        offset += snprintf(buf + offset, buf_size - (size_t)offset,
-            "\"serial_number\":\"%s\",", self->serial_number);
-    }
-
-    offset += snprintf(buf + offset, buf_size - (size_t)offset,
-        "\"manufacturer\":\"GE Appliances\"},");
-
-    offset += snprintf(buf + offset, buf_size - (size_t)offset,
-        "\"state_topic\":\"%s\",", self->actual_state_topic_buf);
-
-    if (command_template && command_template[0]) {
-        offset += snprintf(buf + offset, buf_size - (size_t)offset,
-            "\"command_topic\":\"%s\",", self->actual_command_topic_buf);
-    }
-
-    if (value_template && value_template[0]) {
-        offset += snprintf(buf + offset, buf_size - (size_t)offset,
-            "\"value_template\":\"%s\",", value_template);
-    }
-
-    if (command_template && command_template[0]) {
-        offset += snprintf(buf + offset, buf_size - (size_t)offset,
-            "\"command_template\":\"%s\",", command_template);
-    }
-
-    if (unit && unit[0]) {
-        offset += snprintf(buf + offset, buf_size - (size_t)offset,
-            "\"unit_of_measurement\":\"%s\",", unit);
-    }
-
-    if (device_class && device_class[0]) {
-        offset += snprintf(buf + offset, buf_size - (size_t)offset,
-            "\"device_class\":\"%s\",", device_class);
-    }
-
-    if (state_class && state_class[0]) {
-        offset += snprintf(buf + offset, buf_size - (size_t)offset,
-            "\"state_class\":\"%s\",", state_class);
-    }
-
-    if (options && options[0]) {
-        offset += snprintf(buf + offset, buf_size - (size_t)offset,
-            "\"options\":%s,", options);
-    }
-
-    if (data_type && data_type[0]) {
-        if (strcmp(data_type, "u8") == 0) {
-            offset += snprintf(buf + offset, buf_size - (size_t)offset,
-                "\"min\":0,\"max\":255,");
-        } else if (strcmp(data_type, "i8") == 0) {
-            offset += snprintf(buf + offset, buf_size - (size_t)offset,
-                "\"min\":-128,\"max\":127,");
-        } else if (strcmp(data_type, "u16") == 0) {
-            offset += snprintf(buf + offset, buf_size - (size_t)offset,
-                "\"min\":0,\"max\":65535,");
-        } else if (strcmp(data_type, "i16") == 0) {
-            offset += snprintf(buf + offset, buf_size - (size_t)offset,
-                "\"min\":-32768,\"max\":32767,");
-        } else if (strcmp(data_type, "u32") == 0) {
-            offset += snprintf(buf + offset, buf_size - (size_t)offset,
-                "\"min\":0,\"max\":4294967295,");
-        } else if (strcmp(data_type, "i32") == 0) {
-            offset += snprintf(buf + offset, buf_size - (size_t)offset,
-                "\"min\":-2147483648,\"max\":2147483647,");
-        }
-    }
-
-    if (scale_factor && scale_factor[0]) {
-        offset += snprintf(buf + offset, buf_size - (size_t)offset,
-            "\"step\":%s,", scale_factor);
-    }
-
-    /* Remove trailing comma and close */
-    if (offset > 0 && buf[offset - 1] == ',') {
-        buf[offset - 1] = '\0';
-        offset--;
-    }
-
-    offset += snprintf(buf + offset, buf_size - (size_t)offset, "}");
-
-    return offset;
-}
-
-/* ------------------------------------------------------------------ */
-/* Direct publish helper: parse entity line and publish immediately     */
-/* ------------------------------------------------------------------ */
-/*
- * All large buffers are pre-allocated in the struct to avoid stack
- * overflow in the discovery task (4 KB task stack).
- */
-static void publish_entity(ha_discovery_manager_t* self, const char* line)
+#ifdef USE_ESP_IDF
+static void process_jsonl_line(ha_discovery_manager_t* self, const char* line)
 {
     const char* val = NULL;
     size_t len = 0;
 
+    /* Required fields */
     if (!json_get_str(line, "i", &val, &len)) return;
     char erd_id_hex[8];
+    if (len >= sizeof(erd_id_hex)) len = sizeof(erd_id_hex) - 1;
     memcpy(erd_id_hex, val, len);
     erd_id_hex[len] = '\0';
 
     if (!json_get_str(line, "n", &val, &len)) return;
-    if (len >= sizeof(self->entity_name_buf)) len = sizeof(self->entity_name_buf) - 1;
-    memcpy(self->entity_name_buf, val, len);
-    self->entity_name_buf[len] = '\0';
+    json_unescape(val, len, self->entity_name_buf, sizeof(self->entity_name_buf));
 
     if (!json_get_str(line, "d", &val, &len)) return;
-    if (len >= sizeof(self->domain_buf)) len = sizeof(self->domain_buf) - 1;
-    memcpy(self->domain_buf, val, len);
-    self->domain_buf[len] = '\0';
+    json_unescape(val, len, self->domain_buf, sizeof(self->domain_buf));
 
-    /* Optional fields — use struct buffers */
+    /* Optional fields — use struct buffers to avoid stack overflow. */
     self->field_id_buf[0] = '\0';
     self->paired_erd_buf[0] = '\0';
     self->role_buf[0] = '\0';
@@ -374,139 +287,165 @@ static void publish_entity(ha_discovery_manager_t* self, const char* line)
     self->data_type_buf[0] = '\0';
     self->scale_factor_buf[0] = '\0';
 
-    if (json_get_str(line, "fi", &val, &len)) {
-        if (len >= sizeof(self->field_id_buf)) len = sizeof(self->field_id_buf) - 1;
-        memcpy(self->field_id_buf, val, len);
-        self->field_id_buf[len] = '\0';
-    }
-    if (json_get_str(line, "p", &val, &len)) {
-        if (len >= sizeof(self->paired_erd_buf)) len = sizeof(self->paired_erd_buf) - 1;
-        memcpy(self->paired_erd_buf, val, len);
-        self->paired_erd_buf[len] = '\0';
-    }
-    if (json_get_str(line, "r", &val, &len)) {
-        if (len >= sizeof(self->role_buf)) len = sizeof(self->role_buf) - 1;
-        memcpy(self->role_buf, val, len);
-        self->role_buf[len] = '\0';
-    }
-    if (json_get_str(line, "vt", &val, &len)) {
-        if (len >= sizeof(self->value_template_buf)) len = sizeof(self->value_template_buf) - 1;
-        memcpy(self->value_template_buf, val, len);
-        self->value_template_buf[len] = '\0';
-    }
-    if (json_get_str(line, "ct", &val, &len)) {
-        if (len >= sizeof(self->command_template_buf)) len = sizeof(self->command_template_buf) - 1;
-        memcpy(self->command_template_buf, val, len);
-        self->command_template_buf[len] = '\0';
-    }
-    if (json_get_str(line, "u", &val, &len)) {
-        if (len >= sizeof(self->unit_buf)) len = sizeof(self->unit_buf) - 1;
-        memcpy(self->unit_buf, val, len);
-        self->unit_buf[len] = '\0';
-    }
-    if (json_get_str(line, "dc", &val, &len)) {
-        if (len >= sizeof(self->device_class_buf)) len = sizeof(self->device_class_buf) - 1;
-        memcpy(self->device_class_buf, val, len);
-        self->device_class_buf[len] = '\0';
-    }
-    if (json_get_str(line, "sc", &val, &len)) {
-        if (len >= sizeof(self->state_class_buf)) len = sizeof(self->state_class_buf) - 1;
-        memcpy(self->state_class_buf, val, len);
-        self->state_class_buf[len] = '\0';
-    }
-    if (json_get_str(line, "o", &val, &len)) {
-        if (len >= sizeof(self->options_buf)) len = sizeof(self->options_buf) - 1;
-        memcpy(self->options_buf, val, len);
-        self->options_buf[len] = '\0';
-    }
-    if (json_get_str(line, "dt", &val, &len)) {
-        if (len >= sizeof(self->data_type_buf)) len = sizeof(self->data_type_buf) - 1;
-        memcpy(self->data_type_buf, val, len);
-        self->data_type_buf[len] = '\0';
-    }
-    if (json_get_str(line, "sf", &val, &len)) {
-        if (len >= sizeof(self->scale_factor_buf)) len = sizeof(self->scale_factor_buf) - 1;
-        memcpy(self->scale_factor_buf, val, len);
-        self->scale_factor_buf[len] = '\0';
-    }
+    if (json_get_str(line, "fi", &val, &len)) json_unescape(val, len, self->field_id_buf, sizeof(self->field_id_buf));
+    if (json_get_str(line, "p", &val, &len)) json_unescape(val, len, self->paired_erd_buf, sizeof(self->paired_erd_buf));
+    if (json_get_str(line, "r", &val, &len)) json_unescape(val, len, self->role_buf, sizeof(self->role_buf));
+    if (json_get_str(line, "vt", &val, &len)) json_unescape(val, len, self->value_template_buf, sizeof(self->value_template_buf));
+    if (json_get_str(line, "ct", &val, &len)) json_unescape(val, len, self->command_template_buf, sizeof(self->command_template_buf));
+    if (json_get_str(line, "u", &val, &len)) json_unescape(val, len, self->unit_buf, sizeof(self->unit_buf));
+    if (json_get_str(line, "dc", &val, &len)) json_unescape(val, len, self->device_class_buf, sizeof(self->device_class_buf));
+    if (json_get_str(line, "sc", &val, &len)) json_unescape(val, len, self->state_class_buf, sizeof(self->state_class_buf));
+    if (json_get_str(line, "o", &val, &len)) json_unescape(val, len, self->options_buf, sizeof(self->options_buf));
+    if (json_get_str(line, "dt", &val, &len)) json_unescape(val, len, self->data_type_buf, sizeof(self->data_type_buf));
+    if (json_get_str(line, "sf", &val, &len)) json_unescape(val, len, self->scale_factor_buf, sizeof(self->scale_factor_buf));
 
     uint16_t erd_id = (uint16_t)strtoul(erd_id_hex, NULL, 16);
 
-    if (!erd_is_registered(self, erd_id)) {
+    /* Check if ERD is registered (binary search). */
+    if (!erd_is_registered_sorted(self, erd_id)) {
         self->total_filtered++;
         return;
     }
 
+    /* Check paired ERD if present. */
     if (self->paired_erd_buf[0]) {
         uint16_t paired_id = (uint16_t)strtoul(self->paired_erd_buf, NULL, 16);
-        if (!erd_is_registered(self, paired_id)) {
+        if (!erd_is_registered_sorted(self, paired_id)) {
             self->total_filtered++;
             return;
         }
     }
 
-    build_discovery_topic(self->topic_buf, sizeof(self->topic_buf),
-        self->domain_buf, self->device_id, erd_id_hex, self->field_id_buf);
+    /* Build unique_id */
+    if (self->field_id_buf[0]) {
+        snprintf(self->unique_id_buf, sizeof(self->unique_id_buf), "%s_erd_%s_%s", self->device_id, erd_id_hex, self->field_id_buf);
+    } else {
+        snprintf(self->unique_id_buf, sizeof(self->unique_id_buf), "%s_erd_%s", self->device_id, erd_id_hex);
+    }
 
-    build_discovery_payload(self, self->payload_buf, sizeof(self->payload_buf),
-        erd_id_hex, self->entity_name_buf,
-        self->field_id_buf, self->paired_erd_buf, self->role_buf,
-        self->value_template_buf, self->command_template_buf,
-        self->unit_buf, self->device_class_buf, self->state_class_buf,
-        self->options_buf, self->data_type_buf, self->scale_factor_buf);
+    /* Build state_topic and command_topic */
+    snprintf(self->state_topic_buf, sizeof(self->state_topic_buf), "geappliances/%s/erd/0x%s/value", self->device_id, erd_id_hex);
+    snprintf(self->command_topic_buf, sizeof(self->command_topic_buf), "geappliances/%s/erd/0x%s/write", self->device_id, erd_id_hex);
 
-    mqtt_client_publish_raw(self->mqtt_client,
-        self->topic_buf, self->payload_buf, strlen(self->payload_buf), true);
+    /* For paired entities, swap state/command topics */
+    if (self->paired_erd_buf[0]) {
+        if (self->role_buf[0] && strcmp(self->role_buf, "request") == 0) {
+            snprintf(self->actual_command_topic_buf, sizeof(self->actual_command_topic_buf), "geappliances/%s/erd/0x%s/write", self->device_id, erd_id_hex);
+            snprintf(self->actual_state_topic_buf, sizeof(self->actual_state_topic_buf), "geappliances/%s/erd/0x%s/value", self->device_id, self->paired_erd_buf);
+        } else {
+            snprintf(self->actual_state_topic_buf, sizeof(self->actual_state_topic_buf), "geappliances/%s/erd/0x%s/value", self->device_id, erd_id_hex);
+            snprintf(self->actual_command_topic_buf, sizeof(self->actual_command_topic_buf), "geappliances/%s/erd/0x%s/write", self->device_id, self->paired_erd_buf);
+        }
+    } else {
+        strncpy(self->actual_state_topic_buf, self->state_topic_buf, sizeof(self->actual_state_topic_buf));
+        strncpy(self->actual_command_topic_buf, self->command_topic_buf, sizeof(self->actual_command_topic_buf));
+    }
+
+    /* Build topic */
+    if (self->field_id_buf[0]) {
+        snprintf(self->topic_buf, sizeof(self->topic_buf), "homeassistant/%s/%s/%s_%s/config", self->domain_buf, self->device_id, erd_id_hex, self->field_id_buf);
+    } else {
+        snprintf(self->topic_buf, sizeof(self->topic_buf), "homeassistant/%s/%s/%s/config", self->domain_buf, self->device_id, erd_id_hex);
+    }
+
+    /* Build payload */
+    char* payload = self->payload_buf;
+    int offset = 0;
+    offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+        "{\"name\":\"%s\",\"unique_id\":\"%s\",\"device\":%s,",
+        self->entity_name_buf, self->unique_id_buf, self->device_json_buf);
+
+    offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+        "\"state_topic\":\"%s\",", self->actual_state_topic_buf);
+
+    if (self->command_template_buf[0]) {
+        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+            "\"command_topic\":\"%s\",", self->actual_command_topic_buf);
+    }
+
+    if (self->value_template_buf[0]) {
+        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+            "\"value_template\":\"%s\",", self->value_template_buf);
+    }
+    if (self->command_template_buf[0]) {
+        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+            "\"command_template\":\"%s\",", self->command_template_buf);
+    }
+    if (self->unit_buf[0]) {
+        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+            "\"unit_of_measurement\":\"%s\",", self->unit_buf);
+    }
+    if (self->device_class_buf[0]) {
+        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+            "\"device_class\":\"%s\",", self->device_class_buf);
+    }
+    if (self->state_class_buf[0]) {
+        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+            "\"state_class\":\"%s\",", self->state_class_buf);
+    }
+    if (self->options_buf[0]) {
+        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+            "\"options\":%s,", self->options_buf);
+    }
+    if (self->data_type_buf[0]) {
+        if (strcmp(self->data_type_buf, "u8") == 0) {
+            offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+                "\"min\":0,\"max\":255,");
+        } else if (strcmp(self->data_type_buf, "i8") == 0) {
+            offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+                "\"min\":-128,\"max\":127,");
+        } else if (strcmp(self->data_type_buf, "u16") == 0) {
+            offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+                "\"min\":0,\"max\":65535,");
+        } else if (strcmp(self->data_type_buf, "i16") == 0) {
+            offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+                "\"min\":-32768,\"max\":32767,");
+        } else if (strcmp(self->data_type_buf, "u32") == 0) {
+            offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+                "\"min\":0,\"max\":4294967295,");
+        } else if (strcmp(self->data_type_buf, "i32") == 0) {
+            offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+                "\"min\":-2147483648,\"max\":2147483647,");
+        }
+    }
+    if (self->scale_factor_buf[0]) {
+        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+            "\"step\":%s,", self->scale_factor_buf);
+    }
+
+    /* Remove trailing comma and close */
+    if (offset > 0 && payload[offset - 1] == ',') {
+        payload[offset - 1] = '\0';
+        offset--;
+    }
+    offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset, "}");
+
+    /* Store in item pool and queue index */
+    uint16_t idx = self->item_pool_next;
+    self->item_pool_next = (self->item_pool_next + 1) % HA_DISCOVERY_ITEM_POOL_SIZE;
+
+    ha_discovery_item_t* item = &self->item_pool[idx];
+    strncpy(item->topic, self->topic_buf, sizeof(item->topic) - 1);
+    item->topic[sizeof(item->topic) - 1] = '\0';
+    strncpy(item->payload, payload, sizeof(item->payload) - 1);
+    item->payload[sizeof(item->payload) - 1] = '\0';
 
     self->total_discovered++;
-    self->total_published++;
+
+    /* Queue the index — spin-yield if full until main loop drains. */
+    while (xQueueSend(self->item_queue, &idx, 0) != pdTRUE) {
+        vTaskDelay(1);
+        esp_task_wdt_reset();
+    }
 }
+#endif
 
 /* ------------------------------------------------------------------ */
-/* Streaming chunk processing: decompress → publish → discard          */
+/* Process a category: decompress chunks, parse lines, queue items    */
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
-static void IRAM_ATTR process_chunk_streaming(ha_discovery_manager_t* self,
-    const uint8_t* compressed, size_t compressed_len)
-{
-    size_t dst_size = sizeof(self->decompress_buf);
-
-    if (chunk_decompress(self, compressed, compressed_len,
-                         self->decompress_buf, &dst_size) != 0) {
-        return;
-    }
-
-    const char* p = (const char*)self->decompress_buf;
-    const char* end = p + dst_size;
-
-    while (p < end) {
-        const char* line_end = p;
-        while (line_end < end && *line_end != '\n' && *line_end != '\r') line_end++;
-
-        size_t line_len = (size_t)(line_end - p);
-        if (line_len == 0) {
-            p = line_end + 1;
-            continue;
-        }
-
-        if (line_len >= sizeof(self->line_buf) - 1) {
-            line_len = sizeof(self->line_buf) - 1;
-        }
-        memcpy(self->line_buf, p, line_len);
-        self->line_buf[line_len] = '\0';
-
-        publish_entity(self, self->line_buf);
-
-        /* Feed the task watchdog — publish_entity() can block for
-         * seconds on the IDF MQTT mutex. */
-        esp_task_wdt_reset();
-
-        p = line_end + 1;
-    }
-}
-
-static void IRAM_ATTR process_category_streaming(ha_discovery_manager_t* self,
+static void process_category(ha_discovery_manager_t* self,
     const ha_discovery_category_t* cat)
 {
     uint32_t before = self->total_published;
@@ -515,50 +454,175 @@ static void IRAM_ATTR process_category_streaming(ha_discovery_manager_t* self,
         const ha_discovery_chunk_t* chunk = &cat->chunks[ci];
         const uint8_t* src = cat->data + chunk->offset;
 
-        process_chunk_streaming(self, src, chunk->size);
+        size_t dst_size = sizeof(self->decomp_buf);
+        if (chunk_decompress(self, src, chunk->size, self->decomp_buf, &dst_size) != 0) {
+            continue;
+        }
+
+        const char* p = (const char*)self->decomp_buf;
+        const char* end = p + dst_size;
+
+        while (p < end) {
+            const char* line_end = p;
+            while (line_end < end && *line_end != '\n' && *line_end != '\r') line_end++;
+
+            size_t line_len = (size_t)(line_end - p);
+            if (line_len == 0) {
+                p = line_end + 1;
+                continue;
+            }
+            if (line_len >= sizeof(self->line_buf) - 1) {
+                line_len = sizeof(self->line_buf) - 1;
+            }
+            memcpy(self->line_buf, p, line_len);
+            self->line_buf[line_len] = '\0';
+
+            process_jsonl_line(self, self->line_buf);
+
+            p = line_end + 1;
+        }
     }
 
-    ESP_LOGI(TAG, "Category %s: %u published",
-        cat->name, self->total_published - before);
+    ESP_LOGI(TAG, "Category %s: %u discovered",
+        cat->name, self->total_discovered - before);
 }
 #endif
 
 /* ------------------------------------------------------------------ */
-/* Single streaming task (ESP-IDF)                                     */
+/* Fetch task (producer)                                              */
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
-static void discovery_task(void* arg)
+static void fetch_task(void* arg)
 {
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
 
-    self->state = ha_discovery_state_processing;
+    self->state = ha_discovery_state_fetching;
 
-    ESP_LOGI(TAG, "Starting HA discovery streaming...");
+    ESP_LOGI(TAG, "Starting HA discovery fetch...");
 
-    for (size_t i = 0; i < num_categories; i++) {
-        process_category_streaming(self, &ha_discovery_categories[i]);
+    /* Build sorted ERD list and device JSON. */
+    build_sorted_erd_list(self);
+    build_device_json(self);
 
-        /* Feed the task watchdog — MQTT publish below can block for
-         * seconds on the IDF MQTT mutex, starving the main loop WDT. */
+    /* Process each category. */
+    for (size_t i = 0; i < ha_discovery_category_count; i++) {
+        process_category(self, &ha_discovery_categories[i]);
+
+        /* Yield and feed WDT after each category. */
+        vTaskDelay(pdMS_TO_TICKS(50));
         esp_task_wdt_reset();
-
-        /* Yield after each category so the main loop and other tasks
-         * can run.  Prevents starving the ESPHome framework watchdog. */
-        vTaskDelay(pdMS_TO_TICKS(1));
     }
 
-    self->state = ha_discovery_state_complete;
-    ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
-        self->total_published, self->total_filtered);
+    /* Send sentinel to signal completion. */
+    uint16_t sentinel = HA_DISCOVERY_QUEUE_SENTINEL;
+    while (xQueueSend(self->item_queue, &sentinel, 0) != pdTRUE) {
+        vTaskDelay(1);
+        esp_task_wdt_reset();
+    }
 
+    /* Signal done via semaphore before deleting the task. */
     if (self->done_semaphore) {
         xSemaphoreGive(self->done_semaphore);
     }
 
+    ESP_LOGI(TAG, "HA discovery fetch complete: %u discovered, %u filtered",
+        self->total_discovered, self->total_filtered);
+
     vTaskDelete(NULL);
 }
 #endif
+
+/* ------------------------------------------------------------------ */
+/* Consumer: run() called from main loop                              */
+/* ------------------------------------------------------------------ */
+
+#ifdef USE_ESP_IDF
+static void cleanup_fetch_resources(ha_discovery_manager_t* self)
+{
+    if (self->item_queue) {
+        vQueueDelete(self->item_queue);
+        self->item_queue = NULL;
+    }
+    if (self->task_stack) {
+        free(self->task_stack);
+        self->task_stack = NULL;
+    }
+    if (self->task_tcb) {
+        free(self->task_tcb);
+        self->task_tcb = NULL;
+    }
+    self->task_handle = NULL;
+}
+#endif
+
+void ha_discovery_manager_run(ha_discovery_manager_t* self)
+{
+#ifdef USE_ESP_IDF
+    if (self->state != ha_discovery_state_fetching && self->state != ha_discovery_state_publishing) {
+        return;
+    }
+
+    if (self->state == ha_discovery_state_fetching) {
+        self->state = ha_discovery_state_publishing;
+        self->last_publish_ms = self->get_time_ms();
+    }
+
+    /* Check if fetch task has finished (non-blocking semaphore check). */
+    if (self->fetch_done) {
+        /* Fetch is done — just drain remaining items. */
+    } else {
+        /* Try to see if the task has signaled done via semaphore. */
+        if (self->done_semaphore &&
+            xSemaphoreTake(self->done_semaphore, 0) == pdTRUE) {
+            self->fetch_done = true;
+            /* Task will delete itself shortly; clear handle after a delay. */
+            self->task_handle = NULL;
+        }
+    }
+
+    /* Try to drain an item from the queue (non-blocking). */
+    uint16_t idx = 0;
+    if (xQueueReceive(self->item_queue, &idx, 0) == pdTRUE) {
+        /* Check for sentinel. */
+        if (idx == HA_DISCOVERY_QUEUE_SENTINEL) {
+            self->fetch_done = true;
+            /* Continue draining remaining items on next call. */
+            return;
+        }
+
+        /* Rate-limit publishing. */
+        uint32_t now = self->get_time_ms();
+        if (now - self->last_publish_ms < HA_DISCOVERY_PUBLISH_INTERVAL_MS) {
+            /* Put item back at tail and wait for next tick. */
+            xQueueSend(self->item_queue, &idx, pdMS_TO_TICKS(100));
+            return;
+        }
+        self->last_publish_ms = now;
+
+        /* Publish. */
+        ha_discovery_item_t* item = &self->item_pool[idx];
+        if (self->mqtt_client) {
+            mqtt_client_publish_raw(self->mqtt_client, item->topic, item->payload, strlen(item->payload), true);
+        }
+        self->total_published++;
+
+        esp_task_wdt_reset();
+        return;
+    }
+
+    /* Queue is empty. If fetch is done, clean up and complete. */
+    if (self->fetch_done) {
+        cleanup_fetch_resources(self);
+        self->state = ha_discovery_state_complete;
+        ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
+            self->total_published, self->total_filtered);
+        return;
+    }
+#else
+    (void)self;
+#endif
+}
 
 /* ------------------------------------------------------------------ */
 /* Public API                                                           */
@@ -599,21 +663,85 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
     if (self->state != ha_discovery_state_idle) return;
 
 #ifdef USE_ESP_IDF
+    /* Create queue. */
+    uint8_t* queue_storage = (uint8_t*)heap_caps_malloc(
+        HA_DISCOVERY_ITEM_POOL_SIZE * sizeof(uint16_t), MALLOC_CAP_8BIT);
+    StaticQueue_t* queue_tcb = (StaticQueue_t*)heap_caps_malloc(
+        sizeof(StaticQueue_t), MALLOC_CAP_8BIT);
+
+    if (!queue_storage || !queue_tcb) {
+        ESP_LOGW(TAG, "Skipping HA discovery: unable to allocate queue");
+        free(queue_storage);
+        free(queue_tcb);
+        self->state = ha_discovery_state_failed;
+        return;
+    }
+
+    self->item_queue = xQueueCreateStatic(
+        HA_DISCOVERY_ITEM_POOL_SIZE, sizeof(uint16_t),
+        queue_storage, queue_tcb);
+
+    if (!self->item_queue) {
+        ESP_LOGW(TAG, "Skipping HA discovery: xQueueCreateStatic failed");
+        free(queue_storage);
+        free(queue_tcb);
+        self->state = ha_discovery_state_failed;
+        return;
+    }
+
+    /* Allocate task stack — try 8KB, fall back to 4KB. */
+    static constexpr int STACK_SIZE_BIG = 8 * 1024;
+    static constexpr int STACK_SIZE_SMALL = 4 * 1024;
+
+    self->task_stack = (StackType_t*)heap_caps_malloc(STACK_SIZE_BIG, MALLOC_CAP_8BIT);
+    if (!self->task_stack) {
+        self->task_stack = (StackType_t*)heap_caps_malloc(STACK_SIZE_SMALL, MALLOC_CAP_8BIT);
+    }
+
+    self->task_tcb = (StaticTask_t*)heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_8BIT);
+
+    if (!self->task_stack || !self->task_tcb) {
+        ESP_LOGW(TAG, "Skipping HA discovery: unable to allocate task stack/TCB");
+        free(self->task_stack);
+        free(self->task_tcb);
+        vQueueDelete(self->item_queue);
+        self->item_queue = NULL;
+        self->task_stack = NULL;
+        self->task_tcb = NULL;
+        self->state = ha_discovery_state_failed;
+        return;
+    }
+
+    int stack_size = self->task_stack ? STACK_SIZE_BIG : STACK_SIZE_SMALL;
+    /* If we fell back to small, adjust. */
+    if (!self->task_stack) {
+        /* Already handled above — if we got here with task_stack set, it's big. */
+    }
+
     self->task_running = true;
     self->task_handle = xTaskCreateStatic(
-        discovery_task,
+        fetch_task,
         "ha_discovery",
-        4096,
+        stack_size,
         self,
-        2,
+        1,
         self->task_stack,
-        &self->task_tcb);
+        self->task_tcb);
+
     if (!self->task_handle) {
         ESP_LOGE(TAG, "Failed to create discovery task");
+        free(self->task_stack);
+        free(self->task_tcb);
+        vQueueDelete(self->item_queue);
+        self->item_queue = NULL;
+        self->task_stack = NULL;
+        self->task_tcb = NULL;
         self->state = ha_discovery_state_failed;
         self->task_running = false;
         return;
     }
+
+    self->state = ha_discovery_state_fetching;
 #else
     self->state = ha_discovery_state_complete;
 #endif
@@ -632,6 +760,8 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
         self->task_handle = NULL;
     }
 
+    cleanup_fetch_resources(self);
+
     if (self->done_semaphore) {
         vSemaphoreDelete(self->done_semaphore);
         self->done_semaphore = NULL;
@@ -643,7 +773,8 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
 
 bool ha_discovery_manager_is_processing(ha_discovery_manager_t* self)
 {
-    return self->state == ha_discovery_state_processing;
+    return self->state == ha_discovery_state_fetching ||
+           self->state == ha_discovery_state_publishing;
 }
 
 ha_discovery_state_t ha_discovery_manager_get_state(ha_discovery_manager_t* self)

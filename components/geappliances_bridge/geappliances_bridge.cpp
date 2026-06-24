@@ -252,6 +252,11 @@ void GeappliancesBridge::loop() {
     ha_discovery_manager_start(&this->ha_discovery_manager_);
   }
 
+  /* Drive the HA discovery consumer (publishes at rate-limited intervals). */
+  if (ha_discovery_manager_is_processing(&this->ha_discovery_manager_)) {
+    ha_discovery_manager_run(&this->ha_discovery_manager_);
+  }
+
 
   // Publish ERD/MQTT publish rate + cache stats sensors every ~60 seconds.
   if (this->erd_publish_rate_sensor_ != nullptr || this->mqtt_publish_rate_sensor_ != nullptr) {
