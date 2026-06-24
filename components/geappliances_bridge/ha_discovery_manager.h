@@ -69,8 +69,8 @@ typedef struct {
 /* Publish rate limit interval in milliseconds. */
 #define HA_DISCOVERY_PUBLISH_INTERVAL_MS 50
 
-/* Decompression buffer size per chunk. */
-#define HA_DISCOVERY_DECOMP_BUF_SIZE 4096
+/* Decompression buffer size per chunk (max chunk is ~14KB). */
+#define HA_DISCOVERY_DECOMP_BUF_SIZE 16384
 
 /* Line buffer size for JSONL parsing. */
 #define HA_DISCOVERY_LINE_BUF_SIZE 4096
