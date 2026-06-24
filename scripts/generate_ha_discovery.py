@@ -96,14 +96,14 @@ def build_value_template(field: Dict, erd_data: List[Dict], erd_id_hex: str) -> 
 
     # Helper: split hex payload into individual byte strings
     # regex_findall('(..)') on "0a0b" -> [["0a"],["0b"]]
-    # map('first') | list -> ["0a","0b"]
+    # Index with [N][0] to get the Nth byte as a hex string
     def _bytes() -> str:
-        return "value | regex_findall('(..)') | map('first') | list"
+        return "value | regex_findall('(..)')"
 
     if ftype == 'string':
         # Each byte pair decoded as ASCII with 0x20 offset, trailing '_' stripped
         return (
-            "{{ " + _bytes() + " | "
+            "{{ " + _bytes() + " | map('first') | list | "
             "join(' ') | regex_replace('.*', "
             "{{ value.split(' ') | map("
             "  (item) -> (int(item, 16) - 0x20) | chr | default('', true)"
@@ -118,49 +118,42 @@ def build_value_template(field: Dict, erd_data: List[Dict], erd_id_hex: str) -> 
         pairs = ', '.join(f'"{k}": "{v}"' for k, v in values.items())
         if fsize == 1 and foffset == 0:
             # Single-byte enum at offset 0
-            return f"{{{{ {_bytes()} | first | default('') | regex_replace('.*', {{{{ {pairs} }}}}[\\1]]) }}}}"
+            return f"{{{{ {_bytes()} | first | first | default('') | regex_replace('.*', {{{{ {pairs} }}}}[\\1]]) }}}}"
         else:
             # Enum at a specific byte offset within the ERD
-            byte_idx = foffset  # each byte is a pair of hex chars
+            byte_idx = foffset
             return (
-                "{{ " + _bytes() + " | "
-                f"selectattr('index', 'equalto', {byte_idx}) | first | "
-                f"default('') | regex_replace('.*', {{{{ {pairs} }}}}[\\1]]) }}"
+                "{{ " + _bytes() + f"[{byte_idx}][0] | default('') | "
+                f"regex_replace('.*', {{{{ {pairs} }}}}[\\1]]) }}"
             )
 
     if ftype == 'bool':
         # Bool: single byte, 0 or 1
-        return "{{ " + _bytes() + " | first | int(0, 16) }}"
+        return "{{ " + _bytes() + " | first | first | int(0, 16) }}"
 
     if ftype in ('u8', 'i8'):
         if foffset == 0 and fsize == 1:
-            return "{{{{ " + _bytes() + " | first | int(0, 16) }}}}"
+            return "{{{{ " + _bytes() + " | first | first | int(0, 16) }}}}"
         else:
             byte_idx = foffset
-            return (
-                "{{ " + _bytes() + " | "
-                f"selectattr('index', 'equalto', {byte_idx}) | first | "
-                "int(0, 16) }}"
-            )
+            return "{{ " + _bytes() + f"[{byte_idx}][0] | int(0, 16) }}"
 
     if ftype in ('u16', 'i16'):
         # Little-endian 16-bit: bytes at offset and offset+1
         byte_lo = foffset
         byte_hi = foffset + 1
         return (
-            "{{ (" + _bytes() + " | "
-            f"selectattr('index', 'equalto', {byte_hi}) | first | int(0, 16) * 256 + "
-            f"(" + _bytes() + " | selectattr('index', 'equalto', {byte_lo}) | first | int(0, 16)) }}"
+            "{{ (" + _bytes() + f"[{byte_hi}][0] | int(0, 16) * 256 + "
+            f"{_bytes()} | [{byte_lo}][0] | int(0, 16)) }}"
         )
 
     if ftype in ('u32', 'i32'):
         # Little-endian 32-bit
         return (
-            "{{ (" + _bytes() + " | "
-            f"selectattr('index', 'equalto', {foffset + 3}) | first | int(0, 16) * 16777216 + "
-            f"(" + _bytes() + " | selectattr('index', 'equalto', {foffset + 2}) | first | int(0, 16) * 65536 + "
-            f"(" + _bytes() + " | selectattr('index', 'equalto', {foffset + 1}) | first | int(0, 16) * 256 + "
-            f"(" + _bytes() + " | selectattr('index', 'equalto', {foffset}) | first | int(0, 16))) }}"
+            "{{ (" + _bytes() + f"[{foffset + 3}][0] | int(0, 16) * 16777216 + "
+            f"{_bytes()} | [{foffset + 2}][0] | int(0, 16) * 65536 + "
+            f"{_bytes()} | [{foffset + 1}][0] | int(0, 16) * 256 + "
+            f"{_bytes()} | [{foffset}][0] | int(0, 16))) }}"
         )
 
     if ftype == 'raw':
