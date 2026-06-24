@@ -85,29 +85,38 @@ def build_value_template(field: Dict, erd_data: List[Dict], erd_id_hex: str) -> 
     """
     Build a Jinja2 value_template for decoding the hex payload.
 
-    The payload is a hex-encoded string of raw ERD bytes.
-    Uses regex_findall('(..)') which returns a list of lists
-    (each match is a list of capture groups), so we flatten with
-    map('first') | list to get a flat list of hex byte strings.
+    The MQTT payload is a hex-encoded string of raw ERD bytes.
+    E.g. a 2-byte value 0x0064 arrives as "0064".
+
+    We use string slicing on the hex payload to extract the relevant
+    bytes, then int(base=16) to convert. Each byte is 2 hex chars.
     """
     ftype = field['type']
     foffset = field.get('offset', 0)
     fsize = field.get('size', 1)
 
-    # Helper: split hex payload into individual byte strings
-    # regex_findall('(..)') on "0a0b" -> [["0a"],["0b"]]
-    # Index with [N][0] to get the Nth byte as a hex string
-    def _bytes() -> str:
-        return "value | regex_findall('(..)')"
+    # Hex slice for a byte range [offset, offset+size)
+    # Each byte = 2 hex chars, so byte offset N -> hex chars [N*2 : (N+size)*2]
+    def _hex_slice(byte_offset: int, byte_size: int) -> str:
+        start = byte_offset * 2
+        end = (byte_offset + byte_size) * 2
+        return f"value[{start}:{end}]"
 
     if ftype == 'string':
-        # Each byte pair decoded as ASCII with 0x20 offset, trailing '_' stripped
+        # Decode each byte as ASCII with 0x20 offset, strip trailing '_'
+        # Use a for-loop over the hex string in 2-char steps
+        # chars string maps byte value (minus 0x20) to printable ASCII
+        chars = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
         return (
-            "{{ " + _bytes() + " | map('first') | list | "
-            "join(' ') | regex_replace('.*', "
-            "{{ value.split(' ') | map("
-            "  (item) -> (int(item, 16) - 0x20) | chr | default('', true)"
-            ") | join | regex_replace('_+$', '') }}') }}"
+            "{% set ns = namespace(result='') %}"
+            f"{{% set chars = {chars!r} %}}"
+            "{% for i in range(0, value|length, 2) %}"
+            "  {% set idx = value[i:i+2]|int(0, 16) - 32 %}"
+            "  {% if 0 <= idx < 95 %}"
+            "    {% set ns.result = ns.result ~ chars[idx] %}"
+            "  {% endif %}"
+            "{% endfor %}"
+            "{{ ns.result|regex_replace('_+$', '') }}"
         )
 
     if ftype == 'enum':
@@ -116,48 +125,43 @@ def build_value_template(field: Dict, erd_data: List[Dict], erd_id_hex: str) -> 
             return None
         # Build a Jinja2 dict lookup
         pairs = ', '.join(f'"{k}": "{v}"' for k, v in values.items())
-        if fsize == 1 and foffset == 0:
-            # Single-byte enum at offset 0
-            return f"{{{{ {_bytes()} | first | first | default('') | regex_replace('.*', {{{{ {pairs} }}}}[\\1]]) }}}}"
-        else:
-            # Enum at a specific byte offset within the ERD
-            byte_idx = foffset
-            return (
-                "{{ " + _bytes() + f"[{byte_idx}][0] | default('') | "
-                f"regex_replace('.*', {{{{ {pairs} }}}}[\\1]]) }}"
-            )
+        hex_slice = _hex_slice(foffset, fsize)
+        return (
+            "{{ "
+            f"({{ {pairs} }})[({{ {hex_slice} }}|int(base=16))|string]"
+            " }}"
+        )
 
     if ftype == 'bool':
-        # Bool: single byte, 0 or 1
-        return "{{ " + _bytes() + " | first | first | int(0, 16) }}"
+        hex_slice = _hex_slice(foffset, fsize)
+        return f"{{{{ {hex_slice}|int(base=16) }}}}"
 
     if ftype in ('u8', 'i8'):
-        if foffset == 0 and fsize == 1:
-            return "{{{{ " + _bytes() + " | first | first | int(0, 16) }}}}"
-        else:
-            byte_idx = foffset
-            return "{{ " + _bytes() + f"[{byte_idx}][0] | int(0, 16) }}"
+        hex_slice = _hex_slice(foffset, fsize)
+        return f"{{{{ {hex_slice}|int(base=16) }}}}"
 
     if ftype in ('u16', 'i16'):
-        # Little-endian 16-bit: bytes at offset and offset+1
-        byte_lo = foffset
-        byte_hi = foffset + 1
-        return (
-            "{{ (" + _bytes() + f"[{byte_hi}][0] | int(0, 16) * 256 + "
-            f"{_bytes()} | [{byte_lo}][0] | int(0, 16)) }}"
-        )
+        # Little-endian: the hex string is already in the right order
+        # e.g. bytes 00 64 -> hex "0064" -> int(base=16) = 100
+        # But we need to handle the byte order: the hex payload is
+        # the raw bytes in order, so byte[0] is at hex chars 0:2,
+        # byte[1] at 2:4. For little-endian, byte[0] is LSB.
+        # So we need to reverse the byte order when converting.
+        # Actually looking at the reference: value[:4]|int(base=16) works
+        # directly for 2-byte values. The payload "0064" means 0x0064 = 100.
+        # But if the data is little-endian bytes [0x64, 0x00], the hex
+        # payload would be "6400" and int(base=16) = 25600, wrong.
+        # The reference uses value[:4]|int(base=16) directly, so the
+        # payload must already be in big-endian order or the ERD defines
+        # it that way. Let's match the reference pattern.
+        hex_slice = _hex_slice(foffset, fsize)
+        return f"{{{{ {hex_slice}|int(base=16) }}}}"
 
     if ftype in ('u32', 'i32'):
-        # Little-endian 32-bit
-        return (
-            "{{ (" + _bytes() + f"[{foffset + 3}][0] | int(0, 16) * 16777216 + "
-            f"{_bytes()} | [{foffset + 2}][0] | int(0, 16) * 65536 + "
-            f"{_bytes()} | [{foffset + 1}][0] | int(0, 16) * 256 + "
-            f"{_bytes()} | [{foffset}][0] | int(0, 16))) }}"
-        )
+        hex_slice = _hex_slice(foffset, fsize)
+        return f"{{{{ {hex_slice}|int(base=16) }}}}"
 
     if ftype == 'raw':
-        # Raw bytes - just pass through
         return "{{ value }}"
 
     return None
