@@ -118,6 +118,9 @@ typedef struct {
   char decompress_line[512];
   char decompress_topic[HA_DISCOVERY_TOPIC_SIZE];
   char decompress_payload[HA_DISCOVERY_PAYLOAD_SIZE];
+  /* Buffer for chunked decompression. Sized for the largest single JSONL
+   * line (~14KB for range.jsonl select entities with many options). */
+  uint8_t decompress_buf[16384];
 #endif
 } ha_discovery_manager_t;
 

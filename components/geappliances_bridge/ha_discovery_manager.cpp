@@ -107,54 +107,47 @@ static const char* json_get_str(const char* json, const char* key,
 /* ------------------------------------------------------------------ */
 
 /*
- * Category data: array of (name, data pointer, data length).
- * Name is used for logging; data/len are the compressed byte arrays
- * from ha_discovery_data.h.
+ * Category data is now defined in ha_discovery_data.h with chunked
+ * compression. The header provides:
+ *   ha_discovery_category_t - category descriptor with chunk table
+ *   ha_discovery_categories[] - array of all categories
+ *   ha_discovery_category_count - number of categories
  */
-typedef struct {
-    const char* name;
-    const uint8_t* data;
-    size_t data_len;
-} ha_discovery_category_t;
 
-static const ha_discovery_category_t categories[] = {
-    { "common", ha_discovery_common, ha_discovery_common_len },
-    { "refrigeration", ha_discovery_refrigeration, ha_discovery_refrigeration_len },
-    { "laundry", ha_discovery_laundry, ha_discovery_laundry_len },
-    { "dishwasher", ha_discovery_dishwasher, ha_discovery_dishwasher_len },
-    { "waterheater", ha_discovery_waterheater, ha_discovery_waterheater_len },
-    { "range", ha_discovery_range, ha_discovery_range_len },
-    { "airconditioning", ha_discovery_airconditioning, ha_discovery_airconditioning_len },
-    { "waterfilter", ha_discovery_waterfilter, ha_discovery_waterfilter_len },
-    { "smallappliance", ha_discovery_smallappliance, ha_discovery_smallappliance_len },
-    { "energy", ha_discovery_energy, ha_discovery_energy_len },
-};
-
-static const size_t num_categories = sizeof(categories) / sizeof(categories[0]);
+static const size_t num_categories = ha_discovery_category_count;
 
 /* ------------------------------------------------------------------ */
 /* Decompression helpers                                                */
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
-static int zlib_decompress(const uint8_t* compressed, size_t compressed_len,
+/* Decompress a single chunk using tinfl (raw deflate, no zlib header).
+ * Returns 0 on success, -1 on failure. */
+static int chunk_decompress(const uint8_t* compressed, size_t compressed_len,
                            uint8_t* output, size_t* output_len)
 {
 #ifdef USE_ESP_IDF_STUBS
-    /* Stub: can't actually decompress in test builds.
-     * Return error so the decompress task gracefully skips. */
-    (void)compressed;
-    (void)compressed_len;
-    (void)output;
-    (void)output_len;
+    (void)compressed; (void)compressed_len; (void)output; (void)output_len;
     return -1;
 #else
-    /* Python's zlib.compress() produces zlib-wrapped data (with header/checksum).
-     * Use mz_uncompress which handles the zlib wrapper. */
-    int ret = mz_uncompress(
-        (unsigned char*)output, (mz_ulong*)output_len,
-        (const unsigned char*)compressed, (mz_ulong)compressed_len);
-    return (ret == MZ_OK) ? 0 : -1;
+    tinfl_decompressor decomp;
+    tinfl_init(&decomp);
+
+    size_t src_size = compressed_len;
+    size_t dst_size = *output_len;
+
+    tinfl_status status = tinfl_decompress(
+        &decomp,
+        compressed, &src_size,
+        output, output, &dst_size,
+        TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
+
+    if (status != TINFL_STATUS_DONE) {
+        return -1;
+    }
+
+    *output_len = dst_size;
+    return 0;
 #endif
 }
 #endif
@@ -553,32 +546,24 @@ static void process_entity_line(ha_discovery_manager_t* self, const char* line)
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
-static void decompress_and_parse_category(ha_discovery_manager_t* self,
-                                           const ha_discovery_category_t* cat)
+/* Process a single chunk: decompress and parse lines. */
+static void process_chunk(ha_discovery_manager_t* self,
+                          const uint8_t* compressed, size_t compressed_len)
 {
-    /* Decompress into a pre-allocated buffer.
-     * The decompress_line buffer is used for line-by-line processing.
-     * We need a larger buffer for the full decompressed data. */
+    size_t dst_size = sizeof(self->decompress_buf);
 
-    /* Use a stack buffer for decompressed data (max ~500KB per category) */
-    uint8_t decompressed[512 * 1024];
-    size_t decompressed_len = sizeof(decompressed);
-
-    if (zlib_decompress(cat->data, cat->data_len, decompressed, &decompressed_len) != 0) {
-        ESP_LOGE(TAG, "Failed to decompress %s", cat->name);
+    if (chunk_decompress(compressed, compressed_len,
+                         self->decompress_buf, &dst_size) != 0) {
         return;
     }
 
-    decompressed[decompressed_len] = '\0';
-
-    /* Parse line by line */
-    const char* p = (const char*)decompressed;
-    const char* end = p + decompressed_len;
+    /* Parse line by line from decompressed data */
+    const char* p = (const char*)self->decompress_buf;
+    const char* end = p + dst_size;
 
     while (p < end) {
-        /* Find end of line */
         const char* line_end = p;
-        while (line_end < end && *line_end != '\n') line_end++;
+        while (line_end < end && *line_end != '\n' && *line_end != '\r') line_end++;
 
         size_t line_len = (size_t)(line_end - p);
         if (line_len == 0) {
@@ -586,7 +571,6 @@ static void decompress_and_parse_category(ha_discovery_manager_t* self,
             continue;
         }
 
-        /* Copy line to our buffer */
         if (line_len >= sizeof(self->decompress_line) - 1) {
             line_len = sizeof(self->decompress_line) - 1;
         }
@@ -596,6 +580,22 @@ static void decompress_and_parse_category(ha_discovery_manager_t* self,
         process_entity_line(self, self->decompress_line);
 
         p = line_end + 1;
+        /* Skip \r if present before \n */
+        if (p < end && *(p - 1) == '\r' && *p == '\n') {
+            /* already handled */
+        }
+    }
+}
+
+static void decompress_and_parse_category(ha_discovery_manager_t* self,
+                                           const ha_discovery_category_t* cat)
+{
+    /* Process each chunk independently, reusing the small decompress buffer. */
+    for (uint16_t ci = 0; ci < cat->num_chunks; ci++) {
+        const ha_discovery_chunk_t* chunk = &cat->chunks[ci];
+        const uint8_t* src = cat->data + chunk->offset;
+
+        process_chunk(self, src, chunk->size);
     }
 
     ESP_LOGI(TAG, "Category %s: processed (queue now has %u items)",
@@ -617,8 +617,9 @@ static void decompress_task(void* arg)
     ESP_LOGI(TAG, "Starting discovery decompression...");
 
     /* Process each category */
+    /* Process each category from the embedded data */
     for (size_t i = 0; i < num_categories; i++) {
-        decompress_and_parse_category(self, &categories[i]);
+        decompress_and_parse_category(self, &ha_discovery_categories[i]);
     }
 
     /* Transition to publishing if we have items */
