@@ -2,13 +2,15 @@
  * @file
  * @brief Home Assistant MQTT Discovery manager implementation.
  *
- * Producer-consumer design:
+ * Serialized producer-consumer design:
  *   Producer (background task): decompresses embedded JSONL entity definitions,
- *   builds discovery topic/payload pairs, and queues item indices via a FreeRTOS
- *   queue.  Uses a pre-allocated item pool to avoid heap allocation.
+ *   builds one discovery topic/payload at a time in a shared buffer, then
+ *   signals the consumer via a binary semaphore.
  *
- *   Consumer (main loop run()): drains the queue at 50 ms intervals, publishes
- *   each entity to MQTT, and feeds the WDT.
+ *   Consumer (main loop run()): receives the semaphore, publishes the payload
+ *   to MQTT, releases the semaphore, and the producer continues.
+ *
+ *   Only one payload is in flight at any time — no item pool needed.
  */
 
 #include "ha_discovery_manager.h"
@@ -34,7 +36,7 @@
 #endif
 #endif /* USE_ESP_IDF */
 
-static const char* const TAG = "ha_discovery_manager";
+static const char* const TAG = "ha_discovery";
 
 /* ------------------------------------------------------------------ */
 /* Zero-allocation JSON parser helpers                                */
@@ -119,6 +121,70 @@ static void json_unescape(const char* src, size_t src_len, char* out, int out_si
         p++;
     }
     out[i] = '\0';
+}
+
+/* Re-escape a raw JSON string value for embedding in another JSON string.
+ * The input is already JSON-escaped (contains \\, \", etc.).
+ * To embed it as a JSON string value, we need to double the backslashes:
+ *   \\ -> \\\\   \" -> \\\"
+ * Returns the number of bytes written (excluding null terminator).
+ * This avoids needing an intermediate unescaped buffer. */
+static int json_reescape(const char* src, size_t src_len, char* out, int out_size)
+{
+    int i = 0;
+    const char* p = src;
+    const char* end = src + src_len;
+    while (p < end) {
+        if (*p == '\\' && p + 1 < end) {
+            // Always emit a literal backslash for the escape
+            if (i >= out_size - 1) break;
+            out[i++] = '\\';
+            p++;
+            // Then handle the escaped character
+            if (i >= out_size - 1) break;
+            switch (*p) {
+                case '\\':
+                case '"':
+                    // Double-escape: \\ -> \\\\ or \" -> \\\"
+                    if (i >= out_size - 1) break;
+                    out[i++] = '\\';
+                    if (i >= out_size - 1) break;
+                    out[i++] = *p;
+                    break;
+                case '/':
+                    out[i++] = '/';
+                    break;
+                case 'n':
+                    out[i++] = 'n';
+                    break;
+                case 'r':
+                    out[i++] = 'r';
+                    break;
+                case 't':
+                    out[i++] = 't';
+                    break;
+                case 'u':
+                    // \uXXXX — pass through
+                    if (i + 5 > out_size - 1) { p += 4; break; }
+                    out[i++] = 'u';
+                    out[i++] = p[1];
+                    out[i++] = p[2];
+                    out[i++] = p[3];
+                    out[i++] = p[4];
+                    p += 4;
+                    break;
+                default:
+                    out[i++] = *p;
+                    break;
+            }
+        } else {
+            if (i >= out_size - 1) break;
+            out[i++] = *p;
+        }
+        p++;
+    }
+    if (i < out_size) out[i] = '\0';
+    return i;
 }
 
 /* ------------------------------------------------------------------ */
@@ -252,34 +318,32 @@ static int chunk_decompress(ha_discovery_manager_t* self, const uint8_t* compres
 #endif
 
 /* ------------------------------------------------------------------ */
-/* Process a single JSONL line: build topic/payload, queue index      */
+/* Process a single JSONL line: build topic/payload in shared buffers */
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
-static void process_jsonl_line(ha_discovery_manager_t* self, const char* line)
+static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
 {
     const char* val = NULL;
     size_t len = 0;
 
     /* Required fields */
-    if (!json_get_str(line, "i", &val, &len)) return;
+    if (!json_get_str(line, "i", &val, &len)) return false;
     char erd_id_hex[8];
     if (len >= sizeof(erd_id_hex)) len = sizeof(erd_id_hex) - 1;
     memcpy(erd_id_hex, val, len);
     erd_id_hex[len] = '\0';
 
-    if (!json_get_str(line, "n", &val, &len)) return;
+    if (!json_get_str(line, "n", &val, &len)) return false;
     json_unescape(val, len, self->entity_name_buf, sizeof(self->entity_name_buf));
 
-    if (!json_get_str(line, "d", &val, &len)) return;
+    if (!json_get_str(line, "d", &val, &len)) return false;
     json_unescape(val, len, self->domain_buf, sizeof(self->domain_buf));
 
     /* Optional fields — use struct buffers to avoid stack overflow. */
     self->field_id_buf[0] = '\0';
     self->paired_erd_buf[0] = '\0';
     self->role_buf[0] = '\0';
-    self->value_template_buf[0] = '\0';
-    self->command_template_buf[0] = '\0';
     self->unit_buf[0] = '\0';
     self->device_class_buf[0] = '\0';
     self->state_class_buf[0] = '\0';
@@ -290,8 +354,6 @@ static void process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     if (json_get_str(line, "fi", &val, &len)) json_unescape(val, len, self->field_id_buf, sizeof(self->field_id_buf));
     if (json_get_str(line, "p", &val, &len)) json_unescape(val, len, self->paired_erd_buf, sizeof(self->paired_erd_buf));
     if (json_get_str(line, "r", &val, &len)) json_unescape(val, len, self->role_buf, sizeof(self->role_buf));
-    if (json_get_str(line, "vt", &val, &len)) json_unescape(val, len, self->value_template_buf, sizeof(self->value_template_buf));
-    if (json_get_str(line, "ct", &val, &len)) json_unescape(val, len, self->command_template_buf, sizeof(self->command_template_buf));
     if (json_get_str(line, "u", &val, &len)) json_unescape(val, len, self->unit_buf, sizeof(self->unit_buf));
     if (json_get_str(line, "dc", &val, &len)) json_unescape(val, len, self->device_class_buf, sizeof(self->device_class_buf));
     if (json_get_str(line, "sc", &val, &len)) json_unescape(val, len, self->state_class_buf, sizeof(self->state_class_buf));
@@ -304,7 +366,7 @@ static void process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     /* Check if ERD is registered (binary search). */
     if (!erd_is_registered_sorted(self, erd_id)) {
         self->total_filtered++;
-        return;
+        return false;
     }
 
     /* Check paired ERD if present. */
@@ -312,7 +374,7 @@ static void process_jsonl_line(ha_discovery_manager_t* self, const char* line)
         uint16_t paired_id = (uint16_t)strtoul(self->paired_erd_buf, NULL, 16);
         if (!erd_is_registered_sorted(self, paired_id)) {
             self->total_filtered++;
-            return;
+            return false;
         }
     }
 
@@ -348,69 +410,82 @@ static void process_jsonl_line(ha_discovery_manager_t* self, const char* line)
         snprintf(self->topic_buf, sizeof(self->topic_buf), "homeassistant/%s/%s/%s/config", self->domain_buf, self->device_id, erd_id_hex);
     }
 
-    /* Build payload */
+    /* Build payload directly in shared buffer.
+     * Templates are embedded directly from the raw JSONL line with re-escaping,
+     * avoiding intermediate buffer limits. */
     char* payload = self->payload_buf;
     int offset = 0;
-    offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+    int remaining = (int)sizeof(self->payload_buf);
+
+    offset += snprintf(payload + offset, remaining,
         "{\"name\":\"%s\",\"unique_id\":\"%s\",\"device\":%s,",
         self->entity_name_buf, self->unique_id_buf, self->device_json_buf);
+    remaining -= offset;
 
-    offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
+    offset += snprintf(payload + offset, remaining,
         "\"state_topic\":\"%s\",", self->actual_state_topic_buf);
+    remaining -= offset;
 
-    if (self->command_template_buf[0]) {
-        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-            "\"command_topic\":\"%s\",", self->actual_command_topic_buf);
+    /* Embed value_template directly from raw JSONL with re-escaping. */
+    if (json_get_str(line, "vt", &val, &len)) {
+        offset += snprintf(payload + offset, remaining, "\"value_template\":\"");
+        remaining -= offset;
+        int reescaped = json_reescape(val, len, payload + offset, remaining);
+        offset += reescaped;
+        remaining -= reescaped;
+        offset += snprintf(payload + offset, remaining, "\",");
+        remaining -= offset;
     }
 
-    if (self->value_template_buf[0]) {
-        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-            "\"value_template\":\"%s\",", self->value_template_buf);
+    /* Embed command_template directly from raw JSONL with re-escaping. */
+    if (json_get_str(line, "ct", &val, &len)) {
+        offset += snprintf(payload + offset, remaining, "\"command_topic\":\"%s\",\"command_template\":\"", self->actual_command_topic_buf);
+        remaining -= offset;
+        int reescaped = json_reescape(val, len, payload + offset, remaining);
+        offset += reescaped;
+        remaining -= reescaped;
+        offset += snprintf(payload + offset, remaining, "\",");
+        remaining -= offset;
+    } else if (self->paired_erd_buf[0]) {
+        offset += snprintf(payload + offset, remaining, "\"command_topic\":\"%s\",", self->actual_command_topic_buf);
+        remaining -= offset;
     }
-    if (self->command_template_buf[0]) {
-        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-            "\"command_template\":\"%s\",", self->command_template_buf);
-    }
+
     if (self->unit_buf[0]) {
-        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-            "\"unit_of_measurement\":\"%s\",", self->unit_buf);
+        offset += snprintf(payload + offset, remaining, "\"unit_of_measurement\":\"%s\",", self->unit_buf);
+        remaining -= offset;
     }
     if (self->device_class_buf[0]) {
-        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-            "\"device_class\":\"%s\",", self->device_class_buf);
+        offset += snprintf(payload + offset, remaining, "\"device_class\":\"%s\",", self->device_class_buf);
+        remaining -= offset;
     }
     if (self->state_class_buf[0]) {
-        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-            "\"state_class\":\"%s\",", self->state_class_buf);
+        offset += snprintf(payload + offset, remaining, "\"state_class\":\"%s\",", self->state_class_buf);
+        remaining -= offset;
     }
     if (self->options_buf[0]) {
-        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-            "\"options\":%s,", self->options_buf);
+        offset += snprintf(payload + offset, remaining, "\"options\":%s,", self->options_buf);
+        remaining -= offset;
     }
     if (self->data_type_buf[0]) {
         if (strcmp(self->data_type_buf, "u8") == 0) {
-            offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-                "\"min\":0,\"max\":255,");
+            offset += snprintf(payload + offset, remaining, "\"min\":0,\"max\":255,");
         } else if (strcmp(self->data_type_buf, "i8") == 0) {
-            offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-                "\"min\":-128,\"max\":127,");
+            offset += snprintf(payload + offset, remaining, "\"min\":-128,\"max\":127,");
         } else if (strcmp(self->data_type_buf, "u16") == 0) {
-            offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-                "\"min\":0,\"max\":65535,");
+            offset += snprintf(payload + offset, remaining, "\"min\":0,\"max\":65535,");
         } else if (strcmp(self->data_type_buf, "i16") == 0) {
-            offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-                "\"min\":-32768,\"max\":32767,");
+            offset += snprintf(payload + offset, remaining, "\"min\":-32768,\"max\":32767,");
         } else if (strcmp(self->data_type_buf, "u32") == 0) {
-            offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-                "\"min\":0,\"max\":4294967295,");
+            offset += snprintf(payload + offset, remaining, "\"min\":0,\"max\":4294967295,");
         } else if (strcmp(self->data_type_buf, "i32") == 0) {
-            offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-                "\"min\":-2147483648,\"max\":2147483647,");
+            offset += snprintf(payload + offset, remaining, "\"min\":-2147483648,\"max\":2147483647,");
         }
+        remaining -= offset;
     }
     if (self->scale_factor_buf[0]) {
-        offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset,
-            "\"step\":%s,", self->scale_factor_buf);
+        offset += snprintf(payload + offset, remaining, "\"step\":%s,", self->scale_factor_buf);
+        remaining -= offset;
     }
 
     /* Remove trailing comma and close */
@@ -420,35 +495,27 @@ static void process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     }
     offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset, "}");
 
-    /* Store in item pool and queue index */
-    uint16_t idx = self->item_pool_next;
-    self->item_pool_next = (self->item_pool_next + 1) % HA_DISCOVERY_ITEM_POOL_SIZE;
-
-    ha_discovery_item_t* item = &self->item_pool[idx];
-    strncpy(item->topic, self->topic_buf, sizeof(item->topic) - 1);
-    item->topic[sizeof(item->topic) - 1] = '\0';
-    strncpy(item->payload, payload, sizeof(item->payload) - 1);
-    item->payload[sizeof(item->payload) - 1] = '\0';
+    /* Check if payload fits */
+    if (offset >= (int)sizeof(self->payload_buf)) {
+        ESP_LOGW(TAG, "Payload too large for ERD 0x%s, skipping", erd_id_hex);
+        self->total_filtered++;
+        return false;
+    }
 
     self->total_discovered++;
-
-    /* Queue the index — spin-yield if full until main loop drains. */
-    while (xQueueSend(self->item_queue, &idx, 0) != pdTRUE) {
-        vTaskDelay(1);
-        esp_task_wdt_reset();
-    }
+    return true;
 }
 #endif
 
 /* ------------------------------------------------------------------ */
-/* Process a category: decompress chunks, parse lines, queue items    */
+/* Process a category: decompress chunks, parse lines, sync with consumer */
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
 static void process_category(ha_discovery_manager_t* self,
     const ha_discovery_category_t* cat)
 {
-    uint32_t before = self->total_published;
+    uint32_t before = self->total_discovered;
 
     for (uint16_t ci = 0; ci < cat->num_chunks; ci++) {
         const ha_discovery_chunk_t* chunk = &cat->chunks[ci];
@@ -477,7 +544,18 @@ static void process_category(ha_discovery_manager_t* self,
             memcpy(self->line_buf, p, line_len);
             self->line_buf[line_len] = '\0';
 
-            process_jsonl_line(self, self->line_buf);
+            /* Wait for consumer to finish publishing previous payload. */
+            if (xSemaphoreTake(self->publish_sem, portMAX_DELAY) != pdTRUE) {
+                break;
+            }
+
+            if (process_jsonl_line(self, self->line_buf)) {
+                /* Signal consumer: payload ready in shared buffer. */
+                xSemaphoreGive(self->publish_sem);
+            } else {
+                /* Line filtered — give sem back so producer can continue. */
+                xSemaphoreGive(self->publish_sem);
+            }
 
             p = line_end + 1;
         }
@@ -505,7 +583,9 @@ static void fetch_task(void* arg)
     build_sorted_erd_list(self);
     build_device_json(self);
 
-    /* Process each category. */
+    /* publish_sem starts empty. Give it so the first entity can proceed
+     * without blocking (producer takes before building, gives after). */
+    xSemaphoreGive(self->publish_sem);
     for (size_t i = 0; i < ha_discovery_category_count; i++) {
         process_category(self, &ha_discovery_categories[i]);
 
@@ -514,16 +594,9 @@ static void fetch_task(void* arg)
         esp_task_wdt_reset();
     }
 
-    /* Send sentinel to signal completion. */
-    uint16_t sentinel = HA_DISCOVERY_QUEUE_SENTINEL;
-    while (xQueueSend(self->item_queue, &sentinel, 0) != pdTRUE) {
-        vTaskDelay(1);
-        esp_task_wdt_reset();
-    }
-
-    /* Signal done via semaphore before deleting the task. */
-    if (self->done_semaphore) {
-        xSemaphoreGive(self->done_semaphore);
+    /* Signal done via semaphore. */
+    if (self->done_sem) {
+        xSemaphoreGive(self->done_sem);
     }
 
     ESP_LOGI(TAG, "HA discovery fetch complete: %u discovered, %u filtered",
@@ -540,9 +613,13 @@ static void fetch_task(void* arg)
 #ifdef USE_ESP_IDF
 static void cleanup_fetch_resources(ha_discovery_manager_t* self)
 {
-    if (self->item_queue) {
-        vQueueDelete(self->item_queue);
-        self->item_queue = NULL;
+    if (self->publish_sem) {
+        vSemaphoreDelete(self->publish_sem);
+        self->publish_sem = NULL;
+    }
+    if (self->done_sem) {
+        vSemaphoreDelete(self->done_sem);
+        self->done_sem = NULL;
     }
     if (self->task_stack) {
         free(self->task_stack);
@@ -568,57 +645,56 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         self->last_publish_ms = self->get_time_ms();
     }
 
-    /* Check if fetch task has finished (non-blocking semaphore check). */
-    if (self->fetch_done) {
-        /* Fetch is done — just drain remaining items. */
-    } else {
-        /* Try to see if the task has signaled done via semaphore. */
-        if (self->done_semaphore &&
-            xSemaphoreTake(self->done_semaphore, 0) == pdTRUE) {
+    /* Check if fetch task has finished. */
+    if (!self->fetch_done && self->done_sem) {
+        if (xSemaphoreTake(self->done_sem, 0) == pdTRUE) {
             self->fetch_done = true;
-            /* Task will delete itself shortly; clear handle after a delay. */
             self->task_handle = NULL;
         }
     }
 
-    /* Try to drain an item from the queue (non-blocking). */
-    uint16_t idx = 0;
-    if (xQueueReceive(self->item_queue, &idx, 0) == pdTRUE) {
-        /* Check for sentinel. */
-        if (idx == HA_DISCOVERY_QUEUE_SENTINEL) {
-            self->fetch_done = true;
-            /* Continue draining remaining items on next call. */
-            return;
+    /* Try to take the publish semaphore (non-blocking).
+     * If taken, the producer has built a payload for us to publish. */
+    if (xSemaphoreTake(self->publish_sem, 0) != pdTRUE) {
+        /* No payload ready yet. */
+        if (self->fetch_done) {
+            /* Fetch is done and no pending payload. But we need to ensure
+             * the last entity was published. The producer gives publish_sem
+             * for each entity then takes it back. If fetch_done and sem is
+             * not available, either: (a) the last entity is still being
+             * published by us (sem taken, not yet given back), or
+             * (b) all entities are published. Check if we've published
+             * as many as were discovered. */
+            if (self->total_published >= self->total_discovered) {
+                cleanup_fetch_resources(self);
+                self->state = ha_discovery_state_complete;
+                ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
+                    self->total_published, self->total_filtered);
+            }
         }
-
-        /* Rate-limit publishing. */
-        uint32_t now = self->get_time_ms();
-        if (now - self->last_publish_ms < HA_DISCOVERY_PUBLISH_INTERVAL_MS) {
-            /* Put item back at tail and wait for next tick. */
-            xQueueSend(self->item_queue, &idx, pdMS_TO_TICKS(100));
-            return;
-        }
-        self->last_publish_ms = now;
-
-        /* Publish. */
-        ha_discovery_item_t* item = &self->item_pool[idx];
-        if (self->mqtt_client) {
-            mqtt_client_publish_raw(self->mqtt_client, item->topic, item->payload, strlen(item->payload), true);
-        }
-        self->total_published++;
-
-        esp_task_wdt_reset();
         return;
     }
 
-    /* Queue is empty. If fetch is done, clean up and complete. */
-    if (self->fetch_done) {
-        cleanup_fetch_resources(self);
-        self->state = ha_discovery_state_complete;
-        ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
-            self->total_published, self->total_filtered);
+    /* Rate-limit publishing. */
+    uint32_t now = self->get_time_ms();
+    if (now - self->last_publish_ms < HA_DISCOVERY_PUBLISH_INTERVAL_MS) {
+        /* Give semaphore back immediately so producer can continue building.
+         * We'll take it again next loop iteration. */
+        xSemaphoreGive(self->publish_sem);
         return;
     }
+    self->last_publish_ms = now;
+
+    /* Publish from shared buffer. */
+    if (self->mqtt_client) {
+        mqtt_client_publish_raw(self->mqtt_client, self->topic_buf, self->payload_buf, strlen(self->payload_buf), true);
+    }
+    self->total_published++;
+
+    /* Give semaphore back so producer can build the next payload. */
+    xSemaphoreGive(self->publish_sem);
+
+    esp_task_wdt_reset();
 #else
     (void)self;
 #endif
@@ -635,8 +711,12 @@ void ha_discovery_manager_init(ha_discovery_manager_t* self)
     self->get_time_ms = esphome::millis;
 
 #ifdef USE_ESP_IDF
-    self->done_semaphore = xSemaphoreCreateBinary();
-    if (!self->done_semaphore) {
+    self->publish_sem = xSemaphoreCreateBinary();
+    if (!self->publish_sem) {
+        ESP_LOGE(TAG, "Failed to create publish semaphore");
+    }
+    self->done_sem = xSemaphoreCreateBinary();
+    if (!self->done_sem) {
         ESP_LOGE(TAG, "Failed to create done semaphore");
     }
     self->task_running = false;
@@ -663,32 +743,6 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
     if (self->state != ha_discovery_state_idle) return;
 
 #ifdef USE_ESP_IDF
-    /* Create queue. */
-    uint8_t* queue_storage = (uint8_t*)heap_caps_malloc(
-        HA_DISCOVERY_ITEM_POOL_SIZE * sizeof(uint16_t), MALLOC_CAP_8BIT);
-    StaticQueue_t* queue_tcb = (StaticQueue_t*)heap_caps_malloc(
-        sizeof(StaticQueue_t), MALLOC_CAP_8BIT);
-
-    if (!queue_storage || !queue_tcb) {
-        ESP_LOGW(TAG, "Skipping HA discovery: unable to allocate queue");
-        free(queue_storage);
-        free(queue_tcb);
-        self->state = ha_discovery_state_failed;
-        return;
-    }
-
-    self->item_queue = xQueueCreateStatic(
-        HA_DISCOVERY_ITEM_POOL_SIZE, sizeof(uint16_t),
-        queue_storage, queue_tcb);
-
-    if (!self->item_queue) {
-        ESP_LOGW(TAG, "Skipping HA discovery: xQueueCreateStatic failed");
-        free(queue_storage);
-        free(queue_tcb);
-        self->state = ha_discovery_state_failed;
-        return;
-    }
-
     /* Allocate task stack — try 8KB, fall back to 4KB. */
     static constexpr int STACK_SIZE_BIG = 8 * 1024;
     static constexpr int STACK_SIZE_SMALL = 4 * 1024;
@@ -704,8 +758,6 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
         ESP_LOGW(TAG, "Skipping HA discovery: unable to allocate task stack/TCB");
         free(self->task_stack);
         free(self->task_tcb);
-        vQueueDelete(self->item_queue);
-        self->item_queue = NULL;
         self->task_stack = NULL;
         self->task_tcb = NULL;
         self->state = ha_discovery_state_failed;
@@ -713,10 +765,6 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
     }
 
     int stack_size = self->task_stack ? STACK_SIZE_BIG : STACK_SIZE_SMALL;
-    /* If we fell back to small, adjust. */
-    if (!self->task_stack) {
-        /* Already handled above — if we got here with task_stack set, it's big. */
-    }
 
     self->task_running = true;
     self->task_handle = xTaskCreateStatic(
@@ -732,8 +780,6 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
         ESP_LOGE(TAG, "Failed to create discovery task");
         free(self->task_stack);
         free(self->task_tcb);
-        vQueueDelete(self->item_queue);
-        self->item_queue = NULL;
         self->task_stack = NULL;
         self->task_tcb = NULL;
         self->state = ha_discovery_state_failed;
@@ -752,8 +798,8 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
 #ifdef USE_ESP_IDF
     if (self->task_handle) {
         self->task_running = false;
-        if (self->done_semaphore) {
-            xSemaphoreTake(self->done_semaphore, pdMS_TO_TICKS(1000));
+        if (self->done_sem) {
+            xSemaphoreTake(self->done_sem, pdMS_TO_TICKS(1000));
         }
         esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(100));
@@ -761,11 +807,6 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
     }
 
     cleanup_fetch_resources(self);
-
-    if (self->done_semaphore) {
-        vSemaphoreDelete(self->done_semaphore);
-        self->done_semaphore = NULL;
-    }
 #endif
 
     memset(self, 0, sizeof(*self));
