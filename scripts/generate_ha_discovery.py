@@ -125,37 +125,33 @@ def build_value_template(field: Dict, erd_data: List[Dict], erd_id_hex: str) -> 
 
     if ftype in ('u8', 'i8'):
         if foffset == 0 and fsize == 1:
-            signed = 'signed=true' if ftype == 'i8' else 'signed=false'
-            return f"{{{{ value | regex_findall_index('(..)') | first | int(0, 16, {signed}) }}}}"
+            return "{{{{ value | regex_findall_index('(..)') | first | int(0, 16) }}}}"
         else:
             byte_idx = foffset
-            signed = 'signed=true' if ftype == 'i8' else 'signed=false'
             return (
                 "{{ value | regex_findall_index('(..)') | "
                 f"selectattr('index', 'equalto', {byte_idx}) | first | "
-                f"int(0, 16, {signed}) }}"
+                "int(0, 16) }}"
             )
 
     if ftype in ('u16', 'i16'):
         # Little-endian 16-bit: bytes at offset and offset+1
         byte_lo = foffset
         byte_hi = foffset + 1
-        signed = 'signed=true' if ftype == 'i16' else 'signed=false'
         return (
             "{{ (value | regex_findall_index('(..)') | "
             f"selectattr('index', 'equalto', {byte_hi}) | first | int(0, 16) * 256 + "
-            f"(value | regex_findall_index('(..)') | selectattr('index', 'equalto', {byte_lo}) | first | int(0, 16, {signed})) }}"
+            f"(value | regex_findall_index('(..)') | selectattr('index', 'equalto', {byte_lo}) | first | int(0, 16)) }}"
         )
 
     if ftype in ('u32', 'i32'):
         # Little-endian 32-bit
-        signed = 'signed=true' if ftype == 'i32' else 'signed=false'
         return (
             "{{ (value | regex_findall_index('(..)') | "
             f"selectattr('index', 'equalto', {foffset + 3}) | first | int(0, 16) * 16777216 + "
             f"(value | regex_findall_index('(..)') | selectattr('index', 'equalto', {foffset + 2}) | first | int(0, 16) * 65536 + "
             f"(value | regex_findall_index('(..)') | selectattr('index', 'equalto', {foffset + 1}) | first | int(0, 16) * 256 + "
-            f"(value | regex_findall_index('(..)') | selectattr('index', 'equalto', {foffset}) | first | int(0, 16, {signed}))) }}"
+            f"(value | regex_findall_index('(..)') | selectattr('index', 'equalto', {foffset}) | first | int(0, 16))) }}"
         )
 
     if ftype == 'raw':

@@ -137,18 +137,18 @@ static int json_reescape(const char* src, size_t src_len, char* out, int out_siz
     while (p < end) {
         if (*p == '\\' && p + 1 < end) {
             // Always emit a literal backslash for the escape
-            if (i >= out_size - 1) break;
+            if (i + 1 >= out_size) break;
             out[i++] = '\\';
             p++;
             // Then handle the escaped character
-            if (i >= out_size - 1) break;
+            if (i + 1 >= out_size) break;
             switch (*p) {
                 case '\\':
                 case '"':
                     // Double-escape: \\ -> \\\\ or \" -> \\\"
-                    if (i >= out_size - 1) break;
+                    if (i + 1 >= out_size) break;
                     out[i++] = '\\';
-                    if (i >= out_size - 1) break;
+                    if (i + 1 >= out_size) break;
                     out[i++] = *p;
                     break;
                 case '/':
@@ -165,7 +165,7 @@ static int json_reescape(const char* src, size_t src_len, char* out, int out_siz
                     break;
                 case 'u':
                     // \uXXXX — pass through
-                    if (i + 5 > out_size - 1) { p += 4; break; }
+                    if (i + 5 >= out_size) { p += 4; break; }
                     out[i++] = 'u';
                     out[i++] = p[1];
                     out[i++] = p[2];
@@ -178,7 +178,7 @@ static int json_reescape(const char* src, size_t src_len, char* out, int out_siz
                     break;
             }
         } else {
-            if (i >= out_size - 1) break;
+            if (i + 1 >= out_size) break;
             out[i++] = *p;
         }
         p++;
