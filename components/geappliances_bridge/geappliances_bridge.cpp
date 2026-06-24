@@ -252,14 +252,6 @@ void GeappliancesBridge::loop() {
     ha_discovery_manager_start(&this->ha_discovery_manager_);
   }
 
-  // Signal the discovery manager publish task (after erd_cache_publisher_).
-  if (ha_discovery_manager_is_publishing(&this->ha_discovery_manager_)) {
-#ifdef USE_ESP_IDF
-    ha_discovery_manager_signal_work(&this->ha_discovery_manager_);
-#else
-    ha_discovery_manager_run(&this->ha_discovery_manager_, 5);
-#endif
-  }
 
   // Publish ERD/MQTT publish rate + cache stats sensors every ~60 seconds.
   if (this->erd_publish_rate_sensor_ != nullptr || this->mqtt_publish_rate_sensor_ != nullptr) {

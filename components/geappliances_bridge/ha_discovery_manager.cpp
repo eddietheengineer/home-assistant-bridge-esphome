@@ -153,51 +153,6 @@ static int IRAM_ATTR chunk_decompress(const uint8_t* compressed, size_t compress
 }
 #endif
 
-/* ------------------------------------------------------------------ */
-/* Queue helpers                                                        */
-/* ------------------------------------------------------------------ */
-
-static bool queue_is_full(const ha_discovery_manager_t* self)
-{
-    return self->queue_count >= HA_DISCOVERY_QUEUE_CAPACITY;
-}
-
-static bool queue_is_empty(const ha_discovery_manager_t* self)
-{
-    return self->queue_count == 0;
-}
-
-static bool queue_push(ha_discovery_manager_t* self, const char* topic, const char* payload)
-{
-    if (queue_is_full(self)) return false;
-
-    ha_discovery_item_t* item = &self->queue[self->queue_tail];
-    size_t topic_len = strlen(topic);
-    size_t payload_len = strlen(payload);
-
-    if (topic_len >= HA_DISCOVERY_TOPIC_SIZE) return false;
-    if (payload_len >= HA_DISCOVERY_PAYLOAD_SIZE) return false;
-
-    memcpy(item->topic, topic, topic_len + 1);
-    memcpy(item->payload, payload, payload_len + 1);
-
-    self->queue_tail = (self->queue_tail + 1) % HA_DISCOVERY_QUEUE_CAPACITY;
-    self->queue_count++;
-    return true;
-}
-
-static const ha_discovery_item_t* queue_peek(const ha_discovery_manager_t* self)
-{
-    if (queue_is_empty(self)) return NULL;
-    return &self->queue[self->queue_head];
-}
-
-static void queue_pop(ha_discovery_manager_t* self)
-{
-    if (queue_is_empty(self)) return;
-    self->queue_head = (self->queue_head + 1) % HA_DISCOVERY_QUEUE_CAPACITY;
-    self->queue_count--;
-}
 
 /* ------------------------------------------------------------------ */
 /* ERD cache lookup                                                     */
@@ -403,19 +358,15 @@ static int build_discovery_payload(char* buf, size_t buf_size,
 
     return offset;
 }
-
 /* ------------------------------------------------------------------ */
-/* Process a single JSONL line                                          */
+/* Direct publish helper (replaces queue)                              */
 /* ------------------------------------------------------------------ */
 
-static void process_entity_line(ha_discovery_manager_t* self, const char* line)
+static void publish_entity(ha_discovery_manager_t* self, const char* line)
 {
-    /* Extract fields from the JSON line */
     const char* val = NULL;
     size_t len = 0;
 
-
-    /* Required fields */
     if (!json_get_str(line, "i", &val, &len)) return;
     char erd_id_hex[8];
     memcpy(erd_id_hex, val, len);
@@ -433,7 +384,6 @@ static void process_entity_line(ha_discovery_manager_t* self, const char* line)
     memcpy(domain, val, len);
     domain[len] = '\0';
 
-    /* Optional fields */
     char field_id[16] = "";
     char paired_erd[8] = "";
     char role[16] = "";
@@ -502,7 +452,6 @@ static void process_entity_line(ha_discovery_manager_t* self, const char* line)
         scale_factor[len] = '\0';
     }
 
-    /* Filter: check if ERD is registered in the cache */
     uint16_t erd_id = (uint16_t)strtoul(erd_id_hex, NULL, 16);
 
     if (!erd_is_registered(self, erd_id)) {
@@ -510,7 +459,6 @@ static void process_entity_line(ha_discovery_manager_t* self, const char* line)
         return;
     }
 
-    /* For paired entities, both ERDs must be registered */
     if (paired_erd[0]) {
         uint16_t paired_id = (uint16_t)strtoul(paired_erd, NULL, 16);
         if (!erd_is_registered(self, paired_id)) {
@@ -519,37 +467,31 @@ static void process_entity_line(ha_discovery_manager_t* self, const char* line)
         }
     }
 
-    /* Build discovery topic */
-    char topic[HA_DISCOVERY_TOPIC_SIZE];
-    build_discovery_topic(topic, sizeof(topic),
+    build_discovery_topic(self->topic_buf, sizeof(self->topic_buf),
         domain, self->device_id, erd_id_hex, field_id);
 
-    /* Build discovery payload */
-    char payload[HA_DISCOVERY_PAYLOAD_SIZE];
-    build_discovery_payload(payload, sizeof(payload),
+    build_discovery_payload(self->payload_buf, sizeof(self->payload_buf),
         self, erd_id_hex, entity_name,
         field_id, paired_erd, role,
         value_template, command_template,
         unit, device_class, state_class,
         options, data_type, scale_factor);
 
-    /* Queue the item */
-    if (!queue_push(self, topic, payload)) {
-        ESP_LOGW(TAG, "Discovery queue full, dropping entity: %s", entity_name);
-        return;
-    }
+    mqtt_client_publish_raw(self->mqtt_client,
+        self->topic_buf, self->payload_buf, strlen(self->payload_buf), true);
 
     self->total_discovered++;
+    self->total_published++;
 }
 
 /* ------------------------------------------------------------------ */
-/* Decompress and parse a category                                      */
+/* Streaming chunk processing: decompress → publish → discard          */
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
-/* Process a single chunk: decompress and parse lines. */
-static void IRAM_ATTR process_chunk(ha_discovery_manager_t* self,
-                          const uint8_t* compressed, size_t compressed_len)
+/* Process a single chunk: decompress, publish each entity, discard. */
+static void IRAM_ATTR process_chunk_streaming(ha_discovery_manager_t* self,
+    const uint8_t* compressed, size_t compressed_len)
 {
     size_t dst_size = sizeof(self->decompress_buf);
 
@@ -558,7 +500,7 @@ static void IRAM_ATTR process_chunk(ha_discovery_manager_t* self,
         return;
     }
 
-    /* Parse line by line from decompressed data */
+    /* Parse line by line from decompressed data, publishing each entity. */
     const char* p = (const char*)self->decompress_buf;
     const char* end = p + dst_size;
 
@@ -572,125 +514,62 @@ static void IRAM_ATTR process_chunk(ha_discovery_manager_t* self,
             continue;
         }
 
-        if (line_len >= sizeof(self->decompress_line) - 1) {
-            line_len = sizeof(self->decompress_line) - 1;
+        if (line_len >= sizeof(self->line_buf) - 1) {
+            line_len = sizeof(self->line_buf) - 1;
         }
-        memcpy(self->decompress_line, p, line_len);
-        self->decompress_line[line_len] = '\0';
+        memcpy(self->line_buf, p, line_len);
+        self->line_buf[line_len] = '\0';
 
-        process_entity_line(self, self->decompress_line);
+        publish_entity(self, self->line_buf);
 
         p = line_end + 1;
-        /* Skip \r if present before \n */
-        if (p < end && *(p - 1) == '\r' && *p == '\n') {
-            /* already handled */
-        }
     }
 }
 
-static void IRAM_ATTR decompress_and_parse_category(ha_discovery_manager_t* self,
-                                           const ha_discovery_category_t* cat)
+static void IRAM_ATTR process_category_streaming(ha_discovery_manager_t* self,
+    const ha_discovery_category_t* cat)
 {
-    /* Process each chunk independently, reusing the small decompress buffer. */
+    uint32_t before = self->total_published;
+
     for (uint16_t ci = 0; ci < cat->num_chunks; ci++) {
         const ha_discovery_chunk_t* chunk = &cat->chunks[ci];
         const uint8_t* src = cat->data + chunk->offset;
 
-        process_chunk(self, src, chunk->size);
+        process_chunk_streaming(self, src, chunk->size);
     }
 
-    ESP_LOGI(TAG, "Category %s: processed (queue now has %u items)",
-        cat->name, self->queue_count);
+    ESP_LOGI(TAG, "Category %s: %u published",
+        cat->name, self->total_published - before);
 }
 #endif
 
 /* ------------------------------------------------------------------ */
-/* Decompress task (ESP-IDF)                                            */
+/* Single streaming task (ESP-IDF)                                     */
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
-static void decompress_task(void* arg)
+static void discovery_task(void* arg)
 {
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
 
-    self->state = ha_discovery_state_decompressing;
+    self->state = ha_discovery_state_processing;
 
-    ESP_LOGI(TAG, "Starting discovery decompression...");
+    ESP_LOGI(TAG, "Starting HA discovery streaming...");
 
-    /* Process each category */
-    /* Process each category from the embedded data */
+    /* Walk every category, processing each chunk: decompress → publish → discard. */
     for (size_t i = 0; i < num_categories; i++) {
-        decompress_and_parse_category(self, &ha_discovery_categories[i]);
+        process_category_streaming(self, &ha_discovery_categories[i]);
+
+        /* Yield after each category so the main loop and other tasks
+         * can run.  Prevents starving the ESPHome framework watchdog. */
+        vTaskDelay(pdMS_TO_TICKS(1));
     }
 
-    /* Transition to publishing if we have items */
-    if (self->queue_count > 0) {
-        self->state = ha_discovery_state_publishing;
-        ESP_LOGI(TAG, "Discovery complete: %u entities, %u filtered, %u queued",
-            self->total_discovered, self->total_filtered, self->queue_count);
-
-        /* Signal the publish task */
-        if (self->work_semaphore) {
-            xSemaphoreGive(self->work_semaphore);
-        }
-    } else {
-        self->state = ha_discovery_state_complete;
-        ESP_LOGI(TAG, "No discovery entities to publish");
-    }
+    self->state = ha_discovery_state_complete;
+    ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
+        self->total_published, self->total_filtered);
 
     /* Signal completion */
-    if (self->done_semaphore) {
-        xSemaphoreGive(self->done_semaphore);
-    }
-
-    vTaskDelete(NULL);
-}
-#endif
-
-/* ------------------------------------------------------------------ */
-/* Publish task (ESP-IDF)                                               */
-/* ------------------------------------------------------------------ */
-
-#ifdef USE_ESP_IDF
-static void publish_task(void* arg)
-{
-    ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
-
-    if (self->work_semaphore == NULL) {
-        vTaskDelete(NULL);
-        return;
-    }
-
-    while (self->task_running) {
-        /* Wait for work signal or timeout */
-        if (xSemaphoreTake(self->work_semaphore, pdMS_TO_TICKS(100)) != pdTRUE) {
-            continue;
-        }
-
-        /* Drain queue */
-        while (!queue_is_empty(self)) {
-            const ha_discovery_item_t* item = queue_peek(self);
-            if (!item) break;
-
-            /* Publish */
-            mqtt_client_publish_raw(self->mqtt_client,
-                item->topic, item->payload, strlen(item->payload), true);
-
-            queue_pop(self);
-            self->total_published++;
-
-            /* 50ms interval between publishes */
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
-
-        /* Check if queue is empty and we're done */
-        if (queue_is_empty(self) && self->state == ha_discovery_state_publishing) {
-            self->state = ha_discovery_state_complete;
-            ESP_LOGI(TAG, "All discovery payloads published (%u total)",
-                self->total_published);
-        }
-    }
-
     if (self->done_semaphore) {
         xSemaphoreGive(self->done_semaphore);
     }
@@ -707,23 +586,12 @@ void ha_discovery_manager_init(ha_discovery_manager_t* self)
 {
     memset(self, 0, sizeof(*self));
     self->state = ha_discovery_state_idle;
-    self->queue_head = 0;
-    self->queue_tail = 0;
-    self->queue_count = 0;
     self->get_time_ms = esphome::millis;
 
 #ifdef USE_ESP_IDF
-    self->work_semaphore = xSemaphoreCreateBinary();
-    if (!self->work_semaphore) {
-        ESP_LOGE(TAG, "Failed to create work semaphore");
-    }
     self->done_semaphore = xSemaphoreCreateBinary();
     if (!self->done_semaphore) {
         ESP_LOGE(TAG, "Failed to create done semaphore");
-    }
-    self->queue_mutex = xSemaphoreCreateMutex();
-    if (!self->queue_mutex) {
-        ESP_LOGE(TAG, "Failed to create queue mutex");
     }
     self->task_running = false;
 #endif
@@ -749,43 +617,23 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
     if (self->state != ha_discovery_state_idle) return;
 
 #ifdef USE_ESP_IDF
-    /* Start the publish task first (long-lived) */
     self->task_running = true;
-    self->publish_task_handle = xTaskCreateStatic(
-        publish_task,
-        "ha_discovery_pub",
+    self->task_handle = xTaskCreateStatic(
+        discovery_task,
+        "ha_discovery",
         2048,
         self,
         2,
-        self->publish_task_stack,
-        &self->publish_task_tcb);
-    if (!self->publish_task_handle) {
-        ESP_LOGE(TAG, "Failed to create publish task");
+        self->task_stack,
+        &self->task_tcb);
+    if (!self->task_handle) {
+        ESP_LOGE(TAG, "Failed to create discovery task");
         self->state = ha_discovery_state_failed;
         self->task_running = false;
         return;
     }
-
-    /* Start the decompress task (one-shot) */
-    self->decompress_task_handle = xTaskCreateStatic(
-        decompress_task,
-        "ha_discovery_decomp",
-        2048,
-        self,
-        2,
-        self->decompress_task_stack,
-        &self->decompress_task_tcb);
-    if (!self->decompress_task_handle) {
-        ESP_LOGE(TAG, "Failed to create decompress task");
-        self->state = ha_discovery_state_failed;
-        return;
-    }
 #else
-    /* Non-ESP-IDF: run inline */
-    self->state = ha_discovery_state_decompressing;
-
-    /* For non-ESP-IDF, we can't decompress with zlib easily.
-     * Mark as complete with no entities. */
+    /* Non-ESP-IDF: cannot decompress, mark complete. */
     self->state = ha_discovery_state_complete;
 #endif
 }
@@ -793,86 +641,28 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
 void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
 {
 #ifdef USE_ESP_IDF
-    /* Stop publish task */
-    if (self->publish_task_handle) {
+    if (self->task_handle) {
         self->task_running = false;
-        if (self->work_semaphore) {
-            xSemaphoreGive(self->work_semaphore);
-        }
         if (self->done_semaphore) {
             xSemaphoreTake(self->done_semaphore, pdMS_TO_TICKS(1000));
         }
         esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(100));
-        self->publish_task_handle = NULL;
+        self->task_handle = NULL;
     }
 
-    /* Wait for decompress task to finish */
-    if (self->decompress_task_handle) {
-        if (self->done_semaphore) {
-            xSemaphoreTake(self->done_semaphore, pdMS_TO_TICKS(1000));
-        }
-        esp_task_wdt_reset();
-        vTaskDelay(pdMS_TO_TICKS(100));
-        self->decompress_task_handle = NULL;
-    }
-
-    if (self->work_semaphore) {
-        vSemaphoreDelete(self->work_semaphore);
-        self->work_semaphore = NULL;
-    }
     if (self->done_semaphore) {
         vSemaphoreDelete(self->done_semaphore);
         self->done_semaphore = NULL;
-    }
-    if (self->queue_mutex) {
-        vSemaphoreDelete(self->queue_mutex);
-        self->queue_mutex = NULL;
     }
 #endif
 
     memset(self, 0, sizeof(*self));
 }
 
-void ha_discovery_manager_signal_work(ha_discovery_manager_t* self)
+bool ha_discovery_manager_is_processing(ha_discovery_manager_t* self)
 {
-#ifdef USE_ESP_IDF
-    if (self->work_semaphore) {
-        xSemaphoreGive(self->work_semaphore);
-    }
-#else
-    (void)self;
-#endif
-}
-
-uint16_t ha_discovery_manager_run(
-    ha_discovery_manager_t* self,
-    uint16_t max_publishes)
-{
-    uint16_t published = 0;
-
-    while (published < max_publishes && !queue_is_empty(self)) {
-        const ha_discovery_item_t* item = queue_peek(self);
-        if (!item) break;
-
-        mqtt_client_publish_raw(self->mqtt_client,
-            item->topic, item->payload, strlen(item->payload), true);
-
-        queue_pop(self);
-        self->total_published++;
-        published++;
-    }
-
-    if (queue_is_empty(self) && self->state == ha_discovery_state_publishing) {
-        self->state = ha_discovery_state_complete;
-    }
-
-    return published;
-}
-
-bool ha_discovery_manager_is_publishing(ha_discovery_manager_t* self)
-{
-    return self->state == ha_discovery_state_publishing;
+    return self->state == ha_discovery_state_processing;
 }
 
 ha_discovery_state_t ha_discovery_manager_get_state(ha_discovery_manager_t* self)

@@ -2,18 +2,17 @@
  * @file
  * @brief Home Assistant MQTT Discovery manager.
  *
- * Decompresses embedded JSONL entity definitions, filters against the
- * device's registered ERDs, and publishes HA discovery payloads to MQTT.
+ * Streaming design: decompresses embedded JSONL entity definitions one chunk
+ * at a time, publishes each entity's discovery payload to MQTT immediately,
+ * then discards the chunk before moving to the next.  No large queue is
+ * needed — peak memory is the decompress buffer plus one topic/payload pair.
  *
- * Two-task design (mirrors erd_cache_mqtt_publisher):
- *   1. Decompress/parse task: runs once during start(), decompresses
- *      embedded JSONL, parses, filters against ERD cache, and queues
- *      discovery payloads into a pre-allocated ring buffer.
- *   2. MQTT publish task: long-lived background task that drains the
- *      ring buffer and publishes discovery payloads at 50ms intervals.
- *      Signaled from loop() via signal_work().
+ * Single-task design:
+ *   One background FreeRTOS task walks categories → chunks → lines,
+ *   publishing each entity inline.  It yields (vTaskDelay 0) after every
+ *   chunk so the main loop and other tasks are never starved.
  *
- * States: IDLE -> DECOMPRESSING -> PUBLISHING -> COMPLETE / FAILED
+ * States: IDLE -> PROCESSING -> COMPLETE / FAILED
  *
  * All FreeRTOS task code is guarded with #ifdef USE_ESP_IDF for
  * simulator/test build compatibility.
@@ -35,7 +34,6 @@
 #    include "freertos/FreeRTOS.h"
 #    include "freertos/task.h"
 #    include "freertos/semphr.h"
-#    include "freertos/queue.h"
 #  endif
 #endif
 
@@ -46,33 +44,16 @@ extern "C" {
 /* Discovery manager states */
 typedef enum {
   ha_discovery_state_idle,
-  ha_discovery_state_decompressing,
-  ha_discovery_state_publishing,
+  ha_discovery_state_processing,
   ha_discovery_state_complete,
   ha_discovery_state_failed
 } ha_discovery_state_t;
 
-/*
- * Pre-allocated discovery payload item.
- * Each item holds a fully-formed MQTT topic and JSON payload
- * ready for publishing.
- */
-#define HA_DISCOVERY_TOPIC_SIZE 128
-#define HA_DISCOVERY_PAYLOAD_SIZE 512
-
-typedef struct {
-  char topic[HA_DISCOVERY_TOPIC_SIZE];
-  char payload[HA_DISCOVERY_PAYLOAD_SIZE];
-} ha_discovery_item_t;
-
-/* Maximum number of discovery items that can be queued. */
-#define HA_DISCOVERY_QUEUE_CAPACITY 256
-
 /*!
  * @brief Home Assistant MQTT Discovery manager.
  *
- * All buffers are pre-allocated — no heap allocation during decompress
- * or publish phases.
+ * All buffers are pre-allocated — no heap allocation during processing.
+ * Peak memory: decompress buffer (~16 KB) + one topic/payload pair (~640 B).
  */
 typedef struct {
   erd_cache_t* cache;              // Shared ERD cache (owned by GeappliancesBridge)
@@ -83,41 +64,26 @@ typedef struct {
 
   ha_discovery_state_t state;
 
-  /* Pre-allocated queue for discovery items. */
-  ha_discovery_item_t queue[HA_DISCOVERY_QUEUE_CAPACITY];
-  uint16_t queue_head;             // Next item to publish
-  uint16_t queue_tail;             // Next slot to enqueue
-  uint16_t queue_count;            // Items currently in queue
-
   /* Stats */
   uint32_t total_discovered;       // Total entities discovered
   uint32_t total_published;        // Total discovery publishes
   uint32_t total_filtered;         // Entities filtered out (ERD not registered)
 
-  /* Pre-allocated buffers for the background task. */
-  char task_topic[HA_DISCOVERY_TOPIC_SIZE];
-
   /* Time source */
   uint32_t (*get_time_ms)(void);
 
 #ifdef USE_ESP_IDF
-  TaskHandle_t    decompress_task_handle;
-  StaticTask_t    decompress_task_tcb;
-  StackType_t     decompress_task_stack[2048 / sizeof(StackType_t)];
+  TaskHandle_t    task_handle;
+  StaticTask_t    task_tcb;
+  StackType_t     task_stack[2048 / sizeof(StackType_t)];
 
-  TaskHandle_t    publish_task_handle;
-  StaticTask_t    publish_task_tcb;
-  StackType_t     publish_task_stack[2048 / sizeof(StackType_t)];
-
-  SemaphoreHandle_t work_semaphore;
   SemaphoreHandle_t done_semaphore;
-  SemaphoreHandle_t queue_mutex;  // Protects queue from torn reads
   bool task_running;
 
-  /* Pre-allocated buffers for the decompress task. */
-  char decompress_line[512];
-  char decompress_topic[HA_DISCOVERY_TOPIC_SIZE];
-  char decompress_payload[HA_DISCOVERY_PAYLOAD_SIZE];
+  /* Pre-allocated buffers for the background task. */
+  char topic_buf[128];
+  char payload_buf[512];
+  char line_buf[512];
   /* Buffer for chunked decompression. Sized for the largest single JSONL
    * line (~14KB for range.jsonl select entities with many options). */
   uint8_t decompress_buf[16384];
@@ -144,8 +110,8 @@ void ha_discovery_manager_configure(
 
 /*!
  * Start the discovery process.
- * Decompresses embedded JSONL, parses, filters, and queues discovery payloads.
- * On ESP-IDF, spawns background tasks; on non-ESP-IDF, runs inline.
+ * On ESP-IDF, spawns a background task that streams: decompress → publish → discard.
+ * On non-ESP-IDF, no-op (marks complete).
  */
 void ha_discovery_manager_start(ha_discovery_manager_t* self);
 
@@ -156,24 +122,9 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self);
 void ha_discovery_manager_cleanup(ha_discovery_manager_t* self);
 
 /*!
- * Signal the background publish task that there is work to do (ESP-IDF only).
- * On non-ESP-IDF, call run() directly from loop().
+ * Returns true if the manager is currently processing (decompressing/publishing).
  */
-void ha_discovery_manager_signal_work(ha_discovery_manager_t* self);
-
-/*!
- * Inline drain for non-ESP-IDF platforms.
- * Publishes one discovery item per call, up to max_publishes.
- * Returns the number of items published.
- */
-uint16_t ha_discovery_manager_run(
-  ha_discovery_manager_t* self,
-  uint16_t max_publishes);
-
-/*!
- * Returns true if the manager is in the PUBLISHING state.
- */
-bool ha_discovery_manager_is_publishing(ha_discovery_manager_t* self);
+bool ha_discovery_manager_is_processing(ha_discovery_manager_t* self);
 
 /*!
  * Returns the current state.
