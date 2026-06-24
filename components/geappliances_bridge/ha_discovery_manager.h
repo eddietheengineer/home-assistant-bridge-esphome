@@ -75,7 +75,7 @@ typedef struct {
 #ifdef USE_ESP_IDF
   TaskHandle_t    task_handle;
   StaticTask_t    task_tcb;
-  StackType_t     task_stack[2048 / sizeof(StackType_t)];
+  StackType_t     task_stack[4096 / sizeof(StackType_t)];
 
   SemaphoreHandle_t done_semaphore;
   bool task_running;
@@ -84,6 +84,29 @@ typedef struct {
   char topic_buf[128];
   char payload_buf[512];
   char line_buf[512];
+  /* Pre-allocated buffers for entity parsing to avoid stack overflow.
+   * publish_entity() and build_discovery_payload() together need ~2.3 KB
+   * of stack-local buffers; these are moved here so the task stack stays
+   * small.  Accessed via self->entity_* from the task. */
+  char entity_name_buf[128];
+  char domain_buf[32];
+  char field_id_buf[16];
+  char paired_erd_buf[8];
+  char role_buf[16];
+  char value_template_buf[512];
+  char command_template_buf[512];
+  char unit_buf[32];
+  char device_class_buf[32];
+  char state_class_buf[32];
+  char options_buf[256];
+  char data_type_buf[16];
+  char scale_factor_buf[16];
+  /* Intermediate topic buffers for build_discovery_payload. */
+  char state_topic_buf[128];
+  char command_topic_buf[128];
+  char actual_state_topic_buf[128];
+  char actual_command_topic_buf[128];
+  char unique_id_buf[128];
   /* Buffer for chunked decompression. Sized for the largest single JSONL
    * line (~14KB for range.jsonl select entities with many options). */
   uint8_t decompress_buf[16384];

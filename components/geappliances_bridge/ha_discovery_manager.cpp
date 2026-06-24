@@ -1,6 +1,16 @@
 /*!
  * @file
  * @brief Home Assistant MQTT Discovery manager implementation.
+ *
+ * Streaming design: decompresses embedded JSONL entity definitions one chunk
+ * at a time, publishes each entity's discovery payload to MQTT immediately,
+ * then discards the chunk before moving to the next.  No large queue is
+ * needed — peak memory is the decompress buffer plus pre-allocated buffers
+ * in the struct.
+ *
+ * Single-task design: one background FreeRTOS task walks categories → chunks
+ * → lines, publishing each entity inline.  It yields (vTaskDelay 0) after
+ * every chunk so the main loop and other tasks are never starved.
  */
 
 #include "ha_discovery_manager.h"
@@ -10,7 +20,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-
 
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
@@ -33,20 +42,12 @@
 #endif
 #endif /* USE_ESP_IDF */
 
-
 static const char* const TAG = "ha_discovery_manager";
 
 /* ------------------------------------------------------------------ */
 /* Zero-allocation JSON parser helpers                                */
 /* ------------------------------------------------------------------ */
 
-/*
- * json_get_str: extract a string value for a given key from a JSON line.
- * Returns a pointer into the source string, or NULL if not found.
- * The returned pointer is valid as long as the source string is valid.
- * The value is NOT null-terminated by this function; the caller must
- * find the end (next comma, closing brace, or end of string).
- */
 static const char* json_get_str(const char* json, const char* key,
                                  const char** out_value, size_t* out_len)
 {
@@ -102,18 +103,9 @@ static const char* json_get_str(const char* json, const char* key,
     return NULL;
 }
 
-
 /* ------------------------------------------------------------------ */
 /* Embedded category data declarations                                  */
 /* ------------------------------------------------------------------ */
-
-/*
- * Category data is now defined in ha_discovery_data.h with chunked
- * compression. The header provides:
- *   ha_discovery_category_t - category descriptor with chunk table
- *   ha_discovery_categories[] - array of all categories
- *   ha_discovery_category_count - number of categories
- */
 
 static const size_t num_categories = ha_discovery_category_count;
 
@@ -122,8 +114,6 @@ static const size_t num_categories = ha_discovery_category_count;
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
-/* Decompress a single chunk using tinfl (raw deflate, no zlib header).
- * Returns 0 on success, -1 on failure. */
 static int IRAM_ATTR chunk_decompress(const uint8_t* compressed, size_t compressed_len,
                            uint8_t* output, size_t* output_len)
 {
@@ -153,15 +143,10 @@ static int IRAM_ATTR chunk_decompress(const uint8_t* compressed, size_t compress
 }
 #endif
 
-
 /* ------------------------------------------------------------------ */
 /* ERD cache lookup                                                     */
 /* ------------------------------------------------------------------ */
 
-/*
- * erd_cache_find is a static function in erd_cache.cpp.
- * We replicate the linear scan here to avoid depending on an internal function.
- */
 static bool erd_is_registered(const ha_discovery_manager_t* self, uint16_t erd_id)
 {
     if (!self->cache) return false;
@@ -176,13 +161,9 @@ static bool erd_is_registered(const ha_discovery_manager_t* self, uint16_t erd_i
 }
 
 /* ------------------------------------------------------------------ */
-/* Discovery payload builder                                            */
+/* Discovery topic builder                                              */
 /* ------------------------------------------------------------------ */
 
-/*
- * Build the HA discovery topic:
- *   homeassistant/<domain>/<device_id>/<topic_key>/config
- */
 static int build_discovery_topic(char* buf, size_t buf_size,
                                   const char* domain,
                                   const char* device_id,
@@ -200,12 +181,16 @@ static int build_discovery_topic(char* buf, size_t buf_size,
     }
 }
 
+/* ------------------------------------------------------------------ */
+/* Discovery payload builder                                            */
+/* ------------------------------------------------------------------ */
 /*
- * Build the HA discovery JSON payload.
- * The payload is a compact JSON object conforming to the HA MQTT Discovery schema.
+ * All intermediate buffers are pre-allocated in the struct to avoid
+ * stack overflow in the discovery task.  The caller passes pointers
+ * to these buffers via the self->* fields.
  */
-static int build_discovery_payload(char* buf, size_t buf_size,
-                                    const ha_discovery_manager_t* self,
+static int build_discovery_payload(ha_discovery_manager_t* self,
+                                    char* buf, size_t buf_size,
                                     const char* erd_id_hex,
                                     const char* entity_name,
                                     const char* field_id,
@@ -220,54 +205,45 @@ static int build_discovery_payload(char* buf, size_t buf_size,
                                     const char* data_type,
                                     const char* scale_factor)
 {
-    /* Build unique_id */
-    char unique_id[128];
+    /* Build unique_id in pre-allocated buffer */
     if (field_id && field_id[0]) {
-        snprintf(unique_id, sizeof(unique_id),
+        snprintf(self->unique_id_buf, sizeof(self->unique_id_buf),
             "%s_erd_%s_%s", self->device_id, erd_id_hex, field_id);
     } else {
-        snprintf(unique_id, sizeof(unique_id),
+        snprintf(self->unique_id_buf, sizeof(self->unique_id_buf),
             "%s_erd_%s", self->device_id, erd_id_hex);
     }
 
-    /* Build state_topic and command_topic */
-    char state_topic[128];
-    char command_topic[128];
-
-    snprintf(state_topic, sizeof(state_topic),
+    /* Build state_topic and command_topic in pre-allocated buffers */
+    snprintf(self->state_topic_buf, sizeof(self->state_topic_buf),
         "geappliances/%s/erd/0x%s/value", self->device_id, erd_id_hex);
 
-    snprintf(command_topic, sizeof(command_topic),
+    snprintf(self->command_topic_buf, sizeof(self->command_topic_buf),
         "geappliances/%s/erd/0x%s/write", self->device_id, erd_id_hex);
 
-    /* For paired entities, the request ERD is the command topic, status is state topic */
-    char actual_state_topic[128];
-    char actual_command_topic[128];
-
+    /* For paired entities, swap state/command topics */
     if (paired_erd && paired_erd[0]) {
         if (role && strcmp(role, "request") == 0) {
-            /* This is the request ERD — command goes to this ERD, state comes from paired */
-            snprintf(actual_command_topic, sizeof(actual_command_topic),
+            snprintf(self->actual_command_topic_buf, sizeof(self->actual_command_topic_buf),
                 "geappliances/%s/erd/0x%s/write", self->device_id, erd_id_hex);
-            snprintf(actual_state_topic, sizeof(actual_state_topic),
+            snprintf(self->actual_state_topic_buf, sizeof(self->actual_state_topic_buf),
                 "geappliances/%s/erd/0x%s/value", self->device_id, paired_erd);
         } else {
-            /* This is the status ERD — state comes from this ERD, command goes to paired */
-            snprintf(actual_state_topic, sizeof(actual_state_topic),
+            snprintf(self->actual_state_topic_buf, sizeof(self->actual_state_topic_buf),
                 "geappliances/%s/erd/0x%s/value", self->device_id, erd_id_hex);
-            snprintf(actual_command_topic, sizeof(actual_command_topic),
+            snprintf(self->actual_command_topic_buf, sizeof(self->actual_command_topic_buf),
                 "geappliances/%s/erd/0x%s/write", self->device_id, paired_erd);
         }
     } else {
-        strncpy(actual_state_topic, state_topic, sizeof(actual_state_topic));
-        strncpy(actual_command_topic, command_topic, sizeof(actual_command_topic));
+        strncpy(self->actual_state_topic_buf, self->state_topic_buf, sizeof(self->actual_state_topic_buf));
+        strncpy(self->actual_command_topic_buf, self->command_topic_buf, sizeof(self->actual_command_topic_buf));
     }
 
     /* Build the JSON payload */
     int offset = 0;
     offset += snprintf(buf + offset, buf_size - (size_t)offset,
         "{\"name\":\"%s\",\"unique_id\":\"%s\",\"device\":{\"identifiers\":[\"%s\"],",
-        entity_name, unique_id, self->device_id);
+        entity_name, self->unique_id_buf, self->device_id);
 
     if (self->model_number && self->model_number[0]) {
         offset += snprintf(buf + offset, buf_size - (size_t)offset,
@@ -283,11 +259,11 @@ static int build_discovery_payload(char* buf, size_t buf_size,
         "\"manufacturer\":\"GE Appliances\"},");
 
     offset += snprintf(buf + offset, buf_size - (size_t)offset,
-        "\"state_topic\":\"%s\",", actual_state_topic);
+        "\"state_topic\":\"%s\",", self->actual_state_topic_buf);
 
     if (command_template && command_template[0]) {
         offset += snprintf(buf + offset, buf_size - (size_t)offset,
-            "\"command_topic\":\"%s\",", actual_command_topic);
+            "\"command_topic\":\"%s\",", self->actual_command_topic_buf);
     }
 
     if (value_template && value_template[0]) {
@@ -321,7 +297,6 @@ static int build_discovery_payload(char* buf, size_t buf_size,
     }
 
     if (data_type && data_type[0]) {
-        /* For number domain, add min/max based on data type */
         if (strcmp(data_type, "u8") == 0) {
             offset += snprintf(buf + offset, buf_size - (size_t)offset,
                 "\"min\":0,\"max\":255,");
@@ -358,10 +333,14 @@ static int build_discovery_payload(char* buf, size_t buf_size,
 
     return offset;
 }
-/* ------------------------------------------------------------------ */
-/* Direct publish helper (replaces queue)                              */
-/* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Direct publish helper: parse entity line and publish immediately     */
+/* ------------------------------------------------------------------ */
+/*
+ * All large buffers are pre-allocated in the struct to avoid stack
+ * overflow in the discovery task (4 KB task stack).
+ */
 static void publish_entity(ha_discovery_manager_t* self, const char* line)
 {
     const char* val = NULL;
@@ -373,83 +352,82 @@ static void publish_entity(ha_discovery_manager_t* self, const char* line)
     erd_id_hex[len] = '\0';
 
     if (!json_get_str(line, "n", &val, &len)) return;
-    char entity_name[128];
-    if (len >= sizeof(entity_name)) len = sizeof(entity_name) - 1;
-    memcpy(entity_name, val, len);
-    entity_name[len] = '\0';
+    if (len >= sizeof(self->entity_name_buf)) len = sizeof(self->entity_name_buf) - 1;
+    memcpy(self->entity_name_buf, val, len);
+    self->entity_name_buf[len] = '\0';
 
     if (!json_get_str(line, "d", &val, &len)) return;
-    char domain[32];
-    if (len >= sizeof(domain)) len = sizeof(domain) - 1;
-    memcpy(domain, val, len);
-    domain[len] = '\0';
+    if (len >= sizeof(self->domain_buf)) len = sizeof(self->domain_buf) - 1;
+    memcpy(self->domain_buf, val, len);
+    self->domain_buf[len] = '\0';
 
-    char field_id[16] = "";
-    char paired_erd[8] = "";
-    char role[16] = "";
-    char value_template[512] = "";
-    char command_template[512] = "";
-    char unit[32] = "";
-    char device_class[32] = "";
-    char state_class[32] = "";
-    char options[256] = "";
-    char data_type[16] = "";
-    char scale_factor[16] = "";
+    /* Optional fields — use struct buffers */
+    self->field_id_buf[0] = '\0';
+    self->paired_erd_buf[0] = '\0';
+    self->role_buf[0] = '\0';
+    self->value_template_buf[0] = '\0';
+    self->command_template_buf[0] = '\0';
+    self->unit_buf[0] = '\0';
+    self->device_class_buf[0] = '\0';
+    self->state_class_buf[0] = '\0';
+    self->options_buf[0] = '\0';
+    self->data_type_buf[0] = '\0';
+    self->scale_factor_buf[0] = '\0';
 
     if (json_get_str(line, "fi", &val, &len)) {
-        if (len >= sizeof(field_id)) len = sizeof(field_id) - 1;
-        memcpy(field_id, val, len);
-        field_id[len] = '\0';
+        if (len >= sizeof(self->field_id_buf)) len = sizeof(self->field_id_buf) - 1;
+        memcpy(self->field_id_buf, val, len);
+        self->field_id_buf[len] = '\0';
     }
     if (json_get_str(line, "p", &val, &len)) {
-        if (len >= sizeof(paired_erd)) len = sizeof(paired_erd) - 1;
-        memcpy(paired_erd, val, len);
-        paired_erd[len] = '\0';
+        if (len >= sizeof(self->paired_erd_buf)) len = sizeof(self->paired_erd_buf) - 1;
+        memcpy(self->paired_erd_buf, val, len);
+        self->paired_erd_buf[len] = '\0';
     }
     if (json_get_str(line, "r", &val, &len)) {
-        if (len >= sizeof(role)) len = sizeof(role) - 1;
-        memcpy(role, val, len);
-        role[len] = '\0';
+        if (len >= sizeof(self->role_buf)) len = sizeof(self->role_buf) - 1;
+        memcpy(self->role_buf, val, len);
+        self->role_buf[len] = '\0';
     }
     if (json_get_str(line, "vt", &val, &len)) {
-        if (len >= sizeof(value_template)) len = sizeof(value_template) - 1;
-        memcpy(value_template, val, len);
-        value_template[len] = '\0';
+        if (len >= sizeof(self->value_template_buf)) len = sizeof(self->value_template_buf) - 1;
+        memcpy(self->value_template_buf, val, len);
+        self->value_template_buf[len] = '\0';
     }
     if (json_get_str(line, "ct", &val, &len)) {
-        if (len >= sizeof(command_template)) len = sizeof(command_template) - 1;
-        memcpy(command_template, val, len);
-        command_template[len] = '\0';
+        if (len >= sizeof(self->command_template_buf)) len = sizeof(self->command_template_buf) - 1;
+        memcpy(self->command_template_buf, val, len);
+        self->command_template_buf[len] = '\0';
     }
     if (json_get_str(line, "u", &val, &len)) {
-        if (len >= sizeof(unit)) len = sizeof(unit) - 1;
-        memcpy(unit, val, len);
-        unit[len] = '\0';
+        if (len >= sizeof(self->unit_buf)) len = sizeof(self->unit_buf) - 1;
+        memcpy(self->unit_buf, val, len);
+        self->unit_buf[len] = '\0';
     }
     if (json_get_str(line, "dc", &val, &len)) {
-        if (len >= sizeof(device_class)) len = sizeof(device_class) - 1;
-        memcpy(device_class, val, len);
-        device_class[len] = '\0';
+        if (len >= sizeof(self->device_class_buf)) len = sizeof(self->device_class_buf) - 1;
+        memcpy(self->device_class_buf, val, len);
+        self->device_class_buf[len] = '\0';
     }
     if (json_get_str(line, "sc", &val, &len)) {
-        if (len >= sizeof(state_class)) len = sizeof(state_class) - 1;
-        memcpy(state_class, val, len);
-        state_class[len] = '\0';
+        if (len >= sizeof(self->state_class_buf)) len = sizeof(self->state_class_buf) - 1;
+        memcpy(self->state_class_buf, val, len);
+        self->state_class_buf[len] = '\0';
     }
     if (json_get_str(line, "o", &val, &len)) {
-        if (len >= sizeof(options)) len = sizeof(options) - 1;
-        memcpy(options, val, len);
-        options[len] = '\0';
+        if (len >= sizeof(self->options_buf)) len = sizeof(self->options_buf) - 1;
+        memcpy(self->options_buf, val, len);
+        self->options_buf[len] = '\0';
     }
     if (json_get_str(line, "dt", &val, &len)) {
-        if (len >= sizeof(data_type)) len = sizeof(data_type) - 1;
-        memcpy(data_type, val, len);
-        data_type[len] = '\0';
+        if (len >= sizeof(self->data_type_buf)) len = sizeof(self->data_type_buf) - 1;
+        memcpy(self->data_type_buf, val, len);
+        self->data_type_buf[len] = '\0';
     }
     if (json_get_str(line, "sf", &val, &len)) {
-        if (len >= sizeof(scale_factor)) len = sizeof(scale_factor) - 1;
-        memcpy(scale_factor, val, len);
-        scale_factor[len] = '\0';
+        if (len >= sizeof(self->scale_factor_buf)) len = sizeof(self->scale_factor_buf) - 1;
+        memcpy(self->scale_factor_buf, val, len);
+        self->scale_factor_buf[len] = '\0';
     }
 
     uint16_t erd_id = (uint16_t)strtoul(erd_id_hex, NULL, 16);
@@ -459,8 +437,8 @@ static void publish_entity(ha_discovery_manager_t* self, const char* line)
         return;
     }
 
-    if (paired_erd[0]) {
-        uint16_t paired_id = (uint16_t)strtoul(paired_erd, NULL, 16);
+    if (self->paired_erd_buf[0]) {
+        uint16_t paired_id = (uint16_t)strtoul(self->paired_erd_buf, NULL, 16);
         if (!erd_is_registered(self, paired_id)) {
             self->total_filtered++;
             return;
@@ -468,14 +446,14 @@ static void publish_entity(ha_discovery_manager_t* self, const char* line)
     }
 
     build_discovery_topic(self->topic_buf, sizeof(self->topic_buf),
-        domain, self->device_id, erd_id_hex, field_id);
+        self->domain_buf, self->device_id, erd_id_hex, self->field_id_buf);
 
-    build_discovery_payload(self->payload_buf, sizeof(self->payload_buf),
-        self, erd_id_hex, entity_name,
-        field_id, paired_erd, role,
-        value_template, command_template,
-        unit, device_class, state_class,
-        options, data_type, scale_factor);
+    build_discovery_payload(self, self->payload_buf, sizeof(self->payload_buf),
+        erd_id_hex, self->entity_name_buf,
+        self->field_id_buf, self->paired_erd_buf, self->role_buf,
+        self->value_template_buf, self->command_template_buf,
+        self->unit_buf, self->device_class_buf, self->state_class_buf,
+        self->options_buf, self->data_type_buf, self->scale_factor_buf);
 
     mqtt_client_publish_raw(self->mqtt_client,
         self->topic_buf, self->payload_buf, strlen(self->payload_buf), true);
@@ -489,7 +467,6 @@ static void publish_entity(ha_discovery_manager_t* self, const char* line)
 /* ------------------------------------------------------------------ */
 
 #ifdef USE_ESP_IDF
-/* Process a single chunk: decompress, publish each entity, discard. */
 static void IRAM_ATTR process_chunk_streaming(ha_discovery_manager_t* self,
     const uint8_t* compressed, size_t compressed_len)
 {
@@ -500,7 +477,6 @@ static void IRAM_ATTR process_chunk_streaming(ha_discovery_manager_t* self,
         return;
     }
 
-    /* Parse line by line from decompressed data, publishing each entity. */
     const char* p = (const char*)self->decompress_buf;
     const char* end = p + dst_size;
 
@@ -556,7 +532,6 @@ static void discovery_task(void* arg)
 
     ESP_LOGI(TAG, "Starting HA discovery streaming...");
 
-    /* Walk every category, processing each chunk: decompress → publish → discard. */
     for (size_t i = 0; i < num_categories; i++) {
         process_category_streaming(self, &ha_discovery_categories[i]);
 
@@ -569,7 +544,6 @@ static void discovery_task(void* arg)
     ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
         self->total_published, self->total_filtered);
 
-    /* Signal completion */
     if (self->done_semaphore) {
         xSemaphoreGive(self->done_semaphore);
     }
@@ -621,7 +595,7 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
     self->task_handle = xTaskCreateStatic(
         discovery_task,
         "ha_discovery",
-        2048,
+        4096,
         self,
         2,
         self->task_stack,
@@ -633,7 +607,6 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
         return;
     }
 #else
-    /* Non-ESP-IDF: cannot decompress, mark complete. */
     self->state = ha_discovery_state_complete;
 #endif
 }
