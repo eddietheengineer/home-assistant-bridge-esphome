@@ -759,15 +759,21 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         return;
     }
 
-    /* Rate-limit publishing. */
+    /* Non-blocking: try to take semaphore for a pending payload. */
+    if (xSemaphoreTake(self->publish_sem, 0) != pdTRUE) {
+        return;  /* No payload ready yet. */
+    }
+
+    /* Wait until rate-limit window has passed before publishing.
+     * We hold the semaphore so the producer blocks, preventing buffer
+     * overwrite. The producer's portMAX_DELAY wait is bounded by the
+     * rate-limit interval (max 50ms). */
     uint32_t now = self->get_time_ms();
     if (now - self->last_publish_ms < HA_DISCOVERY_PUBLISH_INTERVAL_MS) {
-        /* Give semaphore back immediately so producer can continue building.
-         * We'll take it again next loop iteration. */
-        xSemaphoreGive(self->publish_sem);
-        return;
+        uint32_t wait_ms = HA_DISCOVERY_PUBLISH_INTERVAL_MS - (now - self->last_publish_ms);
+        vTaskDelay(pdMS_TO_TICKS(wait_ms));
     }
-    self->last_publish_ms = now;
+    self->last_publish_ms = self->get_time_ms();
 
     /* Publish from shared buffer. */
     if (self->payload_valid && self->mqtt_client) {
