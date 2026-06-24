@@ -414,96 +414,112 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
      * Templates are embedded directly from the raw JSONL line with re-escaping,
      * avoiding intermediate buffer limits. */
     char* payload = self->payload_buf;
-    int offset = 0;
-    int remaining = (int)sizeof(self->payload_buf);
+    int pos = 0;
+    int space = (int)sizeof(self->payload_buf) - 1;  /* leave room for null */
 
-    offset += snprintf(payload + offset, remaining,
+    int n;
+
+    n = snprintf(payload + pos, space,
         "{\"name\":\"%s\",\"unique_id\":\"%s\",\"device\":%s,",
         self->entity_name_buf, self->unique_id_buf, self->device_json_buf);
-    remaining -= offset;
+    if (n < 0 || n >= space) goto too_large;
+    pos += n; space -= n;
 
-    offset += snprintf(payload + offset, remaining,
+    n = snprintf(payload + pos, space,
         "\"state_topic\":\"%s\",", self->actual_state_topic_buf);
-    remaining -= offset;
+    if (n < 0 || n >= space) goto too_large;
+    pos += n; space -= n;
 
     /* Embed value_template directly from raw JSONL with re-escaping. */
     if (json_get_str(line, "vt", &val, &len)) {
-        offset += snprintf(payload + offset, remaining, "\"value_template\":\"");
-        remaining -= offset;
-        int reescaped = json_reescape(val, len, payload + offset, remaining);
-        offset += reescaped;
-        remaining -= reescaped;
-        offset += snprintf(payload + offset, remaining, "\",");
-        remaining -= offset;
+        n = snprintf(payload + pos, space, "\"value_template\":\"");
+        if (n < 0 || n >= space) goto too_large;
+        pos += n; space -= n;
+        int reescaped = json_reescape(val, len, payload + pos, space);
+        if (reescaped >= space) goto too_large;
+        pos += reescaped; space -= reescaped;
+        n = snprintf(payload + pos, space, "\",");
+        if (n < 0 || n >= space) goto too_large;
+        pos += n; space -= n;
     }
 
     /* Embed command_template directly from raw JSONL with re-escaping. */
     if (json_get_str(line, "ct", &val, &len)) {
-        offset += snprintf(payload + offset, remaining, "\"command_topic\":\"%s\",\"command_template\":\"", self->actual_command_topic_buf);
-        remaining -= offset;
-        int reescaped = json_reescape(val, len, payload + offset, remaining);
-        offset += reescaped;
-        remaining -= reescaped;
-        offset += snprintf(payload + offset, remaining, "\",");
-        remaining -= offset;
+        n = snprintf(payload + pos, space, "\"command_topic\":\"%s\",\"command_template\":\"", self->actual_command_topic_buf);
+        if (n < 0 || n >= space) goto too_large;
+        pos += n; space -= n;
+        int reescaped = json_reescape(val, len, payload + pos, space);
+        if (reescaped >= space) goto too_large;
+        pos += reescaped; space -= reescaped;
+        n = snprintf(payload + pos, space, "\",");
+        if (n < 0 || n >= space) goto too_large;
+        pos += n; space -= n;
     } else if (self->paired_erd_buf[0]) {
-        offset += snprintf(payload + offset, remaining, "\"command_topic\":\"%s\",", self->actual_command_topic_buf);
-        remaining -= offset;
+        n = snprintf(payload + pos, space, "\"command_topic\":\"%s\",", self->actual_command_topic_buf);
+        if (n < 0 || n >= space) goto too_large;
+        pos += n; space -= n;
     }
 
     if (self->unit_buf[0]) {
-        offset += snprintf(payload + offset, remaining, "\"unit_of_measurement\":\"%s\",", self->unit_buf);
-        remaining -= offset;
+        n = snprintf(payload + pos, space, "\"unit_of_measurement\":\"%s\",", self->unit_buf);
+        if (n < 0 || n >= space) goto too_large;
+        pos += n; space -= n;
     }
     if (self->device_class_buf[0]) {
-        offset += snprintf(payload + offset, remaining, "\"device_class\":\"%s\",", self->device_class_buf);
-        remaining -= offset;
+        n = snprintf(payload + pos, space, "\"device_class\":\"%s\",", self->device_class_buf);
+        if (n < 0 || n >= space) goto too_large;
+        pos += n; space -= n;
     }
     if (self->state_class_buf[0]) {
-        offset += snprintf(payload + offset, remaining, "\"state_class\":\"%s\",", self->state_class_buf);
-        remaining -= offset;
+        n = snprintf(payload + pos, space, "\"state_class\":\"%s\",", self->state_class_buf);
+        if (n < 0 || n >= space) goto too_large;
+        pos += n; space -= n;
     }
     if (self->options_buf[0]) {
-        offset += snprintf(payload + offset, remaining, "\"options\":%s,", self->options_buf);
-        remaining -= offset;
+        n = snprintf(payload + pos, space, "\"options\":%s,", self->options_buf);
+        if (n < 0 || n >= space) goto too_large;
+        pos += n; space -= n;
     }
     if (self->data_type_buf[0]) {
         if (strcmp(self->data_type_buf, "u8") == 0) {
-            offset += snprintf(payload + offset, remaining, "\"min\":0,\"max\":255,");
+            n = snprintf(payload + pos, space, "\"min\":0,\"max\":255,");
         } else if (strcmp(self->data_type_buf, "i8") == 0) {
-            offset += snprintf(payload + offset, remaining, "\"min\":-128,\"max\":127,");
+            n = snprintf(payload + pos, space, "\"min\":-128,\"max\":127,");
         } else if (strcmp(self->data_type_buf, "u16") == 0) {
-            offset += snprintf(payload + offset, remaining, "\"min\":0,\"max\":65535,");
+            n = snprintf(payload + pos, space, "\"min\":0,\"max\":65535,");
         } else if (strcmp(self->data_type_buf, "i16") == 0) {
-            offset += snprintf(payload + offset, remaining, "\"min\":-32768,\"max\":32767,");
+            n = snprintf(payload + pos, space, "\"min\":-32768,\"max\":32767,");
         } else if (strcmp(self->data_type_buf, "u32") == 0) {
-            offset += snprintf(payload + offset, remaining, "\"min\":0,\"max\":4294967295,");
+            n = snprintf(payload + pos, space, "\"min\":0,\"max\":4294967295,");
         } else if (strcmp(self->data_type_buf, "i32") == 0) {
-            offset += snprintf(payload + offset, remaining, "\"min\":-2147483648,\"max\":2147483647,");
+            n = snprintf(payload + pos, space, "\"min\":-2147483648,\"max\":2147483647,");
         }
-        remaining -= offset;
+        if (n < 0 || n >= space) goto too_large;
+        pos += n; space -= n;
     }
     if (self->scale_factor_buf[0]) {
-        offset += snprintf(payload + offset, remaining, "\"step\":%s,", self->scale_factor_buf);
-        remaining -= offset;
+        n = snprintf(payload + pos, space, "\"step\":%s,", self->scale_factor_buf);
+        if (n < 0 || n >= space) goto too_large;
+        pos += n; space -= n;
     }
 
     /* Remove trailing comma and close */
-    if (offset > 0 && payload[offset - 1] == ',') {
-        payload[offset - 1] = '\0';
-        offset--;
+    if (pos > 0 && payload[pos - 1] == ',') {
+        payload[pos - 1] = '\0';
+        pos--; space++;
     }
-    offset += snprintf(payload + offset, sizeof(self->payload_buf) - (size_t)offset, "}");
-
-    /* Check if payload fits */
-    if (offset >= (int)sizeof(self->payload_buf)) {
-        ESP_LOGW(TAG, "Payload too large for ERD 0x%s, skipping", erd_id_hex);
-        self->total_filtered++;
-        return false;
-    }
+    n = snprintf(payload + pos, space, "}");
+    if (n < 0 || n >= space) goto too_large;
+    pos += n;
+    payload[pos] = '\0';
 
     self->total_discovered++;
     return true;
+
+too_large:
+    ESP_LOGW(TAG, "Payload too large for ERD 0x%s, skipping", erd_id_hex);
+    self->total_filtered++;
+    return false;
 }
 #endif
 
