@@ -58,7 +58,7 @@
 {"i":"7121","n":"External control input override - Y (Compressor)","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 16) % 2 else '00' }}","fi":"y_compressor","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7121","n":"External control input override - W (Heater)","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 32) % 2 else '00' }}","fi":"w_heater","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7121","n":"External control input override - Y2 (Compressor Stage 2)","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 64) % 2 else '00' }}","fi":"y2_compressor_stage_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7122","n":"Central desk control","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'CDC input is clear - unit operates normally', '01': 'CDC input is asserted - unit operation is suspended'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7122","n":"Central desk control","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7123","n":"External Thermostat Mode","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Stop', '01': 'Heat', '02': 'Fan', '03': 'Cool', '04': 'Parameter Set', '05': 'Forced Run', '06': 'External Thermostat', '07': 'Fault Code Display', '08': 'Factory Test', '09': 'Engineering Digit Entry'}.get(value[:2], 'Unknown') }}"}
 {"i":"712f","n":"Outdoor Fan Count","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"7130","n":"Inside fan speed","d":"sensor","ds":2,"u":"rpm","vt":"{{ value | int(base=16) }}"}
@@ -102,7 +102,7 @@
 {"i":"745b","n":"24V External Thermostat","d":"switch","ds":1,"p":"745a","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"745d","n":"Fan Boost","d":"switch","ds":1,"p":"745c","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"745f","n":"Heat Selector","d":"select","ds":1,"p":"745e","r":"request","vt":"{{ {'00': 'Electric Heat Only', '01': 'High Demand', '02': 'Hybrid', '03': 'Boost Heat Pump Allowed', '04': 'Heat Pump Only'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Electric Heat Only': '00', 'High Demand': '01', 'Hybrid': '02', 'Boost Heat Pump Allowed': '03', 'Heat Pump Only': '04'}[value] }}","o":"[\"Electric Heat Only\", \"High Demand\", \"Hybrid\", \"Boost Heat Pump Allowed\", \"Heat Pump Only\"]"}
-{"i":"7460","n":"Heat Selector Strict Status","d":"binary_sensor","ds":5,"vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
+{"i":"7460","n":"Heat Selector Strict Status","d":"binary_sensor","ds":5,"vt":"{{ 'ON' if value[:10] | int(base=16) != 0 else 'OFF' }}"}
 {"i":"7460","n":"Heat Selector Strict Status - Disabled Supported","d":"binary_sensor","ds":5,"vt":"{{ '01' if ((value[2:10] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"disabled_supported","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7460","n":"Heat Selector Strict Status - Enabled Supported","d":"binary_sensor","ds":5,"vt":"{{ '01' if ((value[2:10] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"enabled_supported","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7463","n":"UVC Module","d":"switch","ds":1,"p":"7462","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -458,7 +458,7 @@
 {"i":"7975","n":"Vacation Mode (10C Heating Mode) Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7976","n":"Vacation Mode (10C Heating Mode) Control","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7977","n":"Service Mode Electric Room Heater Request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7978","n":"Self Clean Request","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'No Request', '01': 'Request Self Clean Cycle To Occur'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7978","n":"Self Clean Request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7979","n":"Self Clean Reminder Timer Duration Selection","d":"sensor","ds":1,"dc":"duration","vt":"{{ {'00': '250 Hours', '01': '500 Hours', '02': '1000 Hours', '03': '1500 Hours', '04': 'Never'}.get(value[:2], 'Unknown') }}"}
 {"i":"797a","n":"Self Clean Alert Countdown","d":"sensor","ds":4,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"797b","n":"Alerts - Self Clean First Alert","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"self_clean_first_alert","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -544,7 +544,7 @@
 {"i":"7a00","n":"WAC Fan Setting","d":"sensor","ds":1,"vt":"{{ {'01': 'Auto', '02': 'Low', '04': 'Medium', '08': 'High', '10': 'Smart Dry'}.get(value[:2], 'Unknown') }}"}
 {"i":"7a01","n":"WAC Operation Mode","d":"sensor","ds":1,"vt":"{{ {'00': 'Cool', '01': 'Fan Only', '02': 'Energy Saver', '03': 'Heat', '04': 'Dehumidify/Dry', '05': 'Auto', '06': 'Turbo Cool', '07': 'Silent'}.get(value[:2], 'Unknown') }}"}
 {"i":"7a02","n":"WAC Ambient Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
-{"i":"7a04","n":"WAC Filter Notification","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Clean filter light off', '01': 'Clean filter light on'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7a04","n":"WAC Filter Notification","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7a06","n":"Information of consumed power and time period. - Power Consumption kWh (most significant 32 bits)","d":"sensor","ds":12,"vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"7a06","n":"Information of consumed power and time period. - Power Consumption kWh (least significant 32 bits)","d":"sensor","ds":12,"vt":"{{ value[8:16] | int(base=16) }}","fi":"power_consumption_kwh_least_significant_32_bits"}
 {"i":"7a06","n":"Information of consumed power and time period. - Power Consumption Period","d":"sensor","ds":12,"vt":"{{ value[16:24] | int(base=16) }}","fi":"power_consumption_period"}
@@ -581,7 +581,7 @@
 {"i":"7b02","n":"Target Humidity","d":"sensor","ds":1,"u":"%","dc":"humidity","vt":"{{ value | int(base=16) }}"}
 {"i":"7b03","n":"Target Humidity Range - Minimum Target Humidity","d":"sensor","ds":2,"u":"%","dc":"humidity","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"7b03","n":"Target Humidity Range - Maximum Target Humidity","d":"sensor","ds":2,"u":"%","vt":"{{ value[2:4] | int(base=16) }}","fi":"maximum_target_humidity"}
-{"i":"7b05","n":"Sleep Mode","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Sleep Mode Off', '01': 'Sleep Mode On'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7b05","n":"Sleep Mode","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7b06","n":"Target Temperature Range - Minimum Target Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"7b06","n":"Target Temperature Range - Maximum Target Temperature","d":"sensor","ds":2,"u":"°F","vt":"{{ value[2:4] | int(base=16) }}","fi":"maximum_target_temperature"}
 {"i":"7b07","n":"Up-down Air Swing","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -593,6 +593,6 @@
 {"i":"7b0b","n":"Available AC Fan Speeds - Medium","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"medium","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7b0b","n":"Available AC Fan Speeds - Low","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"low","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7b0b","n":"Available AC Fan Speeds - Smart Dry","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 16) % 2 else '00' }}","fi":"smart_dry","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7b0c","n":"Eco Mode","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Eco Mode Off', '01': 'Eco Mode On'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7b0c","n":"Eco Mode","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7b0e","n":"Sleep Mode Request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7b0f","n":"Sleep Mode On/Off Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}

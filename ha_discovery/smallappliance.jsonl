@@ -359,7 +359,7 @@
 {"i":"910a","n":"Under Counter Ice Maker Bin Full","d":"sensor","ds":1,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"910b","n":"Ice Maker Filter Life Used Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"910c","n":"Ice Maker Clean Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Clean', '01': 'Clean soon (order supplies)', '02': 'Clean now'}.get(value[:2], 'Unknown') }}"}
-{"i":"910f","n":"Door Status","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ {'00': 'Closed', '01': 'Open'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"910f","n":"Door Status","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"911d","n":"Ice Maker Filter Status Reset","d":"button","ds":1,"dc":"restart"}
 {"i":"9132","n":"Tank Drain Frequency Setting","d":"sensor","ds":1,"vt":"{{ {'00': 'Normal', '01': 'More Frequent', '02': 'Very Frequent'}.get(value[:2], 'Unknown') }}"}
 {"i":"9133","n":"Harvest Time Adjustment Setting","d":"sensor","ds":1,"vt":"{{ {'00': 'Normal', '01': 'Longer', '02': 'Longest'}.get(value[:2], 'Unknown') }}"}

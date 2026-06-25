@@ -124,7 +124,7 @@
 {"i":"301b","n":"CSM Fault Data - Water Valve","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 32768) % 2 else '00' }}","fi":"water_valve","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"301c","n":"Cycle Names - Selected Cycle Name","d":"sensor","ds":20,"vt":"{{ value[0:20] | int(base=16) }}"}
 {"i":"301c","n":"Cycle Names - Active Sub-cycle Name","d":"sensor","ds":20,"vt":"{{ value[20:40] | int(base=16) }}","fi":"active_sub_cycle_name"}
-{"i":"301d","n":"Leak Detected","d":"binary_sensor","ds":1,"dc":"moisture","vt":"{{ {'00': 'Leak Not Detected', '01': 'Leak Detected'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301d","n":"Leak Detected","d":"binary_sensor","ds":1,"dc":"moisture","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"301e","n":"Dispense Count","d":"sensor","ds":2,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"301f","n":"PODS Count","d":"sensor","ds":2,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"3020","n":"Dishwasher Usage Profile - Wash Pump Run Time in Seconds","d":"sensor","ds":32,"vt":"{{ value[0:8] | int(base=16) }}"}

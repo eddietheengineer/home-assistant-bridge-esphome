@@ -24,7 +24,7 @@
 {"i":"003a","n":"Application Version","d":"sensor","ds":4,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}"}
 {"i":"003b","n":"Parametric Version","d":"sensor","ds":4,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}"}
 {"i":"003c","n":"Auxiliary Version","d":"sensor","ds":4,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}"}
-{"i":"004f","n":"Enhanced Sabbath Mode Status","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Inactive', '01': 'Active'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"004f","n":"Enhanced Sabbath Mode Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0050","n":"Timer","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
 {"i":"0051","n":"Available Sound Levels - Off","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"off","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0051","n":"Available Sound Levels - Low","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 512) % 2 else '00' }}","fi":"low","pon":"01","poff":"00","son":"01","soff":"00"}

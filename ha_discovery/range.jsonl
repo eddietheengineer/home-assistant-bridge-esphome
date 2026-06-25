@@ -1,5 +1,5 @@
 {"i":"5000","n":"Twelve Hour Shutoff","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5001","n":"End Tone","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Beep', '01': 'Continuous Tone'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"5001","n":"End Tone","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5003","n":"Convection Conversion","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5006","n":"Key Pressed","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5007","n":"Oven Configuration - Has Camera","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"has_camera","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -193,7 +193,7 @@
 {"i":"510b","n":"Upper Oven Available Cook Modes - Bake Probe Delay Start","d":"binary_sensor","ds":10,"vt":"{{ '01' if ((value[0:20] | int(base=16)) // 64) % 2 else '00' }}","fi":"bake_probe_delay_start","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"510d","n":"Upper Oven Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"510e","n":"Upper Oven Baking Surface Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
-{"i":"510f","n":"Request Upper Door Open","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Default', '01': 'Open Door Request'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"510f","n":"Request Upper Door Open","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5110","n":"Upper Oven Door State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'Open', '02': 'Closed', '03': 'Initial Inspection'}.get(value[:2], 'Unknown') }}"}
 {"i":"5111","n":"Upper Oven Light Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'01': 'High', '02': 'Dim'}.get(value[:2], 'Unknown') }}"}
 {"i":"5112","n":"Upper Oven Light Level Availability - Off","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"off","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -729,7 +729,7 @@
 {"i":"520b","n":"Lower Oven Available Cook Modes - Bake Timed Two-Temp","d":"binary_sensor","ds":10,"vt":"{{ '01' if ((value[0:20] | int(base=16)) // 32) % 2 else '00' }}","fi":"bake_timed_two_temp","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"520b","n":"Lower Oven Available Cook Modes - Bake Probe Delay Start","d":"binary_sensor","ds":10,"vt":"{{ '01' if ((value[0:20] | int(base=16)) // 64) % 2 else '00' }}","fi":"bake_probe_delay_start","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"520d","n":"Lower Oven Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
-{"i":"520f","n":"Request Lower Door Open","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Default', '01': 'Open Door Request'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"520f","n":"Request Lower Door Open","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5210","n":"Lower Oven Door State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'Open', '02': 'Closed', '03': 'Initial Inspection'}.get(value[:2], 'Unknown') }}"}
 {"i":"5211","n":"Lower Oven Light Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'01': 'High', '02': 'Dim'}.get(value[:2], 'Unknown') }}"}
 {"i":"5212","n":"Lower Oven Light Level Availability - Off","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"off","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1842,7 +1842,7 @@
 {"i":"58b5","n":"Right Front Closed Loop Cooking Device Index","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"58b6","n":"Right Rear Closed Loop Cooking Device Index","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5900","n":"Gas Lockout Valve Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Initializing', '01': 'Gas Valve Unlocked', '02': 'Gas Valve Locked', '03': 'Gas Valve in Transition', '04': 'Gas Valve status unknown'}.get(value[:2], 'Unknown') }}"}
-{"i":"5901","n":"Lock Gas Valve Request","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Do Nothing', '01': 'Request Gas Valve to be Locked'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"5901","n":"Lock Gas Valve Request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5903","n":"Modular Cooktops (MCT) System Configuration Status - Number of Devices to Report","d":"sensor","ds":15,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"5903","n":"Modular Cooktops (MCT) System Configuration Status - Pos 7D Device Type","d":"sensor","ds":15,"dc":"enum","vt":"{{ {'00': 'Undefined', '01': 'Induction Cooktop 300 mm', '02': 'Induction Cooktop 390 mm', '03': 'Induction Cooktop 600 mm', '04': 'Induction Cooktop 760 mm', '05': 'Induction Cooktop 900 mm', '06': 'Teppan Cooktop 300 mm', '07': 'Teppan Cooktop 390 mm', '08': 'Downdraft', 'ff': 'Unknown'}.get(value[2:4], 'Unknown') }}","fi":"pos_7d_device_type"}
 {"i":"5903","n":"Modular Cooktops (MCT) System Configuration Status - Pos 7D Device State","d":"sensor","ds":15,"dc":"enum","vt":"{{ {'00': 'Undefined', '01': 'Missing', '02': 'Confirmed', '03': 'New Found'}.get(value[4:6], 'Unknown') }}","fi":"pos_7d_device_state"}
@@ -2855,11 +2855,11 @@
 {"i":"5b03","n":"Hood Light Level Availability - High","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"high","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b03","n":"Hood Light Level Availability - Infinite","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"infinite","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b03","n":"Hood Light Level Availability - Med","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 16) % 2 else '00' }}","fi":"med","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5b04","n":"Hood Delay Off","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Cancel', '01': 'Activate'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"5b04","n":"Hood Delay Off","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b05","n":"Hood Delay On","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Cancel', '01': 'Activate'}.get(value[:2], 'Unknown') }}"}
 {"i":"5b06","n":"Hood Heat Sensor Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
 {"i":"5b07","n":"Hood Heat Sensor State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Normal', '01': 'Heat Alarm', 'ff': 'Invalid'}.get(value[:2], 'Unknown') }}"}
-{"i":"5b08","n":"Hood Camera Light Assist Level","d":"binary_sensor","ds":1,"vt":"{{ {'01': 'Dim', '02': 'High'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"5b08","n":"Hood Camera Light Assist Level","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b09","n":"Hood Camera Light Assist Level Availability - Off","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"off","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b09","n":"Hood Camera Light Assist Level Availability - Dim","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"dim","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b09","n":"Hood Camera Light Assist Level Availability - High","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"high","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -2880,7 +2880,7 @@
 {"i":"5b10","n":"Boost Duration Limits - Maximum Boost Duration","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"maximum_boost_duration"}
 {"i":"5b11","n":"Delay Off Duration Limits - Min Delay Off Duration","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"5b11","n":"Delay Off Duration Limits - Max Delay Off Duration","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"max_delay_off_duration"}
-{"i":"5b12","n":"Hood Request On/Off","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Off', '01': 'On'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"5b12","n":"Hood Request On/Off","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b13","n":"Hood Actual Fan Speed","d":"sensor","ds":1,"u":"rpm","vt":"{{ value | int(base=16) }}"}
 {"i":"5b14","n":"Hood Requested Fan Speed","d":"sensor","ds":1,"u":"rpm","vt":"{{ value | int(base=16) }}"}
 {"i":"5b15","n":"Hood Available Fan Speeds","d":"sensor","ds":1,"u":"rpm","vt":"{{ value | int(base=16) }}"}
@@ -2889,7 +2889,7 @@
 {"i":"5b18","n":"Hood Requested Light Level","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b19","n":"Hood Available Light Levels","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b1a","n":"Hood Actual Delay Off Mode","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Disabled', '01': 'Enabled', 'ff': 'Not Available'}.get(value[:2], 'Unknown') }}"}
-{"i":"5b1b","n":"Hood Delay Off Request","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"5b1b","n":"Hood Delay Off Request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b1c","n":"Hood Actual Delay Off Duration","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b1d","n":"Hood Requested Delay Off Duration","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b1e","n":"Hood to Cooktop Connection Status (Hood-Side)","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not Paired And Not Connected', '01': 'Paired But Not Connected', '02': 'Paired And Connected', 'ff': 'Hood-To-Cooktop Not Available'}.get(value[:2], 'Unknown') }}"}
@@ -3100,7 +3100,7 @@
 {"i":"5c11","n":"Microwave State - Oven Temperature","d":"sensor","ds":6,"vt":"{{ value[8:12] | int(base=16) }}","fi":"oven_temperature"}
 {"i":"5c12","n":"Microwave Power in Watts","d":"sensor","ds":2,"u":"W","dc":"power","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"5c13","n":"Microwave Time after Cycle End","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
-{"i":"5c14","n":"Microwave Remote Enable","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"5c14","n":"Microwave Remote Enable","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5c15","n":"Microwave Cook Timer - Minutes (minutes)","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"5c15","n":"Microwave Cook Timer - Seconds (seconds)","d":"sensor","ds":2,"u":"min","vt":"{{ value[2:4] | int(base=16) }}","fi":"seconds_seconds"}
 {"i":"5c16","n":"Microwave Defrost by Weight - Current Setting","d":"sensor","ds":1,"sf":10,"vt":"{{ (value | int(base=16)) / 10 | round(1) }}"}

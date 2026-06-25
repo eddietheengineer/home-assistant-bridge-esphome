@@ -798,14 +798,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     signed = _is_signed_type(_get_primary_data_type(erd_data))
                     vt = _compute_sensor_value_template(scaling_factor, data_size, signed)
             elif ha_domain == 'binary_sensor':
-                primary_type = _get_primary_data_type(erd_data)
-                if primary_type == 'enum':
-                    # Misclassified: binary_sensor can't show enum labels.
-                    # Treat as an enum sensor instead.
-                    ev, fs = _get_first_enum_field_info(erd_data)
-                    vt = _enum_sensor_value_template(ev, fs)
-                else:
-                    vt = _compute_binary_sensor_value_template(data_size)
+                vt = _compute_binary_sensor_value_template(data_size)
             elif ha_domain == 'switch':
                 if paired_erd_str and paired_erd_str in erd_by_id:
                     s_size = get_erd_byte_size(erd_by_id[paired_erd_str].get('data', [])) or 1
@@ -860,7 +853,11 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 f_dev_cls = 'enum' if f_type == 'enum' else (device_class if idx == 0 else '')
                 f_state_cls = state_class if idx == 0 else ''
                 f_unit = _infer_unit_from_field_name(leaf, unit)
-                vt = _byte_subfield_value_template(field, scaling_factor)
+                if ha_domain == 'binary_sensor' and f_type == 'enum':
+                    f_dev_cls = ''
+                    vt = _compute_binary_sensor_value_template(data_size)
+                else:
+                    vt = _byte_subfield_value_template(field, scaling_factor)
                 collect(erd_id_int, entity_name, ha_domain, f_unit, f_dev_cls,
                         f_state_cls, scaling_factor, data_size, paired_erd_id,
                         pair_role, vt, '', '', fid, '', '', '', '', '')
@@ -889,7 +886,12 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             if primary:
                 p_type = primary.get('type', '')
                 p_dev_cls = 'enum' if p_type == 'enum' else device_class
-                p_vt = _byte_subfield_value_template(primary, scaling_factor)
+                if ha_domain == 'binary_sensor' and p_type == 'enum':
+                    # binary_sensor can't display enum labels; use ON/OFF
+                    p_dev_cls = ''
+                    p_vt = _compute_binary_sensor_value_template(data_size)
+                else:
+                    p_vt = _byte_subfield_value_template(primary, scaling_factor)
                 collect(erd_id_int, display_name, ha_domain, unit, p_dev_cls,
                         state_class, scaling_factor, data_size, paired_erd_id,
                         pair_role, p_vt, '', '', '', '', '', '', '', '')
