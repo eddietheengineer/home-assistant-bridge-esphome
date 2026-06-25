@@ -47,7 +47,7 @@
 {"i":"5017","n":"Broil Level Availability - Convection High","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"convection_high"}
 {"i":"5017","n":"Broil Level Availability - Convection Crisp","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 16) % 2 else '00' }}","fi":"convection_crisp"}
 {"i":"5018","n":"Cavity Layout","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Over Under', '01': 'Side by Side'}.get(value[:2], 'Unknown') }}"}
-{"i":"5019","n":"Clock Display","d":"switch","ds":1,"p":"501a","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"5019","n":"Clock Display","d":"switch","ds":1,"p":"501a","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5020","n":"Active Notifications in Range/Cooktop - Expiry notification for Kitchen Timer 1 associated with ERD 0x5105","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[0:12] | int(base=16)) // 1099511627776) % 2 else '00' }}","fi":"expiry_notification_for_kitchen_timer_1_associated_with_erd_0x51"}
 {"i":"5020","n":"Active Notifications in Range/Cooktop - Expiry notification for Kitchen Timer 2 associated with ERD 0x5205","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[0:12] | int(base=16)) // 2199023255552) % 2 else '00' }}","fi":"expiry_notification_for_kitchen_timer_2_associated_with_erd_0x52"}
 {"i":"5020","n":"Active Notifications in Range/Cooktop - Expiry notification for Kitchen Timer associated with ERD 0x0050","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[0:12] | int(base=16)) // 4398046511104) % 2 else '00' }}","fi":"expiry_notification_for_kitchen_timer_associated_with_erd_0x0050"}
@@ -81,10 +81,10 @@
 {"i":"502c","n":"Automatic Door Opener Local Public Enable","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"502d","n":"Oven Light Auto On Off State","d":"sensor","ds":1,"vt":"{{ {'00': 'Manual', '01': 'Haier Knob Auto On', '02': 'Auto Off', '03': 'Auto On', 'ff': 'Unset'}.get(value[:2], 'Unknown') }}"}
 {"i":"502e","n":"Enhanced Sabbath State","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"502f","n":"Enhanced Sabbath Cooking Accepted","d":"switch","ds":1,"p":"5030","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5031","n":"Enhanced Sabbath Warmness Setting","d":"switch","ds":1,"p":"5032","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"502f","n":"Enhanced Sabbath Cooking Accepted","d":"switch","ds":1,"p":"5030","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"5031","n":"Enhanced Sabbath Warmness Setting","d":"switch","ds":1,"p":"5032","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5033","n":"Enhanced Shabbos Keeper Is Connected Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"504e","n":"Cook Cam AI Assistant Enabled","d":"switch","ds":1,"p":"504f","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"504e","n":"Cook Cam AI Assistant Enabled","d":"switch","ds":1,"p":"504f","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5060","n":"AI Bake Oven Status - Session ID","d":"sensor","ds":20,"vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"5060","n":"AI Bake Oven Status - Oven AI Bake State","d":"sensor","ds":20,"dc":"enum","vt":"{{ {'00': 'Initializing', '01': 'Session ID Confirmation', '02': 'Camera On', '03': 'Doneness Selected', '04': 'Food Misidentified', '05': 'Baking', '06': 'Bake Complete', '07': 'User Feedback Pending', '08': 'User Feedback', 'fe': 'Fault', 'ff': 'Inactive'}.get(value[8:10], 'Unknown') }}","fi":"oven_ai_bake_state"}
 {"i":"5060","n":"AI Bake Oven Status - Doneness Level Selected","d":"sensor","ds":20,"dc":"enum","vt":"{{ {'01': 'Light', '02': 'Medium', '03': 'Dark', '04': 'Roasted', '05': 'Toasted', 'fe': 'Cloud Selected', 'ff': 'Invalid'}.get(value[10:12], 'Unknown') }}","fi":"doneness_level_selected"}

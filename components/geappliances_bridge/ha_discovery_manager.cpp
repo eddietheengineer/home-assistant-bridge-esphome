@@ -668,7 +668,7 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             if (n < 0 || n >= space) goto too_large;
             pos += n; space -= n;
         }
-        if (self->scale_factor_buf[0]) {
+        if (self->scale_factor_buf[0] && strcmp(self->domain_buf, "number") == 0) {
             n = snprintf(payload + pos, space, "\"step\":%s,", self->scale_factor_buf);
             if (n < 0 || n >= space) goto too_large;
             pos += n; space -= n;

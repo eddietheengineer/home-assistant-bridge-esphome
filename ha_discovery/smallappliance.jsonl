@@ -970,7 +970,7 @@
 {"i":"9402","n":"Supported States - Awaiting Start","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"awaiting_start"}
 {"i":"9402","n":"Supported States - Cooking","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"cooking"}
 {"i":"9402","n":"Supported States - Keep Warm","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"keep_warm"}
-{"i":"9404","n":"Smoke","d":"switch","ds":1,"p":"9403","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"9404","n":"Smoke","d":"switch","ds":1,"p":"9403","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9405","n":"Pause Smoke Status - Pause Smoke Option Editable","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"pause_smoke_option_editable"}
 {"i":"9405","n":"Pause Smoke Status - Smoke Paused","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"smoke_paused"}
 {"i":"9406","n":"Smoke Paused Request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}

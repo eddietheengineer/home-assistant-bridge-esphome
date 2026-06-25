@@ -1045,8 +1045,8 @@
 {"i":"2123","n":"Laundry Combi Unit Remaining Dry Cycle Time","d":"sensor","ds":2,"u":"s","dc":"duration","vt":"{{ value | int(base=16) }}"}
 {"i":"2124","n":"Eco Option","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"2125","n":"Eco Option Request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"2126","n":"Wash Mode Option","d":"switch","ds":1,"p":"2127","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"2129","n":"Dry Mode Option","d":"switch","ds":1,"p":"2128","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"2126","n":"Wash Mode Option","d":"switch","ds":1,"p":"2127","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"2129","n":"Dry Mode Option","d":"switch","ds":1,"p":"2128","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"212a","n":"Remote Spin Time Level Request","d":"sensor","ds":1,"vt":"{{ {'00': 'No Spin', '01': 'Low', '02': 'Medium', '03': 'High', '04': 'Extra High', '05': 'Disable', '06': 'Max', 'ff': 'Request processed'}.get(value[:2], 'Unknown') }}"}
 {"i":"212b","n":"Smart HQ Remote Option","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"212c","n":"Water Level Option","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Off', '01': 'Auto', '02': 'Low', '03': 'Medium', '04': 'High', '05': 'Max'}.get(value[:2], 'Unknown') }}"}
@@ -1068,7 +1068,7 @@
 {"i":"2134","n":"Timed Dry Option","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"2137","n":"Timed Dry Option Request","d":"sensor","ds":1,"vt":"{{ {'00': 'Disabled', '01': 'Enabled', 'ff': 'Request processed'}.get(value[:2], 'Unknown') }}"}
 {"i":"2139","n":"Remote Spin Time Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'No Spin', '01': 'Low', '02': 'Medium', '03': 'High', '04': 'Extra High', '05': 'Disable', '06': 'Max'}.get(value[:2], 'Unknown') }}"}
-{"i":"213b","n":"More Dry Option","d":"switch","ds":1,"p":"213a","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"213b","n":"More Dry Option","d":"switch","ds":1,"p":"213a","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"213c","n":"Softener Bulk Tank Size","d":"sensor","ds":2,"sf":10,"vt":"{{ (value | int(base=16)) / 10 | round(1) }}"}
 {"i":"213d","n":"Bulk Softener Tank Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'Low', '02': 'Filled', '03': 'Sensor Not Connected', '04': 'Sensor Error'}.get(value[:2], 'Unknown') }}"}
 {"i":"213e","n":"Smart Dispense Softener Tank Level Became 'Low' At End Of Cycle","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
@@ -1687,7 +1687,7 @@
 {"i":"216c","n":"Coin Box Open Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"216d","n":"Coin Value","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"216d","n":"Coin Value - Currency","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'USD'}.get(value[2:4], 'Unknown') }}","fi":"currency"}
-{"i":"216f","n":"Smart Combi Option","d":"switch","ds":1,"p":"216e","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"216f","n":"Smart Combi Option","d":"switch","ds":1,"p":"216e","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"2170","n":"Laundry Center Push Notifications - Washer Delayed Cycle Started","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"washer_delayed_cycle_started"}
 {"i":"2170","n":"Laundry Center Push Notifications - Dryer Delayed Cycle Started","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"dryer_delayed_cycle_started"}
 {"i":"2170","n":"Laundry Center Push Notifications - Washer Pre-Cycle End","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 67108864) % 2 else '00' }}","fi":"washer_pre_cycle_end"}
@@ -1868,7 +1868,7 @@
 {"i":"2236","n":"Commercial Option Id Order - Option n Level[9]","d":"sensor","ds":20,"vt":"{{ value[38:40] | int(base=16) }}","fi":"option_n_level_9"}
 {"i":"2237","n":"Commercial Remote Admin Mode Pin","d":"number","ds":2,"p":"2238","r":"request","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}","m":"box"}
 {"i":"2239","n":"Commercial Remote Number Of Admin Mode Pin Digits","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"223a","n":"Commercial Remote Buzzer Disable","d":"switch","ds":1,"p":"223b","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"223a","n":"Commercial Remote Buzzer Disable","d":"switch","ds":1,"p":"223b","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"223c","n":"Commercial Remote Wash Times - Cycle n Middle Setting Time in Minutes[0]","d":"sensor","ds":32,"p":"223d","r":"request","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"223c","n":"Commercial Remote Wash Times - Cycle n Middle Setting Time in Minutes[1]","d":"sensor","ds":32,"p":"223d","r":"request","vt":"{{ value[2:4] | int(base=16) }}","fi":"cycle_n_middle_setting_time_in_minutes_1"}
 {"i":"223c","n":"Commercial Remote Wash Times - Cycle n Middle Setting Time in Minutes[2]","d":"sensor","ds":32,"p":"223d","r":"request","vt":"{{ value[4:6] | int(base=16) }}","fi":"cycle_n_middle_setting_time_in_minutes_2"}
@@ -2023,7 +2023,7 @@
 {"i":"2245","n":"Commercial Remote Rinse Water Level","d":"number","ds":2,"sf":10,"p":"2246","r":"request","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}","ct":"{{ '%04x' % (((value | float) * 10) | round | int) }}","m":"box"}
 {"i":"2247","n":"Commercial Remote Rinse Water Level Limits - Minimum Rinse Water Level (Liters x 10)","d":"sensor","ds":4,"sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
 {"i":"2247","n":"Commercial Remote Rinse Water Level Limits - Maximum Rinse Water Level (Liters x 10)","d":"sensor","ds":4,"sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"maximum_rinse_water_level_liters_x_10"}
-{"i":"2248","n":"Commercial Remote Extra Rinse Option Deselected By Default","d":"switch","ds":1,"p":"2249","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"2248","n":"Commercial Remote Extra Rinse Option Deselected By Default","d":"switch","ds":1,"p":"2249","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"224a","n":"Commercial Remote Spin Limit Option - Option n Remote Spin Limit Option[0]","d":"sensor","ds":16,"p":"224b","r":"request","vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
 {"i":"224a","n":"Commercial Remote Spin Limit Option - Option n Remote Spin Limit Option[1]","d":"sensor","ds":16,"p":"224b","r":"request","vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"option_n_remote_spin_limit_option_1"}
 {"i":"224a","n":"Commercial Remote Spin Limit Option - Option n Remote Spin Limit Option[2]","d":"sensor","ds":16,"p":"224b","r":"request","vt":"{{ '01' if value[4:6] != '00' else '00' }}","fi":"option_n_remote_spin_limit_option_2"}

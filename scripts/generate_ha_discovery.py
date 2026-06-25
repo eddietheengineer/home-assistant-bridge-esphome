@@ -564,14 +564,12 @@ def _compute_binary_sensor_value_template(data_size: int) -> str:
     tmpl = f"value[:{hex_chars}]" if hex_chars > 2 else "value"
     return f"{{{{ 'ON' if {tmpl} | int(base=16) != 0 else 'OFF' }}}}"
 def _compute_switch_value_template(data_size: int) -> str:
-    """Return value_template for a switch ERD reading from its paired status topic.
+    """Return empty value_template for switch.
 
-    The status topic publishes raw hex (e.g. '00', '01'). Convert to ON/OFF
-    for HA switch payload_on/payload_off defaults.
+    Switches use state_on/state_off and payload_on/payload_off instead of
+    value_template, since HA ignores state_on/off when value_template is set.
     """
-    hex_chars = data_size * 2
-    tmpl = f"value[:{hex_chars}]" if hex_chars > 2 else "value"
-    return f"{{{{ 'ON' if {tmpl} | int(base=16) != 0 else 'OFF' }}}}"
+    return ''
 
 
 def _select_options_and_templates(enum_values: Dict[str, str], data_size: int):
