@@ -170,15 +170,6 @@ static void cleanup_run(ha_discovery_manager_t* self)
         /* NULL sentinel means we've processed all types. */
         if (component == NULL) break;
 
-        /* Flush any queued topics before subscribing to the next component. */
-        if (self->cleanup_queue_count > 0) {
-            cleanup_flush_queue(self);
-            if (self->cleanup_queue_count > 0) {
-                /* Still have queued topics — flush more next run(). */
-                return;
-            }
-        }
-
         /* Subscribe to this component type for our device.
          * homeassistant/{component}/{device_id}/# scopes to one component
          * type at a time, avoiding inbound queue overflow. */
@@ -198,6 +189,17 @@ static void cleanup_run(ha_discovery_manager_t* self)
             return;
         }
 
+        /* Actively drain queued topics before checking idle timeout.
+         * This prevents the ESP-IDF inbound queue from overflowing during
+         * bursts of retained messages. */
+        if (self->cleanup_queue_count > 0) {
+            cleanup_flush_queue(self);
+            if (self->cleanup_queue_count > 0) {
+                /* Still have queued topics — flush more next run(). */
+                return;
+            }
+        }
+
         /* Check if we've been idle long enough — no new matching topics
          * have arrived, so the broker has delivered all retained messages
          * for this component type. Use short timeout for empty components. */
@@ -206,13 +208,6 @@ static void cleanup_run(ha_discovery_manager_t* self)
             ? HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS
             : HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS;
         if (now - self->cleanup_last_activity_ms >= timeout) {
-            /* Flush remaining queued topics before moving on. */
-            if (self->cleanup_queue_count > 0) {
-                cleanup_flush_queue(self);
-                if (self->cleanup_queue_count > 0) {
-                    return;
-                }
-            }
 
             /* Unsubscribe from current component type. */
             if (self->mqtt_client) {
