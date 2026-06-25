@@ -701,7 +701,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
     def collect(erd_id_int: int, name: str, domain: str, unit: str,
                 dev_cls: str, state_cls: str, scaling: int, d_size: int,
                 paired_id: int, role: str, val_tmpl: str, cmd_tmpl: str,
-                opts: str, field_id: str) -> None:
+                opts: str, field_id: str, mode: str = '') -> None:
         entries.append({
             'erd_id': erd_id_int,
             'name': name,
@@ -717,6 +717,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             'command_template': cmd_tmpl,
             'options_json': opts,
             'field_id': field_id,
+            'mode': mode,
         })
 
     processed_status = set()
@@ -795,7 +796,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
 
             collect(erd_id_int, display_name, ha_domain, unit, device_class,
                     state_class, scaling_factor, data_size, paired_erd_id,
-                    pair_role, vt, ct, opts, '')
+                    pair_role, vt, ct, opts, '', 'box' if ha_domain == 'number' else '')
 
         elif classification == 'byte_offset':
             nr_fields = _get_non_reserved_fields(erd_data)
@@ -927,6 +928,7 @@ def generate_ha_discovery_jsonl_by_category(erds: List[Dict]) -> Dict[str, str]:
             if e['command_template']:             obj['ct'] = e['command_template']
             if e['options_json']:                 obj['o']  = e['options_json']
             if e['field_id']:                     obj['fi'] = e['field_id']
+            if e['mode']:                         obj['m']  = e['mode']
             lines.append(json.dumps(obj, ensure_ascii=False, separators=(',', ':')))
         result[cat] = '\n'.join(lines) + '\n'
 

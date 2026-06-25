@@ -402,7 +402,7 @@
 {"i":"20c7","n":"Spin Level Option Allowable - 1100 allowed","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 2) % 2 else '00' }}","fi":"1100_allowed"}
 {"i":"20c7","n":"Spin Level Option Allowable - 1200 allowed","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 4) % 2 else '00' }}","fi":"1200_allowed"}
 {"i":"20c7","n":"Spin Level Option Allowable - 1400 allowed","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 8) % 2 else '00' }}","fi":"1400_allowed"}
-{"i":"20c8","n":"Dry Time Option Current","d":"number","ds":2,"p":"20ca","r":"status","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}"}
+{"i":"20c8","n":"Dry Time Option Current","d":"number","ds":2,"p":"20ca","r":"status","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}","m":"box"}
 {"i":"20c9","n":"Dry Time Option Allowable - 10min","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"10min"}
 {"i":"20c9","n":"Dry Time Option Allowable - 15min","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"15min"}
 {"i":"20c9","n":"Dry Time Option Allowable - 20min","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 67108864) % 2 else '00' }}","fi":"20min"}
@@ -572,7 +572,7 @@
 {"i":"20da","n":"Low Airflow Notification or Warning - Low airflow detection count","d":"sensor","ds":4,"vt":"{{ value[2:4] | int(base=16) }}","fi":"low_airflow_detection_count"}
 {"i":"20db","n":"Water Tank Warnings - Extracted water tank full warning is set","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"extracted_water_tank_full_warning_is_set"}
 {"i":"20db","n":"Water Tank Warnings - Steam water tank empty warning is set","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"steam_water_tank_empty_warning_is_set"}
-{"i":"20dc","n":"Cycle Function Current","d":"number","ds":2,"p":"20de","r":"status","vt":"{{ value | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}"}
+{"i":"20dc","n":"Cycle Function Current","d":"number","ds":2,"p":"20de","r":"status","vt":"{{ value | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}","m":"box"}
 {"i":"20dd","n":"Cycle Function Allowable - Dry","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"dry"}
 {"i":"20dd","n":"Cycle Function Allowable - Refresh","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 512) % 2 else '00' }}","fi":"refresh"}
 {"i":"20dd","n":"Cycle Function Allowable - De-odorise","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 1024) % 2 else '00' }}","fi":"de_odorise"}
@@ -963,14 +963,14 @@
 {"i":"2108","n":"Water Level Option Request - Med","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"med"}
 {"i":"2108","n":"Water Level Option Request - High","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"high"}
 {"i":"2108","n":"Water Level Option Request - Auto","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"auto"}
-{"i":"2109","n":"Wash Progress Option Current","d":"number","ds":1,"p":"210b","r":"status","vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}"}
+{"i":"2109","n":"Wash Progress Option Current","d":"number","ds":1,"p":"210b","r":"status","vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"210a","n":"Wash Progress Option Allowable - Spin","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"spin"}
 {"i":"210a","n":"Wash Progress Option Allowable - Rinse","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"rinse"}
 {"i":"210a","n":"Wash Progress Option Allowable - Wash","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"wash"}
 {"i":"210b","n":"Wash Progress Option - Spin","d":"binary_sensor","ds":1,"p":"2109","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"spin"}
 {"i":"210b","n":"Wash Progress Option - Rinse","d":"binary_sensor","ds":1,"p":"2109","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"rinse"}
 {"i":"210b","n":"Wash Progress Option - Wash","d":"binary_sensor","ds":1,"p":"2109","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"wash"}
-{"i":"210c","n":"Wrinkle Free Option Current","d":"number","ds":2,"p":"210e","r":"status","vt":"{{ value | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}"}
+{"i":"210c","n":"Wrinkle Free Option Current","d":"number","ds":2,"p":"210e","r":"status","vt":"{{ value | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}","m":"box"}
 {"i":"210d","n":"Wrinkle Free Option Allowable - 1 hour Wrinkle free","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"1_hour_wrinkle_free"}
 {"i":"210d","n":"Wrinkle Free Option Allowable - 2 hours Wrinkle free","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 512) % 2 else '00' }}","fi":"2_hours_wrinkle_free"}
 {"i":"210d","n":"Wrinkle Free Option Allowable - 3 hours Wrinkle free","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 1024) % 2 else '00' }}","fi":"3_hours_wrinkle_free"}
@@ -997,7 +997,7 @@
 {"i":"210e","n":"Wrinkle Free Option - 11 hours Wrinkle free","d":"binary_sensor","ds":2,"p":"210c","r":"request","vt":"{{ '01' if ((value[0:4] | int(base=16)) // 4) % 2 else '00' }}","fi":"11_hours_wrinkle_free"}
 {"i":"210e","n":"Wrinkle Free Option - 12 hours Wrinkle free","d":"binary_sensor","ds":2,"p":"210c","r":"request","vt":"{{ '01' if ((value[0:4] | int(base=16)) // 8) % 2 else '00' }}","fi":"12_hours_wrinkle_free"}
 {"i":"210e","n":"Wrinkle Free Option - 24 hours Wrinkle free","d":"binary_sensor","ds":2,"p":"210c","r":"request","vt":"{{ '01' if ((value[0:4] | int(base=16)) // 16) % 2 else '00' }}","fi":"24_hours_wrinkle_free"}
-{"i":"210f","n":"Optimise Cycle Option Actual","d":"number","ds":1,"p":"2111","r":"status","vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}"}
+{"i":"210f","n":"Optimise Cycle Option Actual","d":"number","ds":1,"p":"2111","r":"status","vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"2110","n":"Optimise Cycle Option Allowable - Balanced","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"balanced"}
 {"i":"2110","n":"Optimise Cycle Option Allowable - Speed","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"speed"}
 {"i":"2110","n":"Optimise Cycle Option Allowable - Eco","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"eco"}
@@ -1007,7 +1007,7 @@
 {"i":"2111","n":"Optimise Cycle Option - Speed","d":"binary_sensor","ds":1,"p":"210f","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"speed"}
 {"i":"2111","n":"Optimise Cycle Option - Eco","d":"binary_sensor","ds":1,"p":"210f","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"eco"}
 {"i":"2111","n":"Optimise Cycle Option - Quiet","d":"binary_sensor","ds":1,"p":"210f","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"quiet"}
-{"i":"2112","n":"Auto Dose Option Actual","d":"number","ds":1,"p":"2114","r":"status","vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}"}
+{"i":"2112","n":"Auto Dose Option Actual","d":"number","ds":1,"p":"2114","r":"status","vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"2113","n":"Auto Dose Option Allowable - Auto Detergent","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"auto_detergent"}
 {"i":"2113","n":"Auto Dose Option Allowable - Auto Softener","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"auto_softener"}
 {"i":"2113","n":"Auto Dose Option Allowable - Manual Detergent","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"manual_detergent"}
@@ -1030,12 +1030,12 @@
 {"i":"2119","n":"Prewash Option Allowable - Prewash enable allowed","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"prewash_enable_allowed"}
 {"i":"211a","n":"Time Saver Option Allowable - Time saver disable allowed","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"time_saver_disable_allowed"}
 {"i":"211a","n":"Time Saver Option Allowable - Time saver enable allowed","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"time_saver_enable_allowed"}
-{"i":"211b","n":"Signal Option Current","d":"number","ds":1,"p":"211d","r":"status","vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}"}
+{"i":"211b","n":"Signal Option Current","d":"number","ds":1,"p":"211d","r":"status","vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"211c","n":"Signal Option Allowable","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"211d","n":"Signal Option","d":"sensor","ds":1,"p":"211b","r":"request","vt":"{{ value | int(base=16) }}"}
 {"i":"211e","n":"Commercial Laundry Payment V1 Attribute Bitmap - Coin Box","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 64) % 2 else '00' }}","fi":"coin_box"}
 {"i":"211e","n":"Commercial Laundry Payment V1 Attribute Bitmap - Cycle Complete","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 128) % 2 else '00' }}","fi":"cycle_complete"}
-{"i":"211f","n":"Timed Cycle Total Duration Option Current","d":"number","ds":1,"p":"2120","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}"}
+{"i":"211f","n":"Timed Cycle Total Duration Option Current","d":"number","ds":1,"p":"2120","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"2120","n":"Timed Cycle Total Duration Option - Requested Minutes","d":"sensor","ds":2,"p":"211f","r":"request","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"2120","n":"Timed Cycle Total Duration Option - Is Requested","d":"sensor","ds":2,"p":"211f","r":"request","vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"is_requested"}
 {"i":"2121","n":"Timed Cycle Total Duration Option Allowable Range - Range Min Minutes","d":"sensor","ds":3,"vt":"{{ value[0:2] | int(base=16) }}"}
@@ -1661,7 +1661,7 @@
 {"i":"2166","n":"Option Pricing - Option n Level[6]","d":"sensor","ds":36,"p":"2167","r":"request","vt":"{{ value[66:68] | int(base=16) }}","fi":"option_n_level_6"}
 {"i":"2166","n":"Option Pricing - Option n Level[7]","d":"sensor","ds":36,"p":"2167","r":"request","vt":"{{ value[68:70] | int(base=16) }}","fi":"option_n_level_7"}
 {"i":"2166","n":"Option Pricing - Option n Level[8]","d":"sensor","ds":36,"p":"2167","r":"request","vt":"{{ value[70:72] | int(base=16) }}","fi":"option_n_level_8"}
-{"i":"2167","n":"Option Pricing","d":"number","ds":36,"p":"2166","r":"status","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%072x' % (value | int) }}"}
+{"i":"2167","n":"Option Pricing","d":"number","ds":36,"p":"2166","r":"status","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%072x' % (value | int) }}","m":"box"}
 {"i":"2168","n":"Mid-Cycle Adjustment Pricing - Mid-Cycle Adjustment n Price[0]","d":"sensor","ds":28,"p":"2169","r":"request","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"2168","n":"Mid-Cycle Adjustment Pricing - Mid-Cycle Adjustment n Price[1]","d":"sensor","ds":28,"p":"2169","r":"request","vt":"{{ value[4:8] | int(base=16) }}","fi":"mid_cycle_adjustment_n_price_1"}
 {"i":"2168","n":"Mid-Cycle Adjustment Pricing - Mid-Cycle Adjustment n Price[2]","d":"sensor","ds":28,"p":"2169","r":"request","vt":"{{ value[8:12] | int(base=16) }}","fi":"mid_cycle_adjustment_n_price_2"}
@@ -1681,7 +1681,7 @@
 {"i":"2168","n":"Mid-Cycle Adjustment Pricing - Mid-Cycle Adjustment n ID[7]","d":"sensor","ds":28,"p":"2169","r":"request","vt":"{{ value[50:52] | int(base=16) }}","fi":"mid_cycle_adjustment_n_id_7"}
 {"i":"2168","n":"Mid-Cycle Adjustment Pricing - Mid-Cycle Adjustment n ID[8]","d":"sensor","ds":28,"p":"2169","r":"request","vt":"{{ value[52:54] | int(base=16) }}","fi":"mid_cycle_adjustment_n_id_8"}
 {"i":"2168","n":"Mid-Cycle Adjustment Pricing - Padding","d":"sensor","ds":28,"p":"2169","r":"request","vt":"{{ value[54:56] | int(base=16) }}","fi":"padding"}
-{"i":"2169","n":"Mid-Cycle Adjustment Pricing","d":"number","ds":28,"p":"2168","r":"status","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%056x' % (value | int) }}"}
+{"i":"2169","n":"Mid-Cycle Adjustment Pricing","d":"number","ds":28,"p":"2168","r":"status","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%056x' % (value | int) }}","m":"box"}
 {"i":"216a","n":"Coins Collected Since Last Opening","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"216b","n":"Coin Box Capacity","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"216c","n":"Coin Box Open Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
@@ -1866,7 +1866,7 @@
 {"i":"2236","n":"Commercial Option Id Order - Option n Level[7]","d":"sensor","ds":20,"vt":"{{ value[34:36] | int(base=16) }}","fi":"option_n_level_7"}
 {"i":"2236","n":"Commercial Option Id Order - Option n Level[8]","d":"sensor","ds":20,"vt":"{{ value[36:38] | int(base=16) }}","fi":"option_n_level_8"}
 {"i":"2236","n":"Commercial Option Id Order - Option n Level[9]","d":"sensor","ds":20,"vt":"{{ value[38:40] | int(base=16) }}","fi":"option_n_level_9"}
-{"i":"2237","n":"Commercial Remote Admin Mode Pin","d":"number","ds":2,"p":"2238","r":"request","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}"}
+{"i":"2237","n":"Commercial Remote Admin Mode Pin","d":"number","ds":2,"p":"2238","r":"request","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}","m":"box"}
 {"i":"2239","n":"Commercial Remote Number Of Admin Mode Pin Digits","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"223a","n":"Commercial Remote Buzzer Disable","d":"switch","ds":1,"p":"223b","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"223c","n":"Commercial Remote Wash Times - Cycle n Middle Setting Time in Minutes[0]","d":"sensor","ds":32,"p":"223d","r":"request","vt":"{{ value[0:2] | int(base=16) }}"}
@@ -1901,7 +1901,7 @@
 {"i":"223c","n":"Commercial Remote Wash Times - Cycle n Adjustment Delta Time in Minutes[13]","d":"sensor","ds":32,"p":"223d","r":"request","vt":"{{ value[58:60] | int(base=16) }}","fi":"cycle_n_adjustment_delta_time_in_minutes_13"}
 {"i":"223c","n":"Commercial Remote Wash Times - Cycle n Adjustment Delta Time in Minutes[14]","d":"sensor","ds":32,"p":"223d","r":"request","vt":"{{ value[60:62] | int(base=16) }}","fi":"cycle_n_adjustment_delta_time_in_minutes_14"}
 {"i":"223c","n":"Commercial Remote Wash Times - Cycle n Adjustment Delta Time in Minutes[15]","d":"sensor","ds":32,"p":"223d","r":"request","vt":"{{ value[62:64] | int(base=16) }}","fi":"cycle_n_adjustment_delta_time_in_minutes_15"}
-{"i":"223d","n":"Commercial Remote Wash Times","d":"number","ds":32,"p":"223c","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%064x' % (value | int) }}"}
+{"i":"223d","n":"Commercial Remote Wash Times","d":"number","ds":32,"p":"223c","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%064x' % (value | int) }}","m":"box"}
 {"i":"223e","n":"Commercial Remote Wash Time Limits - Cycle n Minimum Middle Setting Time in Minutes[0]","d":"sensor","ds":112,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"223e","n":"Commercial Remote Wash Time Limits - Cycle n Minimum Middle Setting Time in Minutes[1]","d":"sensor","ds":112,"vt":"{{ value[2:4] | int(base=16) }}","fi":"cycle_n_minimum_middle_setting_time_in_minutes_1"}
 {"i":"223e","n":"Commercial Remote Wash Time Limits - Cycle n Minimum Middle Setting Time in Minutes[2]","d":"sensor","ds":112,"vt":"{{ value[4:6] | int(base=16) }}","fi":"cycle_n_minimum_middle_setting_time_in_minutes_2"}
@@ -2014,13 +2014,13 @@
 {"i":"223e","n":"Commercial Remote Wash Time Limits - Cycle n Number Of Settings (Odd numbers only)[13]","d":"sensor","ds":112,"vt":"{{ value[218:220] | int(base=16) }}","fi":"cycle_n_number_of_settings_odd_numbers_only_13"}
 {"i":"223e","n":"Commercial Remote Wash Time Limits - Cycle n Number Of Settings (Odd numbers only)[14]","d":"sensor","ds":112,"vt":"{{ value[220:222] | int(base=16) }}","fi":"cycle_n_number_of_settings_odd_numbers_only_14"}
 {"i":"223e","n":"Commercial Remote Wash Time Limits - Cycle n Number Of Settings (Odd numbers only)[15]","d":"sensor","ds":112,"vt":"{{ value[222:224] | int(base=16) }}","fi":"cycle_n_number_of_settings_odd_numbers_only_15"}
-{"i":"223f","n":"Commercial Remote Wash Water Level","d":"number","ds":2,"sf":10,"p":"2240","r":"request","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}","ct":"{{ '%04x' % (((value | float) * 10) | round | int) }}"}
+{"i":"223f","n":"Commercial Remote Wash Water Level","d":"number","ds":2,"sf":10,"p":"2240","r":"request","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}","ct":"{{ '%04x' % (((value | float) * 10) | round | int) }}","m":"box"}
 {"i":"2241","n":"Commercial Remote Wash Water Level Limits - Minimum Wash Water Level (Liters x 10)","d":"sensor","ds":4,"sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
 {"i":"2241","n":"Commercial Remote Wash Water Level Limits - Maximum Wash Water Level (Liters x 10)","d":"sensor","ds":4,"sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"maximum_wash_water_level_liters_x_10"}
-{"i":"2242","n":"Commercial Remote Wash Time In Seconds","d":"number","ds":2,"p":"2243","r":"request","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}"}
+{"i":"2242","n":"Commercial Remote Wash Time In Seconds","d":"number","ds":2,"p":"2243","r":"request","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}","m":"box"}
 {"i":"2244","n":"Commercial Remote Wash Time Limits - Minimum Wash Time In Seconds","d":"sensor","ds":4,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"2244","n":"Commercial Remote Wash Time Limits - Maximum Wash Time In Seconds","d":"sensor","ds":4,"vt":"{{ value[4:8] | int(base=16) }}","fi":"maximum_wash_time_in_seconds"}
-{"i":"2245","n":"Commercial Remote Rinse Water Level","d":"number","ds":2,"sf":10,"p":"2246","r":"request","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}","ct":"{{ '%04x' % (((value | float) * 10) | round | int) }}"}
+{"i":"2245","n":"Commercial Remote Rinse Water Level","d":"number","ds":2,"sf":10,"p":"2246","r":"request","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}","ct":"{{ '%04x' % (((value | float) * 10) | round | int) }}","m":"box"}
 {"i":"2247","n":"Commercial Remote Rinse Water Level Limits - Minimum Rinse Water Level (Liters x 10)","d":"sensor","ds":4,"sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
 {"i":"2247","n":"Commercial Remote Rinse Water Level Limits - Maximum Rinse Water Level (Liters x 10)","d":"sensor","ds":4,"sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"maximum_rinse_water_level_liters_x_10"}
 {"i":"2248","n":"Commercial Remote Extra Rinse Option Deselected By Default","d":"switch","ds":1,"p":"2249","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
@@ -2040,7 +2040,7 @@
 {"i":"224a","n":"Commercial Remote Spin Limit Option - Option n Remote Spin Limit Option[13]","d":"sensor","ds":16,"p":"224b","r":"request","vt":"{{ '01' if value[26:28] != '00' else '00' }}","fi":"option_n_remote_spin_limit_option_13"}
 {"i":"224a","n":"Commercial Remote Spin Limit Option - Option n Remote Spin Limit Option[14]","d":"sensor","ds":16,"p":"224b","r":"request","vt":"{{ '01' if value[28:30] != '00' else '00' }}","fi":"option_n_remote_spin_limit_option_14"}
 {"i":"224a","n":"Commercial Remote Spin Limit Option - Option n Remote Spin Limit Option[15]","d":"sensor","ds":16,"p":"224b","r":"request","vt":"{{ '01' if value[30:32] != '00' else '00' }}","fi":"option_n_remote_spin_limit_option_15"}
-{"i":"224b","n":"Commercial Remote Spin Limit Option","d":"number","ds":16,"p":"224a","r":"status","vt":"{{ '01' if value[0:2] != '00' else '00' }}","ct":"{{ '%032x' % (value | int) }}"}
+{"i":"224b","n":"Commercial Remote Spin Limit Option","d":"number","ds":16,"p":"224a","r":"status","vt":"{{ '01' if value[0:2] != '00' else '00' }}","ct":"{{ '%032x' % (value | int) }}","m":"box"}
 {"i":"224c","n":"Commercial Remote Dry Times - Option n Base Dry Time in Minutes[0]","d":"sensor","ds":20,"p":"224d","r":"request","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"224c","n":"Commercial Remote Dry Times - Option n Base Dry Time in Minutes[1]","d":"sensor","ds":20,"p":"224d","r":"request","vt":"{{ value[2:4] | int(base=16) }}","fi":"option_n_base_dry_time_in_minutes_1"}
 {"i":"224c","n":"Commercial Remote Dry Times - Option n Base Dry Time in Minutes[2]","d":"sensor","ds":20,"p":"224d","r":"request","vt":"{{ value[4:6] | int(base=16) }}","fi":"option_n_base_dry_time_in_minutes_2"}
@@ -2061,7 +2061,7 @@
 {"i":"224c","n":"Commercial Remote Dry Times - Option n Increment Dry Time in Minutes[7]","d":"sensor","ds":20,"p":"224d","r":"request","vt":"{{ value[34:36] | int(base=16) }}","fi":"option_n_increment_dry_time_in_minutes_7"}
 {"i":"224c","n":"Commercial Remote Dry Times - Option n Increment Dry Time in Minutes[8]","d":"sensor","ds":20,"p":"224d","r":"request","vt":"{{ value[36:38] | int(base=16) }}","fi":"option_n_increment_dry_time_in_minutes_8"}
 {"i":"224c","n":"Commercial Remote Dry Times - Option n Increment Dry Time in Minutes[9]","d":"sensor","ds":20,"p":"224d","r":"request","vt":"{{ value[38:40] | int(base=16) }}","fi":"option_n_increment_dry_time_in_minutes_9"}
-{"i":"224d","n":"Commercial Remote Dry Times","d":"number","ds":20,"p":"224c","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%040x' % (value | int) }}"}
+{"i":"224d","n":"Commercial Remote Dry Times","d":"number","ds":20,"p":"224c","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%040x' % (value | int) }}","m":"box"}
 {"i":"224e","n":"Commercial Remote Dry Time Limits - Option n Minimum Base Time in Minutes[0]","d":"sensor","ds":40,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"224e","n":"Commercial Remote Dry Time Limits - Option n Minimum Base Time in Minutes[1]","d":"sensor","ds":40,"vt":"{{ value[2:4] | int(base=16) }}","fi":"option_n_minimum_base_time_in_minutes_1"}
 {"i":"224e","n":"Commercial Remote Dry Time Limits - Option n Minimum Base Time in Minutes[2]","d":"sensor","ds":40,"vt":"{{ value[4:6] | int(base=16) }}","fi":"option_n_minimum_base_time_in_minutes_2"}
@@ -2102,7 +2102,7 @@
 {"i":"224e","n":"Commercial Remote Dry Time Limits - Option n Maximum Increment Time in Minutes[7]","d":"sensor","ds":40,"vt":"{{ value[74:76] | int(base=16) }}","fi":"option_n_maximum_increment_time_in_minutes_7"}
 {"i":"224e","n":"Commercial Remote Dry Time Limits - Option n Maximum Increment Time in Minutes[8]","d":"sensor","ds":40,"vt":"{{ value[76:78] | int(base=16) }}","fi":"option_n_maximum_increment_time_in_minutes_8"}
 {"i":"224e","n":"Commercial Remote Dry Time Limits - Option n Maximum Increment Time in Minutes[9]","d":"sensor","ds":40,"vt":"{{ value[78:80] | int(base=16) }}","fi":"option_n_maximum_increment_time_in_minutes_9"}
-{"i":"224f","n":"Commercial Remote Dry Temperature","d":"number","ds":20,"u":"°F","dc":"temperature","sf":10,"p":"2250","r":"request","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}","ct":"{{ '%040x' % (((value | float) * 10) | round | int) }}"}
+{"i":"224f","n":"Commercial Remote Dry Temperature","d":"number","ds":20,"u":"°F","dc":"temperature","sf":10,"p":"2250","r":"request","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}","ct":"{{ '%040x' % (((value | float) * 10) | round | int) }}","m":"box"}
 {"i":"2251","n":"Commercial Remote Dry Temperature Limits - Option n Minimum Drying Temperature (Fahrenheit x 10)[0]","d":"sensor","ds":40,"u":"°F","dc":"temperature","sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
 {"i":"2251","n":"Commercial Remote Dry Temperature Limits - Option n Minimum Drying Temperature (Fahrenheit x 10)[1]","d":"sensor","ds":40,"u":"°F","sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"option_n_minimum_drying_temperature_fahrenheit_x_10_1"}
 {"i":"2251","n":"Commercial Remote Dry Temperature Limits - Option n Minimum Drying Temperature (Fahrenheit x 10)[2]","d":"sensor","ds":40,"u":"°F","sf":10,"vt":"{{ (value[8:12] | int(base=16)) / 10 | round(1) }}","fi":"option_n_minimum_drying_temperature_fahrenheit_x_10_2"}
@@ -2133,7 +2133,7 @@
 {"i":"2252","n":"Commercial Remote Cooldown Times - Option n Cooldown Time in Minutes[7]","d":"sensor","ds":10,"p":"2253","r":"request","vt":"{{ value[14:16] | int(base=16) }}","fi":"option_n_cooldown_time_in_minutes_7"}
 {"i":"2252","n":"Commercial Remote Cooldown Times - Option n Cooldown Time in Minutes[8]","d":"sensor","ds":10,"p":"2253","r":"request","vt":"{{ value[16:18] | int(base=16) }}","fi":"option_n_cooldown_time_in_minutes_8"}
 {"i":"2252","n":"Commercial Remote Cooldown Times - Option n Cooldown Time in Minutes[9]","d":"sensor","ds":10,"p":"2253","r":"request","vt":"{{ value[18:20] | int(base=16) }}","fi":"option_n_cooldown_time_in_minutes_9"}
-{"i":"2253","n":"Commercial Remote Cooldown Times","d":"number","ds":10,"p":"2252","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%020x' % (value | int) }}"}
+{"i":"2253","n":"Commercial Remote Cooldown Times","d":"number","ds":10,"p":"2252","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%020x' % (value | int) }}","m":"box"}
 {"i":"2254","n":"Commercial Remote Cooldown Time Limits - Option n Minimum Cooldown Time in Minutes[0]","d":"sensor","ds":20,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"2254","n":"Commercial Remote Cooldown Time Limits - Option n Minimum Cooldown Time in Minutes[1]","d":"sensor","ds":20,"vt":"{{ value[2:4] | int(base=16) }}","fi":"option_n_minimum_cooldown_time_in_minutes_1"}
 {"i":"2254","n":"Commercial Remote Cooldown Time Limits - Option n Minimum Cooldown Time in Minutes[2]","d":"sensor","ds":20,"vt":"{{ value[4:6] | int(base=16) }}","fi":"option_n_minimum_cooldown_time_in_minutes_2"}
@@ -2154,7 +2154,7 @@
 {"i":"2254","n":"Commercial Remote Cooldown Time Limits - Option n Maximum Cooldown Time in Minutes[7]","d":"sensor","ds":20,"vt":"{{ value[34:36] | int(base=16) }}","fi":"option_n_maximum_cooldown_time_in_minutes_7"}
 {"i":"2254","n":"Commercial Remote Cooldown Time Limits - Option n Maximum Cooldown Time in Minutes[8]","d":"sensor","ds":20,"vt":"{{ value[36:38] | int(base=16) }}","fi":"option_n_maximum_cooldown_time_in_minutes_8"}
 {"i":"2254","n":"Commercial Remote Cooldown Time Limits - Option n Maximum Cooldown Time in Minutes[9]","d":"sensor","ds":20,"vt":"{{ value[38:40] | int(base=16) }}","fi":"option_n_maximum_cooldown_time_in_minutes_9"}
-{"i":"2255","n":"Commercial Remote Cooldown Temperature","d":"number","ds":20,"u":"°F","dc":"temperature","sf":10,"p":"2256","r":"request","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}","ct":"{{ '%040x' % (((value | float) * 10) | round | int) }}"}
+{"i":"2255","n":"Commercial Remote Cooldown Temperature","d":"number","ds":20,"u":"°F","dc":"temperature","sf":10,"p":"2256","r":"request","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}","ct":"{{ '%040x' % (((value | float) * 10) | round | int) }}","m":"box"}
 {"i":"2257","n":"Commercial Remote Cooldown Temperature Limits - Option n Minimum Cooldown Temperature (Fahrenheit x 10)[0]","d":"sensor","ds":40,"u":"°F","dc":"temperature","sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
 {"i":"2257","n":"Commercial Remote Cooldown Temperature Limits - Option n Minimum Cooldown Temperature (Fahrenheit x 10)[1]","d":"sensor","ds":40,"u":"°F","sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"option_n_minimum_cooldown_temperature_fahrenheit_x_10_1"}
 {"i":"2257","n":"Commercial Remote Cooldown Temperature Limits - Option n Minimum Cooldown Temperature (Fahrenheit x 10)[2]","d":"sensor","ds":40,"u":"°F","sf":10,"vt":"{{ (value[8:12] | int(base=16)) / 10 | round(1) }}","fi":"option_n_minimum_cooldown_temperature_fahrenheit_x_10_2"}
@@ -2187,7 +2187,7 @@
 {"i":"2316","n":"Commercial Remote Max Drying Times - Option n Max Drying Time in Minutes[7]","d":"sensor","ds":10,"p":"2317","r":"request","vt":"{{ value[14:16] | int(base=16) }}","fi":"option_n_max_drying_time_in_minutes_7"}
 {"i":"2316","n":"Commercial Remote Max Drying Times - Option n Max Drying Time in Minutes[8]","d":"sensor","ds":10,"p":"2317","r":"request","vt":"{{ value[16:18] | int(base=16) }}","fi":"option_n_max_drying_time_in_minutes_8"}
 {"i":"2316","n":"Commercial Remote Max Drying Times - Option n Max Drying Time in Minutes[9]","d":"sensor","ds":10,"p":"2317","r":"request","vt":"{{ value[18:20] | int(base=16) }}","fi":"option_n_max_drying_time_in_minutes_9"}
-{"i":"2317","n":"Commercial Remote Max Drying Times","d":"number","ds":30,"p":"2316","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%060x' % (value | int) }}"}
+{"i":"2317","n":"Commercial Remote Max Drying Times","d":"number","ds":30,"p":"2316","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%060x' % (value | int) }}","m":"box"}
 {"i":"2f00","n":"Mabe - Water Level Selection","d":"sensor","ds":1,"vt":"{{ {'00': 'Auto Sel', '01': 'Aqua Saver Sel', '02': 'Minimum Sel', '03': 'Low Sel', '04': 'Mid Sel', '05': 'High Sel', '06': 'Maximum Sel', '07': 'Maximum Iec Sel'}.get(value[:2], 'Unknown') }}"}
 {"i":"2f01","n":"Mabe - Sensed Water Level Selection","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Auto Sel', '01': 'Aqua Saber Sel', '02': 'Minimum Sel', '03': 'Low Sel', '04': 'Mid Sel', '05': 'High Sel', '06': 'Maximum Sel', '07': 'Maximum Iec Sel'}.get(value[:2], 'Unknown') }}"}
 {"i":"2f02","n":"Mabe - Manual Selection","d":"sensor","ds":1,"vt":"{{ {'00': 'STANDARD_SEL', '01': 'SOAK_30_MIN_SEL', '02': 'SOAK_60_MIN_SEL', '03': 'ONLY_WASH_SEL', '04': 'ONLY_DEEP_RINSE_SEL', '05': 'WASH_RINSE_SEL', '06': 'WASH_SPIN_SEL', '07': 'RINSE_SPIN_SEL', '08': 'DRAIN_N_SPIN_SEL'}.get(value[:2], 'Unknown') }}"}

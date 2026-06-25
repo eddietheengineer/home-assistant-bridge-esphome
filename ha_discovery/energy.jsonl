@@ -13,8 +13,8 @@
 {"i":"d008","n":"Available Demand Response Modes - Temporary Load Reduction Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"temporary_load_reduction_available"}
 {"i":"d008","n":"Available Demand Response Modes - Temporary Load Increase Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"temporary_load_increase_available"}
 {"i":"d008","n":"Available Demand Response Modes - Temporary Temperature Offset Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"temporary_temperature_offset_available"}
-{"i":"d00b","n":"Temporary Temperature Offset Demand Response","d":"number","ds":44,"u":"°F","dc":"temperature","p":"d00c","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%088x' % (value | int) }}"}
-{"i":"d00e","n":"Cost of power cost/comfort slider","d":"number","ds":1,"u":"W","dc":"power","sc":"measurement","p":"d00f","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}"}
+{"i":"d00b","n":"Temporary Temperature Offset Demand Response","d":"number","ds":44,"u":"°F","dc":"temperature","p":"d00c","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%088x' % (value | int) }}","m":"box"}
+{"i":"d00e","n":"Cost of power cost/comfort slider","d":"number","ds":1,"u":"W","dc":"power","sc":"measurement","p":"d00f","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"d014","n":"Appliance Energy Usage Update Period in Minutes","d":"sensor","ds":1,"u":"Wh","dc":"energy","sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"d015","n":"Appliance Energy Usage Estimated or Measured Flag","d":"sensor","ds":1,"u":"Wh","dc":"energy","sc":"total","vt":"{{ {'00': 'Estimated', '01': 'Measured'}.get(value[:2], 'Unknown') }}"}
 {"i":"d016","n":"Appliance Cumulative Hot Water Usage (L)","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}

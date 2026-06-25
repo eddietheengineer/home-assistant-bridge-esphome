@@ -329,7 +329,7 @@
 {"i":"905b","n":"Coffee Brewer Supported Features - Grind Time Delta Supported","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 2) % 2 else '00' }}","fi":"grind_time_delta_supported"}
 {"i":"905b","n":"Coffee Brewer Supported Features - Favorites Supported","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 4) % 2 else '00' }}","fi":"favorites_supported"}
 {"i":"905c","n":"Coffee Maker Model","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Grind and Brew', '02': 'Drip Coffee', '03': 'Drip Coffee Refresh'}.get(value[:2], 'Unknown') }}"}
-{"i":"905d","n":"Delay Start","d":"number","ds":3,"p":"905e","r":"status","vt":"{{ '01' if value[0:2] != '00' else '00' }}","ct":"{{ '%06x' % (value | int) }}"}
+{"i":"905d","n":"Delay Start","d":"number","ds":3,"p":"905e","r":"status","vt":"{{ '01' if value[0:2] != '00' else '00' }}","ct":"{{ '%06x' % (value | int) }}","m":"box"}
 {"i":"905e","n":"Delay Start Enabled","d":"sensor","ds":3,"p":"905d","r":"request","vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
 {"i":"905e","n":"Delay Start - Hours: Time of Day (24-Hour Format)","d":"sensor","ds":3,"p":"905d","r":"request","vt":"{{ value[2:4] | int(base=16) }}","fi":"hours_time_of_day_24_hour_format"}
 {"i":"905e","n":"Delay Start - Minutes: Time of Day","d":"sensor","ds":3,"p":"905d","r":"request","vt":"{{ value[4:6] | int(base=16) }}","fi":"minutes_time_of_day"}
@@ -378,7 +378,7 @@
 {"i":"913b","n":"Sanitize Indication Elapsed Time","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"913c","n":"Total Compressor Runtime","d":"sensor","ds":2,"u":"h","dc":"duration","vt":"{{ value | int(base=16) }}"}
 {"i":"913d","n":"Time To Descale","d":"sensor","ds":2,"u":"%","vt":"{{ value | int(base=16) }}"}
-{"i":"913e","n":"Light Color","d":"number","ds":4,"p":"913f","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%08x' % (value | int) }}"}
+{"i":"913e","n":"Light Color","d":"number","ds":4,"p":"913f","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%08x' % (value | int) }}","m":"box"}
 {"i":"913f","n":"Light Color - Intensity Percentage (0-100)","d":"sensor","ds":4,"p":"913e","r":"request","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"913f","n":"Light Color - Red (0-255)","d":"sensor","ds":4,"p":"913e","r":"request","vt":"{{ value[2:4] | int(base=16) }}","fi":"red_0_255"}
 {"i":"913f","n":"Light Color - Green (0-255)","d":"sensor","ds":4,"p":"913e","r":"request","vt":"{{ value[4:6] | int(base=16) }}","fi":"green_0_255"}
@@ -1069,10 +1069,10 @@
 {"i":"9429","n":"Auto Warm Reminder Current Setting - Auto Warm Reminder Option Editable","d":"sensor","ds":2,"vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
 {"i":"9429","n":"Auto Warm Reminder Current Setting - Auto Warm Reminder","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'No Reminder', '01': '1 hour Interval', '02': '2 hour Interval', '03': '3 hour Interval'}.get(value[2:4], 'Unknown') }}","fi":"auto_warm_reminder"}
 {"i":"942a","n":"Auto Warm Reminder Requested Setting","d":"sensor","ds":1,"vt":"{{ {'00': 'No Reminder', '01': '1 hour Interval', '02': '2 hour Interval', '03': '3 hour Interval'}.get(value[:2], 'Unknown') }}"}
-{"i":"942c","n":"Early Completion Notification Temperature Threshold","d":"number","ds":1,"u":"°C","dc":"temperature","p":"942b","r":"request","vt":"{{ '01' if value[0:2] != '00' else '00' }}","ct":"{{ '%02x' % (value | int) }}"}
+{"i":"942c","n":"Early Completion Notification Temperature Threshold","d":"number","ds":1,"u":"°C","dc":"temperature","p":"942b","r":"request","vt":"{{ '01' if value[0:2] != '00' else '00' }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"942d","n":"Early Completion Notification Temperature Limits - Early Completion Notification Temperature Min (F)","d":"sensor","ds":2,"u":"°C","dc":"temperature","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"942d","n":"Early Completion Notification Temperature Limits - Early Completion Notification Temperature Max (F)","d":"sensor","ds":2,"u":"°C","vt":"{{ value[2:4] | int(base=16) }}","fi":"early_completion_notification_temperature_max_f"}
-{"i":"942f","n":"Early Completion Notification Time Threshold","d":"number","ds":1,"u":"min","dc":"duration","p":"942e","r":"request","vt":"{{ '01' if value[0:2] != '00' else '00' }}","ct":"{{ '%02x' % (value | int) }}"}
+{"i":"942f","n":"Early Completion Notification Time Threshold","d":"number","ds":1,"u":"min","dc":"duration","p":"942e","r":"request","vt":"{{ '01' if value[0:2] != '00' else '00' }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"9430","n":"Early Completion Notification Time Limits - Early Completion Notification Time Min (Minutes)","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"9430","n":"Early Completion Notification Time Limits - Early Completion Notification Time Max (Minutes)","d":"sensor","ds":2,"u":"min","vt":"{{ value[2:4] | int(base=16) }}","fi":"early_completion_notification_time_max_minutes"}
 {"i":"9431","n":"Current Igniter Temperature - Igniter Temperature Editable","d":"sensor","ds":4,"u":"°F","dc":"temperature","vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
@@ -1116,7 +1116,7 @@
 {"i":"9500","n":"Sourdough Starter Status - Feeding Frequency (Minutes)","d":"sensor","ds":26,"u":"min","vt":"{{ value[32:36] | int(base=16) }}","fi":"feeding_frequency_minutes"}
 {"i":"9500","n":"Sourdough Starter Status - Current Starter Mass (grams)","d":"sensor","ds":26,"u":"min","vt":"{{ value[36:40] | int(base=16) }}","fi":"current_starter_mass_grams"}
 {"i":"9501","n":"Ambient Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
-{"i":"9503","n":"Temperature Offset","d":"number","ds":1,"u":"°F","dc":"temperature","p":"9502","r":"request","vt":"{{ (value[0:2] | int(base=16)) - 256 if (value[0:2] | int(base=16)) >= 128 else (value[0:2] | int(base=16)) }}","ct":"{{ '%02x' % ((value | int) % 256) }}"}
+{"i":"9503","n":"Temperature Offset","d":"number","ds":1,"u":"°F","dc":"temperature","p":"9502","r":"request","vt":"{{ (value[0:2] | int(base=16)) - 256 if (value[0:2] | int(base=16)) >= 128 else (value[0:2] | int(base=16)) }}","ct":"{{ '%02x' % ((value | int) % 256) }}","m":"box"}
 {"i":"9504","n":"Temperature Offset Limits - Minimum Supported Temperature Offset (signed fahrenheit)","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ (value[0:2] | int(base=16)) - 256 if (value[0:2] | int(base=16)) >= 128 else (value[0:2] | int(base=16)) }}"}
 {"i":"9504","n":"Temperature Offset Limits - Maximum Supported Temperature Offset (signed fahrenheit)","d":"sensor","ds":2,"u":"°F","vt":"{{ (value[2:4] | int(base=16)) - 256 if (value[2:4] | int(base=16)) >= 128 else (value[2:4] | int(base=16)) }}","fi":"maximum_supported_temperature_offset_signed_fahrenheit"}
 {"i":"9505","n":"Sourdough Starter Push Notifications - Mode Complete Alert","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"mode_complete_alert"}

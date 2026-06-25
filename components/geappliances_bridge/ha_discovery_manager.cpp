@@ -490,7 +490,7 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     self->state_class_buf[0] = '\0';
     self->options_buf[0] = '\0';
     self->data_type_buf[0] = '\0';
-    self->scale_factor_buf[0] = '\0';
+    self->mode_buf[0] = '\0';
 
     if (json_get_str(line, "fi", &val, &len)) json_unescape(val, len, self->field_id_buf, sizeof(self->field_id_buf));
     if (json_get_str(line, "p", &val, &len)) json_unescape(val, len, self->paired_erd_buf, sizeof(self->paired_erd_buf));
@@ -501,6 +501,7 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     if (json_get_str(line, "o", &val, &len)) json_unescape(val, len, self->options_buf, sizeof(self->options_buf));
     if (json_get_str(line, "dt", &val, &len)) json_unescape(val, len, self->data_type_buf, sizeof(self->data_type_buf));
     if (json_get_str(line, "sf", &val, &len)) json_unescape(val, len, self->scale_factor_buf, sizeof(self->scale_factor_buf));
+    if (json_get_str(line, "m", &val, &len)) json_unescape(val, len, self->mode_buf, sizeof(self->mode_buf));
 
     uint16_t erd_id = (uint16_t)strtoul(erd_id_hex, NULL, 16);
 
@@ -661,6 +662,11 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
         }
         if (self->scale_factor_buf[0]) {
             n = snprintf(payload + pos, space, "\"step\":%s,", self->scale_factor_buf);
+            if (n < 0 || n >= space) goto too_large;
+            pos += n; space -= n;
+        }
+        if (self->mode_buf[0]) {
+            n = snprintf(payload + pos, space, "\"mode\":\"%s\",", self->mode_buf);
             if (n < 0 || n >= space) goto too_large;
             pos += n; space -= n;
         }
