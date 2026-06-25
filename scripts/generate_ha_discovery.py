@@ -597,17 +597,25 @@ def _compute_switch_value_template(data_size: int) -> str:
 
 
 def _paired_primary_field_template(erd_by_id: Dict[str, Dict], paired_erd_str: str,
-                                    erd_scaling: int) -> Optional[str]:
+                                    erd_scaling: int, for_switch: bool = False) -> Optional[str]:
     """Return a Jinja2 value_template that extracts the primary field from a
     paired ERD's full hex payload, or None if the paired ERD isn't found or
     has no non-bitfield primary field.
 
-    Used when a controllable entity (switch/select/number) reads its state from
-    a paired status ERD that may have extra bytes (allowables, bitfields).
+    When for_switch=True, returns a raw hex extraction template (e.g. value[0:2])
+    so the output matches state_on/state_off. Otherwise uses the full field
+    template (enum labels, scaling, etc).
     """
     pf = _get_primary_field(erd_by_id, paired_erd_str)
     if pf is None:
         return None
+    if for_switch:
+        # Extract just the hex bytes for the primary field.
+        offset = pf.get('offset', 0)
+        size = pf.get('size', 1)
+        hex_start = offset * 2
+        hex_end = (offset + size) * 2
+        return f"{{{{ value[{hex_start}:{hex_end}] }}}}"
     return _byte_subfield_value_template(pf, erd_scaling)
 
 def _select_options_and_templates(enum_values: Dict[str, str], data_size: int):
@@ -827,7 +835,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 vt = _compute_binary_sensor_value_template(data_size)
             elif ha_domain == 'switch':
                 # For paired switches, read state from the status ERD's primary field.
-                vt = _paired_primary_field_template(erd_by_id, paired_erd_str, 1) or ''
+                vt = _paired_primary_field_template(erd_by_id, paired_erd_str, 1, True) or ''
             elif ha_domain == 'select':
                 ev = get_first_enum_values(erd_data)
                 if ev:
