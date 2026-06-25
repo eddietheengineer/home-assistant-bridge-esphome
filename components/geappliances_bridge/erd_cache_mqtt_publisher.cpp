@@ -9,11 +9,12 @@
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 #include "esphome/components/mqtt/mqtt_client.h"
+#include "geappliances_bridge_constants.h"
 
 #include <cstdio>
 #include <string.h>
 
-static const char* const TAG = "erd_cache_mqtt_publisher";
+static const char* const PUBLISHER_TAG = "erd_cache_mqtt_publisher";
 #ifdef USE_ESP_IDF
 #include "esp_task_wdt.h"
 #endif
@@ -83,25 +84,48 @@ static void mqtt_publisher_task(void* arg)
       int topic_len = snprintf(self->task_topic, sizeof(self->task_topic),
           "geappliances/%s/erd/0x%04x/value", self->device_id, entry->erd);
       if (topic_len < 0 || (unsigned)topic_len >= sizeof(self->task_topic)) {
-        ESP_LOGW(TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
+        ESP_LOGW(PUBLISHER_TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
         break;
       }
 
-      /* Build hex payload using pre-allocated buffer. */
+      /* Build payload: hex for binary ERDs, decoded ASCII for string ERDs. */
       size_t data_len = entry->data_size;
-      for (size_t i = 0; i < data_len; i++) {
-        snprintf(self->task_hex + i * 2, 3, "%02x", data[i]);
+      const char* payload;
+      size_t payload_len;
+      if (is_string_erd(entry->erd)) {
+        /* Decode string-type ERD: subtract 0x20 offset, strip trailing '_' padding. */
+        int pos = 0;
+        for (size_t i = 0; i < data_len; i++) {
+          uint8_t raw = data[i];
+          if (raw == 0x00) break;
+          uint8_t decoded = raw - 0x20;
+          if ((size_t)(pos + 1) < sizeof(self->task_hex)) {
+            self->task_hex[pos++] = (char)decoded;
+          }
+        }
+        /* Strip trailing '_' padding. */
+        while (pos > 0 && self->task_hex[pos - 1] == '_') pos--;
+        self->task_hex[pos] = '\0';
+        payload = self->task_hex;
+        payload_len = (size_t)pos;
+      } else {
+        /* Build hex payload using pre-allocated buffer. */
+        for (size_t i = 0; i < data_len; i++) {
+          snprintf(self->task_hex + i * 2, 3, "%02x", data[i]);
+        }
+        self->task_hex[data_len * 2] = '\0';
+        payload = self->task_hex;
+        payload_len = data_len * 2;
       }
-      self->task_hex[data_len * 2] = '\0';
 
       /* Publish through the interface. */
       uint32_t t_publish = self->get_time_ms();
       mqtt_client_publish_raw(self->mqtt_client, self->task_topic,
-          self->task_hex, data_len * 2, true);
+          payload, payload_len, true);
       uint32_t elapsed = self->get_time_ms() - t_publish;
 
       if (elapsed >= 1000) {
-        ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
+        ESP_LOGW(PUBLISHER_TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
       }
 
       /* Reload the publish cooldown after successful MQTT publish. */
@@ -142,15 +166,15 @@ void erd_cache_mqtt_publisher_init(
 #ifdef USE_ESP_IDF
   self->work_semaphore = xSemaphoreCreateBinary();
   if (!self->work_semaphore) {
-    ESP_LOGE(TAG, "Failed to create work semaphore");
+    ESP_LOGE(PUBLISHER_TAG, "Failed to create work semaphore");
   }
   self->state_mutex = xSemaphoreCreateMutex();
   if (!self->state_mutex) {
-    ESP_LOGE(TAG, "Failed to create state mutex");
+    ESP_LOGE(PUBLISHER_TAG, "Failed to create state mutex");
   }
   self->done_semaphore = xSemaphoreCreateBinary();
   if (!self->done_semaphore) {
-    ESP_LOGE(TAG, "Failed to create done semaphore");
+    ESP_LOGE(PUBLISHER_TAG, "Failed to create done semaphore");
   }
   self->task_running = false;
 #endif
@@ -188,7 +212,7 @@ void erd_cache_mqtt_publisher_init(
     erd_cache_mqtt_publisher_on_connected(self);
   }
 
-  ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
+  ESP_LOGI(PUBLISHER_TAG, "ERD cache MQTT publisher initialized");
 }
 
 void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self)
@@ -240,7 +264,7 @@ void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
       self->task_stack,
       &self->task_tcb);
   if (self->task_handle == NULL) {
-    ESP_LOGE(TAG, "Failed to create MQTT publisher task");
+    ESP_LOGE(PUBLISHER_TAG, "Failed to create MQTT publisher task");
     self->task_running = false;
   }
 #else
@@ -262,7 +286,7 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
   // know it has entered the termination path.
   if (self->done_semaphore != NULL) {
     if (xSemaphoreTake(self->done_semaphore, pdMS_TO_TICKS(1000)) != pdTRUE) {
-      ESP_LOGW(TAG, "MQTT publisher task did not signal done within 1 s");
+      ESP_LOGW(PUBLISHER_TAG, "MQTT publisher task did not signal done within 1 s");
     }
   } else {
     // Fallback: poll with delay when done_semaphore creation failed.
@@ -272,7 +296,7 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
       vTaskDelay(pdMS_TO_TICKS(10));
     }
     if (self->task_handle != NULL) {
-      ESP_LOGW(TAG, "MQTT publisher task did not terminate within 1 s");
+      ESP_LOGW(PUBLISHER_TAG, "MQTT publisher task did not terminate within 1 s");
     }
   }
 
@@ -342,24 +366,46 @@ uint16_t erd_cache_mqtt_publisher_loop(
     char topic[128];
     int topic_len = snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/value", self->device_id, entry->erd);
     if (topic_len < 0 || (unsigned)topic_len >= sizeof(topic)) {
-      ESP_LOGW(TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
+      ESP_LOGW(PUBLISHER_TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
       return published;
     }
-    /* Build hex payload: max data_size is 255 (uint8_t), so hex is 510 chars + null */
+    /* Build payload: hex for binary ERDs, decoded ASCII for string ERDs. */
     size_t data_len = entry->data_size;
     char hex[512];
-    for (size_t i = 0; i < data_len; i++) {
-      snprintf(hex + i * 2, 3, "%02x", data[i]);
+    const char* payload;
+    size_t payload_len;
+    if (is_string_erd(entry->erd)) {
+      /* Decode string-type ERD: subtract 0x20 offset, strip trailing '_' padding. */
+      int pos = 0;
+      for (size_t i = 0; i < data_len; i++) {
+        uint8_t raw = data[i];
+        if (raw == 0x00) break;
+        uint8_t decoded = raw - 0x20;
+        if ((size_t)(pos + 1) < sizeof(hex)) {
+          hex[pos++] = (char)decoded;
+        }
+      }
+      /* Strip trailing '_' padding. */
+      while (pos > 0 && hex[pos - 1] == '_') pos--;
+      hex[pos] = '\0';
+      payload = hex;
+      payload_len = (size_t)pos;
+    } else {
+      /* Build hex payload: max data_size is 255 (uint8_t), so hex is 510 chars + null */
+      for (size_t i = 0; i < data_len; i++) {
+        snprintf(hex + i * 2, 3, "%02x", data[i]);
+      }
+      hex[data_len * 2] = '\0';
+      payload = hex;
+      payload_len = data_len * 2;
     }
-    hex[data_len * 2] = '\0';
 
-    /* Publish through the interface — measure per-publish time. */
     uint32_t t_publish = self->get_time_ms();
-    mqtt_client_publish_raw(self->mqtt_client, topic, hex, data_len * 2, true);
+    mqtt_client_publish_raw(self->mqtt_client, topic, payload, payload_len, true);
     uint32_t elapsed = self->get_time_ms() - t_publish;
 
     if (elapsed >= 1000) {
-      ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
+      ESP_LOGW(PUBLISHER_TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
     }
 
     /* Reload the publish cooldown after successful MQTT publish. */
@@ -387,7 +433,7 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
 #else
   self->mqtt_connected = true;
 #endif
-  ESP_LOGI(TAG, "MQTT reconnected — resuming ERD cache publishing");
+  ESP_LOGI(PUBLISHER_TAG, "MQTT reconnected — resuming ERD cache publishing");
   /* Wake the background task so it can start publishing again. */
   erd_cache_mqtt_publisher_signal_work(self);
 }
@@ -405,7 +451,7 @@ void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self)
 #else
   self->mqtt_connected = false;
 #endif
-  ESP_LOGW(TAG, "MQTT disconnected — pausing ERD cache publishing");
+  ESP_LOGW(PUBLISHER_TAG, "MQTT disconnected — pausing ERD cache publishing");
 }
 
 void erd_cache_mqtt_publisher_pause(erd_cache_mqtt_publisher_t* self)

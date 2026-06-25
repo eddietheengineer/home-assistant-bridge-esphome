@@ -766,6 +766,10 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 if device_class == 'enum' or primary_type == 'enum':
                     ev, fs = _get_first_enum_field_info(erd_data)
                     vt = _enum_sensor_value_template(ev, fs)
+                elif primary_type == 'string':
+                    # String-type ERDs: MQTT payload is already decoded ASCII
+                    # (with 0x20 offset applied), so just pass through.
+                    vt = '{{ value }}'
                 elif data_size <= 4:
                     signed = _is_signed_type(_get_primary_data_type(erd_data))
                     vt = _compute_sensor_value_template(scaling_factor, data_size, signed)
