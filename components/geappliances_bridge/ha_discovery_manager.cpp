@@ -107,6 +107,13 @@ static void cleanup_run(ha_discovery_manager_t* self)
     if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
         ESP_LOGI(TAG, "Cleanup idle timeout reached, proceeding to discovery");
         self->cleanup_subscribed = false;
+        /* Unsubscribe from cleanup topic so new discovery publishes aren't
+         * immediately cleared by the still-active subscription callback. */
+        if (self->mqtt_client) {
+            char sub_topic[128];
+            snprintf(sub_topic, sizeof(sub_topic), "homeassistant/+/%s/#", self->device_id);
+            mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
+        }
         self->state = ha_discovery_state_discovering;
         self->current_category = 0;
         self->current_chunk = 0;

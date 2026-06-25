@@ -57,6 +57,8 @@ typedef struct i_mqtt_client_api_t {
   void (*publish_raw)(i_mqtt_client_t* self, const char* topic, const char* payload, size_t payload_len, bool retain);
 
   void (*subscribe)(i_mqtt_client_t* self, const char* topic, void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg), void* arg);
+
+  void (*unsubscribe)(i_mqtt_client_t* self, const char* topic);
 } i_mqtt_client_api_t;
 
 /*!
@@ -114,6 +116,14 @@ static inline void mqtt_client_publish_raw(i_mqtt_client_t* self, const char* to
 static inline void mqtt_client_subscribe(i_mqtt_client_t* self, const char* topic, void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg), void* arg)
 {
   self->api->subscribe(self, topic, callback, arg);
+}
+
+/*!
+ * Unsubscribe from a topic.
+ */
+static inline void mqtt_client_unsubscribe(i_mqtt_client_t* self, const char* topic)
+{
+  self->api->unsubscribe(self, topic);
 }
 
 #endif

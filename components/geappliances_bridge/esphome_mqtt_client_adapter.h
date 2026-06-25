@@ -114,6 +114,14 @@ void esphome_mqtt_client_adapter_subscribe(
   void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg),
   void* arg);
 
+/*!
+ * Unsubscribe from a topic.
+ * Implements the i_mqtt_client_t unsubscribe vtable slot.
+ */
+void esphome_mqtt_client_adapter_unsubscribe(
+  i_mqtt_client_t* self,
+  const char* topic);
+
 #ifdef __cplusplus
 }
 #endif
