@@ -1,163 +1,157 @@
-{"i":"4008","n":"Mixing valve home request byte","d":"binary_sensor","ds":1,"vt":"{{ ({ \"0\": \"Write to return to normal operation\", \"1\": \"Write to cycle to full cold\" })[({ value[0:2] }|int(base=16))|string] }}","ct":"{{ {{ \"Write to return to normal operation\": \"00\", \"Write to cycle to full cold\": \"01\" }}[value] | default('00') }}"}
-{"i":"4009","n":"Mixing valve home cycle state byte","d":"sensor","ds":1,"vt":"{{ ({ \"0\": \"Mixing valve normal operation\", \"1\": \"Mixing valve full cold\", \"2\": \"Mixing valve cycling to cold\", \"3\": \"Mixing valve cycling to normal position\" })[({ value[0:2] }|int(base=16))|string] }}"}
-{"i":"400a","n":"StepOffset","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}"}
-{"i":"400b","n":"PositionInSteps","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}"}
-{"i":"400c","n":"PositionInSteps","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}"}
-{"i":"4020","n":"Mode","d":"sensor","ds":1,"vt":"{{ ({ \"0\": \"Hybrid\", \"1\": \"Standard electric\", \"2\": \"E-heat\", \"3\": \"HiDemand\", \"4\": \"Vacation\" })[({ value[0:2] }|int(base=16))|string] }}","ct":"{{ {{ \"Hybrid\": \"00\", \"Standard electric\": \"01\", \"E-heat\": \"02\", \"HiDemand\": \"03\", \"Vacation\": \"04\" }}[value] | default('00') }}"}
-{"i":"4023","n":"Mode","d":"sensor","ds":1,"vt":"{{ ({ \"0\": \"Hybrid\", \"1\": \"Standard electric\", \"2\": \"E-heat\", \"3\": \"HiDemand\", \"4\": \"Vacation\" })[({ value[0:2] }|int(base=16))|string] }}","ct":"{{ {{ \"Hybrid\": \"00\", \"Standard electric\": \"01\", \"E-heat\": \"02\", \"HiDemand\": \"03\", \"Vacation\": \"04\" }}[value] | default('00') }}"}
-{"i":"4024","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","ct":"{{ '{{:04x}}'.format(value | int) | regex_replace('(..)(..)', '\\2\\1') }}","u":"\u00b0F","dc":"temperature"}
-{"i":"4025","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","ct":"{{ '{{:04x}}'.format(value | int) | regex_replace('(..)(..)', '\\2\\1') }}","u":"\u00b0F","dc":"temperature"}
-{"i":"4026","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","ct":"{{ '{{:04x}}'.format(value | int) | regex_replace('(..)(..)', '\\2\\1') }}","u":"\u00b0F","dc":"temperature"}
-{"i":"4028","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","ct":"{{ '{{:04x}}'.format(value | int) | regex_replace('(..)(..)', '\\2\\1') }}"}
-{"i":"402a","n":"Mode","d":"sensor","ds":1,"vt":"{{ ({ \"0\": \"Normal\", \"1\": \"High\", \"2\": \"X-High\" })[({ value[0:2] }|int(base=16))|string] }}","ct":"{{ {{ \"Normal\": \"00\", \"High\": \"01\", \"X-High\": \"02\" }}[value] | default('00') }}"}
-{"i":"402b","n":"Water Heater Mixing Valve Available Tank Capacities Available Tank Capacities.Normal","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}","fi":0}
-{"i":"402b","n":"Water Heater Mixing Valve Available Tank Capacities Available Tank Capacities.High","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}","fi":1}
-{"i":"402b","n":"Water Heater Mixing Valve Available Tank Capacities Available Tank Capacities.X-High","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}","fi":2}
-{"i":"402b","n":"Water Heater Mixing Valve Available Tank Capacities Available Tank Capacities.Reserved","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}","fi":3}
-{"i":"4030","n":"Notification state","d":"sensor","ds":32,"vt":"{{ value }}"}
-{"i":"4040","n":"Available Modes Available Modes.Hybrid","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}","fi":0}
-{"i":"4040","n":"Available Modes Available Modes.Standard electric","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}","fi":1}
-{"i":"4040","n":"Available Modes Available Modes.E-heat","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}","fi":2}
-{"i":"4040","n":"Available Modes Available Modes.HiDemand","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}","fi":3}
-{"i":"4040","n":"Available Modes Available Modes.Vacation","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}","fi":4}
-{"i":"4040","n":"Available Modes Available Modes.Reserved","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}","fi":5}
-{"i":"4041","n":"Mode","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}"}
-{"i":"4047","n":"Min/max allowed setpoint Minimum setpoint","d":"sensor","ds":4,"vt":"{{ value[0:4]|int(base=16) }}","ct":"{{ '{{:04x}}'.format(value | int) | regex_replace('(..)(..)', '\\2\\1') }}","u":"\u00b0F","dc":"temperature","fi":0}
-{"i":"4047","n":"Min/max allowed setpoint Maximum setpoint","d":"sensor","ds":4,"vt":"{{ value[4:8]|int(base=16) }}","ct":"{{ '{{:04x}}'.format(value | int) | regex_replace('(..)(..)', '\\2\\1') }}","u":"\u00b0F","dc":"temperature","fi":1}
-{"i":"4048","n":"Min/max allowed vacation setpoint Minimum setpoint","d":"sensor","ds":4,"vt":"{{ value[0:4]|int(base=16) }}","ct":"{{ '{{:04x}}'.format(value | int) | regex_replace('(..)(..)', '\\2\\1') }}","u":"\u00b0F","dc":"temperature","fi":0}
-{"i":"4048","n":"Min/max allowed vacation setpoint Maximum setpoint","d":"sensor","ds":4,"vt":"{{ value[4:8]|int(base=16) }}","ct":"{{ '{{:04x}}'.format(value | int) | regex_replace('(..)(..)', '\\2\\1') }}","u":"\u00b0F","dc":"temperature","fi":1}
-{"i":"4049","n":"Maximum hours","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","ct":"{{ '{{:04x}}'.format(value | int) | regex_replace('(..)(..)', '\\2\\1') }}"}
-{"i":"404a","n":"Maximum hours","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","ct":"{{ '{{:04x}}'.format(value | int) | regex_replace('(..)(..)', '\\2\\1') }}"}
-{"i":"404c","n":"Anode depleted mass Mass","d":"sensor","ds":8,"vt":"{{ value[0:8]|int(base=16) }}","fi":0}
-{"i":"404c","n":"Anode depleted mass Mass","d":"sensor","ds":8,"vt":"{{ value[8:16]|int(base=16) }}","fi":1}
-{"i":"404d","n":"Hours","d":"sensor","ds":4,"vt":"{{ value[0:8]|int(base=16) }}"}
-{"i":"4056","n":"Diagnostic Failure counts inverterFault","d":"sensor","ds":32,"vt":"{{ value[0:2]|int(base=16) }}","sc":"total","fi":0}
-{"i":"4056","n":"Diagnostic Failure counts inverterHeartbeat","d":"sensor","ds":32,"vt":"{{ value[2:4]|int(base=16) }}","sc":"total","fi":1}
-{"i":"4056","n":"Diagnostic Failure counts fanSpeed","d":"sensor","ds":32,"vt":"{{ value[4:6]|int(base=16) }}","sc":"total","fi":2}
-{"i":"4056","n":"Diagnostic Failure counts lowerElement","d":"sensor","ds":32,"vt":"{{ value[6:8]|int(base=16) }}","sc":"total","fi":3}
-{"i":"4056","n":"Diagnostic Failure counts upperElement","d":"sensor","ds":32,"vt":"{{ value[8:10]|int(base=16) }}","sc":"total","fi":4}
-{"i":"4056","n":"Diagnostic Failure counts t1Drift","d":"sensor","ds":32,"vt":"{{ value[10:12]|int(base=16) }}","sc":"total","fi":5}
-{"i":"4056","n":"Diagnostic Failure counts t2Drift","d":"sensor","ds":32,"vt":"{{ value[12:14]|int(base=16) }}","sc":"total","fi":6}
-{"i":"4056","n":"Diagnostic Failure counts t3aDrift","d":"sensor","ds":32,"vt":"{{ value[14:16]|int(base=16) }}","sc":"total","fi":7}
-{"i":"4056","n":"Diagnostic Failure counts t3bDrift","d":"sensor","ds":32,"vt":"{{ value[16:18]|int(base=16) }}","sc":"total","fi":8}
-{"i":"4056","n":"Diagnostic Failure counts t4Drift","d":"sensor","ds":32,"vt":"{{ value[18:20]|int(base=16) }}","sc":"total","fi":9}
-{"i":"4056","n":"Diagnostic Failure counts t5Drift","d":"sensor","ds":32,"vt":"{{ value[20:22]|int(base=16) }}","sc":"total","fi":10}
-{"i":"4056","n":"Diagnostic Failure counts compressorPowerTooHigh","d":"sensor","ds":32,"vt":"{{ value[22:24]|int(base=16) }}","sc":"total","fi":11}
-{"i":"4056","n":"Diagnostic Failure counts compressorPowerTooLow","d":"sensor","ds":32,"vt":"{{ value[24:26]|int(base=16) }}","sc":"total","fi":12}
-{"i":"4056","n":"Diagnostic Failure counts compressorTempTooHigh","d":"sensor","ds":32,"vt":"{{ value[26:28]|int(base=16) }}","sc":"total","fi":13}
-{"i":"4056","n":"Diagnostic Failure counts compressorTempTooLow","d":"sensor","ds":32,"vt":"{{ value[28:30]|int(base=16) }}","sc":"total","fi":14}
-{"i":"4056","n":"Diagnostic Failure counts eevPosition","d":"sensor","ds":32,"vt":"{{ value[30:32]|int(base=16) }}","sc":"total","fi":15}
-{"i":"4056","n":"Diagnostic Failure counts superHeatControl","d":"sensor","ds":32,"vt":"{{ value[32:34]|int(base=16) }}","sc":"total","fi":16}
-{"i":"4056","n":"Diagnostic Failure counts sealedSystemLeak","d":"sensor","ds":32,"vt":"{{ value[34:36]|int(base=16) }}","sc":"total","fi":17}
-{"i":"4056","n":"Diagnostic Failure counts defrost","d":"sensor","ds":32,"vt":"{{ value[36:38]|int(base=16) }}","sc":"total","fi":18}
-{"i":"4056","n":"Diagnostic Failure counts evaporatorFrosted","d":"sensor","ds":32,"vt":"{{ value[38:40]|int(base=16) }}","sc":"total","fi":19}
-{"i":"4056","n":"Diagnostic Failure counts vaporLocked","d":"sensor","ds":32,"vt":"{{ value[40:42]|int(base=16) }}","sc":"total","fi":20}
-{"i":"4056","n":"Diagnostic Failure counts unused[0]","d":"sensor","ds":32,"vt":"{{ value[42:44]|int(base=16) }}","sc":"total","fi":21}
-{"i":"4056","n":"Diagnostic Failure counts unused[1]","d":"sensor","ds":32,"vt":"{{ value[44:46]|int(base=16) }}","sc":"total","fi":22}
-{"i":"4056","n":"Diagnostic Failure counts unused[2]","d":"sensor","ds":32,"vt":"{{ value[46:48]|int(base=16) }}","sc":"total","fi":23}
-{"i":"4056","n":"Diagnostic Failure counts unused[3]","d":"sensor","ds":32,"vt":"{{ value[48:50]|int(base=16) }}","sc":"total","fi":24}
-{"i":"4056","n":"Diagnostic Failure counts unused[4]","d":"sensor","ds":32,"vt":"{{ value[50:52]|int(base=16) }}","sc":"total","fi":25}
-{"i":"4056","n":"Diagnostic Failure counts unused[5]","d":"sensor","ds":32,"vt":"{{ value[52:54]|int(base=16) }}","sc":"total","fi":26}
-{"i":"4056","n":"Diagnostic Failure counts unused[6]","d":"sensor","ds":32,"vt":"{{ value[54:56]|int(base=16) }}","sc":"total","fi":27}
-{"i":"4056","n":"Diagnostic Failure counts unused[7]","d":"sensor","ds":32,"vt":"{{ value[56:58]|int(base=16) }}","sc":"total","fi":28}
-{"i":"4056","n":"Diagnostic Failure counts unused[8]","d":"sensor","ds":32,"vt":"{{ value[58:60]|int(base=16) }}","sc":"total","fi":29}
-{"i":"4056","n":"Diagnostic Failure counts unused[9]","d":"sensor","ds":32,"vt":"{{ value[60:62]|int(base=16) }}","sc":"total","fi":30}
-{"i":"4056","n":"Diagnostic Failure counts unused[10]","d":"sensor","ds":32,"vt":"{{ value[62:64]|int(base=16) }}","sc":"total","fi":31}
-{"i":"4058","n":"Heating Issues Fault_T2Fail","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":0}
-{"i":"4058","n":"Heating Issues Fault_T1T2VotingFailUsingT1","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":1}
-{"i":"4058","n":"Heating Issues Fault_SabbathKeeperLostComms","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":2}
-{"i":"4058","n":"Heating Issues Fault_WaterTooHotForSabbath","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":3}
-{"i":"4058","n":"Heating Issues Defrosting","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":4}
-{"i":"4058","n":"Heating Issues PrepareToEnterBootloader","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":5}
-{"i":"4058","n":"Heating Issues Fault_DryTank","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":6}
-{"i":"4058","n":"Heating Issues Fault_ConcurrentLoad","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":7}
-{"i":"4058","n":"Heating Issues HeatPumpDryTankDetectionActive","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":8}
-{"i":"4058","n":"Heating Issues Failure_UpperElement","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":9}
-{"i":"4058","n":"Heating Issues Fault_UpperElementFail","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":10}
-{"i":"4058","n":"Heating Issues Failure_LowerElement","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":11}
-{"i":"4058","n":"Heating Issues Fault_LowerElementFail","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":12}
-{"i":"4058","n":"Heating Issues Fault_T1Fail","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":13}
-{"i":"4058","n":"Heating Issues Fault_LowLineVoltage","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":14}
-{"i":"4058","n":"Heating Issues Fault_DirtyFilter","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":15}
-{"i":"4058","n":"Heating Issues Failure_T3aDrift","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":16}
-{"i":"4058","n":"Heating Issues Fault_T3aFail","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":17}
-{"i":"4058","n":"Heating Issues Failure_T3bDrift","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":18}
-{"i":"4058","n":"Heating Issues Fault_T3bFail","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":19}
-{"i":"4058","n":"Heating Issues Fault_T4Fail","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":20}
-{"i":"4058","n":"Heating Issues Failure_T5Drift","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":21}
-{"i":"4058","n":"Heating Issues Fault_T5Fail","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":22}
-{"i":"4058","n":"Heating Issues Failure_Fan","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":23}
-{"i":"4058","n":"Heating Issues Fault_FanFail","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":24}
-{"i":"4058","n":"Heating Issues Failure_Inverter","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":25}
-{"i":"4058","n":"Heating Issues Failure_InverterHeartbeat","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":26}
-{"i":"4058","n":"Heating Issues Fault_InverterFail","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":27}
-{"i":"4058","n":"Heating Issues Fault_InverterApiMismatch","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":28}
-{"i":"4058","n":"Heating Issues Failure_LowCompressorPower","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":29}
-{"i":"4058","n":"Heating Issues Failure_HighCompressorPower","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":30}
-{"i":"4058","n":"Heating Issues Failure_HighCompressorDischargeTemp","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":31}
-{"i":"4058","n":"Heating Issues Fault_CompressorFail","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":32}
-{"i":"4058","n":"Heating Issues Failure_Defrost","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":33}
-{"i":"4058","n":"Heating Issues Fault_Defrost","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":34}
-{"i":"4058","n":"Heating Issues Fault_AmbientTemperatureOutOfRange","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":35}
-{"i":"4058","n":"Heating Issues Fault_CondensateSensor","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":36}
-{"i":"4058","n":"Heating Issues Fault_CondensateDrainPan","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":37}
-{"i":"4058","n":"Heating Issues Failure_VaporLocked","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":38}
-{"i":"4058","n":"Heating Issues Fault_VaporLocked","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":39}
-{"i":"4058","n":"Heating Issues Failure_LowCompressorDischargeTemp","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":40}
-{"i":"4058","n":"Heating Issues Fault_LowCompressorDischargeTemp","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":41}
-{"i":"4058","n":"Heating Issues Failure_EvaporatorFrosted","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":42}
-{"i":"4058","n":"Heating Issues Fault_EvaporatorFrosted","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":43}
-{"i":"4058","n":"Heating Issues Failure_SuperHeatControl","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":44}
-{"i":"4058","n":"Heating Issues Fault_SuperHeatControl","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":45}
-{"i":"4058","n":"Heating Issues Failure_EevPositionError","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":46}
-{"i":"4058","n":"Heating Issues Fault_EevPositionError","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":47}
-{"i":"4058","n":"Heating Issues Failure_SealedSystemLeak","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":48}
-{"i":"4058","n":"Heating Issues Fault_SealedSystemLeak","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":49}
-{"i":"4058","n":"Heating Issues reserved","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":50}
-{"i":"4058","n":"Heating Issues reserved","d":"sensor","ds":8,"vt":"{{ value[0:16]|int(base=16) }}","fi":51}
-{"i":"405f","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"\u00b0F","dc":"temperature"}
-{"i":"4060","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"\u00b0F","dc":"temperature"}
-{"i":"4061","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"\u00b0F","dc":"temperature"}
-{"i":"4062","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"\u00b0F","dc":"temperature"}
-{"i":"4063","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"\u00b0F","dc":"temperature"}
-{"i":"4064","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"\u00b0F","dc":"temperature"}
-{"i":"4065","n":"Current","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"A","dc":"current"}
-{"i":"4066","n":"Voltage","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"V","dc":"voltage"}
-{"i":"4068","n":"Relay status Relay status.Reserved","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","fi":0}
-{"i":"4068","n":"Relay status Relay status.DLB","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","fi":1}
-{"i":"4068","n":"Relay status Relay status.Compressor","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","fi":2}
-{"i":"4068","n":"Relay status Relay status.Upper element","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","fi":3}
-{"i":"4068","n":"Relay status Relay status.Lower element","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","fi":4}
-{"i":"4068","n":"Relay status Relay status.Fan","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","fi":5}
-{"i":"4068","n":"Relay status Relay status.Reserved","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","fi":6}
-{"i":"4069","n":"State","d":"sensor","ds":1,"vt":"{{ ({ \"0\": \"Not flowing\", \"1\": \"Small flow\", \"2\": \"Medium flow\", \"4\": \"Large flow\" })[({ value[0:2] }|int(base=16))|string] }}"}
-{"i":"406e","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"\u00b0F","dc":"temperature"}
-{"i":"4081","n":"Mode","d":"sensor","ds":1,"vt":"{{ ({ \"0\": \"Alarm not active\", \"1\": \"Alarm active\" })[({ value[0:2] }|int(base=16))|string] }}"}
-{"i":"4082","n":"Mode","d":"sensor","ds":1,"vt":"{{ ({ \"0\": \"Alarm not active\", \"1\": \"Alarm active\" })[({ value[0:2] }|int(base=16))|string] }}","dc":"battery"}
-{"i":"4083","n":"Mode","d":"binary_sensor","ds":1,"vt":"{{ ({ \"0\": \"Alarm not active\", \"1\": \"Alarm active\" })[({ value[0:2] }|int(base=16))|string] }}","dc":"moisture"}
-{"i":"40b8","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"\u00b0F","dc":"temperature"}
-{"i":"40b9","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"\u00b0F","dc":"temperature"}
-{"i":"40ba","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"\u00b0F","dc":"temperature"}
-{"i":"40bb","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"\u00b0F","dc":"temperature"}
-{"i":"40bc","n":"Temperature","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","u":"\u00b0F","dc":"temperature"}
-{"i":"40c0","n":"NumberOfResets","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}"}
-{"i":"40c2","n":"AnodePercentageRemaining","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}"}
-{"i":"40c3","n":"State","d":"sensor","ds":1,"vt":"{{ ({ \"0\": \"Missed flow off not active\", \"1\": \"Missed flow off active\" })[({ value[0:2] }|int(base=16))|string] }}"}
-{"i":"40c6","n":"State","d":"sensor","ds":1,"vt":"{{ ({ \"0\": \"Service not required\", \"1\": \"Service soon\" })[({ value[0:2] }|int(base=16))|string] }}"}
-{"i":"40cb","n":"State","d":"sensor","ds":1,"vt":"{{ ({ \"0\": \"Undepleted\", \"1\": \"Mild depletion\", \"2\": \"Severe depletion\", \"3\": \"Critical depletion\" })[({ value[0:2] }|int(base=16))|string] }}"}
-{"i":"40cc","n":"State","d":"sensor","ds":1,"vt":"{{ ({ \"0\": \"Service not required\", \"1\": \"Service soon\" })[({ value[0:2] }|int(base=16))|string] }}"}
-{"i":"40ce","n":"minutes","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}"}
-{"i":"40d0","n":"gallons","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}"}
-{"i":"4101","n":"Counter","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","sc":"total"}
-{"i":"4102","n":"Signal","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}"}
-{"i":"4103","n":"Signal","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}"}
-{"i":"4105","n":"Counter","d":"sensor","ds":2,"vt":"{{ value[0:4]|int(base=16) }}","sc":"total"}
-{"i":"4107","n":"Reset information","d":"sensor","ds":4,"vt":"{{ value }}"}
-{"i":"411d","n":"Dad Mode Delay Minutes","d":"sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}","ct":"{{ '{{:02x}}'.format(value | int) }}"}
-{"i":"4125","n":"Cost","d":"sensor","ds":1,"vt":"{{ ({ \"0\": \"Unknown cost\", \"1\": \"Cost lower than average\", \"2\": \"Average cost\", \"3\": \"Cost higher than average\" })[({ value[0:2] }|int(base=16))|string] }}"}
-{"i":"4220","n":"Boost enabled","d":"binary_sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}"}
-{"i":"4221","n":"Boost enabled","d":"binary_sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}","ct":"{{ '01' if value else '00' }}"}
-{"i":"4222","n":"Water Valve Position/State","d":"sensor","ds":1,"vt":"{{ ({ \"0\": \"Not fitted\", \"1\": \"Open\", \"2\": \"Closed\", \"3\": \"Transition\" })[({ value[0:2] }|int(base=16))|string] }}"}
-{"i":"4223","n":"Water Valve Position Request","d":"binary_sensor","ds":1,"vt":"{{ ({ \"1\": \"Open\", \"2\": \"Closed\" })[({ value[0:2] }|int(base=16))|string] }}","ct":"{{ {{ \"Open\": \"01\", \"Closed\": \"02\" }}[value] | default('00') }}"}
-{"i":"4225","n":"Active","d":"binary_sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}"}
-{"i":"4226","n":"Active","d":"binary_sensor","ds":1,"vt":"{{ value[0:2]|int(base=16) }}","ct":"{{ '01' if value else '00' }}"}
+{"i":"4008","n":"Mixing valve home state request","d":"binary_sensor","ds":1}
+{"i":"4009","n":"Mixing valve home state","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Mixing valve normal operation', '01': 'Mixing valve full cold', '02': 'Mixing valve cycling to cold', '03': 'Mixing valve cycling to normal position'}.get(value[:2], 'Unknown') }}"}
+{"i":"400a","n":"Mixing valve step offset","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
+{"i":"400b","n":"Mixing valve absolute position","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
+{"i":"400c","n":"Mixing valve park position","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
+{"i":"4020","n":"Water Heater User Mode","d":"sensor","ds":1,"vt":"{{ {'00': 'Hybrid', '01': 'Standard electric', '02': 'E-heat', '03': 'HiDemand', '04': 'Vacation'}.get(value[:2], 'Unknown') }}"}
+{"i":"4023","n":"Vacation Fallback Mode","d":"sensor","ds":1,"vt":"{{ {'00': 'Hybrid', '01': 'Standard electric', '02': 'E-heat', '03': 'HiDemand', '04': 'Vacation'}.get(value[:2], 'Unknown') }}"}
+{"i":"4024","n":"User Setpoint Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"4025","n":"Vacation Setpoint Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"4026","n":"Actual Setpoint Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"4028","n":"Timed Mode Hours Remaining","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"402a","n":"Water Heater Mixing Valve Tank Capacity","d":"sensor","ds":1,"vt":"{{ {'00': 'Normal', '01': 'High', '02': 'X-High'}.get(value[:2], 'Unknown') }}"}
+{"i":"402b","n":"Water Heater Mixing Valve Available Tank Capacities - Normal","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 0) & 1 else '00' }}","fi":"normal"}
+{"i":"402b","n":"Water Heater Mixing Valve Available Tank Capacities - High","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 1) & 1 else '00' }}","fi":"high"}
+{"i":"402b","n":"Water Heater Mixing Valve Available Tank Capacities - X-High","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 2) & 1 else '00' }}","fi":"x_high"}
+{"i":"4030","n":"Notifications","d":"sensor","ds":32}
+{"i":"4040","n":"Available Modes - Hybrid","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 0) & 1 else '00' }}","fi":"hybrid"}
+{"i":"4040","n":"Available Modes - Standard electric","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 1) & 1 else '00' }}","fi":"standard_electric"}
+{"i":"4040","n":"Available Modes - E-heat","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 2) & 1 else '00' }}","fi":"e_heat"}
+{"i":"4040","n":"Available Modes - HiDemand","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 3) & 1 else '00' }}","fi":"hidemand"}
+{"i":"4040","n":"Available Modes - Vacation","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 4) & 1 else '00' }}","fi":"vacation"}
+{"i":"4041","n":"Tank size","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"4047","n":"Min/max allowed setpoint - Minimum setpoint","d":"sensor","ds":4,"u":"°F","dc":"temperature","sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
+{"i":"4047","n":"Min/max allowed setpoint - Maximum setpoint","d":"sensor","ds":4,"u":"°F","sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"maximum_setpoint"}
+{"i":"4048","n":"Min/max allowed vacation setpoint - Minimum setpoint","d":"sensor","ds":4,"u":"°F","dc":"temperature","sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
+{"i":"4048","n":"Min/max allowed vacation setpoint - Maximum setpoint","d":"sensor","ds":4,"u":"°F","sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"maximum_setpoint"}
+{"i":"4049","n":"Max allowed vacation hours","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"404a","n":"Max allowed standard electric hours","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"404c","n":"Anode depleted mass - Mass (most significant 32 bits)","d":"sensor","ds":8,"vt":"{{ value[0:8] | int(base=16) }}"}
+{"i":"404c","n":"Anode depleted mass - Mass (least significant 32 bits)","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"mass_least_significant_32_bits"}
+{"i":"404d","n":"Anode hours of service","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
+{"i":"4056","n":"Diagnostic Failure counts - inverterFault","d":"sensor","ds":32,"sc":"total","vt":"{{ value[0:2] | int(base=16) }}"}
+{"i":"4056","n":"Diagnostic Failure counts - inverterHeartbeat","d":"sensor","ds":32,"vt":"{{ value[2:4] | int(base=16) }}","fi":"inverterheartbeat"}
+{"i":"4056","n":"Diagnostic Failure counts - fanSpeed","d":"sensor","ds":32,"vt":"{{ value[4:6] | int(base=16) }}","fi":"fanspeed"}
+{"i":"4056","n":"Diagnostic Failure counts - lowerElement","d":"sensor","ds":32,"vt":"{{ value[6:8] | int(base=16) }}","fi":"lowerelement"}
+{"i":"4056","n":"Diagnostic Failure counts - upperElement","d":"sensor","ds":32,"vt":"{{ value[8:10] | int(base=16) }}","fi":"upperelement"}
+{"i":"4056","n":"Diagnostic Failure counts - t1Drift","d":"sensor","ds":32,"vt":"{{ value[10:12] | int(base=16) }}","fi":"t1drift"}
+{"i":"4056","n":"Diagnostic Failure counts - t2Drift","d":"sensor","ds":32,"vt":"{{ value[12:14] | int(base=16) }}","fi":"t2drift"}
+{"i":"4056","n":"Diagnostic Failure counts - t3aDrift","d":"sensor","ds":32,"vt":"{{ value[14:16] | int(base=16) }}","fi":"t3adrift"}
+{"i":"4056","n":"Diagnostic Failure counts - t3bDrift","d":"sensor","ds":32,"vt":"{{ value[16:18] | int(base=16) }}","fi":"t3bdrift"}
+{"i":"4056","n":"Diagnostic Failure counts - t4Drift","d":"sensor","ds":32,"vt":"{{ value[18:20] | int(base=16) }}","fi":"t4drift"}
+{"i":"4056","n":"Diagnostic Failure counts - t5Drift","d":"sensor","ds":32,"vt":"{{ value[20:22] | int(base=16) }}","fi":"t5drift"}
+{"i":"4056","n":"Diagnostic Failure counts - compressorPowerTooHigh","d":"sensor","ds":32,"vt":"{{ value[22:24] | int(base=16) }}","fi":"compressorpowertoohigh"}
+{"i":"4056","n":"Diagnostic Failure counts - compressorPowerTooLow","d":"sensor","ds":32,"vt":"{{ value[24:26] | int(base=16) }}","fi":"compressorpowertoolow"}
+{"i":"4056","n":"Diagnostic Failure counts - compressorTempTooHigh","d":"sensor","ds":32,"vt":"{{ value[26:28] | int(base=16) }}","fi":"compressortemptoohigh"}
+{"i":"4056","n":"Diagnostic Failure counts - compressorTempTooLow","d":"sensor","ds":32,"vt":"{{ value[28:30] | int(base=16) }}","fi":"compressortemptoolow"}
+{"i":"4056","n":"Diagnostic Failure counts - eevPosition","d":"sensor","ds":32,"vt":"{{ value[30:32] | int(base=16) }}","fi":"eevposition"}
+{"i":"4056","n":"Diagnostic Failure counts - superHeatControl","d":"sensor","ds":32,"vt":"{{ value[32:34] | int(base=16) }}","fi":"superheatcontrol"}
+{"i":"4056","n":"Diagnostic Failure counts - sealedSystemLeak","d":"sensor","ds":32,"vt":"{{ value[34:36] | int(base=16) }}","fi":"sealedsystemleak"}
+{"i":"4056","n":"Diagnostic Failure counts - defrost","d":"sensor","ds":32,"vt":"{{ value[36:38] | int(base=16) }}","fi":"defrost"}
+{"i":"4056","n":"Diagnostic Failure counts - evaporatorFrosted","d":"sensor","ds":32,"vt":"{{ value[38:40] | int(base=16) }}","fi":"evaporatorfrosted"}
+{"i":"4056","n":"Diagnostic Failure counts - vaporLocked","d":"sensor","ds":32,"vt":"{{ value[40:42] | int(base=16) }}","fi":"vaporlocked"}
+{"i":"4056","n":"Diagnostic Failure counts - unused[0]","d":"sensor","ds":32,"vt":"{{ value[42:44] | int(base=16) }}","fi":"unused_0"}
+{"i":"4056","n":"Diagnostic Failure counts - unused[1]","d":"sensor","ds":32,"vt":"{{ value[44:46] | int(base=16) }}","fi":"unused_1"}
+{"i":"4056","n":"Diagnostic Failure counts - unused[2]","d":"sensor","ds":32,"vt":"{{ value[46:48] | int(base=16) }}","fi":"unused_2"}
+{"i":"4056","n":"Diagnostic Failure counts - unused[3]","d":"sensor","ds":32,"vt":"{{ value[48:50] | int(base=16) }}","fi":"unused_3"}
+{"i":"4056","n":"Diagnostic Failure counts - unused[4]","d":"sensor","ds":32,"vt":"{{ value[50:52] | int(base=16) }}","fi":"unused_4"}
+{"i":"4056","n":"Diagnostic Failure counts - unused[5]","d":"sensor","ds":32,"vt":"{{ value[52:54] | int(base=16) }}","fi":"unused_5"}
+{"i":"4056","n":"Diagnostic Failure counts - unused[6]","d":"sensor","ds":32,"vt":"{{ value[54:56] | int(base=16) }}","fi":"unused_6"}
+{"i":"4056","n":"Diagnostic Failure counts - unused[7]","d":"sensor","ds":32,"vt":"{{ value[56:58] | int(base=16) }}","fi":"unused_7"}
+{"i":"4056","n":"Diagnostic Failure counts - unused[8]","d":"sensor","ds":32,"vt":"{{ value[58:60] | int(base=16) }}","fi":"unused_8"}
+{"i":"4056","n":"Diagnostic Failure counts - unused[9]","d":"sensor","ds":32,"vt":"{{ value[60:62] | int(base=16) }}","fi":"unused_9"}
+{"i":"4056","n":"Diagnostic Failure counts - unused[10]","d":"sensor","ds":32,"vt":"{{ value[62:64] | int(base=16) }}","fi":"unused_10"}
+{"i":"4058","n":"Heating Issues - Fault_T2Fail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 56) & 1 else '00' }}","fi":"fault_t2fail"}
+{"i":"4058","n":"Heating Issues - Fault_T1T2VotingFailUsingT1","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 57) & 1 else '00' }}","fi":"fault_t1t2votingfailusingt1"}
+{"i":"4058","n":"Heating Issues - Fault_SabbathKeeperLostComms","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 58) & 1 else '00' }}","fi":"fault_sabbathkeeperlostcomms"}
+{"i":"4058","n":"Heating Issues - Fault_WaterTooHotForSabbath","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 59) & 1 else '00' }}","fi":"fault_watertoohotforsabbath"}
+{"i":"4058","n":"Heating Issues - Defrosting","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 60) & 1 else '00' }}","fi":"defrosting"}
+{"i":"4058","n":"Heating Issues - PrepareToEnterBootloader","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 61) & 1 else '00' }}","fi":"preparetoenterbootloader"}
+{"i":"4058","n":"Heating Issues - Fault_DryTank","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 62) & 1 else '00' }}","fi":"fault_drytank"}
+{"i":"4058","n":"Heating Issues - Fault_ConcurrentLoad","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 63) & 1 else '00' }}","fi":"fault_concurrentload"}
+{"i":"4058","n":"Heating Issues - HeatPumpDryTankDetectionActive","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 48) & 1 else '00' }}","fi":"heatpumpdrytankdetectionactive"}
+{"i":"4058","n":"Heating Issues - Failure_UpperElement","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 49) & 1 else '00' }}","fi":"failure_upperelement"}
+{"i":"4058","n":"Heating Issues - Fault_UpperElementFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 50) & 1 else '00' }}","fi":"fault_upperelementfail"}
+{"i":"4058","n":"Heating Issues - Failure_LowerElement","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 51) & 1 else '00' }}","fi":"failure_lowerelement"}
+{"i":"4058","n":"Heating Issues - Fault_LowerElementFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 52) & 1 else '00' }}","fi":"fault_lowerelementfail"}
+{"i":"4058","n":"Heating Issues - Fault_T1Fail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 53) & 1 else '00' }}","fi":"fault_t1fail"}
+{"i":"4058","n":"Heating Issues - Fault_LowLineVoltage","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 54) & 1 else '00' }}","fi":"fault_lowlinevoltage"}
+{"i":"4058","n":"Heating Issues - Fault_DirtyFilter","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 55) & 1 else '00' }}","fi":"fault_dirtyfilter"}
+{"i":"4058","n":"Heating Issues - Failure_T3aDrift","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 40) & 1 else '00' }}","fi":"failure_t3adrift"}
+{"i":"4058","n":"Heating Issues - Fault_T3aFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 41) & 1 else '00' }}","fi":"fault_t3afail"}
+{"i":"4058","n":"Heating Issues - Failure_T3bDrift","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 42) & 1 else '00' }}","fi":"failure_t3bdrift"}
+{"i":"4058","n":"Heating Issues - Fault_T3bFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 43) & 1 else '00' }}","fi":"fault_t3bfail"}
+{"i":"4058","n":"Heating Issues - Fault_T4Fail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 44) & 1 else '00' }}","fi":"fault_t4fail"}
+{"i":"4058","n":"Heating Issues - Failure_T5Drift","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 45) & 1 else '00' }}","fi":"failure_t5drift"}
+{"i":"4058","n":"Heating Issues - Fault_T5Fail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 46) & 1 else '00' }}","fi":"fault_t5fail"}
+{"i":"4058","n":"Heating Issues - Failure_Fan","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 47) & 1 else '00' }}","fi":"failure_fan"}
+{"i":"4058","n":"Heating Issues - Fault_FanFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 32) & 1 else '00' }}","fi":"fault_fanfail"}
+{"i":"4058","n":"Heating Issues - Failure_Inverter","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 33) & 1 else '00' }}","fi":"failure_inverter"}
+{"i":"4058","n":"Heating Issues - Failure_InverterHeartbeat","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 34) & 1 else '00' }}","fi":"failure_inverterheartbeat"}
+{"i":"4058","n":"Heating Issues - Fault_InverterFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 35) & 1 else '00' }}","fi":"fault_inverterfail"}
+{"i":"4058","n":"Heating Issues - Fault_InverterApiMismatch","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 36) & 1 else '00' }}","fi":"fault_inverterapimismatch"}
+{"i":"4058","n":"Heating Issues - Failure_LowCompressorPower","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 37) & 1 else '00' }}","fi":"failure_lowcompressorpower"}
+{"i":"4058","n":"Heating Issues - Failure_HighCompressorPower","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 38) & 1 else '00' }}","fi":"failure_highcompressorpower"}
+{"i":"4058","n":"Heating Issues - Failure_HighCompressorDischargeTemp","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 39) & 1 else '00' }}","fi":"failure_highcompressordischargetemp"}
+{"i":"4058","n":"Heating Issues - Fault_CompressorFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 24) & 1 else '00' }}","fi":"fault_compressorfail"}
+{"i":"4058","n":"Heating Issues - Failure_Defrost","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 25) & 1 else '00' }}","fi":"failure_defrost"}
+{"i":"4058","n":"Heating Issues - Fault_Defrost","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 26) & 1 else '00' }}","fi":"fault_defrost"}
+{"i":"4058","n":"Heating Issues - Fault_AmbientTemperatureOutOfRange","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 27) & 1 else '00' }}","fi":"fault_ambienttemperatureoutofrange"}
+{"i":"4058","n":"Heating Issues - Fault_CondensateSensor","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 28) & 1 else '00' }}","fi":"fault_condensatesensor"}
+{"i":"4058","n":"Heating Issues - Fault_CondensateDrainPan","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 29) & 1 else '00' }}","fi":"fault_condensatedrainpan"}
+{"i":"4058","n":"Heating Issues - Failure_VaporLocked","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 30) & 1 else '00' }}","fi":"failure_vaporlocked"}
+{"i":"4058","n":"Heating Issues - Fault_VaporLocked","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 31) & 1 else '00' }}","fi":"fault_vaporlocked"}
+{"i":"4058","n":"Heating Issues - Failure_LowCompressorDischargeTemp","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 16) & 1 else '00' }}","fi":"failure_lowcompressordischargetemp"}
+{"i":"4058","n":"Heating Issues - Fault_LowCompressorDischargeTemp","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 17) & 1 else '00' }}","fi":"fault_lowcompressordischargetemp"}
+{"i":"4058","n":"Heating Issues - Failure_EvaporatorFrosted","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 18) & 1 else '00' }}","fi":"failure_evaporatorfrosted"}
+{"i":"4058","n":"Heating Issues - Fault_EvaporatorFrosted","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 19) & 1 else '00' }}","fi":"fault_evaporatorfrosted"}
+{"i":"4058","n":"Heating Issues - Failure_SuperHeatControl","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 20) & 1 else '00' }}","fi":"failure_superheatcontrol"}
+{"i":"4058","n":"Heating Issues - Fault_SuperHeatControl","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 21) & 1 else '00' }}","fi":"fault_superheatcontrol"}
+{"i":"4058","n":"Heating Issues - Failure_EevPositionError","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 22) & 1 else '00' }}","fi":"failure_eevpositionerror"}
+{"i":"4058","n":"Heating Issues - Fault_EevPositionError","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 23) & 1 else '00' }}","fi":"fault_eevpositionerror"}
+{"i":"4058","n":"Heating Issues - Failure_SealedSystemLeak","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 8) & 1 else '00' }}","fi":"failure_sealedsystemleak"}
+{"i":"4058","n":"Heating Issues - Fault_SealedSystemLeak","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 9) & 1 else '00' }}","fi":"fault_sealedsystemleak"}
+{"i":"405f","n":"T1 Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"4060","n":"T2 Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"4061","n":"T3a Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"4062","n":"T3b Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"4063","n":"T4 Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"4064","n":"T5 Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"4065","n":"Measured current","d":"sensor","ds":2,"u":"A","dc":"current","sf":10,"vt":"{{ (value | int(base=16)) / 10 | round(1) }}"}
+{"i":"4066","n":"Measured voltage","d":"sensor","ds":2,"u":"V","dc":"voltage","vt":"{{ value | int(base=16) }}"}
+{"i":"4068","n":"Relay status - DLB","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) >> 0) & 1 else '00' }}","fi":"dlb"}
+{"i":"4068","n":"Relay status - Compressor","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) >> 1) & 1 else '00' }}","fi":"compressor"}
+{"i":"4068","n":"Relay status - Upper element","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) >> 2) & 1 else '00' }}","fi":"upper_element"}
+{"i":"4068","n":"Relay status - Lower element","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) >> 3) & 1 else '00' }}","fi":"lower_element"}
+{"i":"4068","n":"Relay status - Fan","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) >> 4) & 1 else '00' }}","fi":"fan"}
+{"i":"4069","n":"Flow state","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not flowing', '01': 'Small flow', '02': 'Medium flow', '04': 'Large flow'}.get(value[:2], 'Unknown') }}"}
+{"i":"406e","n":"T6 Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ (value | int(base=16)) / 10 | round(1) }}"}
+{"i":"4081","n":"Anode alarm active","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Alarm not active', '01': 'Alarm active'}.get(value[:2], 'Unknown') }}"}
+{"i":"4082","n":"Accessory low battery alarm active","d":"sensor","ds":1,"dc":"battery","vt":"{{ {'00': 'Alarm not active', '01': 'Alarm active'}.get(value[:2], 'Unknown') }}"}
+{"i":"4083","n":"Accessory leak detected alarm active","d":"binary_sensor","ds":1,"dc":"moisture"}
+{"i":"40b8","n":"Groundwater Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"40b9","n":"T7 Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"40ba","n":"MC CPU Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"40bb","n":"MC Circuit Board Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"40bc","n":"MC Power Connector Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
+{"i":"40c0","n":"Number of resets","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"40c2","n":"Percentage of anode remaining","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"40c3","n":"Missed flow off state","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Missed flow off not active', '01': 'Missed flow off active'}.get(value[:2], 'Unknown') }}"}
+{"i":"40c6","n":"Service requested","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Service not required', '01': 'Service soon'}.get(value[:2], 'Unknown') }}"}
+{"i":"40cb","n":"Depletion state","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Undepleted', '01': 'Mild depletion', '02': 'Severe depletion', '03': 'Critical depletion'}.get(value[:2], 'Unknown') }}"}
+{"i":"40cc","n":"Service requested (non-GEA)","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Service not required', '01': 'Service soon'}.get(value[:2], 'Unknown') }}"}
+{"i":"40ce","n":"Minutes until recharged","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"40d0","n":"Usable hot water in gallons","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"4101","n":"Missed flow off counter","d":"sensor","ds":2,"sc":"total","vt":"{{ value | int(base=16) }}"}
+{"i":"4102","n":"Heating cycle satisfied","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"4103","n":"Heating cycle started","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"4105","n":"Missed flow off fault counter","d":"sensor","ds":2,"sc":"total","vt":"{{ value | int(base=16) }}"}
+{"i":"4107","n":"Water Heater Reset Information","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
+{"i":"411d","n":"Water Heater Dad Mode Delay In Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"4125","n":"Water Heater Current Cost Of Power","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown cost', '01': 'Cost lower than average', '02': 'Average cost', '03': 'Cost higher than average'}.get(value[:2], 'Unknown') }}"}
+{"i":"4220","n":"Water Heater Boost Mode State - Status/Actual","d":"binary_sensor","ds":1}
+{"i":"4221","n":"Water Heater Boost Mode State - Requested/Desired","d":"binary_sensor","ds":1}
+{"i":"4222","n":"Shutoff Water Valve Position/State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not fitted', '01': 'Open', '02': 'Closed', '03': 'Transition'}.get(value[:2], 'Unknown') }}"}
+{"i":"4223","n":"Requested Water Valve Position","d":"binary_sensor","ds":1}
+{"i":"4225","n":"Water Heater Active State - Status/Actual","d":"binary_sensor","ds":1}
+{"i":"4226","n":"Water Heater Active State - Requested/Desired","d":"binary_sensor","ds":1}
