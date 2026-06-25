@@ -150,10 +150,7 @@ typedef struct {
 
   /* Cleanup state: discover and remove old discovery topics. */
   uint32_t cleanup_last_activity_ms;  // Last time a topic was received
-  uint16_t cleanup_cleared_count;     // Number of unique topics cleared
   bool cleanup_subscribed;            // Whether we've subscribed
-  char cleanup_cleared_buf[4096];     // String pool for already-cleared topics
-  char* cleanup_cleared[64];          // Pointers into cleared_buf
 #endif
 } ha_discovery_manager_t;
 

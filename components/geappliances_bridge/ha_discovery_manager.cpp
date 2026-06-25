@@ -50,11 +50,10 @@ static const char* const TAG = "ha_discovery";
 /* Callback for homeassistant/+/{device_id}/# subscription during cleanup.
  * The subscription already filters to our device, so we just need to check
  * that the topic ends with /config and publish an empty retained payload.
- * Tracks cleared topics to avoid re-clearing when the broker re-delivers. */
+ * If the payload is already empty, it's our own echo — skip it. */
 static void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     (void)payload;
-    (void)payload_len;
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
 
     /* Only remove config topics. */
@@ -62,23 +61,8 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     if (topic_len < 7) return;
     if (strcmp(topic + topic_len - 7, "/config") != 0) return;
 
-    /* Check if we've already cleared this topic. */
-    for (uint16_t i = 0; i < self->cleanup_cleared_count; i++) {
-        if (strcmp(self->cleanup_cleared[i], topic) == 0) return;
-    }
-
-    /* Remember this topic so we don't clear it again. */
-    if (self->cleanup_cleared_count < 64) {
-        int pos = 0;
-        for (int i = 0; i < self->cleanup_cleared_count; i++) {
-            pos += (int)strlen(self->cleanup_cleared[i]) + 1;
-        }
-        if (pos + (int)topic_len + 1 < 4096) {
-            self->cleanup_cleared[self->cleanup_cleared_count] = self->cleanup_cleared_buf + pos;
-            memcpy(self->cleanup_cleared[self->cleanup_cleared_count], topic, topic_len + 1);
-            self->cleanup_cleared_count++;
-        }
-    }
+    /* If the payload is empty, it's our own echo from a previous clear — skip. */
+    if (payload_len == 0) return;
 
     /* Publish empty payload with retain=true to remove the topic. */
     if (self->mqtt_client) {
@@ -95,7 +79,6 @@ static void cleanup_start(ha_discovery_manager_t* self)
 {
     self->cleanup_subscribed = false;
     self->cleanup_last_activity_ms = self->get_time_ms();
-    self->cleanup_cleared_count = 0;
     self->last_publish_ms = self->get_time_ms();
 
     ESP_LOGI(TAG, "Starting HA discovery cleanup...");
