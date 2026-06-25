@@ -837,9 +837,13 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 bits_size = field.get('bits', {}).get('size', 1)
                 sub_domain = 'binary_sensor' if bits_size == 1 else 'sensor'
                 vt = _bitfield_sub_value_template(field)
+                b_p_on = '01' if sub_domain == 'binary_sensor' else ''
+                b_p_off = '00' if sub_domain == 'binary_sensor' else ''
+                b_s_on = '01' if sub_domain == 'binary_sensor' else ''
+                b_s_off = '00' if sub_domain == 'binary_sensor' else ''
                 collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
                         '', scaling_factor, data_size, paired_erd_id, pair_role,
-                        vt, '', '', fid, '', '', '', '', '')
+                        vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
 
         elif classification == 'mixed':
             primary = next(
@@ -862,9 +866,13 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 bits_size = field.get('bits', {}).get('size', 1)
                 sub_domain = 'binary_sensor' if bits_size == 1 else 'sensor'
                 vt = _bitfield_sub_value_template(field)
+                b_p_on = '01' if sub_domain == 'binary_sensor' else ''
+                b_p_off = '00' if sub_domain == 'binary_sensor' else ''
+                b_s_on = '01' if sub_domain == 'binary_sensor' else ''
+                b_s_off = '00' if sub_domain == 'binary_sensor' else ''
                 collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
                         '', scaling_factor, data_size, paired_erd_id, pair_role,
-                        vt, '', '', fid, '', '', '', '', '')
+                        vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
 
         elif classification == 'version':
             nr_fields = _get_non_reserved_fields(erd_data)
