@@ -6,4 +6,4 @@
 	url = https://github.com/ryanplusplus/tiny
 [submodule "lib/public-appliance-api-documentation"]
 	path = lib/public-appliance-api-documentation
-	url = https://github.com/geappliances/public-appliance-api-documentation.git
+	url = https://github.com/eddietheengineer/public-appliance-api-documentation.git
