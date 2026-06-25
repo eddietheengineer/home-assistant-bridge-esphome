@@ -315,68 +315,17 @@ static void json_unescape(const char* src, size_t src_len, char* out, int out_si
     out[i] = '\0';
 }
 
-/* Re-escape a raw JSON string value for embedding in another JSON string.
+/* Copy a raw JSON string value for embedding in another JSON string.
  * The input is already JSON-escaped (contains \\, \", etc.).
- * To embed it as a JSON string value, we need to double the backslashes:
- *   \\ -> \\\\   \" -> \\\"
- * Returns the number of bytes written (excluding null terminator).
- * This avoids needing an intermediate unescaped buffer. */
+ * Embedding it directly in another JSON string requires no transformation —
+ * the escape sequences remain valid.
+ * Returns the number of bytes written (excluding null terminator). */
 static int json_reescape(const char* src, size_t src_len, char* out, int out_size)
 {
-    int i = 0;
-    const char* p = src;
-    const char* end = src + src_len;
-    while (p < end) {
-        if (*p == '\\' && p + 1 < end) {
-            // Always emit a literal backslash for the escape
-            if (i + 1 >= out_size) break;
-            out[i++] = '\\';
-            p++;
-            // Then handle the escaped character
-            if (i + 1 >= out_size) break;
-            switch (*p) {
-                case '\\':
-                case '"':
-                    // Double-escape: \\ -> \\\\ or \" -> \\\"
-                    if (i + 1 >= out_size) break;
-                    out[i++] = '\\';
-                    if (i + 1 >= out_size) break;
-                    out[i++] = *p;
-                    break;
-                case '/':
-                    out[i++] = '/';
-                    break;
-                case 'n':
-                    out[i++] = 'n';
-                    break;
-                case 'r':
-                    out[i++] = 'r';
-                    break;
-                case 't':
-                    out[i++] = 't';
-                    break;
-                case 'u':
-                    // \uXXXX — pass through
-                    if (i + 5 >= out_size) { p += 4; break; }
-                    out[i++] = 'u';
-                    out[i++] = p[1];
-                    out[i++] = p[2];
-                    out[i++] = p[3];
-                    out[i++] = p[4];
-                    p += 4;
-                    break;
-                default:
-                    out[i++] = *p;
-                    break;
-            }
-        } else {
-            if (i + 1 >= out_size) break;
-            out[i++] = *p;
-        }
-        p++;
-    }
-    if (i < out_size) out[i] = '\0';
-    return i;
+    if (src_len >= (size_t)out_size) src_len = (size_t)(out_size - 1);
+    memcpy(out, src, src_len);
+    out[src_len] = '\0';
+    return (int)src_len;
 }
 
 /* ------------------------------------------------------------------ */
