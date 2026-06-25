@@ -231,7 +231,22 @@ void GeappliancesBridge::loop() {
   // On ESP-IDF, signal the background MQTT publisher task instead of
   // blocking the main loop on the IDF MQTT mutex.  On non-ESP-IDF
   // platforms, fall back to the direct loop() call as before.
-  if (this->erd_cache_publisher_.cache != nullptr) {
+  // Pause ERD cache publishing during HA discovery cleanup & publish
+  // to avoid competing for the ESP-IDF MQTT task's inbound/outbound
+  // queues, which causes dropped retained messages during cleanup.
+  bool ha_discovery_active = ha_discovery_manager_is_processing(&this->ha_discovery_manager_);
+
+  if (ha_discovery_active) {
+    if (this->erd_cache_publisher_.cache != nullptr) {
+      erd_cache_mqtt_publisher_pause(&this->erd_cache_publisher_);
+    }
+  } else {
+    if (this->erd_cache_publisher_.cache != nullptr) {
+      erd_cache_mqtt_publisher_resume(&this->erd_cache_publisher_);
+    }
+  }
+
+  if (this->erd_cache_publisher_.cache != nullptr && !ha_discovery_active) {
 #ifdef USE_ESP_IDF
     erd_cache_mqtt_publisher_signal_work(&this->erd_cache_publisher_);
 #else

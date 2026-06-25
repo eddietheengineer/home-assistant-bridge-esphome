@@ -40,22 +40,25 @@ static void mqtt_publisher_task(void* arg)
     // modified by the main loop during context switches.
     bool connected = false;
     bool has_deps = false;
+    bool paused = false;
     bool mutex_held = false;
     if (self->state_mutex) {
       if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         mutex_held = true;
         connected = self->mqtt_connected;
+        paused = self->paused;
         has_deps = self->cache != NULL && self->mqtt_client != NULL &&
                    self->device_id != NULL && self->get_time_ms != NULL;
       }
     } else {
       // Fallback when mutex creation failed — read without protection.
       connected = self->mqtt_connected;
+      paused = self->paused;
       has_deps = self->cache != NULL && self->mqtt_client != NULL &&
                  self->device_id != NULL && self->get_time_ms != NULL;
     }
 
-    if (!connected || !has_deps) {
+    if (!connected || paused || !has_deps) {
       if (mutex_held) {
         xSemaphoreGive(self->state_mutex);
       }
@@ -403,6 +406,40 @@ void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self)
   self->mqtt_connected = false;
 #endif
   ESP_LOGW(TAG, "MQTT disconnected — pausing ERD cache publishing");
+}
+
+void erd_cache_mqtt_publisher_pause(erd_cache_mqtt_publisher_t* self)
+{
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      self->paused = true;
+      xSemaphoreGive(self->state_mutex);
+    }
+  } else {
+    self->paused = true;
+  }
+#else
+  self->paused = true;
+#endif
+}
+
+void erd_cache_mqtt_publisher_resume(erd_cache_mqtt_publisher_t* self)
+{
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      self->paused = false;
+      xSemaphoreGive(self->state_mutex);
+      // Wake the task so it can resume publishing.
+      erd_cache_mqtt_publisher_signal_work(self);
+    }
+  } else {
+    self->paused = false;
+  }
+#else
+  self->paused = false;
+#endif
 }
 
 void erd_cache_mqtt_publisher_set_time_fn(

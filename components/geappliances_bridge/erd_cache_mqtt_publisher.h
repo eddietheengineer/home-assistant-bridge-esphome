@@ -46,6 +46,7 @@ typedef struct {
   const char* device_id;           // Device ID string for topic construction
   uint16_t publish_index;          // Round-robin index into cache entries
   bool mqtt_connected;             // True when MQTT broker is connected
+  bool paused;                     // True when publishing should be temporarily paused
   tiny_event_subscription_t mqtt_disconnect_subscription;
   tiny_event_subscription_t mqtt_connect_subscription;
   // Stats
@@ -116,6 +117,17 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self);
  * Called when MQTT broker disconnects.
  */
 void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self);
+
+/*!
+ * Temporarily pause publishing (ESP-IDF only; no-op otherwise).
+ * Use during HA discovery cleanup to reduce MQTT queue contention.
+ */
+void erd_cache_mqtt_publisher_pause(erd_cache_mqtt_publisher_t* self);
+
+/*!
+ * Resume publishing after a pause (ESP-IDF only; no-op otherwise).
+ */
+void erd_cache_mqtt_publisher_resume(erd_cache_mqtt_publisher_t* self);
 
 /*!
  * Override the time source (defaults to esphome::millis).
