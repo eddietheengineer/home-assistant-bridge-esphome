@@ -134,6 +134,7 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     self->cleanup_received_topics = true;
     self->cleanup_pass_found_topics = true;
     self->cleanup_pass_removed_count++;
+    self->cleanup_component_removed_count++;
 
     /* Record activity time so the idle timer resets. */
     self->cleanup_last_activity_ms = self->get_time_ms();
@@ -149,6 +150,8 @@ static void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_clean_passes = 0;
     self->cleanup_pass_found_topics = false;
     self->cleanup_pass_removed_count = 0;
+    self->cleanup_component_removed_count = 0;
+    self->cleanup_pass_number = 1;
     self->cleanup_wait_start_ms = 0;
 
     ESP_LOGI(TAG, "Starting HA discovery cleanup...");
@@ -177,7 +180,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
                 ESP_LOGI(TAG, "  [%u/%u] Subscribing to %s (pass %u)",
                     self->cleanup_current_component + 1,
                     sizeof(HA_DISCOVERY_COMPONENT_TYPES) / sizeof(HA_DISCOVERY_COMPONENT_TYPES[0]) - 1,
-                    component, self->cleanup_clean_passes + 1);
+                    component, self->cleanup_pass_number);
             }
             return;
         }
@@ -201,7 +204,8 @@ static void cleanup_run(ha_discovery_manager_t* self)
             ESP_LOGI(TAG, "  [%u/%u] %s: %u topics removed (pass %u)",
                 self->cleanup_current_component + 1,
                 sizeof(HA_DISCOVERY_COMPONENT_TYPES) / sizeof(HA_DISCOVERY_COMPONENT_TYPES[0]) - 1,
-                component, self->cleanup_pass_removed_count, self->cleanup_clean_passes + 1);
+                component, self->cleanup_component_removed_count, self->cleanup_pass_number);
+            self->cleanup_component_removed_count = 0;
             self->cleanup_current_component++;
             self->cleanup_received_topics = false;
 
@@ -217,11 +221,13 @@ static void cleanup_run(ha_discovery_manager_t* self)
     if (self->cleanup_pass_found_topics) {
         /* Topics were found and cleared — loop again to verify. */
         ESP_LOGI(TAG, "Pass %u: removed %u topics, running another pass...",
-            self->cleanup_clean_passes + 1, self->cleanup_pass_removed_count);
+            self->cleanup_pass_number, self->cleanup_pass_removed_count);
+        self->cleanup_pass_number++;
         self->cleanup_current_component = 0;
         self->cleanup_received_topics = false;
         self->cleanup_pass_found_topics = false;
         self->cleanup_pass_removed_count = 0;
+        self->cleanup_component_removed_count = 0;
         return;
     }
 
@@ -236,9 +242,11 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
     if (self->cleanup_clean_passes < 2) {
         /* Run another validation pass to confirm nothing was missed. */
+        self->cleanup_pass_number++;
         self->cleanup_current_component = 0;
         self->cleanup_received_topics = false;
         self->cleanup_pass_found_topics = false;
+        self->cleanup_component_removed_count = 0;
         return;
     }
 
