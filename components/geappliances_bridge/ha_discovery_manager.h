@@ -137,6 +137,10 @@ typedef struct {
   char data_type_buf[16];
   char scale_factor_buf[16];
   char mode_buf[16];
+  char payload_on_buf[16];
+  char payload_off_buf[16];
+  char state_on_buf[16];
+  char state_off_buf[16];
   char unique_id_buf[128];
   char state_topic_buf[128];
   char command_topic_buf[128];

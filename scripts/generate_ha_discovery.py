@@ -701,7 +701,9 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
     def collect(erd_id_int: int, name: str, domain: str, unit: str,
                 dev_cls: str, state_cls: str, scaling: int, d_size: int,
                 paired_id: int, role: str, val_tmpl: str, cmd_tmpl: str,
-                opts: str, field_id: str, mode: str = '') -> None:
+                opts: str, field_id: str, mode: str = '',
+                payload_on: str = '', payload_off: str = '',
+                state_on: str = '', state_off: str = '') -> None:
         entries.append({
             'erd_id': erd_id_int,
             'name': name,
@@ -718,6 +720,10 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             'options_json': opts,
             'field_id': field_id,
             'mode': mode,
+            'payload_on': payload_on,
+            'payload_off': payload_off,
+            'state_on': state_on,
+            'state_off': state_off,
         })
 
     processed_status = set()
@@ -794,9 +800,21 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 ct = _number_command_template(data_size, scaling_factor, signed)
             # button: no templates
 
+            # For switch/binary_sensor, set payload_on/off and state_on/off to hex
+            p_on = ''
+            p_off = ''
+            s_on = ''
+            s_off = ''
+            if ha_domain in ('switch', 'binary_sensor'):
+                p_on = '01'
+                p_off = '00'
+                s_on = '01'
+                s_off = '00'
             collect(erd_id_int, display_name, ha_domain, unit, device_class,
                     state_class, scaling_factor, data_size, paired_erd_id,
-                    pair_role, vt, ct, opts, '', 'box' if ha_domain == 'number' else '')
+                    pair_role, vt, ct, opts, '',
+                    'box' if ha_domain == 'number' else '',
+                    p_on, p_off, s_on, s_off)
 
         elif classification == 'byte_offset':
             nr_fields = _get_non_reserved_fields(erd_data)
@@ -812,7 +830,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 vt = _byte_subfield_value_template(field, scaling_factor)
                 collect(erd_id_int, entity_name, ha_domain, f_unit, f_dev_cls,
                         f_state_cls, scaling_factor, data_size, paired_erd_id,
-                        pair_role, vt, '', '', fid)
+                        pair_role, vt, '', '', fid, '', '', '', '', '')
 
         elif classification == 'bitfield':
             for field in _get_non_reserved_fields(erd_data):
@@ -823,7 +841,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 vt = _bitfield_sub_value_template(field)
                 collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
                         '', scaling_factor, data_size, paired_erd_id, pair_role,
-                        vt, '', '', fid)
+                        vt, '', '', fid, '', '', '', '', '')
 
         elif classification == 'mixed':
             primary = next(
@@ -837,7 +855,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 p_vt = _byte_subfield_value_template(primary, scaling_factor)
                 collect(erd_id_int, display_name, ha_domain, unit, p_dev_cls,
                         state_class, scaling_factor, data_size, paired_erd_id,
-                        pair_role, p_vt, '', '', '')
+                        pair_role, p_vt, '', '', '', '', '', '', '', '')
 
             for field in [d for d in erd_data
                           if _has_bits(d) and not _is_reserved_field(d.get('name', ''))]:
@@ -848,14 +866,14 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 vt = _bitfield_sub_value_template(field)
                 collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
                         '', scaling_factor, data_size, paired_erd_id, pair_role,
-                        vt, '', '', fid)
+                        vt, '', '', fid, '', '', '', '', '')
 
         elif classification == 'version':
             nr_fields = _get_non_reserved_fields(erd_data)
             vt = _version_value_template(nr_fields)
             collect(erd_id_int, display_name, ha_domain, unit, device_class,
                     state_class, scaling_factor, data_size, paired_erd_id,
-                    pair_role, vt, '', '', '')
+                    pair_role, vt, '', '', '', '', '', '', '', '')
 
         elif classification == 'multi_board_version':
             groups = _group_multi_board_version_fields(erd_data)
@@ -866,7 +884,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 fid = _field_slug(board) if board else ''
                 collect(erd_id_int, entity_name, ha_domain, unit, device_class,
                         state_class, scaling_factor, data_size, paired_erd_id,
-                        pair_role, vt, '', '', fid)
+                        pair_role, vt, '', '', fid, '', '', '', '', '')
 
                 # Add parametric version if both fields present
                 param_fields = group['parametric_fields']
@@ -877,7 +895,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                         param_fid = _field_slug(board + '_parametric') if board else 'parametric'
                         collect(erd_id_int, param_name, ha_domain, unit, device_class,
                                 state_class, scaling_factor, data_size, paired_erd_id,
-                                pair_role, p_vt, '', '', param_fid)
+                                pair_role, p_vt, '', '', param_fid, '', '', '', '', '')
     return entries
 
 
@@ -929,6 +947,10 @@ def generate_ha_discovery_jsonl_by_category(erds: List[Dict]) -> Dict[str, str]:
             if e['options_json']:                 obj['o']  = e['options_json']
             if e['field_id']:                     obj['fi'] = e['field_id']
             if e['mode']:                         obj['m']  = e['mode']
+            if e['payload_on']:                   obj['pon'] = e['payload_on']
+            if e['payload_off']:                  obj['poff'] = e['payload_off']
+            if e['state_on']:                     obj['son'] = e['state_on']
+            if e['state_off']:                    obj['soff'] = e['state_off']
             lines.append(json.dumps(obj, ensure_ascii=False, separators=(',', ':')))
         result[cat] = '\n'.join(lines) + '\n'
 

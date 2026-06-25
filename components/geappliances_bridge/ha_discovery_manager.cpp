@@ -491,6 +491,10 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     self->options_buf[0] = '\0';
     self->data_type_buf[0] = '\0';
     self->mode_buf[0] = '\0';
+    self->payload_on_buf[0] = '\0';
+    self->payload_off_buf[0] = '\0';
+    self->state_on_buf[0] = '\0';
+    self->state_off_buf[0] = '\0';
 
     if (json_get_str(line, "fi", &val, &len)) json_unescape(val, len, self->field_id_buf, sizeof(self->field_id_buf));
     if (json_get_str(line, "p", &val, &len)) json_unescape(val, len, self->paired_erd_buf, sizeof(self->paired_erd_buf));
@@ -502,6 +506,10 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     if (json_get_str(line, "dt", &val, &len)) json_unescape(val, len, self->data_type_buf, sizeof(self->data_type_buf));
     if (json_get_str(line, "sf", &val, &len)) json_unescape(val, len, self->scale_factor_buf, sizeof(self->scale_factor_buf));
     if (json_get_str(line, "m", &val, &len)) json_unescape(val, len, self->mode_buf, sizeof(self->mode_buf));
+    if (json_get_str(line, "pon", &val, &len)) json_unescape(val, len, self->payload_on_buf, sizeof(self->payload_on_buf));
+    if (json_get_str(line, "poff", &val, &len)) json_unescape(val, len, self->payload_off_buf, sizeof(self->payload_off_buf));
+    if (json_get_str(line, "son", &val, &len)) json_unescape(val, len, self->state_on_buf, sizeof(self->state_on_buf));
+    if (json_get_str(line, "soff", &val, &len)) json_unescape(val, len, self->state_off_buf, sizeof(self->state_off_buf));
 
     uint16_t erd_id = (uint16_t)strtoul(erd_id_hex, NULL, 16);
 
@@ -667,6 +675,26 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
         }
         if (self->mode_buf[0]) {
             n = snprintf(payload + pos, space, "\"mode\":\"%s\",", self->mode_buf);
+            if (n < 0 || n >= space) goto too_large;
+            pos += n; space -= n;
+        }
+        if (self->payload_on_buf[0]) {
+            n = snprintf(payload + pos, space, "\"payload_on\":\"%s\",", self->payload_on_buf);
+            if (n < 0 || n >= space) goto too_large;
+            pos += n; space -= n;
+        }
+        if (self->payload_off_buf[0]) {
+            n = snprintf(payload + pos, space, "\"payload_off\":\"%s\",", self->payload_off_buf);
+            if (n < 0 || n >= space) goto too_large;
+            pos += n; space -= n;
+        }
+        if (self->state_on_buf[0]) {
+            n = snprintf(payload + pos, space, "\"state_on\":\"%s\",", self->state_on_buf);
+            if (n < 0 || n >= space) goto too_large;
+            pos += n; space -= n;
+        }
+        if (self->state_off_buf[0]) {
+            n = snprintf(payload + pos, space, "\"state_off\":\"%s\",", self->state_off_buf);
             if (n < 0 || n >= space) goto too_large;
             pos += n; space -= n;
         }
