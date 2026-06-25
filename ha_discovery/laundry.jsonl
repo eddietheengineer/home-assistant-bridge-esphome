@@ -1830,7 +1830,7 @@
 {"i":"2170","n":"Laundry Center Push Notifications - Low Airflow Notification Supported","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[8:16] | int(base=16)) // 2097152) % 2 else '00' }}","fi":"low_airflow_notification_supported"}
 {"i":"2170","n":"Laundry Center Push Notifications - Low Airflow Warning Supported","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[8:16] | int(base=16)) // 4194304) % 2 else '00' }}","fi":"low_airflow_warning_supported"}
 {"i":"2170","n":"Laundry Center Push Notifications - Dryer Pre-Heat Started Supported","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[8:16] | int(base=16)) // 8388608) % 2 else '00' }}","fi":"dryer_pre_heat_started_supported"}
-{"i":"2171","n":"Reset Current Coin Box Count Request","d":"binary_sensor","ds":1,"dc":"restart"}
+{"i":"2171","n":"Reset Current Coin Box Count Request","d":"binary_sensor","ds":1}
 {"i":"2172","n":"Smart Wash And Rinse Option Request","d":"binary_sensor","ds":1}
 {"i":"2173","n":"Smart Wash And Rinse Option Selection","d":"binary_sensor","ds":1}
 {"i":"217a","n":"Dryer Notifications - 5 minutes until end of cycle Notification","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"5_minutes_until_end_of_cycle_notification"}

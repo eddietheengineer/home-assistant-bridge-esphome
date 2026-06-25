@@ -39,6 +39,47 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 
+# Valid HA device_class values per domain. Invalid combos are silently dropped.
+VALID_DEVICE_CLASSES = {
+    'button': {'restart'},
+    'switch': {'outlet', 'switch'},
+    'binary_sensor': {
+        'battery', 'battery_charging', 'carbon_monoxide', 'cold',
+        'connectivity', 'door', 'garage_door', 'gas', 'heat',
+        'light', 'lock', 'moisture', 'motion', 'moving',
+        'occupancy', 'opening', 'plug', 'power', 'presence',
+        'problem', 'running', 'safety', 'smoke', 'sound',
+        'tamper', 'update', 'vibration', 'window',
+    },
+    'sensor': {
+        'date', 'enum', 'timestamp', 'uptime',
+        'absolute_humidity', 'apparent_power', 'aqi', 'area',
+        'atmospheric_pressure', 'battery', 'blood_glucose_concentration',
+        'carbon_monoxide', 'carbon_dioxide', 'conductivity', 'current',
+        'data_rate', 'data_size', 'distance', 'duration', 'energy',
+        'energy_distance', 'energy_storage', 'frequency', 'gas',
+        'humidity', 'illuminance', 'irradiance', 'moisture', 'monetary',
+        'nitrogen_dioxide', 'nitrogen_monoxide', 'nitrous_oxide', 'ozone',
+        'ph', 'pm1', 'pm10', 'pm25', 'pm4', 'power_factor', 'power',
+        'precipitation', 'precipitation_intensity', 'pressure',
+        'reactive_energy', 'reactive_power', 'signal_strength',
+        'sound_pressure', 'speed', 'sulphur_dioxide', 'temperature',
+        'temperature_delta', 'volatile_organic_compounds',
+        'volatile_organic_compounds_parts', 'voltage', 'volume',
+        'volume_storage', 'volume_flow_rate', 'water', 'weight',
+        'wind_direction', 'wind_speed',
+    },
+}
+
+def _is_valid_device_class(domain: str, device_class: str) -> bool:
+    """Check if device_class is valid for the given HA domain."""
+    if not device_class:
+        return True
+    valid = VALID_DEVICE_CLASSES.get(domain)
+    if valid is None:
+        return True  # no restrictions for this domain
+    return device_class in valid
+
 # Category ranges matching the plan
 CATEGORIES = {
     "common": (0x0000, 0x0FFF),
@@ -851,7 +892,8 @@ def generate_ha_discovery_jsonl_by_category(erds: List[Dict]) -> Dict[str, str]:
             }
             # Omit fields that equal their defaults to save space
             if e['unit']:                         obj['u']  = e['unit']
-            if e['device_class']:                 obj['dc'] = e['device_class']
+            if e['device_class'] and _is_valid_device_class(e['domain'], e['device_class']):
+                obj['dc'] = e['device_class']
             if e['state_class']:                  obj['sc'] = e['state_class']
             if e['scaling_factor'] != 1:          obj['sf'] = e['scaling_factor']
             if e['paired_erd_id']:                obj['p']  = f'{e["paired_erd_id"]:04x}'

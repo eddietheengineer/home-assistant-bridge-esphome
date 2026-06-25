@@ -84,11 +84,11 @@
 {"i":"502b","n":"Articulating Display Position Request","d":"sensor","ds":1,"vt":"{{ {'00': 'Don\\'t Care', '01': 'Extend', '02': 'Retract'}.get(value[:2], 'Unknown') }}"}
 {"i":"502c","n":"Automatic Door Opener Local Public Enable","d":"binary_sensor","ds":1}
 {"i":"502d","n":"Oven Light Auto On Off State","d":"sensor","ds":1,"vt":"{{ {'00': 'Manual', '01': 'Haier Knob Auto On', '02': 'Auto Off', '03': 'Auto On', 'ff': 'Unset'}.get(value[:2], 'Unknown') }}"}
-{"i":"502e","n":"Enhanced Sabbath State","d":"binary_sensor","ds":1,"dc":"enum"}
+{"i":"502e","n":"Enhanced Sabbath State","d":"binary_sensor","ds":1}
 {"i":"502f","n":"Enhanced Sabbath Cooking Accepted","d":"switch","ds":1,"p":"5030","r":"request"}
 {"i":"5030","n":"Enhanced Sabbath Cooking Accepted","d":"binary_sensor","ds":1,"p":"502f","r":"status"}
 {"i":"5031","n":"Enhanced Sabbath Warmness Setting","d":"switch","ds":1,"p":"5032","r":"request"}
-{"i":"5032","n":"Enhanced Sabbath Warmness Setting","d":"binary_sensor","ds":1,"dc":"enum","p":"5031","r":"status"}
+{"i":"5032","n":"Enhanced Sabbath Warmness Setting","d":"binary_sensor","ds":1,"p":"5031","r":"status"}
 {"i":"5033","n":"Enhanced Shabbos Keeper Is Connected Status","d":"binary_sensor","ds":1}
 {"i":"504e","n":"Cook Cam AI Assistant Enabled","d":"switch","ds":1,"p":"504f","r":"request"}
 {"i":"504f","n":"Cook Cam AI Assistant Enabled","d":"binary_sensor","ds":1,"p":"504e","r":"status"}
@@ -1319,7 +1319,7 @@
 {"i":"5300","n":"Recipe Status - Recipe Execution ID","d":"sensor","ds":23,"vt":"{{ value[0:40] | int(base=16) }}"}
 {"i":"5300","n":"Recipe Status - Current Cook Step Index","d":"sensor","ds":23,"vt":"{{ value[40:44] | int(base=16) }}","fi":"current_cook_step_index"}
 {"i":"5300","n":"Recipe Status - Cavity Status","d":"sensor","ds":23,"dc":"enum","vt":"{{ {'00': 'Idle', '01': 'Upper Oven', '02': 'Lower Oven', 'ff': 'Invalid'}.get(value[44:46], 'Unknown') }}","fi":"cavity_status"}
-{"i":"5302","n":"Manual Enhanced Sabbath Schedule Selected","d":"binary_sensor","ds":1,"dc":"enum"}
+{"i":"5302","n":"Manual Enhanced Sabbath Schedule Selected","d":"binary_sensor","ds":1}
 {"i":"5303","n":"Time Of Day Synced With UI","d":"binary_sensor","ds":1}
 {"i":"5400","n":"Advantium Remote Cook Mode Configuration - Mode Convection Bake Available","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"mode_convection_bake_available"}
 {"i":"5400","n":"Advantium Remote Cook Mode Configuration - Mode Convection Bake Allows Remote Control","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"mode_convection_bake_allows_remote_control"}
@@ -1781,7 +1781,7 @@
 {"i":"5672","n":"Closed-Loop Cooking Target Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
 {"i":"5673","n":"Closed-Loop Cooking Current Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"5674","n":"Target Closed-Loop Cooking Time","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
-{"i":"5675","n":"Start Closed-Loop Cooking Cook Timer","d":"binary_sensor","ds":1,"dc":"duration"}
+{"i":"5675","n":"Start Closed-Loop Cooking Cook Timer","d":"binary_sensor","ds":1}
 {"i":"5676","n":"Elapsed Closed-Loop Cooking Time","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
 {"i":"5677","n":"Closed-Loop Cooking Target Time Reached","d":"binary_sensor","ds":1}
 {"i":"5678","n":"Closed-Loop Cooking Device Battery State","d":"sensor","ds":1,"dc":"battery","vt":"{{ {'00': 'Normal', '01': 'Low Battery', '02': 'High Board Temperature', 'ff': 'Invalid'}.get(value[:2], 'Unknown') }}"}

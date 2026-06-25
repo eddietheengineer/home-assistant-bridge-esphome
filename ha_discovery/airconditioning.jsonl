@@ -107,23 +107,23 @@
 {"i":"7452","n":"Fan Configuration in Heating - Cyclic Supported","d":"binary_sensor","ds":5,"p":"7453","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"cyclic_supported"}
 {"i":"7452","n":"Fan Configuration in Heating - Continuous Supported","d":"binary_sensor","ds":5,"p":"7453","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"continuous_supported"}
 {"i":"7453","n":"Fan Configuration in Heating","d":"select","ds":1,"p":"7452","r":"request","vt":"{{ {'00': 'Cyclic', '01': 'Continuous'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Cyclic': '00', 'Continuous': '01'}[value] }}","o":"[\"Cyclic\", \"Continuous\"]"}
-{"i":"7454","n":"Freeze Sentinel","d":"binary_sensor","ds":5,"dc":"enum","p":"7455","r":"status","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
+{"i":"7454","n":"Freeze Sentinel","d":"binary_sensor","ds":5,"p":"7455","r":"status","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
 {"i":"7454","n":"Freeze Sentinel - Disabled Supported","d":"binary_sensor","ds":5,"p":"7455","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"disabled_supported"}
 {"i":"7454","n":"Freeze Sentinel - Enabled Supported","d":"binary_sensor","ds":5,"p":"7455","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"enabled_supported"}
 {"i":"7455","n":"Freeze Sentinel","d":"switch","ds":1,"p":"7454","r":"request","vt":"{{ value[:2] }}"}
-{"i":"7456","n":"Heat Sentinel","d":"binary_sensor","ds":5,"dc":"enum","p":"7457","r":"status","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
+{"i":"7456","n":"Heat Sentinel","d":"binary_sensor","ds":5,"p":"7457","r":"status","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
 {"i":"7456","n":"Heat Sentinel - Disabled Supported","d":"binary_sensor","ds":5,"p":"7457","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"disabled_supported"}
 {"i":"7456","n":"Heat Sentinel - Enabled Supported","d":"binary_sensor","ds":5,"p":"7457","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"enabled_supported"}
 {"i":"7457","n":"Heat Sentinel","d":"switch","ds":1,"p":"7456","r":"request","vt":"{{ value[:2] }}"}
-{"i":"7458","n":"Constant Fan","d":"binary_sensor","ds":5,"dc":"enum","p":"7459","r":"status","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
+{"i":"7458","n":"Constant Fan","d":"binary_sensor","ds":5,"p":"7459","r":"status","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
 {"i":"7458","n":"Constant Fan - Disabled Supported","d":"binary_sensor","ds":5,"p":"7459","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"disabled_supported"}
 {"i":"7458","n":"Constant Fan - Enabled Supported","d":"binary_sensor","ds":5,"p":"7459","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"enabled_supported"}
 {"i":"7459","n":"Constant Fan","d":"switch","ds":1,"p":"7458","r":"request","vt":"{{ value[:2] }}"}
-{"i":"745a","n":"24V External Thermostat","d":"binary_sensor","ds":5,"dc":"enum","p":"745b","r":"status","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
+{"i":"745a","n":"24V External Thermostat","d":"binary_sensor","ds":5,"p":"745b","r":"status","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
 {"i":"745a","n":"24V External Thermostat - Disabled Supported","d":"binary_sensor","ds":5,"p":"745b","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"disabled_supported"}
 {"i":"745a","n":"24V External Thermostat - Enabled Supported","d":"binary_sensor","ds":5,"p":"745b","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"enabled_supported"}
 {"i":"745b","n":"24V External Thermostat","d":"switch","ds":1,"p":"745a","r":"request","vt":"{{ value[:2] }}"}
-{"i":"745c","n":"Fan Boost","d":"binary_sensor","ds":5,"dc":"enum","p":"745d","r":"status","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
+{"i":"745c","n":"Fan Boost","d":"binary_sensor","ds":5,"p":"745d","r":"status","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
 {"i":"745c","n":"Fan Boost - Disabled Supported","d":"binary_sensor","ds":5,"p":"745d","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"disabled_supported"}
 {"i":"745c","n":"Fan Boost - Enabled Supported","d":"binary_sensor","ds":5,"p":"745d","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"enabled_supported"}
 {"i":"745d","n":"Fan Boost","d":"switch","ds":1,"p":"745c","r":"request","vt":"{{ value[:2] }}"}
@@ -134,7 +134,7 @@
 {"i":"745e","n":"Heat Selector - Boost Heat Pump Allowed Present","d":"binary_sensor","ds":5,"p":"745f","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 134217728) % 2 else '00' }}","fi":"boost_heat_pump_allowed_present"}
 {"i":"745e","n":"Heat Selector - Heat Pump Only Present","d":"binary_sensor","ds":5,"p":"745f","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 268435456) % 2 else '00' }}","fi":"heat_pump_only_present"}
 {"i":"745f","n":"Heat Selector","d":"select","ds":1,"p":"745e","r":"request","vt":"{{ {'00': 'Electric Heat Only', '01': 'High Demand', '02': 'Hybrid', '03': 'Boost Heat Pump Allowed', '04': 'Heat Pump Only'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Electric Heat Only': '00', 'High Demand': '01', 'Hybrid': '02', 'Boost Heat Pump Allowed': '03', 'Heat Pump Only': '04'}[value] }}","o":"[\"Electric Heat Only\", \"High Demand\", \"Hybrid\", \"Boost Heat Pump Allowed\", \"Heat Pump Only\"]"}
-{"i":"7460","n":"Heat Selector Strict Status","d":"binary_sensor","ds":5,"dc":"enum","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
+{"i":"7460","n":"Heat Selector Strict Status","d":"binary_sensor","ds":5,"vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
 {"i":"7460","n":"Heat Selector Strict Status - Disabled Supported","d":"binary_sensor","ds":5,"vt":"{{ '01' if ((value[2:10] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"disabled_supported"}
 {"i":"7460","n":"Heat Selector Strict Status - Enabled Supported","d":"binary_sensor","ds":5,"vt":"{{ '01' if ((value[2:10] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"enabled_supported"}
 {"i":"7462","n":"UVC Module","d":"sensor","ds":5,"dc":"enum","p":"7463","r":"status","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
@@ -150,7 +150,7 @@
 {"i":"7466","n":"Make-up Air Filter Type - No Filter Option Present","d":"binary_sensor","ds":5,"p":"7467","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"no_filter_option_present"}
 {"i":"7466","n":"Make-up Air Filter Type - MERV13 Filter Option Present","d":"binary_sensor","ds":5,"p":"7467","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"merv13_filter_option_present"}
 {"i":"7467","n":"Make-up Air Filter Type","d":"select","ds":1,"p":"7466","r":"request","vt":"{{ {'00': 'No Filter', '01': 'MERV13 Filter'}.get(value[:2], 'Unknown') }}","ct":"{{ {'No Filter': '00', 'MERV13 Filter': '01'}[value] }}","o":"[\"No Filter\", \"MERV13 Filter\"]"}
-{"i":"7468","n":"Make-up Air Occupancy Control","d":"binary_sensor","ds":5,"dc":"enum","p":"7469","r":"status","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
+{"i":"7468","n":"Make-up Air Occupancy Control","d":"binary_sensor","ds":5,"p":"7469","r":"status","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}"}
 {"i":"7468","n":"Make-up Air Occupancy Control - Disabled Supported","d":"binary_sensor","ds":5,"p":"7469","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"disabled_supported"}
 {"i":"7468","n":"Make-up Air Occupancy Control - Enabled Supported","d":"binary_sensor","ds":5,"p":"7469","r":"status","vt":"{{ '01' if ((value[2:10] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"enabled_supported"}
 {"i":"7469","n":"Make-up Air Occupancy Control","d":"switch","ds":1,"p":"7468","r":"request","vt":"{{ value[:2] }}"}

@@ -11,7 +11,7 @@
 {"i":"000a","n":"Sound Level","d":"sensor","ds":1,"vt":"{{ {'00': 'Off/Mute', '01': 'Low', '02': 'Medium', '03': 'High'}.get(value[:2], 'Unknown') }}"}
 {"i":"000e","n":"Line Input Voltage","d":"sensor","ds":2,"u":"V","dc":"voltage","sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"0030","n":"Ready to Enter Boot Loader","d":"binary_sensor","ds":1}
-{"i":"0032","n":"Reset Board","d":"sensor","ds":1,"dc":"restart","vt":"{{ value | int(base=16) }}"}
+{"i":"0032","n":"Reset Board","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"0034","n":"System Current","d":"sensor","ds":2,"u":"A","dc":"current","sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"0035","n":"Personality (32-bit)","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
 {"i":"0036","n":"Service Mode State Request","d":"binary_sensor","ds":1}
