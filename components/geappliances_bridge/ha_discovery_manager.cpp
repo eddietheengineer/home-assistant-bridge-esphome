@@ -705,7 +705,6 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     pos += n;
     payload[pos] = '\0';
 
-    self->total_discovered++;
     return true;
 
 too_large:
@@ -901,15 +900,12 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                 memcpy(self->line_buf, line_start, line_len);
                 self->line_buf[line_len] = '\0';
 
-                /* Advance offset past this line. */
-                self->current_offset = (uint32_t)(line_end - decomp) + 1;
-
                 /* Process the line. */
                 if (process_jsonl_line(self, self->line_buf)) {
                     /* Rate-limit before publishing. */
                     uint32_t now = self->get_time_ms();
                     if (now - self->last_publish_ms < HA_DISCOVERY_PUBLISH_INTERVAL_MS) {
-                        /* Save state and return; next run() call will continue. */
+                        /* Don't advance offset; next run() will retry this line. */
                         return;
                     }
                     self->last_publish_ms = now;
@@ -920,6 +916,10 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                             self->payload_buf, strlen(self->payload_buf), true);
                     }
                     self->total_published++;
+                    self->total_discovered++;
+
+                    /* Advance offset past this line after successful publish. */
+                    self->current_offset = (uint32_t)(line_end - decomp) + 1;
 
                     ESP_LOGD(TAG, "Published: %s (0x%s)", self->entity_name_buf, self->erd_id_hex_buf);
 
@@ -928,6 +928,9 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                         ESP_LOGI(TAG, "Category %s: %u discovered, %u published",
                             cat->name, self->total_discovered, self->total_published);
                     }
+                } else {
+                    /* Line was filtered; advance offset past it. */
+                    self->current_offset = (uint32_t)(line_end - decomp) + 1;
                 }
 
                 /* Yield to other tasks after each entity. */
