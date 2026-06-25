@@ -160,6 +160,7 @@ typedef struct {
   bool cleanup_received_topics;       // Whether we received any topics for current component
   uint8_t cleanup_clean_passes;       // Consecutive passes with no topics found
   bool cleanup_pass_found_topics;      // Whether any topics were found during current pass
+  uint16_t cleanup_pass_removed_count; // Topics removed during current pass
   uint32_t cleanup_wait_start_ms;     // Start time of final wait before discovery
 
   /* Cleanup topic queue: buffer topic names for batched publishing.
