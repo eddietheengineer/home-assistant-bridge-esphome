@@ -182,18 +182,159 @@ def _get_non_reserved_fields(erd_data: List[Dict]) -> List[Dict]:
     return [d for d in erd_data if not _is_reserved_field(d.get('name', ''))]
 
 
+def _is_version_field(name: str) -> bool:
+    """Return True if a field name matches a version component pattern.
+
+    Matches: Critical Major, Critical Minor, Non-Critical Major, Non-Critical Minor
+    (with optional prefix like "UI ", "MC ", "Inverter ", etc. and optional " Version" suffix).
+    """
+    n = name.lower()
+    for pattern in ('critical major', 'critical minor', 'non-critical major', 'non-critical minor'):
+        if pattern in n:
+            return True
+    return False
+
+
+def _version_field_role(name: str) -> Optional[str]:
+    """Return the version role of a field, or None if not a version field.
+
+    Returns one of: 'crit_major', 'crit_minor', 'noncrit_major', 'noncrit_minor'.
+    """
+    n = name.lower()
+    # Check non-critical before critical to avoid substring match
+    # ("critical major" is a substring of "non-critical major")
+    if 'non-critical major' in n:
+        return 'noncrit_major'
+    if 'non-critical minor' in n:
+        return 'noncrit_minor'
+    if 'critical major' in n:
+        return 'crit_major'
+    if 'critical minor' in n:
+        return 'crit_minor'
+    return None
+
+
+def _is_parametric_field(name: str) -> bool:
+    """Return True if a field name is a parametric version component."""
+    n = name.lower()
+    return ('parametric major' in n) or ('parametric minor' in n)
+
+
+def _extract_board_prefix(name: str) -> str:
+    """Extract the board prefix from a field name like 'UI Critical Major Version'.
+
+    Returns the prefix before the version role keyword, stripped.
+    E.g. 'UI Critical Major Version' -> 'UI', 'Critical Major' -> ''.
+    """
+    n = name.strip()
+    # Check longer keywords first to avoid substring matches
+    for keyword in ('Non-Critical Major', 'Non-Critical Minor',
+                    'Critical Major', 'Critical Minor',
+                    'Parametric Major', 'Parametric Minor'):
+        idx = n.find(keyword)
+        if idx >= 0:
+            return n[:idx].rstrip()
+    return n
+
+
+def _is_simple_version_erd(erd_data: List[Dict]) -> bool:
+    """Return True if the ERD is a simple 4-byte version ERD.
+
+    Must have exactly 4 non-reserved u8 fields at offsets 0-3 with the pattern:
+    Critical Major, Critical Minor, Non-Critical Major, Non-Critical Minor.
+    """
+    nr = _get_non_reserved_fields(erd_data)
+    if len(nr) != 4:
+        return False
+    expected_roles = ['crit_major', 'crit_minor', 'noncrit_major', 'noncrit_minor']
+    for i, field in enumerate(nr):
+        if field.get('type') != 'u8':
+            return False
+        if field.get('offset', 0) != i:
+            return False
+        role = _version_field_role(field.get('name', ''))
+        if role != expected_roles[i]:
+            return False
+    return True
+
+
+def _group_multi_board_version_fields(erd_data: List[Dict]) -> List[Dict]:
+    """Group fields of a multi-board version ERD by board prefix.
+
+    Returns a list of groups, each with:
+      - 'prefix': board name (e.g. 'UI', 'MC')
+      - 'version_fields': list of 4 version fields in order (crit_major, crit_minor, noncrit_major, noncrit_minor)
+      - 'parametric_fields': list of 2 parametric fields (major, minor) or empty
+    """
+    nr = _get_non_reserved_fields(erd_data)
+    if not nr:
+        return []
+
+    # Group fields by board prefix
+    boards: Dict[str, Dict[str, Dict]] = {}
+    for field in nr:
+        name = field.get('name', '')
+        prefix = _extract_board_prefix(name)
+        if prefix not in boards:
+            boards[prefix] = {}
+        role = _version_field_role(name)
+        if role:
+            boards[prefix][role] = field
+        elif _is_parametric_field(name):
+            n = name.lower()
+            p_role = 'parametric_major' if 'parametric major' in n else 'parametric_minor'
+            boards[prefix][p_role] = field
+
+    # Filter to boards that have all 4 version components
+    required = {'crit_major', 'crit_minor', 'noncrit_major', 'noncrit_minor'}
+    groups = []
+    for prefix, roles in boards.items():
+        if required.issubset(roles.keys()):
+            groups.append({
+                'prefix': prefix,
+                'version_fields': [
+                    roles['crit_major'],
+                    roles['crit_minor'],
+                    roles['noncrit_major'],
+                    roles['noncrit_minor'],
+                ],
+                'parametric_fields': [
+                    roles.get('parametric_major'),
+                    roles.get('parametric_minor'),
+                ],
+            })
+    return groups
+
+
 def _classify_erd_data(erd_data: List[Dict]) -> str:
     """Classify how sub-fields of an ERD should be expanded for HA discovery.
 
     Returns one of:
-        'single'      - one entity covers the whole ERD value
-        'byte_offset' - multiple fields at distinct byte positions (no bits)
-        'bitfield'    - all non-reserved fields are bit-flags at same byte range
-        'mixed'       - one primary byte-offset field + additional bit-flag fields
+        'single'              - one entity covers the whole ERD value
+        'byte_offset'         - multiple fields at distinct byte positions (no bits)
+        'bitfield'            - all non-reserved fields are bit-flags at same byte range
+        'mixed'               - one primary byte-offset field + additional bit-flag fields
+        'version'             - 4-part version ERD (crit.major.noncrit.major.noncrit.minor)
+        'multi_board_version' - multi-board version ERD (e.g. dishwasher system software)
     """
     nr = _get_non_reserved_fields(erd_data)
     if len(nr) <= 1:
         return 'single'
+
+    # Check for simple 4-byte version ERD before other classifications
+    if _is_simple_version_erd(erd_data):
+        return 'version'
+
+    # Check for multi-board version ERD
+    groups = _group_multi_board_version_fields(erd_data)
+    if groups:
+        # Only classify as multi-board if ALL non-reserved fields are accounted for
+        total_accounted = 0
+        for g in groups:
+            total_accounted += len(g['version_fields'])
+            total_accounted += len([f for f in g['parametric_fields'] if f is not None])
+        if total_accounted == len(nr):
+            return 'multi_board_version'
 
     with_bits = [d for d in nr if _has_bits(d)]
     no_bits = [d for d in nr if not _has_bits(d)]
@@ -287,6 +428,38 @@ def _bitfield_sub_value_template(field: Dict) -> str:
         modulus = 1 << bit_size
         return (f"{{{{ ((value[{hex_start}:{hex_end}] | int(base=16))"
                 f" // {divisor}) % {modulus} }}}}")
+
+def _version_value_template(fields: List[Dict]) -> str:
+    """Generate a Jinja2 value_template for a 4-part version ERD.
+
+    Produces a dotted decimal string like '1.0.2.3' from 4 u8 fields
+    at consecutive byte offsets.
+    """
+    parts = []
+    for field in fields:
+        offset = field.get('offset', 0)
+        hex_start = offset * 2
+        hex_end = (offset + 1) * 2
+        parts.append(f"(value[{hex_start}:{hex_end}] | int(base=16) | string)")
+    return '{{ ' + ' + \".\" + '.join(parts) + ' }}'
+
+
+def _parametric_version_value_template(fields: List[Dict]) -> str:
+    """Generate a Jinja2 value_template for a 2-part parametric version.
+
+    Produces a dotted decimal string like '1.2' from 2 u8 fields.
+    """
+    parts = []
+    for field in fields:
+        if field is None:
+            return ''
+        offset = field.get('offset', 0)
+        hex_start = offset * 2
+        hex_end = (offset + 1) * 2
+        parts.append(f"(value[{hex_start}:{hex_end}] | int(base=16) | string)")
+    if len(parts) != 2:
+        return ''
+    return '{{ ' + ' + \".\" + '.join(parts) + ' }}'
 
 
 def _unit_to_ha(unit: str) -> str:
@@ -610,6 +783,34 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                         '', scaling_factor, data_size, paired_erd_id, pair_role,
                         vt, '', '', fid)
 
+        elif classification == 'version':
+            nr_fields = _get_non_reserved_fields(erd_data)
+            vt = _version_value_template(nr_fields)
+            collect(erd_id_int, display_name, ha_domain, unit, device_class,
+                    state_class, scaling_factor, data_size, paired_erd_id,
+                    pair_role, vt, '', '', '')
+
+        elif classification == 'multi_board_version':
+            groups = _group_multi_board_version_fields(erd_data)
+            for group in groups:
+                board = group['prefix']
+                entity_name = f'{display_name} - {board} Version' if board else display_name
+                vt = _version_value_template(group['version_fields'])
+                fid = _field_slug(board) if board else ''
+                collect(erd_id_int, entity_name, ha_domain, unit, device_class,
+                        state_class, scaling_factor, data_size, paired_erd_id,
+                        pair_role, vt, '', '', fid)
+
+                # Add parametric version if both fields present
+                param_fields = group['parametric_fields']
+                if param_fields[0] is not None and param_fields[1] is not None:
+                    param_name = f'{display_name} - {board} Parametric Version' if board else f'{display_name} - Parametric Version'
+                    p_vt = _parametric_version_value_template(param_fields)
+                    if p_vt:
+                        param_fid = _field_slug(board + '_parametric') if board else 'parametric'
+                        collect(erd_id_int, param_name, ha_domain, unit, device_class,
+                                state_class, scaling_factor, data_size, paired_erd_id,
+                                pair_role, p_vt, '', '', param_fid)
     return entries
 
 

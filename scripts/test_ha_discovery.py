@@ -649,5 +649,79 @@ class TestActualZonelineERDs(unittest.TestCase):
         self.assertEqual(ct_tmpl.render(value='Simple'), '01')
 
 
+class TestVersionTemplates(unittest.TestCase):
+    """Test that version ERD templates produce correct dotted decimal output."""
+
+    def test_common_version_entities_consolidated(self):
+        """Common version ERDs produce a single entity each, not four."""
+        entities = load_all_entities()
+        common = [e for e in entities if e['i'] in ('0039', '003a', '003b', '003c')]
+        # Should be exactly 4 entities (one per ERD), not 16
+        self.assertEqual(len(common), 4,
+                         f"Expected 4 consolidated version entities, got {len(common)}")
+
+    def test_application_version_template(self):
+        """Application Version (0x003a) produces dotted decimal from hex."""
+        entities = load_all_entities()
+        obj = next((e for e in entities if e['i'] == '003a'), None)
+        self.assertIsNotNone(obj, "Application Version entity not found")
+        self.assertIn('vt', obj)
+        tmpl = JINJA2_ENV.from_string(obj['vt'])
+        self.assertEqual(tmpl.render(value='01000203'), '1.0.2.3')
+        self.assertEqual(tmpl.render(value='00000000'), '0.0.0.0')
+        self.assertEqual(tmpl.render(value='ff0a0b0c'), '255.10.11.12')
+
+    def test_boot_loader_version_template(self):
+        """Boot Loader Version (0x0039) produces dotted decimal."""
+        entities = load_all_entities()
+        obj = next((e for e in entities if e['i'] == '0039'), None)
+        self.assertIsNotNone(obj)
+        tmpl = JINJA2_ENV.from_string(obj['vt'])
+        self.assertEqual(tmpl.render(value='02010000'), '2.1.0.0')
+
+    def test_dishwasher_multi_board_versions(self):
+        """Dishwasher 0x304d produces per-board version + parametric entities."""
+        entities = load_all_entities()
+        version_entities = [e for e in entities if e['i'] == '304d']
+        # 4 boards x 2 (version + parametric) = 8 entities
+        self.assertEqual(len(version_entities), 8,
+                         f"Expected 8 dishwasher version entities, got {len(version_entities)}")
+
+        # Check UI version entity
+        ui_ver = next((e for e in version_entities if 'UI Version' in e['n']), None)
+        self.assertIsNotNone(ui_ver, "UI Version entity not found")
+        tmpl = JINJA2_ENV.from_string(ui_ver['vt'])
+        # Simulate: UI=1.2.3.4 at offsets 0-3
+        payload = '0102030405060708090a0b0c0d0e0f101112131415161718'
+        self.assertEqual(tmpl.render(value=payload), '1.2.3.4')
+
+        # Check UI parametric entity
+        ui_param = next((e for e in version_entities if 'UI Parametric' in e['n']), None)
+        self.assertIsNotNone(ui_param, "UI Parametric Version entity not found")
+        tmpl = JINJA2_ENV.from_string(ui_param['vt'])
+        self.assertEqual(tmpl.render(value=payload), '5.6')
+
+        # Check MC version
+        mc_ver = next((e for e in version_entities if 'MC Version' in e['n']), None)
+        self.assertIsNotNone(mc_ver)
+        tmpl = JINJA2_ENV.from_string(mc_ver['vt'])
+        self.assertEqual(tmpl.render(value=payload), '7.8.9.10')
+
+    def test_dishwasher_version_field_ids_unique(self):
+        """Each board version and parametric entity has a unique field_id."""
+        entities = load_all_entities()
+        version_entities = [e for e in entities if e['i'] == '304d']
+        field_ids = [(e['n'], e.get('fi', '')) for e in version_entities]
+        # All field_ids must be unique
+        fids = [fid for _, fid in field_ids]
+        self.assertEqual(len(fids), len(set(fids)),
+                         f"Duplicate field_ids in 0x304d: {field_ids}")
+
+    def test_dishwasher_tub1_versions(self):
+        """Dishwasher 0x324d (Tub 1) also produces consolidated version entities."""
+        entities = load_all_entities()
+        version_entities = [e for e in entities if e['i'] == '324d']
+        self.assertEqual(len(version_entities), 8,
+                         f"Expected 8 Tub 1 version entities, got {len(version_entities)}")
 if __name__ == '__main__':
     unittest.main()

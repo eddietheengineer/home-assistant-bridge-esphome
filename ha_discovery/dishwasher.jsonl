@@ -150,30 +150,14 @@
 {"i":"3046","n":"Heater Relay State","d":"binary_sensor","ds":1}
 {"i":"3049","n":"Fan 1 Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"304b","n":"Fan 2 Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"304d","n":"System Software Versions - UI Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"304d","n":"System Software Versions - UI Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[2:4] | int(base=16) }}","fi":"ui_critical_minor_version"}
-{"i":"304d","n":"System Software Versions - UI Non-Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[4:6] | int(base=16) }}","fi":"ui_non_critical_major_version"}
-{"i":"304d","n":"System Software Versions - UI Non-Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[6:8] | int(base=16) }}","fi":"ui_non_critical_minor_version"}
-{"i":"304d","n":"System Software Versions - UI Parametric Major Version","d":"sensor","ds":24,"vt":"{{ value[8:10] | int(base=16) }}","fi":"ui_parametric_major_version"}
-{"i":"304d","n":"System Software Versions - UI Parametric Minor Version","d":"sensor","ds":24,"vt":"{{ value[10:12] | int(base=16) }}","fi":"ui_parametric_minor_version"}
-{"i":"304d","n":"System Software Versions - MC Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[12:14] | int(base=16) }}","fi":"mc_critical_major_version"}
-{"i":"304d","n":"System Software Versions - MC Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[14:16] | int(base=16) }}","fi":"mc_critical_minor_version"}
-{"i":"304d","n":"System Software Versions - MC Non-Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[16:18] | int(base=16) }}","fi":"mc_non_critical_major_version"}
-{"i":"304d","n":"System Software Versions - MC Non-Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[18:20] | int(base=16) }}","fi":"mc_non_critical_minor_version"}
-{"i":"304d","n":"System Software Versions - MC Parametric Major Version","d":"sensor","ds":24,"vt":"{{ value[20:22] | int(base=16) }}","fi":"mc_parametric_major_version"}
-{"i":"304d","n":"System Software Versions - MC Parametric Minor Version","d":"sensor","ds":24,"vt":"{{ value[22:24] | int(base=16) }}","fi":"mc_parametric_minor_version"}
-{"i":"304d","n":"System Software Versions - Inverter Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[24:26] | int(base=16) }}","fi":"inverter_critical_major_version"}
-{"i":"304d","n":"System Software Versions - Inverter Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[26:28] | int(base=16) }}","fi":"inverter_critical_minor_version"}
-{"i":"304d","n":"System Software Versions - Inverter Non-Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[28:30] | int(base=16) }}","fi":"inverter_non_critical_major_version"}
-{"i":"304d","n":"System Software Versions - Inverter Non-Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[30:32] | int(base=16) }}","fi":"inverter_non_critical_minor_version"}
-{"i":"304d","n":"System Software Versions - Inverter Parametric Major Version","d":"sensor","ds":24,"vt":"{{ value[32:34] | int(base=16) }}","fi":"inverter_parametric_major_version"}
-{"i":"304d","n":"System Software Versions - Inverter Parametric Minor Version","d":"sensor","ds":24,"vt":"{{ value[34:36] | int(base=16) }}","fi":"inverter_parametric_minor_version"}
-{"i":"304d","n":"System Software Versions - Wifi Module Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[36:38] | int(base=16) }}","fi":"wifi_module_critical_major_version"}
-{"i":"304d","n":"System Software Versions - Wifi Module Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[38:40] | int(base=16) }}","fi":"wifi_module_critical_minor_version"}
-{"i":"304d","n":"System Software Versions - Wifi Module Non-Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[40:42] | int(base=16) }}","fi":"wifi_module_non_critical_major_version"}
-{"i":"304d","n":"System Software Versions - Wifi Module Non-Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[42:44] | int(base=16) }}","fi":"wifi_module_non_critical_minor_version"}
-{"i":"304d","n":"System Software Versions - Wifi Module Parametric Major Version","d":"sensor","ds":24,"vt":"{{ value[44:46] | int(base=16) }}","fi":"wifi_module_parametric_major_version"}
-{"i":"304d","n":"System Software Versions - Wifi Module Parametric Minor Version","d":"sensor","ds":24,"vt":"{{ value[46:48] | int(base=16) }}","fi":"wifi_module_parametric_minor_version"}
+{"i":"304d","n":"System Software Versions - UI Version","d":"sensor","ds":24,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}","fi":"ui"}
+{"i":"304d","n":"System Software Versions - UI Parametric Version","d":"sensor","ds":24,"vt":"{{ (value[8:10] | int(base=16) | string) + \".\" + (value[10:12] | int(base=16) | string) }}","fi":"ui_parametric"}
+{"i":"304d","n":"System Software Versions - MC Version","d":"sensor","ds":24,"vt":"{{ (value[12:14] | int(base=16) | string) + \".\" + (value[14:16] | int(base=16) | string) + \".\" + (value[16:18] | int(base=16) | string) + \".\" + (value[18:20] | int(base=16) | string) }}","fi":"mc"}
+{"i":"304d","n":"System Software Versions - MC Parametric Version","d":"sensor","ds":24,"vt":"{{ (value[20:22] | int(base=16) | string) + \".\" + (value[22:24] | int(base=16) | string) }}","fi":"mc_parametric"}
+{"i":"304d","n":"System Software Versions - Inverter Version","d":"sensor","ds":24,"vt":"{{ (value[24:26] | int(base=16) | string) + \".\" + (value[26:28] | int(base=16) | string) + \".\" + (value[28:30] | int(base=16) | string) + \".\" + (value[30:32] | int(base=16) | string) }}","fi":"inverter"}
+{"i":"304d","n":"System Software Versions - Inverter Parametric Version","d":"sensor","ds":24,"vt":"{{ (value[32:34] | int(base=16) | string) + \".\" + (value[34:36] | int(base=16) | string) }}","fi":"inverter_parametric"}
+{"i":"304d","n":"System Software Versions - Wifi Module Version","d":"sensor","ds":24,"vt":"{{ (value[36:38] | int(base=16) | string) + \".\" + (value[38:40] | int(base=16) | string) + \".\" + (value[40:42] | int(base=16) | string) + \".\" + (value[42:44] | int(base=16) | string) }}","fi":"wifi_module"}
+{"i":"304d","n":"System Software Versions - Wifi Module Parametric Version","d":"sensor","ds":24,"vt":"{{ (value[44:46] | int(base=16) | string) + \".\" + (value[46:48] | int(base=16) | string) }}","fi":"wifi_module_parametric"}
 {"i":"304e","n":"Dishwasher Rinse Aid Sensor Exists","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Rinse Aid Sensor Does Not Exist', '01': 'Rinse Aid Sensor Exists'}.get(value[:2], 'Unknown') }}"}
 {"i":"304f","n":"Dry Heater Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
 {"i":"3074","n":"Dry Heater Fan Speed Feedback","d":"sensor","ds":2,"u":"rpm","vt":"{{ value | int(base=16) }}"}
@@ -555,30 +539,14 @@
 {"i":"3237","n":"Tub 1 Dishwasher Door Status","d":"binary_sensor","ds":1,"dc":"door"}
 {"i":"323e","n":"Tub 1 Drain Pump Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"3245","n":"Tub 1 Circ Pump Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"324d","n":"System Software Versions Tub 1 - UI Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"324d","n":"System Software Versions Tub 1 - UI Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[2:4] | int(base=16) }}","fi":"ui_critical_minor_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - UI Non-Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[4:6] | int(base=16) }}","fi":"ui_non_critical_major_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - UI Non-Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[6:8] | int(base=16) }}","fi":"ui_non_critical_minor_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - UI Parametric Major Version","d":"sensor","ds":24,"vt":"{{ value[8:10] | int(base=16) }}","fi":"ui_parametric_major_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - UI Parametric Minor Version","d":"sensor","ds":24,"vt":"{{ value[10:12] | int(base=16) }}","fi":"ui_parametric_minor_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - MC Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[12:14] | int(base=16) }}","fi":"mc_critical_major_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - MC Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[14:16] | int(base=16) }}","fi":"mc_critical_minor_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - MC Non-Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[16:18] | int(base=16) }}","fi":"mc_non_critical_major_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - MC Non-Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[18:20] | int(base=16) }}","fi":"mc_non_critical_minor_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - MC Parametric Major Version","d":"sensor","ds":24,"vt":"{{ value[20:22] | int(base=16) }}","fi":"mc_parametric_major_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - MC Parametric Minor Version","d":"sensor","ds":24,"vt":"{{ value[22:24] | int(base=16) }}","fi":"mc_parametric_minor_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - Inverter Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[24:26] | int(base=16) }}","fi":"inverter_critical_major_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - Inverter Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[26:28] | int(base=16) }}","fi":"inverter_critical_minor_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - Inverter Non-Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[28:30] | int(base=16) }}","fi":"inverter_non_critical_major_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - Inverter Non-Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[30:32] | int(base=16) }}","fi":"inverter_non_critical_minor_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - Inverter Parametric Major Version","d":"sensor","ds":24,"vt":"{{ value[32:34] | int(base=16) }}","fi":"inverter_parametric_major_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - Inverter Parametric Minor Version","d":"sensor","ds":24,"vt":"{{ value[34:36] | int(base=16) }}","fi":"inverter_parametric_minor_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - Wifi Module Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[36:38] | int(base=16) }}","fi":"wifi_module_critical_major_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - Wifi Module Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[38:40] | int(base=16) }}","fi":"wifi_module_critical_minor_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - Wifi Module Non-Critical Major Version","d":"sensor","ds":24,"vt":"{{ value[40:42] | int(base=16) }}","fi":"wifi_module_non_critical_major_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - Wifi Module Non-Critical Minor Version","d":"sensor","ds":24,"vt":"{{ value[42:44] | int(base=16) }}","fi":"wifi_module_non_critical_minor_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - Wifi Module Parametric Major Version","d":"sensor","ds":24,"vt":"{{ value[44:46] | int(base=16) }}","fi":"wifi_module_parametric_major_version"}
-{"i":"324d","n":"System Software Versions Tub 1 - Wifi Module Parametric Minor Version","d":"sensor","ds":24,"vt":"{{ value[46:48] | int(base=16) }}","fi":"wifi_module_parametric_minor_version"}
+{"i":"324d","n":"System Software Versions Tub 1 - UI Version","d":"sensor","ds":24,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}","fi":"ui"}
+{"i":"324d","n":"System Software Versions Tub 1 - UI Parametric Version","d":"sensor","ds":24,"vt":"{{ (value[8:10] | int(base=16) | string) + \".\" + (value[10:12] | int(base=16) | string) }}","fi":"ui_parametric"}
+{"i":"324d","n":"System Software Versions Tub 1 - MC Version","d":"sensor","ds":24,"vt":"{{ (value[12:14] | int(base=16) | string) + \".\" + (value[14:16] | int(base=16) | string) + \".\" + (value[16:18] | int(base=16) | string) + \".\" + (value[18:20] | int(base=16) | string) }}","fi":"mc"}
+{"i":"324d","n":"System Software Versions Tub 1 - MC Parametric Version","d":"sensor","ds":24,"vt":"{{ (value[20:22] | int(base=16) | string) + \".\" + (value[22:24] | int(base=16) | string) }}","fi":"mc_parametric"}
+{"i":"324d","n":"System Software Versions Tub 1 - Inverter Version","d":"sensor","ds":24,"vt":"{{ (value[24:26] | int(base=16) | string) + \".\" + (value[26:28] | int(base=16) | string) + \".\" + (value[28:30] | int(base=16) | string) + \".\" + (value[30:32] | int(base=16) | string) }}","fi":"inverter"}
+{"i":"324d","n":"System Software Versions Tub 1 - Inverter Parametric Version","d":"sensor","ds":24,"vt":"{{ (value[32:34] | int(base=16) | string) + \".\" + (value[34:36] | int(base=16) | string) }}","fi":"inverter_parametric"}
+{"i":"324d","n":"System Software Versions Tub 1 - Wifi Module Version","d":"sensor","ds":24,"vt":"{{ (value[36:38] | int(base=16) | string) + \".\" + (value[38:40] | int(base=16) | string) + \".\" + (value[40:42] | int(base=16) | string) + \".\" + (value[42:44] | int(base=16) | string) }}","fi":"wifi_module"}
+{"i":"324d","n":"System Software Versions Tub 1 - Wifi Module Parametric Version","d":"sensor","ds":24,"vt":"{{ (value[44:46] | int(base=16) | string) + \".\" + (value[46:48] | int(base=16) | string) }}","fi":"wifi_module_parametric"}
 {"i":"3250","n":"Dishwasher Cycle Modifier Actual - ½ Load","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"load"}
 {"i":"3250","n":"Dishwasher Cycle Modifier Actual - Quiet","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 512) % 2 else '00' }}","fi":"quiet"}
 {"i":"3250","n":"Dishwasher Cycle Modifier Actual - Sanitize","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 1024) % 2 else '00' }}","fi":"sanitize"}

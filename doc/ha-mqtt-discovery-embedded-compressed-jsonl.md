@@ -144,11 +144,35 @@ New file: `scripts/generate_ha_discovery.py`
 
   - **enum**: Raw byte mapped to human-readable label via the `values` map in the data field definition. The template embeds the mapping as a Jinja2 dict lookup.
   - **Multi-field ERDs**: Each field generates its own entity with a template that extracts the byte at that field's `offset`. For example, Clock Time (0x0005) produces three entities — hours extracts byte 0, minutes extracts byte 1, seconds extracts byte 2.
-  - **Version ERDs** (4-byte u8 sequences like 0x0019): Template formats as `major.minor.patch.build` from the four hex byte pairs.
+  - **Version ERDs**: See [Version ERD Handling](#version-erd-handling) below.
 - `ct` (command template): Derived for writable ERDs based on data type and size.
 - `o` (options): Derived from enum `values` map in the data field definition.
 
 **Multi-field ERD handling**: ERDs with multiple data fields (e.g., Clock Time with Hours/Minutes/Seconds) generate one JSONL line *per field*, each with a distinct `fi` (field ID) and a suffixed entity name (e.g., `clock_time_hours`, `clock_time_minutes`). Each field becomes a separate HA discovery payload.
+
+**Version ERD Handling**: Version ERDs with a 4-part structure are consolidated into a single entity per version group, producing a dotted decimal string instead of four separate sensors.
+
+- **Simple version ERDs**: An ERD is classified as a simple version ERD when it has exactly 4 non-reserved `u8` data fields at consecutive offsets 0–3, with field names matching the pattern `Critical Major`, `Critical Minor`, `Non-Critical Major`, `Non-Critical Minor` (case-insensitive, with optional prefix/suffix). The generator produces **one** sensor entity with the ERD's display name and a value template that concatenates the four bytes as decimal with dots:
+
+  ```
+  {{ (value[0:2] | int(base=16) | string) + "." + (value[2:4] | int(base=16) | string) + "." + (value[4:6] | int(base=16) | string) + "." + (value[6:8] | int(base=16) | string) }}
+  ```
+
+  Example: ERD 0x003A (Application Version) with payload `01000203` → entity value `1.0.2.3`.
+
+  Affected ERDs: 0x0039 (Boot Loader Version), 0x003A (Application Version), 0x003B (Parametric Version), 0x003C (Auxiliary Version).
+
+- **Multi-board version ERDs**: ERDs containing version data for multiple boards (e.g., 0x304D System Software Versions) are detected by grouping fields by board prefix (the text before the version role keyword). Each board that has all 4 version components (Critical Major, Critical Minor, Non-Critical Major, Non-Critical Minor) produces one version entity. If the board also has Parametric Major and Parametric Minor fields, a second parametric version entity is generated.
+
+  - Version entity name: `{display_name} - {board} Version` (e.g., `System Software Versions - UI Version`)
+  - Version entity `fi`: slug of the board name (e.g., `ui`)
+  - Parametric entity name: `{display_name} - {board} Parametric Version` (e.g., `System Software Versions - UI Parametric Version`)
+  - Parametric entity `fi`: slug of `{board}_parametric` (e.g., `ui_parametric`)
+  - Parametric value template: `{{ (value[8:10] | int(base=16) | string) + "." + (value[10:12] | int(base=16) | string) }}`
+
+  Affected ERDs: 0x304D (System Software Versions), 0x324D (System Software Versions Tub 1).
+
+- **Non-matching version ERDs**: Board version ERDs that do not follow the 4-part pattern (e.g., refrigeration board versions 0x1152–0x115d with Non-critical Major, Non-critical Minor, ERD Update Version) are treated as standard multi-field ERDs and expanded as separate entities per field.
 
 The generated JSONL files are written to `ha_discovery/` and compressed at build time into `components/geappliances_bridge/ha_discovery_data.h` — embedded as C byte arrays in the firmware binary. No runtime network fetch is needed.
 
