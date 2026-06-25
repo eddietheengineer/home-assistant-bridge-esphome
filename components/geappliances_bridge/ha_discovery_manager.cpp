@@ -70,18 +70,48 @@ static const char* const HA_DISCOVERY_COMPONENT_TYPES[] = {
 /* Cleanup: discover and remove old HA discovery topics               */
 /* ------------------------------------------------------------------ */
 
-/* Idle timeout: if no new matching topic arrives within this window,
- * assume the broker has delivered all retained messages and we can
- * proceed to the next component type or to discovery. */
+/* Idle timeout when topics were received for current component type. */
 #define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 5000
+/* Short timeout for component types with no topics — skip quickly. */
+#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS 1000
+
+/* Flush queued cleanup topics: publish empty retained payloads to remove them.
+ * Called from cleanup_run() during idle periods, not from the MQTT callback,
+ * to avoid blocking the ESP-IDF MQTT task. Returns the number of topics
+ * remaining in the queue (0 means all flushed). */
+static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
+{
+    uint16_t batch = 0;
+    const uint16_t max_batch = 8;
+
+    while (self->cleanup_queue_count > 0 && batch < max_batch) {
+        /* Pop from the front of the queue by shifting. */
+        mqtt_client_publish_raw(self->mqtt_client,
+            self->cleanup_topic_queue[0], "", 0, true);
+
+        ESP_LOGD(TAG, "Removed old topic: %s", self->cleanup_topic_queue[0]);
+
+        /* Shift remaining entries down. */
+        for (uint16_t i = 1; i < self->cleanup_queue_count; i++) {
+            memcpy(self->cleanup_topic_queue[i - 1], self->cleanup_topic_queue[i],
+                   sizeof(self->cleanup_topic_queue[0]));
+        }
+        self->cleanup_queue_count--;
+        batch++;
+
+        /* Yield between batches to let the MQTT task process inbound messages. */
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+
+    return self->cleanup_queue_count;
+}
 
 /* Callback for homeassistant/{component}/{device_id}/# subscription during cleanup.
- * The subscription already filters to our device and component type, so we just
- * need to check that the topic ends with /config and publish an empty retained
- * payload. If the payload is already empty, it's our own echo — skip it. */
+ * Instead of publishing immediately (which blocks the MQTT task), we queue the
+ * topic name and flush it from cleanup_run() in batches. This prevents the
+ * ESP-IDF MQTT inbound queue from overflowing during the initial burst. */
 static void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
-    (void)payload;
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
 
     /* Only remove config topics. */
@@ -92,15 +122,22 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     /* If the payload is empty, it's our own echo from a previous clear — skip. */
     if (payload_len == 0) return;
 
-    /* Publish empty payload with retain=true to remove the topic. */
-    if (self->mqtt_client) {
+    /* Queue the topic for batched publishing. If the queue is full,
+     * publish immediately as fallback. */
+    if (self->cleanup_queue_count < HA_DISCOVERY_CLEANUP_QUEUE_SIZE) {
+        strncpy(self->cleanup_topic_queue[self->cleanup_queue_count], topic,
+                sizeof(self->cleanup_topic_queue[0]) - 1);
+        self->cleanup_topic_queue[self->cleanup_queue_count][sizeof(self->cleanup_topic_queue[0]) - 1] = '\0';
+        self->cleanup_queue_count++;
+        self->cleanup_received_topics = true;
+    } else {
+        /* Queue full — publish immediately as fallback. */
         mqtt_client_publish_raw(self->mqtt_client, topic, "", 0, true);
+        ESP_LOGD(TAG, "Removed old topic (queue full): %s", topic);
     }
 
     /* Record activity time so the idle timer resets. */
     self->cleanup_last_activity_ms = self->get_time_ms();
-
-    ESP_LOGD(TAG, "Removed old topic: %s", topic);
 }
 
 static void cleanup_start(ha_discovery_manager_t* self)
@@ -108,7 +145,8 @@ static void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_subscribed = false;
     self->cleanup_current_component = 0;
     self->cleanup_last_activity_ms = self->get_time_ms();
-    self->last_publish_ms = self->get_time_ms();
+    self->cleanup_queue_count = 0;
+    self->cleanup_received_topics = false;
 
     ESP_LOGI(TAG, "Starting HA discovery cleanup...");
 }
@@ -121,6 +159,15 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
         /* NULL sentinel means we've processed all types. */
         if (component == NULL) break;
+
+        /* Flush any queued topics before subscribing to the next component. */
+        if (self->cleanup_queue_count > 0) {
+            cleanup_flush_queue(self);
+            if (self->cleanup_queue_count > 0) {
+                /* Still have queued topics — flush more next run(). */
+                return;
+            }
+        }
 
         /* Subscribe to this component type for our device.
          * homeassistant/{component}/{device_id}/# scopes to one component
@@ -139,9 +186,20 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
         /* Check if we've been idle long enough — no new matching topics
          * have arrived, so the broker has delivered all retained messages
-         * for this component type. */
+         * for this component type. Use short timeout for empty components. */
         uint32_t now = self->get_time_ms();
-        if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
+        uint32_t timeout = self->cleanup_received_topics
+            ? HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS
+            : HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS;
+        if (now - self->cleanup_last_activity_ms >= timeout) {
+            /* Flush remaining queued topics before moving on. */
+            if (self->cleanup_queue_count > 0) {
+                cleanup_flush_queue(self);
+                if (self->cleanup_queue_count > 0) {
+                    return;
+                }
+            }
+
             /* Unsubscribe from current component type. */
             if (self->mqtt_client) {
                 char sub_topic[128];
@@ -150,6 +208,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
             }
             self->cleanup_subscribed = false;
             self->cleanup_current_component++;
+            self->cleanup_received_topics = false;
 
             /* Move to the next component type. */
             continue;

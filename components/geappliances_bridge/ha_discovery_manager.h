@@ -152,6 +152,15 @@ typedef struct {
   uint32_t cleanup_last_activity_ms;  // Last time a topic was received
   bool cleanup_subscribed;            // Whether we've subscribed
   uint16_t cleanup_current_component; // Index into ha_discovery_component_types[]
+  bool cleanup_received_topics;       // Whether we received any topics for current component
+
+  /* Cleanup topic queue: buffer topic names for batched publishing.
+   * Each entry is a pointer into the shared topic_buf, so we queue
+   * offsets into topic_buf as we receive messages, then publish them
+   * in batches from the main loop to avoid blocking the MQTT task. */
+#define HA_DISCOVERY_CLEANUP_QUEUE_SIZE 64
+  char cleanup_topic_queue[HA_DISCOVERY_CLEANUP_QUEUE_SIZE][128];
+  uint16_t cleanup_queue_count;
 #endif
 } ha_discovery_manager_t;
 
