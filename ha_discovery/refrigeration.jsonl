@@ -144,7 +144,7 @@
 {"i":"103e","n":"Desired Temperature Setpoint (Kelvin) Upper Compartment","d":"sensor","ds":2,"u":"K","dc":"temperature","sf":32,"vt":"{{ (value | int(base=16)) / 32 | round(3) }}"}
 {"i":"103f","n":"Desired Temperature Setpoint (Kelvin) Lower Compartment","d":"sensor","ds":2,"u":"K","dc":"temperature","sf":32,"vt":"{{ (value | int(base=16)) / 32 | round(3) }}"}
 {"i":"1040","n":"Desired Temperature Setpoint (Kelvin) Middle Compartment","d":"sensor","ds":2,"u":"K","dc":"temperature","sf":32,"vt":"{{ (value | int(base=16)) / 32 | round(3) }}"}
-{"i":"1041","n":"Water Filter Reset Request","d":"sensor","ds":1,"vt":"{{ {'00': 'No Request', '01': 'Reset Requested', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
+{"i":"1041","n":"Water Filter Reset Request","d":"button","ds":1,"dc":"restart"}
 {"i":"1042","n":"Food Mode Upper Compartment (Desired)","d":"sensor","ds":1,"vt":"{{ {'00': 'Fridge', '01': 'Pantry', '02': 'Chill', '03': 'Freezer', '04': 'Soft Freeze', '05': 'Deep Freeze', '06': 'Cellar Wine', '07': 'Red Wine', '08': 'White Wine', '09': 'Sparkling Wine', '0a': 'Beverage', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
 {"i":"1043","n":"Food Mode Lower Compartment (Desired)","d":"sensor","ds":1,"vt":"{{ {'00': 'Fridge', '01': 'Pantry', '02': 'Chill', '03': 'Freezer', '04': 'Soft Freeze', '05': 'Deep Freeze', '06': 'Cellar Wine', '07': 'Red Wine', '08': 'White Wine', '09': 'Sparkling Wine', '0a': 'Beverage', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
 {"i":"1044","n":"Food Mode Middle Compartment (Desired)","d":"sensor","ds":1,"vt":"{{ {'00': 'Fridge', '01': 'Pantry', '02': 'Chill', '03': 'Freezer', '04': 'Soft Freeze', '05': 'Deep Freeze', '06': 'Cellar Wine', '07': 'Red Wine', '08': 'White Wine', '09': 'Sparkling Wine', '0a': 'Beverage', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
@@ -479,7 +479,7 @@
 {"i":"1164","n":"Water Filter Status Details - Days to Expiration","d":"sensor","ds":12,"vt":"{{ (value[16:24] | int(base=16)) - 4294967296 if (value[16:24] | int(base=16)) >= 2147483648 else (value[16:24] | int(base=16)) }}","fi":"days_to_expiration"}
 {"i":"1165","n":"Water Filter Expiration Limits - Initial Gallons to Expiration","d":"sensor","ds":8,"vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"1165","n":"Water Filter Expiration Limits - Initial Days to Expiration","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"initial_days_to_expiration"}
-{"i":"1166","n":"Water Filter Reset Request","d":"binary_sensor","ds":1}
+{"i":"1166","n":"Water Filter Reset Request","d":"button","ds":1,"dc":"restart"}
 {"i":"1167","n":"Requested Water Valve Position","d":"sensor","ds":1,"vt":"{{ {'00': 'Bypass', '01': 'Closed', '02': 'Open/Filtered'}.get(value[:2], 'Unknown') }}"}
 {"i":"1168","n":"Valve Manual Override Status","d":"binary_sensor","ds":1}
 {"i":"1169","n":"Continuous Flow Alert - Low Limit Continuous Flow","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"low_limit_continuous_flow"}
