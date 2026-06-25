@@ -125,22 +125,15 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     /* If the payload is empty, it's our own echo from a previous clear — skip. */
     if (payload_len == 0) return;
 
-    /* Queue the topic for batched publishing. If the queue is full,
-     * publish immediately as fallback. */
-    if (self->cleanup_queue_count < HA_DISCOVERY_CLEANUP_QUEUE_SIZE) {
-        strncpy(self->cleanup_topic_queue[self->cleanup_queue_count], topic,
-                sizeof(self->cleanup_topic_queue[0]) - 1);
-        self->cleanup_topic_queue[self->cleanup_queue_count][sizeof(self->cleanup_topic_queue[0]) - 1] = '\0';
-        self->cleanup_queue_count++;
-        self->cleanup_received_topics = true;
-        self->cleanup_pass_found_topics = true;
-    } else {
-        /* Queue full — publish immediately as fallback. */
-        mqtt_client_publish_raw(self->mqtt_client, topic, "", 0, true);
-        ESP_LOGD(TAG, "Removed old topic (queue full): %s", topic);
-        self->cleanup_pass_found_topics = true;
-        self->cleanup_pass_removed_count++;
-    }
+    /* Publish the clear immediately. esp_mqtt_client_publish() is non-blocking
+     * (enqueues in the outbound queue), so this is safe from the callback context.
+     * Immediate publish frees the inbound slot for the next retained message,
+     * preventing the ESP-IDF inbound event queue from overflowing and dropping
+     * messages that we'd never see. */
+    mqtt_client_publish_raw(self->mqtt_client, topic, "", 0, true);
+    self->cleanup_received_topics = true;
+    self->cleanup_pass_found_topics = true;
+    self->cleanup_pass_removed_count++;
 
     /* Record activity time so the idle timer resets. */
     self->cleanup_last_activity_ms = self->get_time_ms();
@@ -187,17 +180,6 @@ static void cleanup_run(ha_discovery_manager_t* self)
                     component, self->cleanup_clean_passes + 1);
             }
             return;
-        }
-
-        /* Actively drain queued topics before checking idle timeout.
-         * This prevents the ESP-IDF inbound queue from overflowing during
-         * bursts of retained messages. */
-        if (self->cleanup_queue_count > 0) {
-            cleanup_flush_queue(self);
-            if (self->cleanup_queue_count > 0) {
-                /* Still have queued topics — flush more next run(). */
-                return;
-            }
         }
 
         /* Check if we've been idle long enough — no new matching topics
