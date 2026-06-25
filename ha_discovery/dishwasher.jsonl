@@ -210,7 +210,6 @@
 {"i":"310a","n":"Critical Fault Status","d":"binary_sensor","ds":1}
 {"i":"310b","n":"Noncritical Fault Status","d":"binary_sensor","ds":1}
 {"i":"310c","n":"Smart Assist Cloud Notification","d":"switch","ds":1,"p":"310d","r":"request"}
-{"i":"310d","n":"Smart Assist Cloud Notification","d":"binary_sensor","ds":1,"p":"310c","r":"status"}
 {"i":"3200","n":"Dish Feature Configuration","d":"sensor","ds":15,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"3200","n":"Dish Feature Configuration - displayInHoursAndMinutes","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 1) % 2 else '00' }}","fi":"displayinhoursandminutes"}
 {"i":"3200","n":"Dish Feature Configuration - bottleJets","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 2) % 2 else '00' }}","fi":"bottlejets"}
@@ -478,7 +477,6 @@
 {"i":"322a","n":"Motor Identification Data - inputB","d":"sensor","ds":4,"vt":"{{ value[4:8] | int(base=16) }}","fi":"inputb"}
 {"i":"322b","n":"Silverware Wash Option State","d":"binary_sensor","ds":1}
 {"i":"322c","n":"Custom Cycle Index","d":"number","ds":1,"p":"322d","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}"}
-{"i":"322d","n":"Custom Cycle Index","d":"sensor","ds":1,"p":"322c","r":"status","vt":"{{ value | int(base=16) }}"}
 {"i":"322e","n":"Dish Favorite Settings","d":"sensor","ds":12,"p":"322f","r":"request","vt":"{{ value[6:8] | int(base=16) }}"}
 {"i":"322e","n":"Dish Favorite Settings - validStoredSettings","d":"binary_sensor","ds":12,"p":"322f","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"validstoredsettings"}
 {"i":"322e","n":"Dish Favorite Settings - steam","d":"binary_sensor","ds":12,"p":"322f","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"steam"}

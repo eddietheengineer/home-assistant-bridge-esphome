@@ -708,6 +708,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             'field_id': field_id,
         })
 
+    processed_status = set()
+
     for erd in ha_erds:
         erd_id_int = parse_erd_id(erd['id'])
         name = erd.get('name', '')
@@ -722,6 +724,16 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
         display_name = _strip_pair_role_word(name) if pair_role else name
         erd_data = erd.get('data', [])
         data_size = get_erd_byte_size(erd_data) or 1
+
+        # Skip status ERD if its paired request ERD is a controllable domain
+        # (switch/select/number) — the request ERD will handle both state+command.
+        if pair_role == 'status' and paired_erd_str and paired_erd_str in erd_by_id:
+            paired = erd_by_id[paired_erd_str]
+            paired_role = paired.get('pair_role') or ''
+            paired_domain = paired.get('ha_domain') or ''
+            if paired_role == 'request' and paired_domain in ('switch', 'select', 'number'):
+                processed_status.add(erd_id_int)
+                continue
 
         classification = (
             'single'

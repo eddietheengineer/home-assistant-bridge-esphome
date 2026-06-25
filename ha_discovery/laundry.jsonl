@@ -1046,8 +1046,6 @@
 {"i":"2124","n":"Eco Option","d":"binary_sensor","ds":1}
 {"i":"2125","n":"Eco Option Request","d":"binary_sensor","ds":1}
 {"i":"2126","n":"Wash Mode Option","d":"switch","ds":1,"p":"2127","r":"request"}
-{"i":"2127","n":"Wash Mode Option","d":"binary_sensor","ds":1,"p":"2126","r":"status"}
-{"i":"2128","n":"Dry Mode Option","d":"binary_sensor","ds":1,"p":"2129","r":"status"}
 {"i":"2129","n":"Dry Mode Option","d":"switch","ds":1,"p":"2128","r":"request"}
 {"i":"212a","n":"Remote Spin Time Level Request","d":"sensor","ds":1,"vt":"{{ {'00': 'No Spin', '01': 'Low', '02': 'Medium', '03': 'High', '04': 'Extra High', '05': 'Disable', '06': 'Max', 'ff': 'Request processed'}.get(value[:2], 'Unknown') }}"}
 {"i":"212b","n":"Smart HQ Remote Option","d":"binary_sensor","ds":1}
@@ -1070,7 +1068,6 @@
 {"i":"2134","n":"Timed Dry Option","d":"binary_sensor","ds":1}
 {"i":"2137","n":"Timed Dry Option Request","d":"sensor","ds":1,"vt":"{{ {'00': 'Disabled', '01': 'Enabled', 'ff': 'Request processed'}.get(value[:2], 'Unknown') }}"}
 {"i":"2139","n":"Remote Spin Time Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'No Spin', '01': 'Low', '02': 'Medium', '03': 'High', '04': 'Extra High', '05': 'Disable', '06': 'Max'}.get(value[:2], 'Unknown') }}"}
-{"i":"213a","n":"More Dry option","d":"binary_sensor","ds":1,"p":"213b","r":"status"}
 {"i":"213b","n":"More Dry Option","d":"switch","ds":1,"p":"213a","r":"request"}
 {"i":"213c","n":"Softener Bulk Tank Size","d":"sensor","ds":2,"sf":10,"vt":"{{ (value | int(base=16)) / 10 | round(1) }}"}
 {"i":"213d","n":"Bulk Softener Tank Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'Low', '02': 'Filled', '03': 'Sensor Not Connected', '04': 'Sensor Error'}.get(value[:2], 'Unknown') }}"}
@@ -1690,7 +1687,6 @@
 {"i":"216c","n":"Coin Box Open Status","d":"binary_sensor","ds":1}
 {"i":"216d","n":"Coin Value","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"216d","n":"Coin Value - Currency","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'USD'}.get(value[2:4], 'Unknown') }}","fi":"currency"}
-{"i":"216e","n":"Smart Combi Option","d":"binary_sensor","ds":1,"p":"216f","r":"status"}
 {"i":"216f","n":"Smart Combi Option","d":"switch","ds":1,"p":"216e","r":"request"}
 {"i":"2170","n":"Laundry Center Push Notifications - Washer Delayed Cycle Started","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"washer_delayed_cycle_started"}
 {"i":"2170","n":"Laundry Center Push Notifications - Dryer Delayed Cycle Started","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"dryer_delayed_cycle_started"}
@@ -1871,10 +1867,8 @@
 {"i":"2236","n":"Commercial Option Id Order - Option n Level[8]","d":"sensor","ds":20,"vt":"{{ value[36:38] | int(base=16) }}","fi":"option_n_level_8"}
 {"i":"2236","n":"Commercial Option Id Order - Option n Level[9]","d":"sensor","ds":20,"vt":"{{ value[38:40] | int(base=16) }}","fi":"option_n_level_9"}
 {"i":"2237","n":"Commercial Remote Admin Mode Pin","d":"number","ds":2,"p":"2238","r":"request","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}"}
-{"i":"2238","n":"Commercial Remote Admin Mode Pin","d":"sensor","ds":2,"p":"2237","r":"status","vt":"{{ value | int(base=16) }}"}
 {"i":"2239","n":"Commercial Remote Number Of Admin Mode Pin Digits","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"223a","n":"Commercial Remote Buzzer Disable","d":"switch","ds":1,"p":"223b","r":"request"}
-{"i":"223b","n":"Commercial Remote Buzzer Disable","d":"binary_sensor","ds":1,"p":"223a","r":"status"}
 {"i":"223c","n":"Commercial Remote Wash Times - Cycle n Middle Setting Time in Minutes[0]","d":"sensor","ds":32,"p":"223d","r":"request","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"223c","n":"Commercial Remote Wash Times - Cycle n Middle Setting Time in Minutes[1]","d":"sensor","ds":32,"p":"223d","r":"request","vt":"{{ value[2:4] | int(base=16) }}","fi":"cycle_n_middle_setting_time_in_minutes_1"}
 {"i":"223c","n":"Commercial Remote Wash Times - Cycle n Middle Setting Time in Minutes[2]","d":"sensor","ds":32,"p":"223d","r":"request","vt":"{{ value[4:6] | int(base=16) }}","fi":"cycle_n_middle_setting_time_in_minutes_2"}
@@ -2021,19 +2015,15 @@
 {"i":"223e","n":"Commercial Remote Wash Time Limits - Cycle n Number Of Settings (Odd numbers only)[14]","d":"sensor","ds":112,"vt":"{{ value[220:222] | int(base=16) }}","fi":"cycle_n_number_of_settings_odd_numbers_only_14"}
 {"i":"223e","n":"Commercial Remote Wash Time Limits - Cycle n Number Of Settings (Odd numbers only)[15]","d":"sensor","ds":112,"vt":"{{ value[222:224] | int(base=16) }}","fi":"cycle_n_number_of_settings_odd_numbers_only_15"}
 {"i":"223f","n":"Commercial Remote Wash Water Level","d":"number","ds":2,"sf":10,"p":"2240","r":"request","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}","ct":"{{ '%04x' % (((value | float) * 10) | round | int) }}"}
-{"i":"2240","n":"Commercial Remote Wash Water Level","d":"sensor","ds":2,"sf":10,"p":"223f","r":"status","vt":"{{ (value | int(base=16)) / 10 | round(1) }}"}
 {"i":"2241","n":"Commercial Remote Wash Water Level Limits - Minimum Wash Water Level (Liters x 10)","d":"sensor","ds":4,"sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
 {"i":"2241","n":"Commercial Remote Wash Water Level Limits - Maximum Wash Water Level (Liters x 10)","d":"sensor","ds":4,"sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"maximum_wash_water_level_liters_x_10"}
 {"i":"2242","n":"Commercial Remote Wash Time In Seconds","d":"number","ds":2,"p":"2243","r":"request","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}"}
-{"i":"2243","n":"Commercial Remote Wash Time In Seconds","d":"sensor","ds":2,"p":"2242","r":"status","vt":"{{ value | int(base=16) }}"}
 {"i":"2244","n":"Commercial Remote Wash Time Limits - Minimum Wash Time In Seconds","d":"sensor","ds":4,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"2244","n":"Commercial Remote Wash Time Limits - Maximum Wash Time In Seconds","d":"sensor","ds":4,"vt":"{{ value[4:8] | int(base=16) }}","fi":"maximum_wash_time_in_seconds"}
 {"i":"2245","n":"Commercial Remote Rinse Water Level","d":"number","ds":2,"sf":10,"p":"2246","r":"request","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}","ct":"{{ '%04x' % (((value | float) * 10) | round | int) }}"}
-{"i":"2246","n":"Commercial Remote Rinse Water Level","d":"sensor","ds":2,"sf":10,"p":"2245","r":"status","vt":"{{ (value | int(base=16)) / 10 | round(1) }}"}
 {"i":"2247","n":"Commercial Remote Rinse Water Level Limits - Minimum Rinse Water Level (Liters x 10)","d":"sensor","ds":4,"sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
 {"i":"2247","n":"Commercial Remote Rinse Water Level Limits - Maximum Rinse Water Level (Liters x 10)","d":"sensor","ds":4,"sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"maximum_rinse_water_level_liters_x_10"}
 {"i":"2248","n":"Commercial Remote Extra Rinse Option Deselected By Default","d":"switch","ds":1,"p":"2249","r":"request"}
-{"i":"2249","n":"Commercial Remote Extra Rinse Option Deselected By Default","d":"binary_sensor","ds":1,"p":"2248","r":"status"}
 {"i":"224a","n":"Commercial Remote Spin Limit Option - Option n Remote Spin Limit Option[0]","d":"sensor","ds":16,"p":"224b","r":"request","vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
 {"i":"224a","n":"Commercial Remote Spin Limit Option - Option n Remote Spin Limit Option[1]","d":"sensor","ds":16,"p":"224b","r":"request","vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"option_n_remote_spin_limit_option_1"}
 {"i":"224a","n":"Commercial Remote Spin Limit Option - Option n Remote Spin Limit Option[2]","d":"sensor","ds":16,"p":"224b","r":"request","vt":"{{ '01' if value[4:6] != '00' else '00' }}","fi":"option_n_remote_spin_limit_option_2"}
@@ -2113,16 +2103,6 @@
 {"i":"224e","n":"Commercial Remote Dry Time Limits - Option n Maximum Increment Time in Minutes[8]","d":"sensor","ds":40,"vt":"{{ value[76:78] | int(base=16) }}","fi":"option_n_maximum_increment_time_in_minutes_8"}
 {"i":"224e","n":"Commercial Remote Dry Time Limits - Option n Maximum Increment Time in Minutes[9]","d":"sensor","ds":40,"vt":"{{ value[78:80] | int(base=16) }}","fi":"option_n_maximum_increment_time_in_minutes_9"}
 {"i":"224f","n":"Commercial Remote Dry Temperature","d":"number","ds":20,"u":"°F","dc":"temperature","sf":10,"p":"2250","r":"request","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}","ct":"{{ '%040x' % (((value | float) * 10) | round | int) }}"}
-{"i":"2250","n":"Commercial Remote Dry Temperature - Option n Drying Temperature (Fahrenheit x 10)[0]","d":"sensor","ds":20,"u":"°F","dc":"temperature","sf":10,"p":"224f","r":"status","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
-{"i":"2250","n":"Commercial Remote Dry Temperature - Option n Drying Temperature (Fahrenheit x 10)[1]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"224f","r":"status","vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"option_n_drying_temperature_fahrenheit_x_10_1"}
-{"i":"2250","n":"Commercial Remote Dry Temperature - Option n Drying Temperature (Fahrenheit x 10)[2]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"224f","r":"status","vt":"{{ (value[8:12] | int(base=16)) / 10 | round(1) }}","fi":"option_n_drying_temperature_fahrenheit_x_10_2"}
-{"i":"2250","n":"Commercial Remote Dry Temperature - Option n Drying Temperature (Fahrenheit x 10)[3]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"224f","r":"status","vt":"{{ (value[12:16] | int(base=16)) / 10 | round(1) }}","fi":"option_n_drying_temperature_fahrenheit_x_10_3"}
-{"i":"2250","n":"Commercial Remote Dry Temperature - Option n Drying Temperature (Fahrenheit x 10)[4]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"224f","r":"status","vt":"{{ (value[16:20] | int(base=16)) / 10 | round(1) }}","fi":"option_n_drying_temperature_fahrenheit_x_10_4"}
-{"i":"2250","n":"Commercial Remote Dry Temperature - Option n Drying Temperature (Fahrenheit x 10)[5]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"224f","r":"status","vt":"{{ (value[20:24] | int(base=16)) / 10 | round(1) }}","fi":"option_n_drying_temperature_fahrenheit_x_10_5"}
-{"i":"2250","n":"Commercial Remote Dry Temperature - Option n Drying Temperature (Fahrenheit x 10)[6]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"224f","r":"status","vt":"{{ (value[24:28] | int(base=16)) / 10 | round(1) }}","fi":"option_n_drying_temperature_fahrenheit_x_10_6"}
-{"i":"2250","n":"Commercial Remote Dry Temperature - Option n Drying Temperature (Fahrenheit x 10)[7]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"224f","r":"status","vt":"{{ (value[28:32] | int(base=16)) / 10 | round(1) }}","fi":"option_n_drying_temperature_fahrenheit_x_10_7"}
-{"i":"2250","n":"Commercial Remote Dry Temperature - Option n Drying Temperature (Fahrenheit x 10)[8]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"224f","r":"status","vt":"{{ (value[32:36] | int(base=16)) / 10 | round(1) }}","fi":"option_n_drying_temperature_fahrenheit_x_10_8"}
-{"i":"2250","n":"Commercial Remote Dry Temperature - Option n Drying Temperature (Fahrenheit x 10)[9]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"224f","r":"status","vt":"{{ (value[36:40] | int(base=16)) / 10 | round(1) }}","fi":"option_n_drying_temperature_fahrenheit_x_10_9"}
 {"i":"2251","n":"Commercial Remote Dry Temperature Limits - Option n Minimum Drying Temperature (Fahrenheit x 10)[0]","d":"sensor","ds":40,"u":"°F","dc":"temperature","sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
 {"i":"2251","n":"Commercial Remote Dry Temperature Limits - Option n Minimum Drying Temperature (Fahrenheit x 10)[1]","d":"sensor","ds":40,"u":"°F","sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"option_n_minimum_drying_temperature_fahrenheit_x_10_1"}
 {"i":"2251","n":"Commercial Remote Dry Temperature Limits - Option n Minimum Drying Temperature (Fahrenheit x 10)[2]","d":"sensor","ds":40,"u":"°F","sf":10,"vt":"{{ (value[8:12] | int(base=16)) / 10 | round(1) }}","fi":"option_n_minimum_drying_temperature_fahrenheit_x_10_2"}
@@ -2175,16 +2155,6 @@
 {"i":"2254","n":"Commercial Remote Cooldown Time Limits - Option n Maximum Cooldown Time in Minutes[8]","d":"sensor","ds":20,"vt":"{{ value[36:38] | int(base=16) }}","fi":"option_n_maximum_cooldown_time_in_minutes_8"}
 {"i":"2254","n":"Commercial Remote Cooldown Time Limits - Option n Maximum Cooldown Time in Minutes[9]","d":"sensor","ds":20,"vt":"{{ value[38:40] | int(base=16) }}","fi":"option_n_maximum_cooldown_time_in_minutes_9"}
 {"i":"2255","n":"Commercial Remote Cooldown Temperature","d":"number","ds":20,"u":"°F","dc":"temperature","sf":10,"p":"2256","r":"request","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}","ct":"{{ '%040x' % (((value | float) * 10) | round | int) }}"}
-{"i":"2256","n":"Commercial Remote Cooldown Temperature - Option n Cooldown Temperature (Fahrenheit x 10)[0]","d":"sensor","ds":20,"u":"°F","dc":"temperature","sf":10,"p":"2255","r":"status","vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
-{"i":"2256","n":"Commercial Remote Cooldown Temperature - Option n Cooldown Temperature (Fahrenheit x 10)[1]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"2255","r":"status","vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"option_n_cooldown_temperature_fahrenheit_x_10_1"}
-{"i":"2256","n":"Commercial Remote Cooldown Temperature - Option n Cooldown Temperature (Fahrenheit x 10)[2]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"2255","r":"status","vt":"{{ (value[8:12] | int(base=16)) / 10 | round(1) }}","fi":"option_n_cooldown_temperature_fahrenheit_x_10_2"}
-{"i":"2256","n":"Commercial Remote Cooldown Temperature - Option n Cooldown Temperature (Fahrenheit x 10)[3]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"2255","r":"status","vt":"{{ (value[12:16] | int(base=16)) / 10 | round(1) }}","fi":"option_n_cooldown_temperature_fahrenheit_x_10_3"}
-{"i":"2256","n":"Commercial Remote Cooldown Temperature - Option n Cooldown Temperature (Fahrenheit x 10)[4]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"2255","r":"status","vt":"{{ (value[16:20] | int(base=16)) / 10 | round(1) }}","fi":"option_n_cooldown_temperature_fahrenheit_x_10_4"}
-{"i":"2256","n":"Commercial Remote Cooldown Temperature - Option n Cooldown Temperature (Fahrenheit x 10)[5]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"2255","r":"status","vt":"{{ (value[20:24] | int(base=16)) / 10 | round(1) }}","fi":"option_n_cooldown_temperature_fahrenheit_x_10_5"}
-{"i":"2256","n":"Commercial Remote Cooldown Temperature - Option n Cooldown Temperature (Fahrenheit x 10)[6]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"2255","r":"status","vt":"{{ (value[24:28] | int(base=16)) / 10 | round(1) }}","fi":"option_n_cooldown_temperature_fahrenheit_x_10_6"}
-{"i":"2256","n":"Commercial Remote Cooldown Temperature - Option n Cooldown Temperature (Fahrenheit x 10)[7]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"2255","r":"status","vt":"{{ (value[28:32] | int(base=16)) / 10 | round(1) }}","fi":"option_n_cooldown_temperature_fahrenheit_x_10_7"}
-{"i":"2256","n":"Commercial Remote Cooldown Temperature - Option n Cooldown Temperature (Fahrenheit x 10)[8]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"2255","r":"status","vt":"{{ (value[32:36] | int(base=16)) / 10 | round(1) }}","fi":"option_n_cooldown_temperature_fahrenheit_x_10_8"}
-{"i":"2256","n":"Commercial Remote Cooldown Temperature - Option n Cooldown Temperature (Fahrenheit x 10)[9]","d":"sensor","ds":20,"u":"°F","sf":10,"p":"2255","r":"status","vt":"{{ (value[36:40] | int(base=16)) / 10 | round(1) }}","fi":"option_n_cooldown_temperature_fahrenheit_x_10_9"}
 {"i":"2257","n":"Commercial Remote Cooldown Temperature Limits - Option n Minimum Cooldown Temperature (Fahrenheit x 10)[0]","d":"sensor","ds":40,"u":"°F","dc":"temperature","sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
 {"i":"2257","n":"Commercial Remote Cooldown Temperature Limits - Option n Minimum Cooldown Temperature (Fahrenheit x 10)[1]","d":"sensor","ds":40,"u":"°F","sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"option_n_minimum_cooldown_temperature_fahrenheit_x_10_1"}
 {"i":"2257","n":"Commercial Remote Cooldown Temperature Limits - Option n Minimum Cooldown Temperature (Fahrenheit x 10)[2]","d":"sensor","ds":40,"u":"°F","sf":10,"vt":"{{ (value[8:12] | int(base=16)) / 10 | round(1) }}","fi":"option_n_minimum_cooldown_temperature_fahrenheit_x_10_2"}
