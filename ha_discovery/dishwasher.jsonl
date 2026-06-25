@@ -124,7 +124,7 @@
 {"i":"301b","n":"CSM Fault Data - Water Valve","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 32768) % 2 else '00' }}","fi":"water_valve","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"301c","n":"Cycle Names - Selected Cycle Name","d":"sensor","ds":20,"vt":"{{ value[0:20] | int(base=16) }}"}
 {"i":"301c","n":"Cycle Names - Active Sub-cycle Name","d":"sensor","ds":20,"vt":"{{ value[20:40] | int(base=16) }}","fi":"active_sub_cycle_name"}
-{"i":"301d","n":"Leak Detected","d":"binary_sensor","ds":1,"dc":"moisture","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301d","n":"Leak Detected","d":"binary_sensor","ds":1,"dc":"moisture","vt":"{{ {'00': 'Leak Not Detected', '01': 'Leak Detected'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"301e","n":"Dispense Count","d":"sensor","ds":2,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"301f","n":"PODS Count","d":"sensor","ds":2,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"3020","n":"Dishwasher Usage Profile - Wash Pump Run Time in Seconds","d":"sensor","ds":32,"vt":"{{ value[0:8] | int(base=16) }}"}
@@ -137,7 +137,7 @@
 {"i":"3020","n":"Dishwasher Usage Profile - Cumulative Power-On Time in Seconds","d":"sensor","ds":32,"vt":"{{ value[56:64] | int(base=16) }}","fi":"cumulative_power_on_time_in_seconds"}
 {"i":"3035","n":"Water Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
 {"i":"3036","n":"Average Turbidity","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"3037","n":"Dishwasher Door Status","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"3037","n":"Dishwasher Door Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Open', '01': 'Closed', '02': 'Invalid', '03': 'Init', '04': 'Unknown'}.get(value[:2], 'Unknown') }}"}
 {"i":"3038","n":"Rinse Aid Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not Empty', '01': 'Empty'}.get(value[:2], 'Unknown') }}"}
 {"i":"3039","n":"Water Volume","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"303a","n":"Diverter Position","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Lower Primary', '01': 'Mid/Upper', '02': 'Lower Reversing', '03': 'Silverware Blaster', '04': 'Unknown/Transitioning'}.get(value[:2], 'Unknown') }}"}
@@ -527,7 +527,7 @@
 {"i":"3232","n":"Default to Eco Cycle","d":"binary_sensor","ds":1,"p":"3231","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3235","n":"Tub1 Water Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
 {"i":"3236","n":"Average Turbidity Tub 1","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"3237","n":"Tub 1 Dishwasher Door Status","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"3237","n":"Tub 1 Dishwasher Door Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Open', '01': 'Closed', '02': 'Invalid', '03': 'Init', '04': 'Unknown'}.get(value[:2], 'Unknown') }}"}
 {"i":"323e","n":"Tub 1 Drain Pump Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"3245","n":"Tub 1 Circ Pump Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"324d","n":"System Software Versions Tub 1 - UI Version","d":"sensor","ds":24,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}","fi":"ui"}

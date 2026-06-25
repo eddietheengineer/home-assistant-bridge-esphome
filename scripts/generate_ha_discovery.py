@@ -798,7 +798,14 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     signed = _is_signed_type(_get_primary_data_type(erd_data))
                     vt = _compute_sensor_value_template(scaling_factor, data_size, signed)
             elif ha_domain == 'binary_sensor':
-                vt = _compute_binary_sensor_value_template(data_size)
+                primary_type = _get_primary_data_type(erd_data)
+                if primary_type == 'enum':
+                    # Misclassified: binary_sensor can't show enum labels.
+                    # Treat as an enum sensor instead.
+                    ev, fs = _get_first_enum_field_info(erd_data)
+                    vt = _enum_sensor_value_template(ev, fs)
+                else:
+                    vt = _compute_binary_sensor_value_template(data_size)
             elif ha_domain == 'switch':
                 if paired_erd_str and paired_erd_str in erd_by_id:
                     s_size = get_erd_byte_size(erd_by_id[paired_erd_str].get('data', [])) or 1

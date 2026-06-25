@@ -106,7 +106,7 @@
 {"i":"1023","n":"Adjustable Convertible Drawer Temperature Limits - Adjustable Convertible Drawer Mode 4 Maximum Temperature (fahrenheit)","d":"sensor","ds":16,"u":"°F","vt":"{{ (value[28:30] | int(base=16)) - 256 if (value[28:30] | int(base=16)) >= 128 else (value[28:30] | int(base=16)) }}","fi":"adjustable_convertible_drawer_mode_4_maximum_temperature_fahrenh"}
 {"i":"1023","n":"Adjustable Convertible Drawer Temperature Limits - Adjustable Convertible Drawer Mode 4 Label Id","d":"sensor","ds":16,"u":"°F","dc":"enum","vt":"{{ {'00': 'Freezer', '01': 'Refrigerator', '02': 'Chiller', '03': 'Soft Freeze', '04': 'Gentle Freeze', '0a': 'Fruit and Vegetables', '0b': 'Beverage', '0c': 'Meat and Seafood', 'ff': 'Not Used'}.get(value[30:32], 'Unknown') }}","fi":"adjustable_convertible_drawer_mode_4_label_id"}
 {"i":"1024","n":"Fresh food cabinet backlight status","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
-{"i":"1025","n":"Door In Door Status","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"1025","n":"Door In Door Status","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ {'00': 'Closed', '01': 'Open', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1026","n":"ConvertibleDrawer Actual Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":100,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 100 | round(2) }}"}
 {"i":"1028","n":"Recess Light On when presence is sensed","d":"sensor","ds":1,"vt":"{{ {'00': 'Disabled', '01': 'Enabled', 'ff': 'Not Available'}.get(value[:2], 'Unknown') }}"}
 {"i":"1029","n":"Presence sensing feature state","d":"sensor","ds":1,"vt":"{{ {'00': 'Disabled', '01': 'Enabled', 'ff': 'Not Available'}.get(value[:2], 'Unknown') }}"}
@@ -127,9 +127,9 @@
 {"i":"1031","n":"Key Status - Key Mute","d":"sensor","ds":5,"dc":"enum","vt":"{{ {'00': 'Off', '01': 'On', 'ff': 'Not Applicable'}.get(value[0:2], 'Unknown') }}"}
 {"i":"1031","n":"Key Status - Key Lock","d":"sensor","ds":5,"dc":"enum","vt":"{{ {'00': 'Unlocked', '01': 'Locked', 'ff': 'Not Applicable'}.get(value[2:4], 'Unknown') }}","fi":"key_lock"}
 {"i":"1031","n":"Key Status - Water Dispense Lock","d":"sensor","ds":5,"dc":"enum","vt":"{{ {'00': 'Unlocked', '01': 'Locked', 'ff': 'Not Applicable'}.get(value[4:6], 'Unknown') }}","fi":"water_dispense_lock"}
-{"i":"1032","n":"Door Mute Status Upper Compartment","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"1033","n":"Door Mute Status Lower Compartment","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"1034","n":"Door Mute Status Middle Compartment","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"1032","n":"Door Mute Status Upper Compartment","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ {'00': 'Off', '01': 'On', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"1033","n":"Door Mute Status Lower Compartment","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ {'00': 'Off', '01': 'On', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"1034","n":"Door Mute Status Middle Compartment","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ {'00': 'Off', '01': 'On', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1035","n":"Bottle Chill Alarm Upper Compartment","d":"sensor","ds":1,"vt":"{{ {'00': 'Timer Off', '01': 'Timer On', '02': 'Timer Expired', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
 {"i":"1036","n":"Bottle Chill Alarm Lower Compartment","d":"sensor","ds":1,"vt":"{{ {'00': 'Timer Off', '01': 'Timer On', '02': 'Timer Expired', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
 {"i":"1037","n":"Bottle Chill Alarm Middle Compartment","d":"sensor","ds":1,"vt":"{{ {'00': 'Timer Off', '01': 'Timer On', '02': 'Timer Expired', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
@@ -217,8 +217,8 @@
 {"i":"1052","n":"Food Mode Configuration Middle Compartment - padding","d":"sensor","ds":30,"vt":"{{ value[50:52] | int(base=16) }}","fi":"padding"}
 {"i":"1052","n":"Food Mode Configuration Middle Compartment - Upper Temperature Limit","d":"sensor","ds":30,"vt":"{{ value[52:56] | int(base=16) }}","fi":"upper_temperature_limit"}
 {"i":"1052","n":"Food Mode Configuration Middle Compartment - Lower Temperature Limit","d":"sensor","ds":30,"vt":"{{ value[56:60] | int(base=16) }}","fi":"lower_temperature_limit"}
-{"i":"1053","n":"Autofill pitcher feature request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"1054","n":"Autofill pitcher feature state","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"1053","n":"Autofill pitcher feature request","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Disable', '01': 'Enable'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"1054","n":"Autofill pitcher feature state","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Disabled', '01': 'Enabled', 'ff': 'Not Available'}.get(value[:2], 'Unknown') }}"}
 {"i":"1055","n":"Autofill pitcher presence","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1056","n":"Autofill pitcher full","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1057","n":"Food Mode Presets Configuration - Upper Compartment Food Mode","d":"sensor","ds":30,"dc":"enum","vt":"{{ {'00': 'Fridge', '01': 'Pantry', '02': 'Chill', '03': 'Freezer', '04': 'Soft Freeze', '05': 'Deep Freeze', '06': 'Cellar Wine', '07': 'Red Wine', '08': 'White Wine', '09': 'Sparkling Wine', 'ff': 'Not Applicable'}.get(value[0:2], 'Unknown') }}"}
@@ -478,7 +478,7 @@
 {"i":"1165","n":"Water Filter Expiration Limits - Initial Days to Expiration","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"initial_days_to_expiration"}
 {"i":"1166","n":"Water Filter Reset Request","d":"button","ds":1,"dc":"restart"}
 {"i":"1167","n":"Requested Water Valve Position","d":"sensor","ds":1,"vt":"{{ {'00': 'Bypass', '01': 'Closed', '02': 'Open/Filtered'}.get(value[:2], 'Unknown') }}"}
-{"i":"1168","n":"Valve Manual Override Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"1168","n":"Valve Manual Override Status","d":"binary_sensor","ds":1,"vt":"{{ {'00': 'Clear', '01': 'Set'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1169","n":"Continuous Flow Alert - Low Limit Continuous Flow","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"low_limit_continuous_flow","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1169","n":"Continuous Flow Alert - Medium Limit Continuous Flow","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"medium_limit_continuous_flow","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1169","n":"Continuous Flow Alert - High Limit Continuous Flow","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"high_limit_continuous_flow","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -490,7 +490,7 @@
 {"i":"116c","n":"System Fault Alert - Water Valve Motor","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"water_valve_motor","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"116c","n":"System Fault Alert - Thermistor","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"thermistor","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"116d","n":"Daily Water Usage","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"116e","n":"Leak Validity Confirmation","d":"binary_sensor","ds":1,"dc":"moisture","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"116e","n":"Leak Validity Confirmation","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Leak Confirmation Inactive', '01': 'Leak Invalid/Rejected', '02': 'Leak Valid/Confirmed'}.get(value[:2], 'Unknown') }}"}
 {"i":"116f","n":"Unlock Request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1170","n":"Go Box Mode Request","d":"sensor","ds":1,"vt":"{{ {'00': 'Standby', '01': 'Fresh', '02': 'Freeze'}.get(value[:2], 'Unknown') }}"}
 {"i":"1171","n":"Keypad Pin Number","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
@@ -1408,7 +1408,7 @@
 {"i":"1313","n":"Grow Profile Chamber 3 - Data[237]","d":"sensor","ds":240,"vt":"{{ value[474:476] | int(base=16) }}","fi":"data_237"}
 {"i":"1313","n":"Grow Profile Chamber 3 - Data[238]","d":"sensor","ds":240,"vt":"{{ value[476:478] | int(base=16) }}","fi":"data_238"}
 {"i":"1313","n":"Grow Profile Chamber 3 - Data[239]","d":"sensor","ds":240,"vt":"{{ value[478:480] | int(base=16) }}","fi":"data_239"}
-{"i":"1314","n":"Water Intake Configuration","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"1314","n":"Water Intake Configuration","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Water Tank', '01': 'Water Supply Line'}.get(value[:2], 'Unknown') }}"}
 {"i":"1315","n":"Paused Mode Request","d":"sensor","ds":8,"dc":"enum","p":"1327","r":"request","vt":"{{ {'00': 'Exit', '01': 'Enter'}.get(value[0:2], 'Unknown') }}"}
 {"i":"1315","n":"Paused Mode - padding","d":"sensor","ds":8,"p":"1327","r":"request","vt":"{{ value[2:8] | int(base=16) }}","fi":"padding"}
 {"i":"1315","n":"Paused Mode - Request ID","d":"sensor","ds":8,"p":"1327","r":"request","vt":"{{ value[8:16] | int(base=16) }}","fi":"request_id"}
@@ -1445,7 +1445,7 @@
 {"i":"1326","n":"Paused Request Result","d":"sensor","ds":8,"dc":"enum","vt":"{{ {'00': 'Approved', '01': 'Rejected'}.get(value[0:2], 'Unknown') }}"}
 {"i":"1326","n":"Paused Request Result - padding","d":"sensor","ds":8,"vt":"{{ value[2:8] | int(base=16) }}","fi":"padding"}
 {"i":"1326","n":"Paused Request Result - Request ID","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"request_id"}
-{"i":"1327","n":"Paused Mode","d":"binary_sensor","ds":1,"p":"1315","r":"status","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"1327","n":"Paused Mode","d":"binary_sensor","ds":1,"p":"1315","r":"status","vt":"{{ {'00': 'Inactive', '01': 'Active'}.get(value[:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1328","n":"In Home Grower Notifications - Water Filter Order Alert","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 72057594037927936) % 2 else '00' }}","fi":"water_filter_order_alert","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1328","n":"In Home Grower Notifications - Water Filter Replace Alert","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 144115188075855872) % 2 else '00' }}","fi":"water_filter_replace_alert","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1328","n":"In Home Grower Notifications - Waste Water Tank Will Need Emptied Soon Alert","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 288230376151711744) % 2 else '00' }}","fi":"waste_water_tank_will_need_emptied_soon_alert","pon":"01","poff":"00","son":"01","soff":"00"}
