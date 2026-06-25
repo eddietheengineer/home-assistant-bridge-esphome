@@ -42,15 +42,43 @@ static const char* const TAG = "ha_discovery";
 /* Cleanup: discover and remove old HA discovery topics               */
 /* ------------------------------------------------------------------ */
 
+/* HA component types to iterate through during cleanup.
+ * Subscribing to all at once (homeassistant/+/{device_id}/#) floods the
+ * ESP-IDF MQTT inbound queue, causing dropped events. Instead, we
+ * subscribe to one component type at a time, wait for idle, clear,
+ * then move to the next. */
+static const char* const HA_DISCOVERY_COMPONENT_TYPES[] = {
+    "binary_sensor",
+    "sensor",
+    "select",
+    "switch",
+    "number",
+    "button",
+    "light",
+    "camera",
+    "update",
+    "climate",
+    "cover",
+    "fan",
+    "lock",
+    "vacuum",
+    "valve",
+    NULL  /* sentinel */
+};
+
+/* ------------------------------------------------------------------ */
+/* Cleanup: discover and remove old HA discovery topics               */
+/* ------------------------------------------------------------------ */
+
 /* Idle timeout: if no new matching topic arrives within this window,
  * assume the broker has delivered all retained messages and we can
- * proceed to discovery. */
+ * proceed to the next component type or to discovery. */
 #define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 5000
 
-/* Callback for homeassistant/+/{device_id}/# subscription during cleanup.
- * The subscription already filters to our device, so we just need to check
- * that the topic ends with /config and publish an empty retained payload.
- * If the payload is already empty, it's our own echo — skip it. */
+/* Callback for homeassistant/{component}/{device_id}/# subscription during cleanup.
+ * The subscription already filters to our device and component type, so we just
+ * need to check that the topic ends with /config and publish an empty retained
+ * payload. If the payload is already empty, it's our own echo — skip it. */
 static void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     (void)payload;
@@ -78,6 +106,7 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
 static void cleanup_start(ha_discovery_manager_t* self)
 {
     self->cleanup_subscribed = false;
+    self->cleanup_current_component = 0;
     self->cleanup_last_activity_ms = self->get_time_ms();
     self->last_publish_ms = self->get_time_ms();
 
@@ -86,43 +115,60 @@ static void cleanup_start(ha_discovery_manager_t* self)
 
 static void cleanup_run(ha_discovery_manager_t* self)
 {
-    /* Subscribe to only our device's discovery topics.
-     * homeassistant/# floods the ESP-IDF MQTT task with retained messages
-     * from all devices on the broker, causing dropped events and connection
-     * resets. Use homeassistant/+/device_id/# to scope to our device only. */
-    if (!self->cleanup_subscribed) {
-        if (self->mqtt_client) {
-            char sub_topic[128];
-            snprintf(sub_topic, sizeof(sub_topic), "homeassistant/+/%s/#", self->device_id);
-            mqtt_client_subscribe(self->mqtt_client, sub_topic,
-                cleanup_topic_callback, self);
-            self->cleanup_subscribed = true;
+    /* Find the next component type to clean. */
+    while (self->cleanup_current_component < sizeof(HA_DISCOVERY_COMPONENT_TYPES) / sizeof(HA_DISCOVERY_COMPONENT_TYPES[0])) {
+        const char* component = HA_DISCOVERY_COMPONENT_TYPES[self->cleanup_current_component];
+
+        /* NULL sentinel means we've processed all types. */
+        if (component == NULL) break;
+
+        /* Subscribe to this component type for our device.
+         * homeassistant/{component}/{device_id}/# scopes to one component
+         * type at a time, avoiding inbound queue overflow. */
+        if (!self->cleanup_subscribed) {
+            if (self->mqtt_client) {
+                char sub_topic[128];
+                snprintf(sub_topic, sizeof(sub_topic), "homeassistant/%s/%s/#", component, self->device_id);
+                mqtt_client_subscribe(self->mqtt_client, sub_topic,
+                    cleanup_topic_callback, self);
+                self->cleanup_subscribed = true;
+                self->cleanup_last_activity_ms = self->get_time_ms();
+            }
+            return;
         }
+
+        /* Check if we've been idle long enough — no new matching topics
+         * have arrived, so the broker has delivered all retained messages
+         * for this component type. */
+        uint32_t now = self->get_time_ms();
+        if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
+            /* Unsubscribe from current component type. */
+            if (self->mqtt_client) {
+                char sub_topic[128];
+                snprintf(sub_topic, sizeof(sub_topic), "homeassistant/%s/%s/#", component, self->device_id);
+                mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
+            }
+            self->cleanup_subscribed = false;
+            self->cleanup_current_component++;
+
+            /* Move to the next component type. */
+            continue;
+        }
+
+        /* Still receiving messages for this component type. */
         return;
     }
 
-    /* Check if we've been idle long enough — no new matching topics
-     * have arrived, so the broker has delivered all retained messages. */
-    uint32_t now = self->get_time_ms();
-    if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
-        ESP_LOGI(TAG, "Cleanup idle timeout reached, proceeding to discovery");
-        self->cleanup_subscribed = false;
-        /* Unsubscribe from cleanup topic so new discovery publishes aren't
-         * immediately cleared by the still-active subscription callback. */
-        if (self->mqtt_client) {
-            char sub_topic[128];
-            snprintf(sub_topic, sizeof(sub_topic), "homeassistant/+/%s/#", self->device_id);
-            mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
-        }
-        self->state = ha_discovery_state_discovering;
-        self->current_category = 0;
-        self->current_chunk = 0;
-        self->current_offset = 0;
-        self->current_decomp_size = 0;
-        self->last_publish_ms = self->get_time_ms();
-        ESP_LOGI(TAG, "Starting HA discovery fetch...");
-        return;
-    }
+    /* All component types cleaned. Proceed to discovery. */
+    ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
+    self->cleanup_subscribed = false;
+    self->state = ha_discovery_state_discovering;
+    self->current_category = 0;
+    self->current_chunk = 0;
+    self->current_offset = 0;
+    self->current_decomp_size = 0;
+    self->last_publish_ms = self->get_time_ms();
+    ESP_LOGI(TAG, "Starting HA discovery fetch...");
 }
 
 /* ------------------------------------------------------------------ */

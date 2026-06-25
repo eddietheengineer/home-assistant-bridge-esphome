@@ -151,6 +151,7 @@ typedef struct {
   /* Cleanup state: discover and remove old discovery topics. */
   uint32_t cleanup_last_activity_ms;  // Last time a topic was received
   bool cleanup_subscribed;            // Whether we've subscribed
+  uint16_t cleanup_current_component; // Index into ha_discovery_component_types[]
 #endif
 } ha_discovery_manager_t;
 
