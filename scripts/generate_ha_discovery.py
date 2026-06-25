@@ -813,8 +813,17 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 vt = _compute_binary_sensor_value_template(data_size)
             elif ha_domain == 'switch':
                 if paired_erd_str and paired_erd_str in erd_by_id:
-                    s_size = get_erd_byte_size(erd_by_id[paired_erd_str].get('data', [])) or 1
-                    vt = _compute_switch_value_template(s_size)
+                    paired = erd_by_id[paired_erd_str]
+                    paired_data = paired.get('data', [])
+                    s_size = get_erd_byte_size(paired_data) or 1
+                    # When the status ERD is larger than the request ERD,
+                    # use a value_template to extract the first byte from
+                    # the status payload before comparing against state_on/off.
+                    if s_size > data_size:
+                        hex_chars = s_size * 2
+                        vt = f"{{{{ value[:{hex_chars}][:2] }}}}"
+                    else:
+                        vt = _compute_switch_value_template(s_size)
                 else:
                     vt = _compute_switch_value_template(data_size)
             elif ha_domain == 'select':
