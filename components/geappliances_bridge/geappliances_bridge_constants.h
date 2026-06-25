@@ -75,13 +75,6 @@ static inline bool is_feature_bit_erd(tiny_erd_t erd)
          erd == ERD_APPLIANCE_FEATURE_API_9;
 }
 
-// Returns true when @p erd is a string-type ERD (model/serial number).
-// String-type ERDs are encoded with a 0x20 offset per byte per GE API spec.
-static inline bool is_string_erd(tiny_erd_t erd)
-{
-  return erd == ERD_MODEL_NUMBER || erd == ERD_SERIAL_NUMBER;
-}
-
 // Reads up to 8 bytes from a big-endian byte buffer as a 64-bit integer.
 // GEA protocol transmits ERD values MSB-first (big-endian).
 static inline uint64_t read_be64(const uint8_t* buf, uint8_t size)

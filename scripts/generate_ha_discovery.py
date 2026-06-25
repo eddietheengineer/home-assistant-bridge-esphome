@@ -537,6 +537,32 @@ def _compute_sensor_value_template(scaling_factor: int, data_size: int, signed: 
     return '{{ value | int(base=16) }}'
 
 
+def _string_value_template(data_size: int) -> str:
+    """Return a Jinja2 value_template for string-type ERDs.
+
+    GE API encodes string data with a 0x20 offset per byte:
+    each raw byte = ASCII_char + 0x20. The MQTT payload is hex, so
+    the template converts each hex byte pair to ASCII by subtracting
+    0x20 (32 decimal), stripping trailing '_' padding.
+    """
+    # Printable ASCII chars (0x20-0x7E) map to raw bytes 0x40-0x9E
+    # Build a lookup string: index i holds the decoded char for raw byte (i+0x40)
+    # i.e., raw_byte 0x40 -> ' ' (0x20), 0x41 -> '!' (0x21), ..., 0x9E -> '~' (0x7E)
+    chars = ''.join(chr(i) for i in range(0x20, 0x7F))  # ' ' through '~'
+    chars_escaped = chars.replace("'", "\\'")
+    return (
+        f"{{% set chars = '{chars_escaped}' %}}"
+        f"{{% set ns = namespace(value='') %}}"
+        f"{{% for i in range(0, value | length, 2) %}}"
+        f"{{% set b = value[i:i+2] | int(base=16) %}}"
+        f"{{% if b >= 0x40 and b <= 0x9E and chars[b - 0x40] != '_' %}}"
+        f"{{% set ns.value = ns.value ~ chars[b - 0x40] %}}"
+        f"{{% endif %}}"
+        f"{{% endfor %}}"
+        f"{{{{ ns.value }}}}"
+    )
+
+
 def _infer_unit_from_field_name(field_name: str, parent_unit: str) -> str:
     """Override the parent ERD unit when the field name explicitly names a unit.
 
@@ -767,9 +793,10 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     ev, fs = _get_first_enum_field_info(erd_data)
                     vt = _enum_sensor_value_template(ev, fs)
                 elif primary_type == 'string':
-                    # String-type ERDs: MQTT payload is already decoded ASCII
-                    # (with 0x20 offset applied), so just pass through.
-                    vt = '{{ value }}'
+                    # String-type ERDs: MQTT payload is hex. Convert each byte
+                    # pair to ASCII by subtracting 0x20 offset per GE API spec,
+                    # stripping trailing '_' padding.
+                    vt = _string_value_template(data_size)
                 elif data_size <= 4:
                     signed = _is_signed_type(_get_primary_data_type(erd_data))
                     vt = _compute_sensor_value_template(scaling_factor, data_size, signed)

@@ -9,7 +9,6 @@
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 #include "esphome/components/mqtt/mqtt_client.h"
-#include "geappliances_bridge_constants.h"
 
 #include <cstdio>
 #include <string.h>
@@ -88,40 +87,17 @@ static void mqtt_publisher_task(void* arg)
         break;
       }
 
-      /* Build payload: hex for binary ERDs, decoded ASCII for string ERDs. */
+      /* Build hex payload using pre-allocated buffer. */
       size_t data_len = entry->data_size;
-      const char* payload;
-      size_t payload_len;
-      if (is_string_erd(entry->erd)) {
-        /* Decode string-type ERD: subtract 0x20 offset, strip trailing '_' padding. */
-        int pos = 0;
-        for (size_t i = 0; i < data_len; i++) {
-          uint8_t raw = data[i];
-          if (raw == 0x00) break;
-          uint8_t decoded = raw - 0x20;
-          if ((size_t)(pos + 1) < sizeof(self->task_hex)) {
-            self->task_hex[pos++] = (char)decoded;
-          }
-        }
-        /* Strip trailing '_' padding. */
-        while (pos > 0 && self->task_hex[pos - 1] == '_') pos--;
-        self->task_hex[pos] = '\0';
-        payload = self->task_hex;
-        payload_len = (size_t)pos;
-      } else {
-        /* Build hex payload using pre-allocated buffer. */
-        for (size_t i = 0; i < data_len; i++) {
-          snprintf(self->task_hex + i * 2, 3, "%02x", data[i]);
-        }
-        self->task_hex[data_len * 2] = '\0';
-        payload = self->task_hex;
-        payload_len = data_len * 2;
+      for (size_t i = 0; i < data_len; i++) {
+        snprintf(self->task_hex + i * 2, 3, "%02x", data[i]);
       }
+      self->task_hex[data_len * 2] = '\0';
 
       /* Publish through the interface. */
       uint32_t t_publish = self->get_time_ms();
       mqtt_client_publish_raw(self->mqtt_client, self->task_topic,
-          payload, payload_len, true);
+          self->task_hex, data_len * 2, true);
       uint32_t elapsed = self->get_time_ms() - t_publish;
 
       if (elapsed >= 1000) {
@@ -369,39 +345,16 @@ uint16_t erd_cache_mqtt_publisher_loop(
       ESP_LOGW(PUBLISHER_TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
       return published;
     }
-    /* Build payload: hex for binary ERDs, decoded ASCII for string ERDs. */
+    /* Build hex payload: max data_size is 255 (uint8_t), so hex is 510 chars + null */
     size_t data_len = entry->data_size;
     char hex[512];
-    const char* payload;
-    size_t payload_len;
-    if (is_string_erd(entry->erd)) {
-      /* Decode string-type ERD: subtract 0x20 offset, strip trailing '_' padding. */
-      int pos = 0;
-      for (size_t i = 0; i < data_len; i++) {
-        uint8_t raw = data[i];
-        if (raw == 0x00) break;
-        uint8_t decoded = raw - 0x20;
-        if ((size_t)(pos + 1) < sizeof(hex)) {
-          hex[pos++] = (char)decoded;
-        }
-      }
-      /* Strip trailing '_' padding. */
-      while (pos > 0 && hex[pos - 1] == '_') pos--;
-      hex[pos] = '\0';
-      payload = hex;
-      payload_len = (size_t)pos;
-    } else {
-      /* Build hex payload: max data_size is 255 (uint8_t), so hex is 510 chars + null */
-      for (size_t i = 0; i < data_len; i++) {
-        snprintf(hex + i * 2, 3, "%02x", data[i]);
-      }
-      hex[data_len * 2] = '\0';
-      payload = hex;
-      payload_len = data_len * 2;
+    for (size_t i = 0; i < data_len; i++) {
+      snprintf(hex + i * 2, 3, "%02x", data[i]);
     }
+    hex[data_len * 2] = '\0';
 
     uint32_t t_publish = self->get_time_ms();
-    mqtt_client_publish_raw(self->mqtt_client, topic, payload, payload_len, true);
+    mqtt_client_publish_raw(self->mqtt_client, topic, hex, data_len * 2, true);
     uint32_t elapsed = self->get_time_ms() - t_publish;
 
     if (elapsed >= 1000) {

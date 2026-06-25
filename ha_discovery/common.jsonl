@@ -1,5 +1,5 @@
-{"i":"0001","n":"Model Number","d":"sensor","ds":32,"vt":"{{ value }}"}
-{"i":"0002","n":"Serial Number","d":"sensor","ds":32,"vt":"{{ value }}"}
+{"i":"0001","n":"Model Number","d":"sensor","ds":32,"vt":"{% set chars = ' !\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~' %}{% set ns = namespace(value='') %}{% for i in range(0, value | length, 2) %}{% set b = value[i:i+2] | int(base=16) %}{% if b >= 0x40 and b <= 0x9E and chars[b - 0x40] != '_' %}{% set ns.value = ns.value ~ chars[b - 0x40] %}{% endif %}{% endfor %}{{ ns.value }}"}
+{"i":"0002","n":"Serial Number","d":"sensor","ds":32,"vt":"{% set chars = ' !\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~' %}{% set ns = namespace(value='') %}{% for i in range(0, value | length, 2) %}{% set b = value[i:i+2] | int(base=16) %}{% if b >= 0x40 and b <= 0x9E and chars[b - 0x40] != '_' %}{% set ns.value = ns.value ~ chars[b - 0x40] %}{% endif %}{% endfor %}{{ ns.value }}"}
 {"i":"0004","n":"Control User Interface Locked","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0005","n":"Clock Time - Hours (hours)","d":"sensor","ds":3,"u":"h","dc":"duration","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"0005","n":"Clock Time - Minutes (minutes)","d":"sensor","ds":3,"u":"h","vt":"{{ value[2:4] | int(base=16) }}","fi":"minutes_minutes"}
@@ -51,7 +51,7 @@
 {"i":"0412","n":"Matter Device Temperature Display Mode","d":"binary_sensor","ds":1,"p":"0413","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0413","n":"Matter Device Temperature Display Mode Actual","d":"sensor","ds":1,"dc":"enum","p":"0412","r":"status","vt":"{{ {'00': 'Celsius', '01': 'Fahrenheit'}.get(value[:2], 'Unknown') }}"}
 {"i":"0414","n":"Matter Device Keypad Lockout","d":"binary_sensor","ds":1,"dc":"lock","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"0415","n":"Matter Device Onboarding Pairing Code","d":"sensor","ds":21,"vt":"{{ value }}"}
+{"i":"0415","n":"Matter Device Onboarding Pairing Code","d":"sensor","ds":21,"vt":"{% set chars = ' !\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~' %}{% set ns = namespace(value='') %}{% for i in range(0, value | length, 2) %}{% set b = value[i:i+2] | int(base=16) %}{% if b >= 0x40 and b <= 0x9E and chars[b - 0x40] != '_' %}{% set ns.value = ns.value ~ chars[b - 0x40] %}{% endif %}{% endfor %}{{ ns.value }}"}
 {"i":"0416","n":"Matter Commissioning Mode Request - Request ID","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"0416","n":"Matter Commissioning Mode Request - Request","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Closed', '01': 'Open'}.get(value[2:4], 'Unknown') }}","fi":"request"}
 {"i":"0417","n":"Matter Commissioning Window State - Request ID","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
