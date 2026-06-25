@@ -9,10 +9,10 @@
 {"i":"d005","n":"DSM Power Usage - Water Usage","d":"sensor","ds":11,"u":"W","vt":"{{ value[18:22] | int(base=16) }}","fi":"water_usage"}
 {"i":"d006","n":"Demand Response Status","d":"sensor","ds":1,"vt":"{{ {'00': 'Not in demand response mode', '01': 'In Demand Response mode', '02': 'In Temporary Load Reduction mode', '03': 'In appliances load reduction mode (Option 3 is controlled by the appliance and it cannot be triggered by the cloud)', '04': 'In Temporary Load Increase mode', '05': 'In Temperature Offset mode', 'ff': 'Invalid'}.get(value[:2], 'Unknown') }}"}
 {"i":"d007","n":"Appliance Cumulative Energy","d":"sensor","ds":4,"u":"Wh","dc":"energy","sc":"total","vt":"{{ value | int(base=16) }}"}
-{"i":"d008","n":"Available Demand Response Modes - Demand Response Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 0) & 1 else '00' }}","fi":"demand_response_available"}
-{"i":"d008","n":"Available Demand Response Modes - Temporary Load Reduction Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 1) & 1 else '00' }}","fi":"temporary_load_reduction_available"}
-{"i":"d008","n":"Available Demand Response Modes - Temporary Load Increase Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 2) & 1 else '00' }}","fi":"temporary_load_increase_available"}
-{"i":"d008","n":"Available Demand Response Modes - Temporary Temperature Offset Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 3) & 1 else '00' }}","fi":"temporary_temperature_offset_available"}
+{"i":"d008","n":"Available Demand Response Modes - Demand Response Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"demand_response_available"}
+{"i":"d008","n":"Available Demand Response Modes - Temporary Load Reduction Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"temporary_load_reduction_available"}
+{"i":"d008","n":"Available Demand Response Modes - Temporary Load Increase Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"temporary_load_increase_available"}
+{"i":"d008","n":"Available Demand Response Modes - Temporary Temperature Offset Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"temporary_temperature_offset_available"}
 {"i":"d00b","n":"Temporary Temperature Offset Demand Response","d":"number","ds":44,"u":"°F","dc":"temperature","p":"d00c","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%088x' % (value | int) }}"}
 {"i":"d00c","n":"Temporary Temperature Offset Demand Response - Segment Count","d":"sensor","ds":44,"u":"°F","dc":"temperature","p":"d00b","r":"status","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"d00c","n":"Temporary Temperature Offset Demand Response - Current Segment (0xFF if not begun)","d":"sensor","ds":44,"u":"°F","p":"d00b","r":"status","vt":"{{ value[2:4] | int(base=16) }}","fi":"current_segment_0xff_if_not_begun"}
@@ -49,11 +49,11 @@
 {"i":"d020","n":"Appliance Cumulative Hot Water Usage (mL)","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
 {"i":"d021","n":"Appliance Cumulative Cold Water Usage (mL)","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
 {"i":"d022","n":"Electrical Pricing Structure Selection","d":"sensor","ds":6,"dc":"enum","p":"d023","r":"status","vt":"{{ {'0000': 'None', '0001': 'Time Of Use', '0002': 'Block', '0003': 'TierBlock', '0004': 'BlockTier'}.get(value[0:4], 'Unknown') }}"}
-{"i":"d022","n":"Electrical Pricing Structure Selection - None","d":"binary_sensor","ds":6,"p":"d023","r":"status","vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 8) & 1 else '00' }}","fi":"none"}
-{"i":"d022","n":"Electrical Pricing Structure Selection - Time of Use","d":"binary_sensor","ds":6,"p":"d023","r":"status","vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 9) & 1 else '00' }}","fi":"time_of_use"}
-{"i":"d022","n":"Electrical Pricing Structure Selection - Blocks","d":"binary_sensor","ds":6,"p":"d023","r":"status","vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 10) & 1 else '00' }}","fi":"blocks"}
-{"i":"d022","n":"Electrical Pricing Structure Selection - TierBlock","d":"binary_sensor","ds":6,"p":"d023","r":"status","vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 11) & 1 else '00' }}","fi":"tierblock"}
-{"i":"d022","n":"Electrical Pricing Structure Selection - BlockTier","d":"binary_sensor","ds":6,"p":"d023","r":"status","vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 12) & 1 else '00' }}","fi":"blocktier"}
+{"i":"d022","n":"Electrical Pricing Structure Selection - None","d":"binary_sensor","ds":6,"p":"d023","r":"status","vt":"{{ '01' if ((value[4:8] | int(base=16)) // 256) % 2 else '00' }}","fi":"none"}
+{"i":"d022","n":"Electrical Pricing Structure Selection - Time of Use","d":"binary_sensor","ds":6,"p":"d023","r":"status","vt":"{{ '01' if ((value[4:8] | int(base=16)) // 512) % 2 else '00' }}","fi":"time_of_use"}
+{"i":"d022","n":"Electrical Pricing Structure Selection - Blocks","d":"binary_sensor","ds":6,"p":"d023","r":"status","vt":"{{ '01' if ((value[4:8] | int(base=16)) // 1024) % 2 else '00' }}","fi":"blocks"}
+{"i":"d022","n":"Electrical Pricing Structure Selection - TierBlock","d":"binary_sensor","ds":6,"p":"d023","r":"status","vt":"{{ '01' if ((value[4:8] | int(base=16)) // 2048) % 2 else '00' }}","fi":"tierblock"}
+{"i":"d022","n":"Electrical Pricing Structure Selection - BlockTier","d":"binary_sensor","ds":6,"p":"d023","r":"status","vt":"{{ '01' if ((value[4:8] | int(base=16)) // 4096) % 2 else '00' }}","fi":"blocktier"}
 {"i":"d023","n":"Electrical Pricing Structure Selection","d":"sensor","ds":4,"p":"d022","r":"request","vt":"{{ {'0000': 'None', '0001': 'Time Of Use', '0002': 'Block', '0003': 'TierBlock', '0004': 'BlockTier'}.get(value[:4], 'Unknown') }}"}
 {"i":"d024","n":"Electrical Time of Use Pricing Schedule Request - Season 1 - Maximum Pricing Tier Value","d":"sensor","ds":116,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"d024","n":"Electrical Time of Use Pricing Schedule Request - Season 1 - Start Month of Year","d":"sensor","ds":116,"vt":"{{ value[2:4] | int(base=16) }}","fi":"start_month_of_year"}

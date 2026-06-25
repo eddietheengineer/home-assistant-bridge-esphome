@@ -125,6 +125,13 @@ def _get_primary_data_type(erd_data: List[Dict]) -> str:
             return d.get('type', 'u8')
     return 'u8'
 
+def _jinja2_escape(s: str) -> str:
+    """Escape a string for safe use inside a single-quoted Jinja2 dict literal.
+
+    Replaces single quotes with backslash-escaped single quotes so that
+    values like "Don't Care" don't break the dict literal syntax.
+    """
+    return s.replace("'", "\\'")
 
 def _is_reserved_field(name: str) -> bool:
     """Return True if a field name indicates it is a reserved/padding field."""
@@ -135,8 +142,19 @@ def _leaf_field_name(name: str) -> str:
     """Return the leaf portion of a potentially dot-qualified field name.
 
     E.g. "Allowed Selections.Cyclic Supported" -> "Cyclic Supported".
+    Handles edge cases like "Air Purifier.PM2.5" where the dot is part of
+    the value (decimal/unicode) rather than a namespace separator.
     """
-    return name.split('.')[-1].strip()
+    parts = name.split('.')
+    if len(parts) == 1:
+        return name.strip()
+    leaf = parts[-1].strip()
+    # If the last part is purely numeric and the second-to-last part ends
+    # with an alphanumeric char (letter or digit), the dot is likely part
+    # of a decimal or version number (e.g., "PM2.5" -> "PM2" + ".5").
+    if len(parts) >= 2 and leaf.isdigit() and parts[-2][-1:].isalnum():
+        return (parts[-2] + '.' + leaf).strip()
+    return leaf
 
 
 def _field_slug(name: str) -> str:
@@ -217,7 +235,7 @@ def _byte_subfield_value_template(field: Dict, erd_scaling: int) -> str:
         if not valid_pairs:
             return f"{{{{ value[{hex_start}:{hex_end}] }}}}"
         hex_chars = size * 2
-        mapping = ', '.join(f"'{k:0{hex_chars}x}': '{v}'" for k, v in valid_pairs)
+        mapping = ', '.join(f"'{k:0{hex_chars}x}': '{_jinja2_escape(v)}'" for k, v in valid_pairs)
         return f"{{{{ {{{mapping}}}.get(value[{hex_start}:{hex_end}], 'Unknown') }}}}"
     elif field_type == 'bool':
         return f"{{{{ '01' if value[{hex_start}:{hex_end}] != '00' else '00' }}}}"
@@ -261,12 +279,14 @@ def _bitfield_sub_value_template(field: Dict) -> str:
     hex_end = (byte_offset + byte_size) * 2
 
     if bit_size == 1:
+        divisor = 2 ** bit_offset
         return (f"{{{{ '01' if ((value[{hex_start}:{hex_end}] | int(base=16))"
-                f" >> {bit_offset}) & 1 else '00' }}}}")
+                f" // {divisor}) % 2 else '00' }}}}")
     else:
-        mask = (1 << bit_size) - 1
+        divisor = 2 ** bit_offset
+        modulus = 1 << bit_size
         return (f"{{{{ ((value[{hex_start}:{hex_end}] | int(base=16))"
-                f" >> {bit_offset}) & {mask} }}}}")
+                f" // {divisor}) % {modulus} }}}}")
 
 
 def _unit_to_ha(unit: str) -> str:
@@ -348,13 +368,13 @@ def _select_options_and_templates(enum_values: Dict[str, str], data_size: int):
 
     # Build value_template: map hex string -> option name
     hex_to_name = ', '.join(
-        f"'{k:0{hex_chars}x}': '{v}'" for k, v in valid_pairs
+        f"'{k:0{hex_chars}x}': '{_jinja2_escape(v)}'" for k, v in valid_pairs
     )
     value_template = f"{{{{ {{{hex_to_name}}}.get(value[:{hex_chars}], 'Unknown') }}}}"
 
     # Build command_template: map option name -> hex string
     name_to_hex = ', '.join(
-        f"'{v}': '{k:0{hex_chars}x}'" for k, v in valid_pairs
+        f"'{_jinja2_escape(v)}': '{k:0{hex_chars}x}'" for k, v in valid_pairs
     )
     command_template = f"{{{{ {{{name_to_hex}}}[value] }}}}"
 
@@ -383,7 +403,7 @@ def _enum_sensor_value_template(enum_values: Dict[str, str], field_size: int) ->
 
     hex_chars = field_size * 2
     hex_to_name = ', '.join(
-        f"'{k:0{hex_chars}x}': '{v}'" for k, v in valid_pairs
+        f"'{k:0{hex_chars}x}': '{_jinja2_escape(v)}'" for k, v in valid_pairs
     )
     return f"{{{{ {{{hex_to_name}}}.get(value[:{hex_chars}], 'Unknown') }}}}"
 
@@ -414,10 +434,10 @@ def _number_command_template(data_size: int, scaling_factor: int, signed: bool =
     if signed:
         max_val = 1 << (data_size * 8)
         if scaling_factor > 1:
-            return f"{{{{ '%0{hex_chars}x' % ((((value | float) * {scaling_factor}) | int) % {max_val}) }}}}"
+            return f"{{{{ '%0{hex_chars}x' % ((((value | float) * {scaling_factor}) | round | int) % {max_val}) }}}}"
         return f"{{{{ '%0{hex_chars}x' % ((value | int) % {max_val}) }}}}"
     if scaling_factor > 1:
-        return f"{{{{ '%0{hex_chars}x' % ((value | float) * {scaling_factor} | int) }}}}"
+        return f"{{{{ '%0{hex_chars}x' % (((value | float) * {scaling_factor}) | round | int) }}}}"
     return f"{{{{ '%0{hex_chars}x' % (value | int) }}}}"
 
 

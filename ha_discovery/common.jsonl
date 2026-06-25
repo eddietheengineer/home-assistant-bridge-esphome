@@ -16,10 +16,10 @@
 {"i":"0035","n":"Personality (32-bit)","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
 {"i":"0036","n":"Service Mode State Request","d":"binary_sensor","ds":1}
 {"i":"0037","n":"Service Mode State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Service mode inactive', '01': 'Service mode active', '02': 'Entering service mode', '03': 'Exiting service mode'}.get(value[:2], 'Unknown') }}"}
-{"i":"0038","n":"Supported Image Types - Boot Loader","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 0) & 1 else '00' }}","fi":"boot_loader"}
-{"i":"0038","n":"Supported Image Types - Application","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 1) & 1 else '00' }}","fi":"application"}
-{"i":"0038","n":"Supported Image Types - Parametric","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 2) & 1 else '00' }}","fi":"parametric"}
-{"i":"0038","n":"Supported Image Types - Auxiliary","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) >> 3) & 1 else '00' }}","fi":"auxiliary"}
+{"i":"0038","n":"Supported Image Types - Boot Loader","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"boot_loader"}
+{"i":"0038","n":"Supported Image Types - Application","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"application"}
+{"i":"0038","n":"Supported Image Types - Parametric","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"parametric"}
+{"i":"0038","n":"Supported Image Types - Auxiliary","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"auxiliary"}
 {"i":"0039","n":"Boot Loader Version - Critical Major","d":"sensor","ds":4,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"0039","n":"Boot Loader Version - Critical Minor","d":"sensor","ds":4,"vt":"{{ value[2:4] | int(base=16) }}","fi":"critical_minor"}
 {"i":"0039","n":"Boot Loader Version - Non-Critical Major","d":"sensor","ds":4,"vt":"{{ value[4:6] | int(base=16) }}","fi":"non_critical_major"}
@@ -38,10 +38,10 @@
 {"i":"003c","n":"Auxiliary Version - Non-Critical Minor","d":"sensor","ds":4,"vt":"{{ value[6:8] | int(base=16) }}","fi":"non_critical_minor"}
 {"i":"004f","n":"Enhanced Sabbath Mode Status","d":"binary_sensor","ds":1}
 {"i":"0050","n":"Timer","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
-{"i":"0051","n":"Available Sound Levels - Off","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) >> 8) & 1 else '00' }}","fi":"off"}
-{"i":"0051","n":"Available Sound Levels - Low","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) >> 9) & 1 else '00' }}","fi":"low"}
-{"i":"0051","n":"Available Sound Levels - Medium","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) >> 10) & 1 else '00' }}","fi":"medium"}
-{"i":"0051","n":"Available Sound Levels - High","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) >> 11) & 1 else '00' }}","fi":"high"}
+{"i":"0051","n":"Available Sound Levels - Off","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"off"}
+{"i":"0051","n":"Available Sound Levels - Low","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 512) % 2 else '00' }}","fi":"low"}
+{"i":"0051","n":"Available Sound Levels - Medium","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 1024) % 2 else '00' }}","fi":"medium"}
+{"i":"0051","n":"Available Sound Levels - High","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 2048) % 2 else '00' }}","fi":"high"}
 {"i":"0060","n":"Configuration Hash","d":"sensor","ds":32}
 {"i":"0099","n":"Brand ID","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'GEA - Covers all GEA Brands (GE, Profile, Cafe, Monogram, Hotpoint)', '02': 'Haier', '03': 'Mabe', '04': 'Fisher & Paykel', '05': 'GE', '06': 'Profile', '07': 'Cafe', '08': 'Monogram', '09': 'Hotpoint', '0a': 'Haier FPA', '0b': 'Adora', '0c': 'Allied', '0d': 'Lennox', '0e': 'FirstBuild'}.get(value[:2], 'Unknown') }}"}
 {"i":"009c","n":"Matter Product ID","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
@@ -95,37 +95,37 @@
 {"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[13]","d":"sensor","ds":32,"vt":"{{ value[56:60] | int(base=16) }}","fi":"supported_digital_feature_13"}
 {"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[14]","d":"sensor","ds":32,"vt":"{{ value[60:64] | int(base=16) }}","fi":"supported_digital_feature_14"}
 {"i":"0601","n":"Request Enabled Enhanced Features","d":"sensor","ds":8,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 1 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 8) & 1 else '00' }}","fi":"digital_feature_1_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 2 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 9) & 1 else '00' }}","fi":"digital_feature_2_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 3 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 10) & 1 else '00' }}","fi":"digital_feature_3_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 4 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 11) & 1 else '00' }}","fi":"digital_feature_4_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 5 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 12) & 1 else '00' }}","fi":"digital_feature_5_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 6 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 13) & 1 else '00' }}","fi":"digital_feature_6_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 7 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 14) & 1 else '00' }}","fi":"digital_feature_7_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 8 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 15) & 1 else '00' }}","fi":"digital_feature_8_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 9 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 0) & 1 else '00' }}","fi":"digital_feature_9_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 10 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 1) & 1 else '00' }}","fi":"digital_feature_10_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 11 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 2) & 1 else '00' }}","fi":"digital_feature_11_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 12 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 3) & 1 else '00' }}","fi":"digital_feature_12_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 13 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 4) & 1 else '00' }}","fi":"digital_feature_13_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 14 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 5) & 1 else '00' }}","fi":"digital_feature_14_enabled"}
-{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 15 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 6) & 1 else '00' }}","fi":"digital_feature_15_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 1 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 256) % 2 else '00' }}","fi":"digital_feature_1_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 2 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 512) % 2 else '00' }}","fi":"digital_feature_2_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 3 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 1024) % 2 else '00' }}","fi":"digital_feature_3_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 4 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 2048) % 2 else '00' }}","fi":"digital_feature_4_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 5 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 4096) % 2 else '00' }}","fi":"digital_feature_5_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 6 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 8192) % 2 else '00' }}","fi":"digital_feature_6_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 7 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 16384) % 2 else '00' }}","fi":"digital_feature_7_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 8 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 32768) % 2 else '00' }}","fi":"digital_feature_8_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 9 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 1) % 2 else '00' }}","fi":"digital_feature_9_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 10 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 2) % 2 else '00' }}","fi":"digital_feature_10_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 11 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 4) % 2 else '00' }}","fi":"digital_feature_11_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 12 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 8) % 2 else '00' }}","fi":"digital_feature_12_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 13 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 16) % 2 else '00' }}","fi":"digital_feature_13_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 14 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 32) % 2 else '00' }}","fi":"digital_feature_14_enabled"}
+{"i":"0601","n":"Request Enabled Enhanced Features - Digital Feature 15 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 64) % 2 else '00' }}","fi":"digital_feature_15_enabled"}
 {"i":"0602","n":"Current Enabled Enhanced Features","d":"sensor","ds":8,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 1 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 8) & 1 else '00' }}","fi":"digital_feature_1_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 2 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 9) & 1 else '00' }}","fi":"digital_feature_2_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 3 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 10) & 1 else '00' }}","fi":"digital_feature_3_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 4 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 11) & 1 else '00' }}","fi":"digital_feature_4_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 5 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 12) & 1 else '00' }}","fi":"digital_feature_5_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 6 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 13) & 1 else '00' }}","fi":"digital_feature_6_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 7 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 14) & 1 else '00' }}","fi":"digital_feature_7_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 8 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 15) & 1 else '00' }}","fi":"digital_feature_8_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 9 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 0) & 1 else '00' }}","fi":"digital_feature_9_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 10 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 1) & 1 else '00' }}","fi":"digital_feature_10_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 11 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 2) & 1 else '00' }}","fi":"digital_feature_11_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 12 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 3) & 1 else '00' }}","fi":"digital_feature_12_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 13 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 4) & 1 else '00' }}","fi":"digital_feature_13_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 14 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 5) & 1 else '00' }}","fi":"digital_feature_14_enabled"}
-{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 15 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) >> 6) & 1 else '00' }}","fi":"digital_feature_15_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 1 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 256) % 2 else '00' }}","fi":"digital_feature_1_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 2 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 512) % 2 else '00' }}","fi":"digital_feature_2_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 3 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 1024) % 2 else '00' }}","fi":"digital_feature_3_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 4 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 2048) % 2 else '00' }}","fi":"digital_feature_4_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 5 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 4096) % 2 else '00' }}","fi":"digital_feature_5_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 6 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 8192) % 2 else '00' }}","fi":"digital_feature_6_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 7 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 16384) % 2 else '00' }}","fi":"digital_feature_7_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 8 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 32768) % 2 else '00' }}","fi":"digital_feature_8_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 9 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 1) % 2 else '00' }}","fi":"digital_feature_9_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 10 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 2) % 2 else '00' }}","fi":"digital_feature_10_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 11 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 4) % 2 else '00' }}","fi":"digital_feature_11_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 12 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 8) % 2 else '00' }}","fi":"digital_feature_12_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 13 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 16) % 2 else '00' }}","fi":"digital_feature_13_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 14 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 32) % 2 else '00' }}","fi":"digital_feature_14_enabled"}
+{"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 15 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 64) % 2 else '00' }}","fi":"digital_feature_15_enabled"}
 {"i":"0700","n":"Reset Count","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
 {"i":"0701","n":"Reset Reason - Reset Source","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Software', '01': 'Watchdog', '02': 'PowerOn', '03': 'Unknown'}.get(value[0:2], 'Unknown') }}"}
 {"i":"0701","n":"Reset Reason - Application-specific Metadata","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"application_specific_metadata"}
@@ -241,9 +241,9 @@
 {"i":"0710","n":"Non-Volatile Usage Error Threshold Exceeded","d":"binary_sensor","ds":1}
 {"i":"0800","n":"Current Sound Theme","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Default', '01': 'Classical', '02': 'Morse Code'}.get(value[:2], 'Unknown') }}"}
 {"i":"0801","n":"Sound Theme Request","d":"sensor","ds":1,"vt":"{{ {'00': 'Default', '01': 'Classical', '02': 'Morse Code'}.get(value[:2], 'Unknown') }}"}
-{"i":"0802","n":"Supported Sound Themes - Default Theme","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 56) & 1 else '00' }}","fi":"default_theme"}
-{"i":"0802","n":"Supported Sound Themes - Classical Theme","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 57) & 1 else '00' }}","fi":"classical_theme"}
-{"i":"0802","n":"Supported Sound Themes - Morse Code Theme","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) >> 58) & 1 else '00' }}","fi":"morse_code_theme"}
+{"i":"0802","n":"Supported Sound Themes - Default Theme","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 72057594037927936) % 2 else '00' }}","fi":"default_theme"}
+{"i":"0802","n":"Supported Sound Themes - Classical Theme","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 144115188075855872) % 2 else '00' }}","fi":"classical_theme"}
+{"i":"0802","n":"Supported Sound Themes - Morse Code Theme","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 288230376151711744) % 2 else '00' }}","fi":"morse_code_theme"}
 {"i":"0900","n":"Sign of Life","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"0902","n":"UI Sound Level Request","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"0903","n":"UI Sound Level State","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
