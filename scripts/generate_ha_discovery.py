@@ -837,9 +837,9 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 # For paired switches, read state from the status ERD's primary field.
                 vt = _paired_primary_field_template(erd_by_id, paired_erd_str, 1, True) or ''
             elif ha_domain == 'select':
-                ev = get_first_enum_values(erd_data)
+                ev, fs = _get_first_enum_field_info(erd_data)
                 if ev:
-                    opts, vt, ct = _select_options_and_templates(ev, data_size)
+                    opts, vt, ct = _select_options_and_templates(ev, fs)
             elif ha_domain == 'number':
                 pf = _get_primary_field(erd_by_id, paired_erd_str)
                 if pf:
