@@ -47,33 +47,16 @@ static const char* const TAG = "ha_discovery";
  * proceed to discovery. */
 #define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 5000
 
-/* Callback for homeassistant/# subscription during cleanup.
- * When a matching topic arrives, immediately publish an empty retained
- * payload to remove it from the broker. */
+/* Callback for homeassistant/+/{device_id}/# subscription during cleanup.
+ * The subscription already filters to our device, so we just need to check
+ * that the topic ends with /config and publish an empty retained payload. */
 static void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     (void)payload;
     (void)payload_len;
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
 
-    /* Check if topic starts with homeassistant/ and contains our device_id. */
-    const char* prefix = "homeassistant/";
-    if (strncmp(topic, prefix, strlen(prefix)) != 0) return;
-
-    /* Check if topic contains our device_id after the domain. */
-    const char* dev = topic + strlen(prefix);
-    /* Skip the domain part (e.g., "sensor/", "switch/") */
-    const char* slash = strchr(dev, '/');
-    if (slash == NULL) return;
-    dev = slash + 1;
-
-    /* Check if device_id matches at the start of the remaining path.
-     * The character after device_id must be '/' to ensure exact match. */
-    size_t did_len = strlen(self->device_id);
-    if (strncmp(dev, self->device_id, did_len) != 0) return;
-    if (dev[did_len] != '/') return;
-
-    /* Check if the topic ends with /config (only config topics need removal). */
+    /* Only remove config topics. */
     size_t topic_len = strlen(topic);
     if (topic_len < 7) return;
     if (strcmp(topic + topic_len - 7, "/config") != 0) return;
@@ -100,10 +83,15 @@ static void cleanup_start(ha_discovery_manager_t* self)
 
 static void cleanup_run(ha_discovery_manager_t* self)
 {
-    /* Subscribe to homeassistant/# if not already done. */
+    /* Subscribe to only our device's discovery topics.
+     * homeassistant/# floods the ESP-IDF MQTT task with retained messages
+     * from all devices on the broker, causing dropped events and connection
+     * resets. Use homeassistant/+/device_id/# to scope to our device only. */
     if (!self->cleanup_subscribed) {
         if (self->mqtt_client) {
-            mqtt_client_subscribe(self->mqtt_client, "homeassistant/#",
+            char sub_topic[128];
+            snprintf(sub_topic, sizeof(sub_topic), "homeassistant/+/%s/#", self->device_id);
+            mqtt_client_subscribe(self->mqtt_client, sub_topic,
                 cleanup_topic_callback, self);
             self->cleanup_subscribed = true;
         }
