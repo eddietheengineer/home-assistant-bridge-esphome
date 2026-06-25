@@ -66,7 +66,7 @@
 {"i":"9021","n":"Espresso Maker Current Rinse Water Volume Parameters - Min Volume Milliliters","d":"sensor","ds":3,"vt":"{{ value[2:4] | int(base=16) }}","fi":"min_volume_milliliters"}
 {"i":"9021","n":"Espresso Maker Current Rinse Water Volume Parameters - Max Volume Milliliters","d":"sensor","ds":3,"vt":"{{ value[4:6] | int(base=16) }}","fi":"max_volume_milliliters"}
 {"i":"9022","n":"Espresso Maker Requested Rinse Water Volume Parameters","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"9023","n":"Espresso Maker Reset Brew Parameters","d":"sensor","ds":1,"vt":"{{ {'00': 'Espresso', '01': 'Americano', '02': 'Lungo', '03': 'Hot Water', '04': 'Steam', '05': 'Ristretto', '06': 'Doppio', '07': 'Triple Shot', '08': 'Red Eye', '09': 'MyBrew/MyCup'}.get(value[:2], 'Unknown') }}"}
+{"i":"9023","n":"Espresso Maker Reset Brew Parameters","d":"button","ds":1,"dc":"restart"}
 {"i":"9024","n":"Espresso Maker Current Standby Timeout - Standby Timeout Seconds","d":"sensor","ds":6,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"9024","n":"Espresso Maker Current Standby Timeout - Standby Timeout Seconds Min","d":"sensor","ds":6,"vt":"{{ value[4:8] | int(base=16) }}","fi":"standby_timeout_seconds_min"}
 {"i":"9024","n":"Espresso Maker Current Standby Timeout - Standby Timeout Seconds Max","d":"sensor","ds":6,"vt":"{{ value[8:12] | int(base=16) }}","fi":"standby_timeout_seconds_max"}
@@ -362,7 +362,7 @@
 {"i":"910b","n":"Ice Maker Filter Life Used Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"910c","n":"Ice Maker Clean Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Clean', '01': 'Clean soon (order supplies)', '02': 'Clean now'}.get(value[:2], 'Unknown') }}"}
 {"i":"910f","n":"Door Status","d":"binary_sensor","ds":1,"dc":"door"}
-{"i":"911d","n":"Ice Maker Filter Status Reset","d":"binary_sensor","ds":1}
+{"i":"911d","n":"Ice Maker Filter Status Reset","d":"button","ds":1,"dc":"restart"}
 {"i":"9132","n":"Tank Drain Frequency Setting","d":"sensor","ds":1,"vt":"{{ {'00': 'Normal', '01': 'More Frequent', '02': 'Very Frequent'}.get(value[:2], 'Unknown') }}"}
 {"i":"9133","n":"Harvest Time Adjustment Setting","d":"sensor","ds":1,"vt":"{{ {'00': 'Normal', '01': 'Longer', '02': 'Longest'}.get(value[:2], 'Unknown') }}"}
 {"i":"9134","n":"Ice Maker Model","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Legacy', '01': 'Opal Mass', '02': 'Opal 2.0 Legacy Power Board', '03': 'Opal 2.0 New Power Board', '04': 'Opal 2.5 Legacy PowerBoard', '05': 'Opal 2.5 New Power Board', '06': 'Opal 2.1', '07': 'Opal 2.6', '08': 'Opal Mini', '09': 'Opal Clear'}.get(value[:2], 'Unknown') }}"}
@@ -729,7 +729,7 @@
 {"i":"9223","n":"Toaster Oven Requested Toast Mode Cooking Parameters - Padding[1]","d":"sensor","ds":12,"u":"s","vt":"{{ value[20:22] | int(base=16) }}","fi":"padding_1"}
 {"i":"9223","n":"Toaster Oven Requested Toast Mode Cooking Parameters - Padding[2]","d":"sensor","ds":12,"u":"s","vt":"{{ value[22:24] | int(base=16) }}","fi":"padding_2"}
 {"i":"9224","n":"Toaster Oven Door Alarm Silence","d":"binary_sensor","ds":1}
-{"i":"9225","n":"Toaster Oven Reset Cooking Parameters for the Selected Cooking Mode","d":"sensor","ds":1,"vt":"{{ {'00': 'Air Fry', '01': 'Bake', '02': 'Broil', '03': 'Roast', '04': 'Reheat', '05': 'Warm', '06': 'Slow Cook', '07': 'Dehydrate', '08': 'Proof', '09': 'Cookie', '0a': 'Pizza', '0b': 'Bagel', '0c': 'Toast', '0d': 'Crisp Finish', '0e': 'Cake', '0f': 'Cookie with Preferences', '10': 'Pizza with Preferences'}.get(value[:2], 'Unknown') }}"}
+{"i":"9225","n":"Toaster Oven Reset Cooking Parameters for the Selected Cooking Mode","d":"button","ds":1,"dc":"restart"}
 {"i":"9226","n":"Toaster Oven Current Crisp Finish Mode Cooking Parameters","d":"sensor","ds":28,"u":"s","dc":"duration","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"9226","n":"Toaster Oven Current Crisp Finish Mode Cooking Parameters - Temperature Used","d":"binary_sensor","ds":28,"vt":"{{ '01' if ((value[52:56] | int(base=16)) // 256) % 2 else '00' }}","fi":"temperature_used"}
 {"i":"9226","n":"Toaster Oven Current Crisp Finish Mode Cooking Parameters - Cook Time Used","d":"binary_sensor","ds":28,"vt":"{{ '01' if ((value[52:56] | int(base=16)) // 512) % 2 else '00' }}","fi":"cook_time_used"}
@@ -1113,7 +1113,7 @@
 {"i":"9432","n":"Requested Igniter Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
 {"i":"9433","n":"Igniter Temperature Limits - Igniter Temperature Min (F)","d":"sensor","ds":4,"u":"°F","dc":"temperature","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"9433","n":"Igniter Temperature Limits - Igniter Temperature Max (F)","d":"sensor","ds":4,"u":"°F","vt":"{{ value[4:8] | int(base=16) }}","fi":"igniter_temperature_max_f"}
-{"i":"9434","n":"Reset Cooking Parameters","d":"sensor","ds":1,"vt":"{{ {'00': 'All', '01': 'Custom', '02': 'Keep Warm', '03': 'Brisket', '04': 'Pork Rib', '05': 'Pork Butt', '06': 'Wings', '07': 'Chicken', '08': 'Salmon'}.get(value[:2], 'Unknown') }}"}
+{"i":"9434","n":"Reset Cooking Parameters","d":"button","ds":1,"dc":"restart"}
 {"i":"9435","n":"Restore Factory Defaults","d":"binary_sensor","ds":1}
 {"i":"9436","n":"Smoker Type","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Arden Indoor Smoker'}.get(value[:2], 'Unknown') }}"}
 {"i":"9437","n":"Smoker Push Notifications - Cooking Started","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"cooking_started"}

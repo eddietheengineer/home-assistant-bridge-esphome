@@ -1781,7 +1781,6 @@
 {"i":"5672","n":"Closed-Loop Cooking Target Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
 {"i":"5673","n":"Closed-Loop Cooking Current Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"5674","n":"Target Closed-Loop Cooking Time","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
-{"i":"5675","n":"Start Closed-Loop Cooking Cook Timer","d":"binary_sensor","ds":1}
 {"i":"5676","n":"Elapsed Closed-Loop Cooking Time","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
 {"i":"5677","n":"Closed-Loop Cooking Target Time Reached","d":"binary_sensor","ds":1}
 {"i":"5678","n":"Closed-Loop Cooking Device Battery State","d":"sensor","ds":1,"dc":"battery","vt":"{{ {'00': 'Normal', '01': 'Low Battery', '02': 'High Board Temperature', 'ff': 'Invalid'}.get(value[:2], 'Unknown') }}"}
