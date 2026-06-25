@@ -41,6 +41,7 @@ extern "C" {
 typedef enum {
   ha_discovery_state_idle,
   ha_discovery_state_building,     // building sorted ERD list
+  ha_discovery_state_cleaning,    // removing old discovery topics
   ha_discovery_state_discovering,  // main loop decompressing/publishing
   ha_discovery_state_complete,
   ha_discovery_state_failed
@@ -146,6 +147,10 @@ typedef struct {
   uint16_t current_chunk;          // Index into current category's chunks
   uint32_t current_offset;         // Byte offset within decompressed chunk
   uint32_t current_decomp_size;    // Size of current decompressed chunk
+
+  /* Cleanup state: collect old discovery topics to remove. */
+  uint32_t cleanup_deadline_ms;       // When to stop collecting topics
+  bool cleanup_subscribed;            // Whether we've subscribed to homeassistant/#
 #endif
 } ha_discovery_manager_t;
 

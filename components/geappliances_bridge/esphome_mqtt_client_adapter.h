@@ -104,6 +104,16 @@ void esphome_mqtt_client_adapter_publish_raw(
   size_t payload_len,
   bool retain);
 
+/*!
+ * Subscribe to a topic with a raw C callback.
+ * Implements the i_mqtt_client_t subscribe vtable slot.
+ */
+void esphome_mqtt_client_adapter_subscribe(
+  i_mqtt_client_t* self,
+  const char* topic,
+  void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg),
+  void* arg);
+
 #ifdef __cplusplus
 }
 #endif

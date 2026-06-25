@@ -39,6 +39,90 @@
 static const char* const TAG = "ha_discovery";
 
 /* ------------------------------------------------------------------ */
+/* Cleanup: discover and remove old HA discovery topics               */
+/* ------------------------------------------------------------------ */
+
+/* How long to wait for topic collection (milliseconds). */
+#define HA_DISCOVERY_CLEANUP_TIMEOUT_MS 5000
+
+/* Callback for homeassistant/# subscription during cleanup.
+ * When a matching topic arrives, immediately publish an empty retained
+ * payload to remove it from the broker. */
+static void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
+{
+    (void)payload;
+    (void)payload_len;
+    ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
+
+    /* Check if topic starts with homeassistant/ and contains our device_id. */
+    const char* prefix = "homeassistant/";
+    if (strncmp(topic, prefix, strlen(prefix)) != 0) return;
+
+    /* Check if topic contains our device_id after the domain. */
+    const char* dev = topic + strlen(prefix);
+    /* Skip the domain part (e.g., "sensor/", "switch/") */
+    const char* slash = strchr(dev, '/');
+    if (slash == NULL) return;
+    dev = slash + 1;
+
+    /* Check if device_id matches at the start of the remaining path.
+     * The character after device_id must be '/' to ensure exact match. */
+    size_t did_len = strlen(self->device_id);
+    if (strncmp(dev, self->device_id, did_len) != 0) return;
+    if (dev[did_len] != '/') return;
+
+    /* Check if the topic ends with /config (only config topics need removal). */
+    size_t topic_len = strlen(topic);
+    if (topic_len < 7) return;
+    if (strcmp(topic + topic_len - 7, "/config") != 0) return;
+
+    /* Publish empty payload with retain=true to remove the topic. */
+    if (self->mqtt_client) {
+        mqtt_client_publish_raw(self->mqtt_client, topic, "", 0, true);
+    }
+
+    ESP_LOGD(TAG, "Removed old topic: %s", topic);
+}
+
+static void cleanup_start(ha_discovery_manager_t* self)
+{
+    self->cleanup_subscribed = false;
+    self->cleanup_deadline_ms = self->get_time_ms() + HA_DISCOVERY_CLEANUP_TIMEOUT_MS;
+    self->last_publish_ms = self->get_time_ms();
+
+    ESP_LOGI(TAG, "Starting HA discovery cleanup...");
+}
+
+static void cleanup_run(ha_discovery_manager_t* self)
+{
+    /* Subscribe to homeassistant/# if not already done. */
+    if (!self->cleanup_subscribed) {
+        if (self->mqtt_client) {
+            mqtt_client_subscribe(self->mqtt_client, "homeassistant/#",
+                cleanup_topic_callback, self);
+            self->cleanup_subscribed = true;
+        }
+        return;
+    }
+
+    /* Check if we've exceeded the deadline. */
+    uint32_t now = self->get_time_ms();
+    if (now >= self->cleanup_deadline_ms) {
+        /* Time's up, proceed to discovery. */
+        ESP_LOGI(TAG, "Cleanup timeout reached, proceeding to discovery");
+        self->cleanup_subscribed = false;
+        self->state = ha_discovery_state_discovering;
+        self->current_category = 0;
+        self->current_chunk = 0;
+        self->current_offset = 0;
+        self->current_decomp_size = 0;
+        self->last_publish_ms = self->get_time_ms();
+        ESP_LOGI(TAG, "Starting HA discovery fetch...");
+        return;
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /* Zero-allocation JSON parser helpers                                */
 /* ------------------------------------------------------------------ */
 
@@ -617,6 +701,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 {
 #ifdef USE_ESP_IDF
     if (self->state != ha_discovery_state_building &&
+        self->state != ha_discovery_state_cleaning &&
         self->state != ha_discovery_state_discovering) {
         return;
     }
@@ -633,15 +718,16 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         }
         if (!self->build_done) return;
 
-        /* Transition to discovering. */
-        self->state = ha_discovery_state_discovering;
-        self->current_category = 0;
-        self->current_chunk = 0;
-        self->current_offset = 0;
-        self->current_decomp_size = 0;
-        self->last_publish_ms = self->get_time_ms();
+        /* Transition to cleaning. */
+        self->state = ha_discovery_state_cleaning;
+        cleanup_start(self);
+        return;
+    }
 
-        ESP_LOGI(TAG, "Starting HA discovery fetch...");
+    /* Cleaning state: collect and remove old discovery topics. */
+    if (self->state == ha_discovery_state_cleaning) {
+        cleanup_run(self);
+        return;
     }
 
     /* Discovering state: decompress chunks and publish entities. */
@@ -881,6 +967,7 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
 bool ha_discovery_manager_is_processing(ha_discovery_manager_t* self)
 {
     return self->state == ha_discovery_state_building ||
+           self->state == ha_discovery_state_cleaning ||
            self->state == ha_discovery_state_discovering;
 }
 

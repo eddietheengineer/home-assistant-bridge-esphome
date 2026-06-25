@@ -92,7 +92,8 @@ static const i_mqtt_client_api_t api = {
   on_write_request,
   on_mqtt_disconnect,
   on_mqtt_connect,
-  esphome_mqtt_client_adapter_publish_raw
+  esphome_mqtt_client_adapter_publish_raw,
+  esphome_mqtt_client_adapter_subscribe
 };
 
 extern "C" void esphome_mqtt_client_adapter_init(
@@ -236,6 +237,21 @@ extern "C" void esphome_mqtt_client_adapter_publish_raw(
   if (mqtt_client != nullptr && mqtt_client->is_connected()) {
     mqtt_client->publish(topic, payload, payload_len, 0, retain);
   }
+}
+
+extern "C" void esphome_mqtt_client_adapter_subscribe(
+  i_mqtt_client_t* _self,
+  const char* topic,
+  void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg),
+  void* arg)
+{
+  (void)_self;
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client == nullptr || !mqtt_client->is_connected()) return;
+
+  mqtt_client->subscribe(topic, [callback, arg](const std::string& t, const std::string& p) {
+    callback(t.c_str(), p.c_str(), p.size(), arg);
+  }, 0);
 }
 
 extern "C" size_t esphome_mqtt_client_adapter_get_pending_update_count(
