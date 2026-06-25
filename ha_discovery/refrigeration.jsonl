@@ -144,7 +144,7 @@
 {"i":"103e","n":"Desired Temperature Setpoint (Kelvin) Upper Compartment","d":"sensor","ds":2,"u":"K","dc":"temperature","sf":32,"vt":"{{ (value | int(base=16)) / 32 | round(3) }}"}
 {"i":"103f","n":"Desired Temperature Setpoint (Kelvin) Lower Compartment","d":"sensor","ds":2,"u":"K","dc":"temperature","sf":32,"vt":"{{ (value | int(base=16)) / 32 | round(3) }}"}
 {"i":"1040","n":"Desired Temperature Setpoint (Kelvin) Middle Compartment","d":"sensor","ds":2,"u":"K","dc":"temperature","sf":32,"vt":"{{ (value | int(base=16)) / 32 | round(3) }}"}
-{"i":"1041","n":"Water Filter Reset Request","d":"button","ds":1,"dc":"restart"}
+{"i":"1041","n":"Water Filter Reset Request","d":"sensor","ds":1,"vt":"{{ {'00': 'No Request', '01': 'Reset Requested', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
 {"i":"1042","n":"Food Mode Upper Compartment (Desired)","d":"sensor","ds":1,"vt":"{{ {'00': 'Fridge', '01': 'Pantry', '02': 'Chill', '03': 'Freezer', '04': 'Soft Freeze', '05': 'Deep Freeze', '06': 'Cellar Wine', '07': 'Red Wine', '08': 'White Wine', '09': 'Sparkling Wine', '0a': 'Beverage', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
 {"i":"1043","n":"Food Mode Lower Compartment (Desired)","d":"sensor","ds":1,"vt":"{{ {'00': 'Fridge', '01': 'Pantry', '02': 'Chill', '03': 'Freezer', '04': 'Soft Freeze', '05': 'Deep Freeze', '06': 'Cellar Wine', '07': 'Red Wine', '08': 'White Wine', '09': 'Sparkling Wine', '0a': 'Beverage', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
 {"i":"1044","n":"Food Mode Middle Compartment (Desired)","d":"sensor","ds":1,"vt":"{{ {'00': 'Fridge', '01': 'Pantry', '02': 'Chill', '03': 'Freezer', '04': 'Soft Freeze', '05': 'Deep Freeze', '06': 'Cellar Wine', '07': 'Red Wine', '08': 'White Wine', '09': 'Sparkling Wine', '0a': 'Beverage', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
@@ -479,7 +479,7 @@
 {"i":"1164","n":"Water Filter Status Details - Days to Expiration","d":"sensor","ds":12,"vt":"{{ (value[16:24] | int(base=16)) - 4294967296 if (value[16:24] | int(base=16)) >= 2147483648 else (value[16:24] | int(base=16)) }}","fi":"days_to_expiration"}
 {"i":"1165","n":"Water Filter Expiration Limits - Initial Gallons to Expiration","d":"sensor","ds":8,"vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"1165","n":"Water Filter Expiration Limits - Initial Days to Expiration","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"initial_days_to_expiration"}
-{"i":"1166","n":"Water Filter Reset Request","d":"button","ds":1,"dc":"restart"}
+{"i":"1166","n":"Water Filter Reset Request","d":"binary_sensor","ds":1}
 {"i":"1167","n":"Requested Water Valve Position","d":"sensor","ds":1,"vt":"{{ {'00': 'Bypass', '01': 'Closed', '02': 'Open/Filtered'}.get(value[:2], 'Unknown') }}"}
 {"i":"1168","n":"Valve Manual Override Status","d":"binary_sensor","ds":1}
 {"i":"1169","n":"Continuous Flow Alert - Low Limit Continuous Flow","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"low_limit_continuous_flow"}
@@ -560,7 +560,7 @@
 {"i":"121c","n":"Current Flowmeter Ounces Dispensed","d":"sensor","ds":2,"sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"121d","n":"Last Flowmeter Ounces Dispensed","d":"sensor","ds":2,"sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"121e","n":"Dimmable Lighting 0 Percent Level","d":"sensor","ds":1,"p":"121f","r":"request","vt":"{{ value | int(base=16) }}"}
-{"i":"121f","n":"Dimmable Lighting 0 Percent Level Setting","d":"sensor","ds":1,"p":"121e","r":"status","vt":"{{ value | int(base=16) }}"}
+{"i":"121f","n":"Dimmable Lighting 0 Percent Level Setting","d":"number","ds":1,"p":"121e","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}"}
 {"i":"1220","n":"Dimmable Lighting 0 Configuration - Fresh Food Back Light","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"fresh_food_back_light"}
 {"i":"1220","n":"Dimmable Lighting 0 Configuration - Fresh Food Top Light","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"fresh_food_top_light"}
 {"i":"1220","n":"Dimmable Lighting 0 Configuration - Freezer Back Light","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"freezer_back_light"}
@@ -650,7 +650,7 @@
 {"i":"128e","n":"Total Single Door Open Time In Seconds","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
 {"i":"128f","n":"Total Single Door Open Counts","d":"sensor","ds":4,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"129e","n":"Recess Light User Brightness Level","d":"sensor","ds":1,"p":"129f","r":"request","vt":"{{ value | int(base=16) }}"}
-{"i":"129f","n":"Recess Light User Brightness Level Setting","d":"sensor","ds":1,"p":"129e","r":"status","vt":"{{ value | int(base=16) }}"}
+{"i":"129f","n":"Recess Light User Brightness Level Setting","d":"number","ds":1,"p":"129e","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}"}
 {"i":"12a6","n":"Freezer Ice Rate Is Active","d":"binary_sensor","ds":1}
 {"i":"12b9","n":"Variable Cube Size Setting Data - Number of Cube Size Settings","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"12b9","n":"Variable Cube Size Setting Data - Cube Size Default Setting","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"cube_size_default_setting"}
