@@ -596,6 +596,20 @@ def _compute_switch_value_template(data_size: int) -> str:
     return ''
 
 
+def _paired_primary_field_template(erd_by_id: Dict[str, Dict], paired_erd_str: str,
+                                    erd_scaling: int) -> Optional[str]:
+    """Return a Jinja2 value_template that extracts the primary field from a
+    paired ERD's full hex payload, or None if the paired ERD isn't found or
+    has no non-bitfield primary field.
+
+    Used when a controllable entity (switch/select/number) reads its state from
+    a paired status ERD that may have extra bytes (allowables, bitfields).
+    """
+    pf = _get_primary_field(erd_by_id, paired_erd_str)
+    if pf is None:
+        return None
+    return _byte_subfield_value_template(pf, erd_scaling)
+
 def _select_options_and_templates(enum_values: Dict[str, str], data_size: int):
     """Build options_json, value_template and command_template for a select entity.
 
@@ -812,20 +826,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             elif ha_domain == 'binary_sensor':
                 vt = _compute_binary_sensor_value_template(data_size)
             elif ha_domain == 'switch':
-                if paired_erd_str and paired_erd_str in erd_by_id:
-                    paired = erd_by_id[paired_erd_str]
-                    paired_data = paired.get('data', [])
-                    s_size = get_erd_byte_size(paired_data) or 1
-                    # When the status ERD is larger than the request ERD,
-                    # use a value_template to extract the first byte from
-                    # the status payload before comparing against state_on/off.
-                    if s_size > data_size:
-                        hex_chars = s_size * 2
-                        vt = f"{{{{ value[:{hex_chars}][:2] }}}}"
-                    else:
-                        vt = _compute_switch_value_template(s_size)
-                else:
-                    vt = _compute_switch_value_template(data_size)
+                # For paired switches, read state from the status ERD's primary field.
+                vt = _paired_primary_field_template(erd_by_id, paired_erd_str, 1) or ''
             elif ha_domain == 'select':
                 ev = get_first_enum_values(erd_data)
                 if ev:

@@ -198,7 +198,7 @@
 {"i":"3109","n":"Demo Mode State","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"310a","n":"Critical Fault Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"310b","n":"Noncritical Fault Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"310c","n":"Smart Assist Cloud Notification","d":"switch","ds":1,"p":"310d","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"310c","n":"Smart Assist Cloud Notification","d":"switch","ds":1,"p":"310d","r":"request","vt":"{{ {'00': 'Inactive', '01': 'Active'}.get(value[0:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3200","n":"Dish Feature Configuration","d":"sensor","ds":15,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"3200","n":"Dish Feature Configuration - displayInHoursAndMinutes","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 1) % 2 else '00' }}","fi":"displayinhoursandminutes","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3200","n":"Dish Feature Configuration - bottleJets","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 2) % 2 else '00' }}","fi":"bottlejets","pon":"01","poff":"00","son":"01","soff":"00"}

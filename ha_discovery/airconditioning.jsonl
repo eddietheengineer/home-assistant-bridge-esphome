@@ -96,19 +96,19 @@
 {"i":"7410","n":"Defrost Cycle Count","d":"sensor","ds":4,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"7451","n":"Fan Configuration in Cooling","d":"select","ds":1,"p":"7450","r":"request","vt":"{{ {'00': 'Cyclic', '01': 'Continuous'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Cyclic': '00', 'Continuous': '01'}[value] }}","o":"[\"Cyclic\", \"Continuous\"]"}
 {"i":"7453","n":"Fan Configuration in Heating","d":"select","ds":1,"p":"7452","r":"request","vt":"{{ {'00': 'Cyclic', '01': 'Continuous'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Cyclic': '00', 'Continuous': '01'}[value] }}","o":"[\"Cyclic\", \"Continuous\"]"}
-{"i":"7455","n":"Freeze Sentinel","d":"switch","ds":1,"p":"7454","r":"request","vt":"{{ value[:10][:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7457","n":"Heat Sentinel","d":"switch","ds":1,"p":"7456","r":"request","vt":"{{ value[:10][:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7459","n":"Constant Fan","d":"switch","ds":1,"p":"7458","r":"request","vt":"{{ value[:10][:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"745b","n":"24V External Thermostat","d":"switch","ds":1,"p":"745a","r":"request","vt":"{{ value[:10][:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"745d","n":"Fan Boost","d":"switch","ds":1,"p":"745c","r":"request","vt":"{{ value[:10][:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7455","n":"Freeze Sentinel","d":"switch","ds":1,"p":"7454","r":"request","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7457","n":"Heat Sentinel","d":"switch","ds":1,"p":"7456","r":"request","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7459","n":"Constant Fan","d":"switch","ds":1,"p":"7458","r":"request","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"745b","n":"24V External Thermostat","d":"switch","ds":1,"p":"745a","r":"request","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"745d","n":"Fan Boost","d":"switch","ds":1,"p":"745c","r":"request","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"745f","n":"Heat Selector","d":"select","ds":1,"p":"745e","r":"request","vt":"{{ {'00': 'Electric Heat Only', '01': 'High Demand', '02': 'Hybrid', '03': 'Boost Heat Pump Allowed', '04': 'Heat Pump Only'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Electric Heat Only': '00', 'High Demand': '01', 'Hybrid': '02', 'Boost Heat Pump Allowed': '03', 'Heat Pump Only': '04'}[value] }}","o":"[\"Electric Heat Only\", \"High Demand\", \"Hybrid\", \"Boost Heat Pump Allowed\", \"Heat Pump Only\"]"}
 {"i":"7460","n":"Heat Selector Strict Status","d":"binary_sensor","ds":5,"vt":"{{ 'ON' if value[:10] | int(base=16) != 0 else 'OFF' }}"}
 {"i":"7460","n":"Heat Selector Strict Status - Disabled Supported","d":"binary_sensor","ds":5,"vt":"{{ '01' if ((value[2:10] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"disabled_supported","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7460","n":"Heat Selector Strict Status - Enabled Supported","d":"binary_sensor","ds":5,"vt":"{{ '01' if ((value[2:10] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"enabled_supported","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7463","n":"UVC Module","d":"switch","ds":1,"p":"7462","r":"request","vt":"{{ value[:10][:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7463","n":"UVC Module","d":"switch","ds":1,"p":"7462","r":"request","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7465","n":"Make-up Air Fan Cfm","d":"number","ds":2,"u":"CFM","p":"7464","r":"request","vt":"{{ value[0:4] | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}","m":"box"}
 {"i":"7467","n":"Make-up Air Filter Type","d":"select","ds":1,"p":"7466","r":"request","vt":"{{ {'00': 'No Filter', '01': 'MERV13 Filter'}.get(value[:2], 'Unknown') }}","ct":"{{ {'No Filter': '00', 'MERV13 Filter': '01'}[value] }}","o":"[\"No Filter\", \"MERV13 Filter\"]"}
-{"i":"7469","n":"Make-up Air Occupancy Control","d":"switch","ds":1,"p":"7468","r":"request","vt":"{{ value[:10][:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7469","n":"Make-up Air Occupancy Control","d":"switch","ds":1,"p":"7468","r":"request","vt":"{{ {'00': 'Disabled', '01': 'Enabled'}.get(value[0:2], 'Unknown') }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"746b","n":"Dehumidification Mode","d":"select","ds":1,"p":"746a","r":"request","vt":"{{ {'00': 'Off', '01': 'Low', '02': 'Standard', '03': 'High'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Off': '00', 'Low': '01', 'Standard': '02', 'High': '03'}[value] }}","o":"[\"Off\", \"Low\", \"Standard\", \"High\"]"}
 {"i":"746c","n":"Auxiliary 24V Input","d":"select","ds":5,"dc":"enum","p":"746d","r":"status","vt":"{{ {'0000000000': 'Central Desk Control', '0000000001': 'Occupancy Control'}.get(value[:10], 'Unknown') }}","ct":"{{ {'Central Desk Control': '0000000000', 'Occupancy Control': '0000000001'}[value] }}","o":"[\"Central Desk Control\", \"Occupancy Control\"]"}
 {"i":"746d","n":"Auxiliary 24V Configuration","d":"sensor","ds":1,"p":"746c","r":"request","vt":"{{ {'00': 'Central Desk Control', '01': 'Occupancy Control'}.get(value[:2], 'Unknown') }}"}
@@ -128,7 +128,7 @@
 {"i":"7602","n":"Inverter Desired Speed","d":"sensor","ds":2,"u":"rpm","vt":"{{ value | int(base=16) }}"}
 {"i":"7610","n":"Inverter IGBT Power","d":"sensor","ds":2,"u":"W","dc":"power","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"7612","n":"Inverter IGBT Temperature","d":"sensor","ds":2,"u":"°C","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
-{"i":"7701","n":"Power","d":"switch","ds":1,"p":"7700","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7701","n":"Power","d":"switch","ds":1,"p":"7700","r":"request","vt":"{{ '01' if value[0:2] != '00' else '00' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7703","n":"System Mode","d":"select","ds":1,"p":"7702","r":"request","vt":"{{ {'00': 'Auto', '01': 'Heat', '02': 'Fan', '03': 'Cool'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Auto': '00', 'Heat': '01', 'Fan': '02', 'Cool': '03'}[value] }}","o":"[\"Auto\", \"Heat\", \"Fan\", \"Cool\"]"}
 {"i":"7705","n":"Temperature Setpoint Step Size Status - Minimum Step Size in Fahrenheit operation in Fahrenheit x 10","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ (value[0:2] | int(base=16)) / 10 | round(1) }}"}
 {"i":"7705","n":"Temperature Setpoint Step Size Status - Minimum Step Size in Celsius operation in Celsius x 10","d":"sensor","ds":2,"u":"°C","sf":10,"vt":"{{ (value[2:4] | int(base=16)) / 10 | round(1) }}","fi":"minimum_step_size_in_celsius_operation_in_celsius_x_10"}
@@ -145,7 +145,7 @@
 {"i":"7832","n":"Dehumidifier Notifications - Bucket full or not properly placed","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[0:12] | int(base=16)) // 1099511627776) % 2 else '00' }}","fi":"bucket_full_or_not_properly_placed","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7832","n":"Dehumidifier Notifications - Filter needs replacement","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[0:12] | int(base=16)) // 2199023255552) % 2 else '00' }}","fi":"filter_needs_replacement","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7832","n":"Dehumidifier Notifications - Pump error","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[0:12] | int(base=16)) // 4398046511104) % 2 else '00' }}","fi":"pump_error","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7833","n":"Dehumidifier Nonstop Mode","d":"switch","ds":1,"p":"7834","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7833","n":"Dehumidifier Nonstop Mode","d":"switch","ds":1,"p":"7834","r":"request","vt":"{{ '01' if value[0:2] != '00' else '00' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7835","n":"Portable A/C Notifications - Bucket full or not properly placed","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"bucket_full_or_not_properly_placed","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7835","n":"Portable A/C Notifications - Filter needs replacement","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"filter_needs_replacement","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7835","n":"Portable A/C Notifications - Pump error","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 67108864) % 2 else '00' }}","fi":"pump_error","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -423,7 +423,7 @@
 {"i":"7971","n":"Console IDU DIP Switch Status - SW3-2","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 4194304) % 2 else '00' }}","fi":"sw3_2","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7971","n":"Console IDU DIP Switch Status - SW3-1","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 8388608) % 2 else '00' }}","fi":"sw3_1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7972","n":"External Damper Presence","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not Available', '01': 'Available', 'ff': 'Unknown'}.get(value[:2], 'Unknown') }}"}
-{"i":"7974","n":"External Damper","d":"switch","ds":1,"p":"7973","r":"request","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7974","n":"External Damper","d":"switch","ds":1,"p":"7973","r":"request","vt":"{{ '01' if value[0:2] != '00' else '00' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7975","n":"Vacation Mode (10C Heating Mode) Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7976","n":"Vacation Mode (10C Heating Mode) Control","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7979","n":"Self Clean Reminder Timer Duration Selection","d":"sensor","ds":1,"dc":"duration","vt":"{{ {'00': '250 Hours', '01': '500 Hours', '02': '1000 Hours', '03': '1500 Hours', '04': 'Never'}.get(value[:2], 'Unknown') }}"}
