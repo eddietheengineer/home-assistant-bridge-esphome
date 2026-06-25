@@ -1,0 +1,653 @@
+#!/usr/bin/env python3
+"""
+Tests for generate_ha_discovery.py output.
+
+Validates that all generated JSONL files:
+  1. Are valid JSON with correct structure
+  2. Have Jinja2 value/command templates that compile and execute
+  3. Produce correct results for known test payloads
+  4. Cover all expected data types (signed, unsigned, enum, bitfield)
+
+Run with:
+    python3 -m pytest scripts/test_ha_discovery.py -v
+  or:
+    python3 -m unittest scripts.test_ha_discovery -v
+"""
+
+import json
+import os
+import sys
+import unittest
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
+# Add scripts dir to path so we can import generate_ha_discovery
+sys.path.insert(0, str(Path(__file__).parent))
+import generate_ha_discovery as gen
+
+# Jinja2 for template validation
+import jinja2
+
+
+JINJA2_ENV = jinja2.Environment()
+
+# Path to generated JSONL files
+HA_DISCOVERY_DIR = Path(__file__).parent.parent / 'ha_discovery'
+
+# All category files
+CATEGORIES = [
+    'common', 'airconditioning', 'refrigeration', 'laundry',
+    'dishwasher', 'waterheater', 'range', 'waterfilter',
+    'smallappliance', 'energy',
+]
+
+
+def load_all_entities() -> List[Dict[str, Any]]:
+    """Load all entities from all category JSONL files."""
+    entities: List[Dict[str, Any]] = []
+    for cat in CATEGORIES:
+        path = HA_DISCOVERY_DIR / f'{cat}.jsonl'
+        if not path.exists():
+            continue
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                obj = json.loads(line)
+                obj['_category'] = cat
+                entities.append(obj)
+    return entities
+
+
+def load_erd_definitions() -> List[Dict[str, Any]]:
+    """Load ERD definitions from the JSON file."""
+    json_file = Path(__file__).parent.parent / 'lib' / 'public-appliance-api-documentation' / 'appliance_api_erd_definitions.json'
+    with open(json_file) as f:
+        data = json.load(f)
+    return data.get('erds', [])
+
+
+class TestJSONLStructure(unittest.TestCase):
+    """Test that all JSONL files have valid structure."""
+
+    def test_all_categories_exist(self):
+        """All expected category files exist."""
+        for cat in CATEGORIES:
+            path = HA_DISCOVERY_DIR / f'{cat}.jsonl'
+            self.assertTrue(path.exists(), f'{cat}.jsonl not found')
+
+    def test_all_lines_valid_json(self):
+        """Every line in every JSONL file is valid JSON."""
+        for cat in CATEGORIES:
+            path = HA_DISCOVERY_DIR / f'{cat}.jsonl'
+            with open(path) as f:
+                for i, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    with self.subTest(category=cat, line=i):
+                        obj = json.loads(line)
+                        self.assertIsInstance(obj, dict)
+
+    def test_required_fields_present(self):
+        """Every entity has the required fields: i, n, d, ds."""
+        entities = load_all_entities()
+        for obj in entities:
+            with self.subTest(entity=obj.get('n', '?'), erd=obj.get('i', '?')):
+                self.assertIn('i', obj, f'Missing "i" in {obj.get("n")}')
+                self.assertIn('n', obj, f'Missing "n" in {obj.get("i")}')
+                self.assertIn('d', obj, f'Missing "d" in {obj.get("i")}')
+                self.assertIn('ds', obj, f'Missing "ds" in {obj.get("i")}')
+
+    def test_valid_domains(self):
+        """Every entity has a valid HA domain."""
+        valid_domains = {'sensor', 'binary_sensor', 'switch', 'select', 'number', 'button'}
+        entities = load_all_entities()
+        for obj in entities:
+            with self.subTest(entity=obj.get('n', '?')):
+                self.assertIn(obj['d'], valid_domains,
+                    f'{obj["n"]} has invalid domain {obj["d"]}')
+
+    def test_data_size_positive(self):
+        """Every entity has a positive data size."""
+        entities = load_all_entities()
+        for obj in entities:
+            with self.subTest(entity=obj.get('n', '?')):
+                self.assertGreater(obj['ds'], 0,
+                    f'{obj["n"]} has non-positive data_size {obj["ds"]}')
+    def test_no_duplicate_unique_ids(self):
+        """No two entities share the same (erd_id, field_id) combination."""
+        entities = load_all_entities()
+        seen: Dict[Tuple[str, str], str] = {}
+        for obj in entities:
+            key = (obj['i'], obj.get('fi', ''))
+            if key in seen:
+                # Allow duplicates only if they have the same name (same entity
+                # emitted from different categories is OK)
+                if seen[key] == obj['n']:
+                    continue
+                self.fail(
+                    f'Duplicate unique_id key {key}: '
+                    f'{seen[key]} and {obj["n"]}')
+            seen[key] = obj['n']
+
+    def test_total_entity_count(self):
+        """Verify total entity count is reasonable (not zero, not excessive)."""
+        entities = load_all_entities()
+        self.assertGreater(len(entities), 5000,
+            f'Expected >5000 entities, got {len(entities)}')
+        self.assertLess(len(entities), 20000,
+            f'Expected <20000 entities, got {len(entities)}')
+
+
+class TestJinja2Templates(unittest.TestCase):
+    """Test that all Jinja2 templates compile and execute correctly."""
+
+    def test_all_value_templates_compile(self):
+        """Every value_template compiles without error."""
+        entities = load_all_entities()
+        for obj in entities:
+            vt = obj.get('vt', '')
+            if not vt:
+                continue
+            with self.subTest(entity=obj['n'], erd=obj['i']):
+                try:
+                    JINJA2_ENV.from_string(vt)
+                except jinja2.TemplateSyntaxError as e:
+                    self.fail(f'{obj["n"]} vt syntax error: {e}\n  {vt[:100]}')
+
+    def test_all_command_templates_compile(self):
+        """Every command_template compiles without error."""
+        entities = load_all_entities()
+        for obj in entities:
+            ct = obj.get('ct', '')
+            if not ct:
+                continue
+            with self.subTest(entity=obj['n'], erd=obj['i']):
+                try:
+                    JINJA2_ENV.from_string(ct)
+                except jinja2.TemplateSyntaxError as e:
+                    self.fail(f'{obj["n"]} ct syntax error: {e}\n  {ct[:100]}')
+
+    def test_value_templates_execute(self):
+        """Every value_template executes without error with sample payloads."""
+        entities = load_all_entities()
+        for obj in entities:
+            vt = obj.get('vt', '')
+            if not vt:
+                continue
+            ds = obj['ds']
+            # Generate a hex payload matching the data size
+            payload = '00' * ds
+            compiled = JINJA2_ENV.from_string(vt)
+            with self.subTest(entity=obj['n'], erd=obj['i']):
+                try:
+                    result = compiled.render(value=payload)
+                    self.assertIsInstance(result, str)
+                except Exception as e:
+                    self.fail(f'{obj["n"]} vt execution error with payload {payload}: {e}\n  {vt[:100]}')
+
+    def test_command_templates_execute(self):
+        """Every command_template executes without error with sample values."""
+        entities = load_all_entities()
+        for obj in entities:
+            ct = obj.get('ct', '')
+            if not ct:
+                continue
+            compiled = JINJA2_ENV.from_string(ct)
+            with self.subTest(entity=obj['n'], erd=obj['i']):
+                try:
+                    result = compiled.render(value=0)
+                    self.assertIsInstance(result, str)
+                except Exception as e:
+                    self.fail(f'{obj["n"]} ct execution error with value=0: {e}\n  {ct[:100]}')
+
+    def test_no_unbalanced_braces(self):
+        """All templates have balanced {{ }}."""
+        entities = load_all_entities()
+        for obj in entities:
+            for tmpl_type, tmpl in [('vt', obj.get('vt', '')), ('ct', obj.get('ct', ''))]:
+                if not tmpl:
+                    continue
+                with self.subTest(entity=obj['n'], tmpl=tmpl_type):
+                    open_count = tmpl.count('{{')
+                    close_count = tmpl.count('}}')
+                    self.assertEqual(open_count, close_count,
+                        f'{obj["n"]} {tmpl_type} unbalanced braces: {{ = {open_count}, }} = {close_count}')
+
+    def test_no_unbalanced_parens(self):
+        """All templates have balanced parentheses."""
+        entities = load_all_entities()
+        for obj in entities:
+            for tmpl_type, tmpl in [('vt', obj.get('vt', '')), ('ct', obj.get('ct', ''))]:
+                if not tmpl:
+                    continue
+                with self.subTest(entity=obj['n'], tmpl=tmpl_type):
+                    self.assertEqual(tmpl.count('('), tmpl.count(')'),
+                        f'{obj["n"]} {tmpl_type} unbalanced parens')
+
+
+class TestSignedIntegerTemplates(unittest.TestCase):
+    """Test that signed integer templates produce correct two's-complement results."""
+
+    def test_i16_positive(self):
+        """i16 positive values are decoded correctly."""
+        # Template: {{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}
+        tmpl = JINJA2_ENV.from_string(
+            '{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}')
+        self.assertEqual(int(tmpl.render(value='0064')), 100)
+        self.assertEqual(int(tmpl.render(value='7fff')), 32767)
+        self.assertEqual(int(tmpl.render(value='0000')), 0)
+
+    def test_i16_negative(self):
+        """i16 negative values are decoded correctly via two's complement."""
+        tmpl = JINJA2_ENV.from_string(
+            '{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}')
+        self.assertEqual(int(tmpl.render(value='ffff')), -1)
+        self.assertEqual(int(tmpl.render(value='8000')), -32768)
+        self.assertEqual(int(tmpl.render(value='ff96')), -106)
+
+    def test_i16_with_scaling(self):
+        """i16 with scaling factor produces correct decimal results."""
+        tmpl = JINJA2_ENV.from_string(
+            '{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}')
+        self.assertEqual(float(tmpl.render(value='0064')), 10.0)   # 100/10
+        self.assertEqual(float(tmpl.render(value='ff96')), -10.6)  # -106/10
+        self.assertEqual(float(tmpl.render(value='0032')), 5.0)    # 50/10
+
+    def test_i32_negative(self):
+        """i32 negative values are decoded correctly."""
+        tmpl = JINJA2_ENV.from_string(
+            '{{ (value | int(base=16)) - 4294967296 if (value | int(base=16)) >= 2147483648 else (value | int(base=16)) }}')
+        self.assertEqual(int(tmpl.render(value='ffffffff')), -1)
+        self.assertEqual(int(tmpl.render(value='80000000')), -2147483648)
+
+    def test_signed_command_template(self):
+        """Signed number command template handles negative values."""
+        tmpl = JINJA2_ENV.from_string(
+            "{{ '%04x' % ((value | int) % 65536) }}")
+        self.assertEqual(tmpl.render(value=-1), 'ffff')
+        self.assertEqual(tmpl.render(value=-10), 'fff6')
+        self.assertEqual(tmpl.render(value=100), '0064')
+
+    def test_signed_command_template_with_scaling(self):
+        """Signed number command template with scaling factor."""
+        tmpl = JINJA2_ENV.from_string(
+            "{{ '%04x' % ((((value | float) * 10) | round | int) % 65536) }}")
+        self.assertEqual(tmpl.render(value=10.5), '0069')   # 105
+        self.assertEqual(tmpl.render(value=-10.5), 'ff97')  # -105 % 65536 = 65431 = 0xff97
+
+
+class TestEnumTemplates(unittest.TestCase):
+    """Test that enum templates produce correct label mappings."""
+
+    def test_enum_value_template(self):
+        """Enum value template maps hex to label."""
+        tmpl = JINJA2_ENV.from_string(
+            "{{ {'00': 'Stop', '01': 'Heat', '02': 'Fan', '03': 'Cool'}.get(value[:2], 'Unknown') }}")
+        self.assertEqual(tmpl.render(value='00'), 'Stop')
+        self.assertEqual(tmpl.render(value='01'), 'Heat')
+        self.assertEqual(tmpl.render(value='03'), 'Cool')
+        self.assertEqual(tmpl.render(value='ff'), 'Unknown')
+
+    def test_enum_with_apostrophe(self):
+        """Enum values with apostrophes are properly escaped."""
+        tmpl = JINJA2_ENV.from_string(
+            "{{ {'00': 'Don\\'t Care', '01': 'Auto', '02': 'Manual'}.get(value[:2], 'Unknown') }}")
+        self.assertEqual(tmpl.render(value='00'), "Don't Care")
+        self.assertEqual(tmpl.render(value='01'), 'Auto')
+        self.assertEqual(tmpl.render(value='02'), 'Manual')
+
+    def test_enum_command_template(self):
+        """Enum command template maps label to hex."""
+        tmpl = JINJA2_ENV.from_string(
+            "{{ {'Stop': '00', 'Heat': '01', 'Cool': '03'}[value] }}")
+        self.assertEqual(tmpl.render(value='Stop'), '00')
+        self.assertEqual(tmpl.render(value='Heat'), '01')
+        self.assertEqual(tmpl.render(value='Cool'), '03')
+
+    def test_enum_with_apostrophe_command(self):
+        """Enum command template with apostrophe in label."""
+        tmpl = JINJA2_ENV.from_string(
+            "{{ {'Don\\'t Care': '00', 'Auto': '01'}[value] }}")
+        self.assertEqual(tmpl.render(value="Don't Care"), '00')
+
+
+class TestBitfieldTemplates(unittest.TestCase):
+    """Test that bitfield templates extract bits correctly using arithmetic."""
+
+    def test_1bit_extraction(self):
+        """1-bit bitfield extraction using // and %."""
+        # Original: ((value[0:4] | int(base=16)) >> 8) & 1
+        # Fixed:    ((value[0:4] | int(base=16)) // 256) % 2
+        tmpl = JINJA2_ENV.from_string(
+            "{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}")
+        self.assertEqual(tmpl.render(value='0000'), '00')
+        self.assertEqual(tmpl.render(value='0100'), '01')
+        self.assertEqual(tmpl.render(value='0200'), '00')
+        self.assertEqual(tmpl.render(value='0300'), '01')
+
+    def test_1bit_at_various_offsets(self):
+        """1-bit extraction at different bit offsets."""
+        # Bit 0
+        tmpl0 = JINJA2_ENV.from_string(
+            "{{ '01' if ((value[0:4] | int(base=16)) // 1) % 2 else '00' }}")
+        self.assertEqual(tmpl0.render(value='0001'), '01')
+        self.assertEqual(tmpl0.render(value='0000'), '00')
+
+        # Bit 15
+        tmpl15 = JINJA2_ENV.from_string(
+            "{{ '01' if ((value[0:4] | int(base=16)) // 32768) % 2 else '00' }}")
+        self.assertEqual(tmpl15.render(value='8000'), '01')
+        self.assertEqual(tmpl15.render(value='0000'), '00')
+
+    def test_multibit_extraction(self):
+        """Multi-bit field extraction using // and %."""
+        # Original: ((value[0:4] | int(base=16)) >> 24) & 0xFF
+        # Fixed:    ((value[0:8] | int(base=16)) // 16777216) % 256
+        tmpl = JINJA2_ENV.from_string(
+            "{{ ((value[0:8] | int(base=16)) // 16777216) % 256 }}")
+        self.assertEqual(int(tmpl.render(value='00000000')), 0)
+        self.assertEqual(int(tmpl.render(value='ff000000')), 255)
+        self.assertEqual(int(tmpl.render(value='01000000')), 1)
+        self.assertEqual(int(tmpl.render(value='80000000')), 128)
+
+
+class TestNumberCommandTemplates(unittest.TestCase):
+    """Test number command templates produce correct hex output."""
+
+    def test_u8_command(self):
+        """u8 command template produces 2-char hex."""
+        tmpl = JINJA2_ENV.from_string("{{ '%02x' % (value | int) }}")
+        self.assertEqual(tmpl.render(value=0), '00')
+        self.assertEqual(tmpl.render(value=255), 'ff')
+        self.assertEqual(tmpl.render(value=100), '64')
+
+    def test_u16_command(self):
+        """u16 command template produces 4-char hex."""
+        tmpl = JINJA2_ENV.from_string("{{ '%04x' % (value | int) }}")
+        self.assertEqual(tmpl.render(value=0), '0000')
+        self.assertEqual(tmpl.render(value=65535), 'ffff')
+        self.assertEqual(tmpl.render(value=100), '0064')
+
+    def test_u16_with_scaling(self):
+        """u16 with scaling factor produces correct hex."""
+        tmpl = JINJA2_ENV.from_string(
+            "{{ '%04x' % (((value | float) * 10) | round | int) }}")
+        self.assertEqual(tmpl.render(value=10.5), '0069')   # 105
+        self.assertEqual(tmpl.render(value=0.1), '0001')    # 1
+
+    def test_i16_command(self):
+        """i16 command template handles negative values via modulo."""
+        tmpl = JINJA2_ENV.from_string("{{ '%04x' % ((value | int) % 65536) }}")
+        self.assertEqual(tmpl.render(value=-1), 'ffff')
+        self.assertEqual(tmpl.render(value=-10), 'fff6')
+        self.assertEqual(tmpl.render(value=100), '0064')
+
+    def test_i16_with_scaling(self):
+        """i16 with scaling factor handles negative values."""
+        tmpl = JINJA2_ENV.from_string(
+            "{{ '%04x' % ((((value | float) * 10) | round | int) % 65536) }}")
+        self.assertEqual(tmpl.render(value=-10.5), 'ff97')
+        self.assertEqual(tmpl.render(value=10.5), '0069')
+
+
+class TestGeneratedTemplatesMatchERD(unittest.TestCase):
+    """Test that generated templates match ERD definitions."""
+
+    def setUp(self):
+        self.entities = load_all_entities()
+        self.erds = load_erd_definitions()
+        self.erd_by_id = {e['id']: e for e in self.erds}
+
+    def test_sensor_enum_detection(self):
+        """Sensors with enum device_class get enum templates, not raw numeric.
+
+        Only checks entities whose device_class is explicitly 'enum', since
+        multi-field ERDs may have both enum and non-enum sub-fields.
+        """
+        for obj in self.entities:
+            if obj['d'] != 'sensor':
+                continue
+            if obj.get('dc') != 'enum':
+                continue
+            if not obj.get('vt'):
+                continue
+            with self.subTest(entity=obj['n']):
+                self.assertIn('.get(', obj['vt'],
+                    f'{obj["n"]} has device_class=enum but vt has no .get() mapping')
+
+    def test_signed_sensor_has_sign_extension(self):
+        """Sensors with signed i16/i32 primary data have two's-complement handling.
+
+        Only checks single-field entities (no field_id) where the primary data
+        type is signed. Multi-field sub-fields are handled by the generator
+        based on their individual field type, not the parent ERD's type.
+        """
+        for obj in self.entities:
+            if obj['d'] != 'sensor':
+                continue
+            # Skip sub-fields — they have their own type from the field def
+            if obj.get('fi'):
+                continue
+            erd_id = f'0x{obj["i"]}'
+            erd = self.erd_by_id.get(erd_id)
+            if not erd:
+                continue
+            erd_data = erd.get('data', [])
+            primary_type = 'u8'
+            for d in erd_data:
+                if not gen._is_reserved_field(d.get('name', '')):
+                    primary_type = d.get('type', 'u8')
+                    break
+            if not primary_type.startswith('i'):
+                continue
+            if primary_type == 'i8':
+                continue
+            if not obj.get('vt'):
+                continue
+            vt = obj['vt']
+            has_sign = '- 65536' in vt or '- 4294967296' in vt
+            self.assertTrue(has_sign,
+                f'{obj["n"]} is {primary_type} type but vt has no sign extension: {vt[:80]}')
+
+    def test_binary_sensor_bitfield_has_arithmetic(self):
+        """Binary sensor bitfields use // and % instead of >> and &."""
+        for obj in self.entities:
+            if obj['d'] != 'binary_sensor':
+                continue
+            vt = obj.get('vt', '')
+            if not vt:
+                continue
+            with self.subTest(entity=obj['n']):
+                self.assertNotIn('>>', vt,
+                    f'{obj["n"]} vt uses >> (invalid Jinja2): {vt[:80]}')
+                self.assertNotIn('& 1', vt,
+                    f'{obj["n"]} vt uses & 1 (invalid Jinja2): {vt[:80]}')
+
+    def test_select_has_options(self):
+        """Select entities have options array (may be JSON string or native list)."""
+        for obj in self.entities:
+            if obj['d'] != 'select':
+                continue
+            with self.subTest(entity=obj['n']):
+                self.assertIn('o', obj,
+                    f'{obj["n"]} is select but has no options')
+                opts = obj['o']
+                if isinstance(opts, str):
+                    opts = json.loads(opts)
+                self.assertIsInstance(opts, list)
+                self.assertGreater(len(opts), 0)
+
+    def test_select_has_value_and_command_templates(self):
+        """Select entities have both value_template and command_template."""
+        for obj in self.entities:
+            if obj['d'] != 'select':
+                continue
+            with self.subTest(entity=obj['n']):
+                self.assertIn('vt', obj,
+                    f'{obj["n"]} is select but has no value_template')
+                self.assertIn('ct', obj,
+                    f'{obj["n"]} is select but has no command_template')
+
+    def test_number_has_command_template(self):
+        """Number entities have command_template."""
+        for obj in self.entities:
+            if obj['d'] != 'number':
+                continue
+            with self.subTest(entity=obj['n']):
+                self.assertIn('ct', obj,
+                    f'{obj["n"]} is number but has no command_template')
+
+    def test_no_bitwise_operators_in_any_template(self):
+        """No template uses >> or & bitwise operators (invalid in Jinja2)."""
+        import re
+        for obj in self.entities:
+            for tmpl_type, tmpl in [('vt', obj.get('vt', '')), ('ct', obj.get('ct', ''))]:
+                if not tmpl:
+                    continue
+                with self.subTest(entity=obj['n'], tmpl=tmpl_type):
+                    self.assertNotIn('>>', tmpl,
+                        f'{obj["n"]} {tmpl_type} uses >> (invalid Jinja2)')
+                    if re.search(r'&\s*\d', tmpl):
+                        self.fail(
+                            f'{obj["n"]} {tmpl_type} uses & as bitwise operator: {tmpl[:80]}')
+
+
+class TestFieldSlugGeneration(unittest.TestCase):
+    """Test that field slugs are generated correctly."""
+
+    def test_leaf_field_name_with_decimal(self):
+        """_leaf_field_name handles dotted names with decimals."""
+        self.assertEqual(gen._leaf_field_name('Air Purifier.PM2.5'), 'PM2.5')
+        self.assertEqual(gen._leaf_field_name('Reserved 1.2'), 'Reserved 1.2')
+
+    def test_leaf_field_name_normal(self):
+        """_leaf_field_name handles normal dotted names."""
+        self.assertEqual(gen._leaf_field_name('Allowed Selections.Cyclic Supported'), 'Cyclic Supported')
+        self.assertEqual(gen._leaf_field_name('Air Purifier.Air Purifier Off'), 'Air Purifier Off')
+        self.assertEqual(gen._leaf_field_name('Bluetooth ERD Stream.MAC address[0]'), 'MAC address[0]')
+
+    def test_leaf_field_name_no_dot(self):
+        """_leaf_field_name handles names without dots."""
+        self.assertEqual(gen._leaf_field_name('Temperature'), 'Temperature')
+        self.assertEqual(gen._leaf_field_name('  Spaced  '), 'Spaced')
+
+    def test_field_slug(self):
+        """_field_slug produces valid identifiers."""
+        self.assertEqual(gen._field_slug('Critical Major'), 'critical_major')
+        self.assertEqual(gen._field_slug('GH (Fan Hi)'), 'gh_fan_hi')
+        self.assertEqual(gen._field_slug('Cyclic Supported'), 'cyclic_supported')
+
+    def test_jinja2_escape(self):
+        """_jinja2_escape properly escapes apostrophes."""
+        self.assertEqual(gen._jinja2_escape("Don't Care"), "Don\\'t Care")
+        self.assertEqual(gen._jinja2_escape('Normal'), 'Normal')
+        self.assertEqual(gen._jinja2_escape("It's a test"), "It\\'s a test")
+
+
+class TestActualZonelineERDs(unittest.TestCase):
+    """Test specific Zoneline ERD templates that are critical for the adapter."""
+
+    def test_erd_7000_system_mode(self):
+        """ERD 0x7000 System Mode enum template works correctly."""
+        # Find the entity in generated files
+        entities = load_all_entities()
+        obj = None
+        for e in entities:
+            if e['i'] == '7000' and not e.get('fi'):
+                obj = e
+                break
+        self.assertIsNotNone(obj, 'ERD 0x7000 not found')
+        self.assertEqual(obj['d'], 'sensor')
+        self.assertIn('vt', obj)
+
+        tmpl = JINJA2_ENV.from_string(obj['vt'])
+        self.assertEqual(tmpl.render(value='00'), 'Stop')
+        self.assertEqual(tmpl.render(value='01'), 'Heat')
+        self.assertEqual(tmpl.render(value='03'), 'Cool')
+        self.assertEqual(tmpl.render(value='ff'), 'Unknown')
+
+    def test_erd_7002_target_heating_temp(self):
+        """ERD 0x7002 Target Heating Temperature signed i16 template."""
+        entities = load_all_entities()
+        obj = None
+        for e in entities:
+            if e['i'] == '7002' and not e.get('fi'):
+                obj = e
+                break
+        self.assertIsNotNone(obj, 'ERD 0x7002 not found')
+        self.assertEqual(obj['d'], 'sensor')
+        self.assertEqual(obj.get('dc'), 'temperature')
+        self.assertIn('vt', obj)
+
+        tmpl = JINJA2_ENV.from_string(obj['vt'])
+        self.assertEqual(int(tmpl.render(value='0064')), 100)
+        self.assertEqual(int(tmpl.render(value='ffff')), -1)
+
+    def test_erd_7100_inside_ambient_temp(self):
+        """ERD 0x7100 Inside ambient temperature signed i16 with scaling."""
+        entities = load_all_entities()
+        obj = None
+        for e in entities:
+            if e['i'] == '7100' and not e.get('fi'):
+                obj = e
+                break
+        self.assertIsNotNone(obj, 'ERD 0x7100 not found')
+        self.assertEqual(obj['d'], 'sensor')
+        self.assertEqual(obj.get('dc'), 'temperature')
+        self.assertEqual(obj.get('sf'), 10)
+        self.assertIn('vt', obj)
+
+        tmpl = JINJA2_ENV.from_string(obj['vt'])
+        self.assertEqual(float(tmpl.render(value='0064')), 10.0)
+        self.assertEqual(float(tmpl.render(value='ff96')), -10.6)
+
+    def test_erd_7010_relay_status_bitfields(self):
+        """ERD 0x7010 Relay Status bitfield templates use arithmetic."""
+        entities = load_all_entities()
+        relay_entities = [e for e in entities if e['i'] == '7010']
+        self.assertGreater(len(relay_entities), 0, 'ERD 0x7010 not found')
+
+        for obj in relay_entities:
+            self.assertEqual(obj['d'], 'binary_sensor')
+            self.assertIn('vt', obj)
+            vt = obj['vt']
+            # Verify no bitwise operators
+            self.assertNotIn('>>', vt, f'{obj["n"]} uses >>')
+            self.assertNotIn('& 1', vt, f'{obj["n"]} uses & 1')
+            # Verify it uses arithmetic
+            self.assertIn('//', vt, f'{obj["n"]} missing //')
+            self.assertIn('% 2', vt, f'{obj["n"]} missing % 2')
+
+            # Test execution
+            tmpl = JINJA2_ENV.from_string(vt)
+            result = tmpl.render(value='0000')
+            self.assertIn(result, ('00', '01'))
+
+    def test_erd_7052_energy_conservation_select(self):
+        """ERD 0x7052 Energy Conservation select entity."""
+        entities = load_all_entities()
+        obj = None
+        for e in entities:
+            if e['i'] == '7052' and not e.get('fi'):
+                obj = e
+                break
+        self.assertIsNotNone(obj, 'ERD 0x7052 not found')
+        self.assertEqual(obj['d'], 'select')
+        self.assertIn('vt', obj)
+        self.assertIn('ct', obj)
+        self.assertIn('o', obj)
+
+        vt_tmpl = JINJA2_ENV.from_string(obj['vt'])
+        self.assertEqual(vt_tmpl.render(value='00'), 'None')
+        self.assertEqual(vt_tmpl.render(value='01'), 'Simple')
+
+        ct_tmpl = JINJA2_ENV.from_string(obj['ct'])
+        self.assertEqual(ct_tmpl.render(value='None'), '00')
+        self.assertEqual(ct_tmpl.render(value='Simple'), '01')
+
+
+if __name__ == '__main__':
+    unittest.main()
