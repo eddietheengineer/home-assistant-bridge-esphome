@@ -95,17 +95,14 @@ bool DeviceIdentityManager::try_queue_read_(tiny_erd_t erd)
 std::string DeviceIdentityManager::bytes_to_string_(const uint8_t* data, size_t size)
 {
   if (size == 0) return "";
-  // GE API encodes model/serial with a 0x20 offset per byte:
-  // actual ASCII character = raw_byte - 0x20.
-  // Trailing '_' (decoded from raw 0x7F) is padding and should be stripped.
+  // GE API model/serial are plain ASCII, null-terminated or padded with 0x00.
+  // Some appliances use 0x7F ('_') as trailing padding; strip it.
   std::string result;
   result.reserve(size);
   for (size_t i = 0; i < size; i++) {
     uint8_t raw = data[i];
-    // Skip null bytes (unused trailing bytes)
     if (raw == 0x00) break;
-    uint8_t decoded = raw - 0x20;
-    result += static_cast<char>(decoded);
+    result += static_cast<char>(raw);
   }
   // Strip trailing '_' padding
   while (!result.empty() && result.back() == '_') {
