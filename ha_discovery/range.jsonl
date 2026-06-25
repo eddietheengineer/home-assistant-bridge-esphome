@@ -35,7 +35,6 @@
 {"i":"5013","n":"Bake Cycle Availability - Warm","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 131072) % 2 else '00' }}","fi":"warm","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5013","n":"Bake Cycle Availability - Proof","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 262144) % 2 else '00' }}","fi":"proof","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5013","n":"Bake Cycle Availability - Sabbath Bake","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 524288) % 2 else '00' }}","fi":"sabbath_bake","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5014","n":"Auto Oven Light On Off Request","d":"sensor","ds":1,"vt":"{{ {'00': 'Manual', '01': 'Haier Knob Auto On', '02': 'Auto Off', '03': 'Auto On', 'ff': 'Unset'}.get(value[:2], 'Unknown') }}"}
 {"i":"5015","n":"Auto Oven Light Availability - Oven Light Manual Control Only","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"oven_light_manual_control_only","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5015","n":"Auto Oven Light Availability - Oven Light Auto On During Cycle for Haier Knob ONLY","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"oven_light_auto_on_during_cycle_for_haier_knob_only","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5015","n":"Auto Oven Light Availability - Oven Light Auto Off/Timeout","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"oven_light_auto_off_timeout","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -75,9 +74,7 @@
 {"i":"5027","n":"Air Fry Oven Minimum and Maximum Temperatures - Maximum (fahrenheit)","d":"sensor","ds":4,"u":"°F","dc":"temperature","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"5027","n":"Air Fry Oven Minimum and Maximum Temperatures - Minimum (fahrenheit)","d":"sensor","ds":4,"u":"°F","vt":"{{ value[4:8] | int(base=16) }}","fi":"minimum_fahrenheit"}
 {"i":"5028","n":"Articulating Display Mode","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Auto', '01': 'Manual'}.get(value[:2], 'Unknown') }}"}
-{"i":"5029","n":"Articulating Display Mode Request","d":"sensor","ds":1,"vt":"{{ {'00': 'Don\\'t Care', '01': 'Auto', '02': 'Manual'}.get(value[:2], 'Unknown') }}"}
 {"i":"502a","n":"Articulating Display Position","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'Extended', '02': 'Retracted', '03': 'Extending', '04': 'Retracting'}.get(value[:2], 'Unknown') }}"}
-{"i":"502b","n":"Articulating Display Position Request","d":"sensor","ds":1,"vt":"{{ {'00': 'Don\\'t Care', '01': 'Extend', '02': 'Retract'}.get(value[:2], 'Unknown') }}"}
 {"i":"502c","n":"Automatic Door Opener Local Public Enable","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"502d","n":"Oven Light Auto On Off State","d":"sensor","ds":1,"vt":"{{ {'00': 'Manual', '01': 'Haier Knob Auto On', '02': 'Auto Off', '03': 'Auto On', 'ff': 'Unset'}.get(value[:2], 'Unknown') }}"}
 {"i":"502e","n":"Enhanced Sabbath State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Inactive', '01': 'Prompt Sabbath', '02': 'Prompt Holiday', '03': 'Cooking Accepted, Sabbath Pending', '04': 'Cooking Accepted, Holiday Pending', '05': 'Sabbath Active, No Cooking', '06': 'Holiday Active, No Cooking', '07': 'Sabbath Active, Warm', '08': 'Holiday Active, Warm', '09': 'Holiday Active, Bake'}.get(value[:2], 'Unknown') }}"}
@@ -193,7 +190,6 @@
 {"i":"510b","n":"Upper Oven Available Cook Modes - Bake Probe Delay Start","d":"binary_sensor","ds":10,"vt":"{{ '01' if ((value[0:20] | int(base=16)) // 64) % 2 else '00' }}","fi":"bake_probe_delay_start","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"510d","n":"Upper Oven Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"510e","n":"Upper Oven Baking Surface Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
-{"i":"510f","n":"Request Upper Door Open","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5110","n":"Upper Oven Door State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'Open', '02': 'Closed', '03': 'Initial Inspection'}.get(value[:2], 'Unknown') }}"}
 {"i":"5111","n":"Upper Oven Light Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'01': 'High', '02': 'Dim'}.get(value[:2], 'Unknown') }}"}
 {"i":"5112","n":"Upper Oven Light Level Availability - Off","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"off","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -729,7 +725,6 @@
 {"i":"520b","n":"Lower Oven Available Cook Modes - Bake Timed Two-Temp","d":"binary_sensor","ds":10,"vt":"{{ '01' if ((value[0:20] | int(base=16)) // 32) % 2 else '00' }}","fi":"bake_timed_two_temp","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"520b","n":"Lower Oven Available Cook Modes - Bake Probe Delay Start","d":"binary_sensor","ds":10,"vt":"{{ '01' if ((value[0:20] | int(base=16)) // 64) % 2 else '00' }}","fi":"bake_probe_delay_start","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"520d","n":"Lower Oven Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
-{"i":"520f","n":"Request Lower Door Open","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5210","n":"Lower Oven Door State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'Open', '02': 'Closed', '03': 'Initial Inspection'}.get(value[:2], 'Unknown') }}"}
 {"i":"5211","n":"Lower Oven Light Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'01': 'High', '02': 'Dim'}.get(value[:2], 'Unknown') }}"}
 {"i":"5212","n":"Lower Oven Light Level Availability - Off","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"off","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1424,8 +1419,6 @@
 {"i":"540a","n":"Advantium Allowable Kitchen Time - Max Allowable Kitchen Time (seconds)","d":"sensor","ds":4,"u":"s","vt":"{{ value[4:8] | int(base=16) }}","fi":"max_allowable_kitchen_time_seconds"}
 {"i":"540b","n":"Precision Cook Mode UID Cavity 1 Selection","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
 {"i":"540c","n":"Precision Cook Mode UID Cavity 2 Selection","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
-{"i":"540d","n":"Precision Cook Mode UID Cavity 1 Request","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
-{"i":"540e","n":"Precision Cook Mode UID Cavity 2 Request","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
 {"i":"5410","n":"Precision Cooking Short Name Cavity 1","d":"sensor","ds":16,"p":"5411","r":"request","vt":"{% set chars = ' !\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~' %}{% set ns = namespace(value='') %}{% for i in range(0, value | length, 2) %}{% set b = value[i:i+2] | int(base=16) %}{% if b >= 0x20 and b <= 0x7E %}{% set ns.value = ns.value ~ chars[b - 0x20] %}{% endif %}{% endfor %}{{ ns.value.rstrip('_') }}"}
 {"i":"5411","n":"Precision Cooking Short Name Cavity 1","d":"number","ds":24,"p":"5410","r":"status","vt":"{{ value[0:32] | int(base=16) }}","ct":"{{ '%048x' % (value | int) }}","m":"box"}
 {"i":"5412","n":"Precision Cooking Menu Cavity 1 Config Key","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
@@ -1842,7 +1835,6 @@
 {"i":"58b5","n":"Right Front Closed Loop Cooking Device Index","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"58b6","n":"Right Rear Closed Loop Cooking Device Index","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5900","n":"Gas Lockout Valve Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Initializing', '01': 'Gas Valve Unlocked', '02': 'Gas Valve Locked', '03': 'Gas Valve in Transition', '04': 'Gas Valve status unknown'}.get(value[:2], 'Unknown') }}"}
-{"i":"5901","n":"Lock Gas Valve Request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5903","n":"Modular Cooktops (MCT) System Configuration Status - Number of Devices to Report","d":"sensor","ds":15,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"5903","n":"Modular Cooktops (MCT) System Configuration Status - Pos 7D Device Type","d":"sensor","ds":15,"dc":"enum","vt":"{{ {'00': 'Undefined', '01': 'Induction Cooktop 300 mm', '02': 'Induction Cooktop 390 mm', '03': 'Induction Cooktop 600 mm', '04': 'Induction Cooktop 760 mm', '05': 'Induction Cooktop 900 mm', '06': 'Teppan Cooktop 300 mm', '07': 'Teppan Cooktop 390 mm', '08': 'Downdraft', 'ff': 'Unknown'}.get(value[2:4], 'Unknown') }}","fi":"pos_7d_device_type"}
 {"i":"5903","n":"Modular Cooktops (MCT) System Configuration Status - Pos 7D Device State","d":"sensor","ds":15,"dc":"enum","vt":"{{ {'00': 'Undefined', '01': 'Missing', '02': 'Confirmed', '03': 'New Found'}.get(value[4:6], 'Unknown') }}","fi":"pos_7d_device_state"}
@@ -2820,14 +2812,6 @@
 {"i":"5997","n":"Device 0x83 - Status - Maximum Selectable Element Temperature","d":"sensor","ds":4,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"5997","n":"Device 0x83 - Status - Health","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Undefined', '01': 'Healthy', '02': 'Unwell'}.get(value[4:6], 'Unknown') }}","fi":"health"}
 {"i":"5997","n":"Device 0x83 - Status - Padding","d":"sensor","ds":4,"vt":"{{ value[6:8] | int(base=16) }}","fi":"padding"}
-{"i":"5999","n":"MCT User Settings Request","d":"sensor","ds":8,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"5999","n":"MCT User Settings Request - Clock Format","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 1) % 2 else '00' }}","fi":"clock_format","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5999","n":"MCT User Settings Request - Temperature Display Unit","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 2) % 2 else '00' }}","fi":"temperature_display_unit","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5999","n":"MCT User Settings Request - Audio Alarms","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 4) % 2 else '00' }}","fi":"audio_alarms","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5999","n":"MCT User Settings Request - Audio Tones","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 8) % 2 else '00' }}","fi":"audio_tones","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5999","n":"MCT User Settings Request - Child Lock","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 16) % 2 else '00' }}","fi":"child_lock","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5999","n":"MCT User Settings Request - Low Power Mode","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 32) % 2 else '00' }}","fi":"low_power_mode","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5999","n":"MCT User Settings Request - Demo Mode","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 64) % 2 else '00' }}","fi":"demo_mode","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"599a","n":"MCT Settings Actual","d":"sensor","ds":8,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"599a","n":"MCT Settings Actual - Clock Format","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 1) % 2 else '00' }}","fi":"clock_format","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"599a","n":"MCT Settings Actual - Temperature Display Unit","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 2) % 2 else '00' }}","fi":"temperature_display_unit","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -2880,63 +2864,43 @@
 {"i":"5b10","n":"Boost Duration Limits - Maximum Boost Duration","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"maximum_boost_duration"}
 {"i":"5b11","n":"Delay Off Duration Limits - Min Delay Off Duration","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"5b11","n":"Delay Off Duration Limits - Max Delay Off Duration","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"max_delay_off_duration"}
-{"i":"5b12","n":"Hood Request On/Off","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b13","n":"Hood Actual Fan Speed","d":"sensor","ds":1,"u":"rpm","vt":"{{ value | int(base=16) }}"}
-{"i":"5b14","n":"Hood Requested Fan Speed","d":"sensor","ds":1,"u":"rpm","vt":"{{ value | int(base=16) }}"}
 {"i":"5b15","n":"Hood Available Fan Speeds","d":"sensor","ds":1,"u":"rpm","vt":"{{ value | int(base=16) }}"}
 {"i":"5b16","n":"Hood Available Boost Speeds","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b17","n":"Hood Actual Light Level","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b18","n":"Hood Requested Light Level","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b19","n":"Hood Available Light Levels","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b1a","n":"Hood Actual Delay Off Mode","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Disabled', '01': 'Enabled', 'ff': 'Not Available'}.get(value[:2], 'Unknown') }}"}
-{"i":"5b1b","n":"Hood Delay Off Request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b1c","n":"Hood Actual Delay Off Duration","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b1d","n":"Hood Requested Delay Off Duration","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b1e","n":"Hood to Cooktop Connection Status (Hood-Side)","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not Paired And Not Connected', '01': 'Paired But Not Connected', '02': 'Paired And Connected', 'ff': 'Hood-To-Cooktop Not Available'}.get(value[:2], 'Unknown') }}"}
 {"i":"5b1f","n":"Hood Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Normal', '01': 'High Temperature', '02': 'Fan Shutdown'}.get(value[:2], 'Unknown') }}"}
 {"i":"5b20","n":"Hood Model","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Undefined', '01': 'F&P SDA', '02': 'OEM CATA'}.get(value[0:2], 'Unknown') }}"}
 {"i":"5b20","n":"Hood Model - Personality","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"personality"}
 {"i":"5b21","n":"Hood Actual Light Color","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Default or Not Set', '01': '3000K', '02': '4000K', 'ff': 'Not Supported'}.get(value[:2], 'Unknown') }}"}
-{"i":"5b22","n":"Hood Requested Light Color","d":"sensor","ds":1,"vt":"{{ {'00': 'Invalid', '01': '3000K', '02': '4000K'}.get(value[:2], 'Unknown') }}"}
 {"i":"5b23","n":"Hood Available Light Colors - 3000K","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"3000k","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b23","n":"Hood Available Light Colors - 4000K","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 512) % 2 else '00' }}","fi":"4000k","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b24","n":"Hood to Hob Actual Auto Control","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Off', '01': 'Auto'}.get(value[:2], 'Unknown') }}"}
-{"i":"5b25","n":"Hood to Hob Request Auto Control","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Off', '01': 'Auto'}.get(value[:2], 'Unknown') }}"}
-{"i":"5b26","n":"Hood Requested Auto Fan Speed","d":"sensor","ds":1,"u":"rpm","vt":"{{ value | int(base=16) }}"}
 {"i":"5b27","n":"Relative Humidity Sensor Idle Update Period in Minutes","d":"sensor","ds":1,"u":"%","dc":"humidity","vt":"{{ value | int(base=16) }}"}
-{"i":"5b28","n":"Requested Relative Humidity Sensor Idle Update Period in Minutes","d":"sensor","ds":1,"u":"%","dc":"humidity","vt":"{{ value | int(base=16) }}"}
-{"i":"5b29","n":"Request Update of Relative Humidity (%)","d":"sensor","ds":1,"u":"%","dc":"humidity","vt":"{{ value | int(base=16) }}"}
 {"i":"5b2a","n":"Relative Humidity (%)","d":"sensor","ds":4,"u":"%","dc":"humidity","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"5b2a","n":"Relative Humidity (%) - Humidity Air Quality","d":"sensor","ds":4,"u":"%","dc":"enum","vt":"{{ {'00': 'Good', '01': 'Air Quality 1', '02': 'Air Quality 2', '03': 'Air Quality 3', '04': 'Air Quality 4', '05': 'Moderate', '06': 'Air Quality 6', '07': 'Air Quality 7', '08': 'Air Quality 8', '09': 'Air Quality 9', '0a': 'Poor', 'ff': 'Invalid'}.get(value[2:4], 'Unknown') }}","fi":"humidity_air_quality"}
 {"i":"5b2a","n":"Relative Humidity (%) - State","d":"sensor","ds":4,"u":"%","dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Operating', '02': 'Error', '03': 'Calibrating'}.get(value[4:6], 'Unknown') }}","fi":"state"}
 {"i":"5b2a","n":"Relative Humidity (%) - padding","d":"sensor","ds":4,"u":"%","vt":"{{ value[6:8] | int(base=16) }}","fi":"padding"}
 {"i":"5b2b","n":"VOC Index Sensor Idle Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b2c","n":"Requested VOC Index Sensor Update Idle Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b2d","n":"Request Update of VOC Index","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b2e","n":"VOC Index","d":"sensor","ds":4,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"5b2e","n":"VOC Index - VOC Quality","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Air Quality 1', '02': 'Air Quality 2', '03': 'Air Quality 3', '04': 'Air Quality 4', '05': 'Moderate', '06': 'Air Quality 6', '07': 'Air Quality 7', '08': 'Air Quality 8', '09': 'Air Quality 9', '0a': 'Poor', 'ff': 'Invalid'}.get(value[4:6], 'Unknown') }}","fi":"voc_quality"}
 {"i":"5b2e","n":"VOC Index - State","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Operating', '02': 'Error', '03': 'Calibrating'}.get(value[6:8], 'Unknown') }}","fi":"state"}
 {"i":"5b2f","n":"PM 2.5 Update Idle Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b30","n":"Requested PM 2.5 Sensor Idle Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b31","n":"Request Update of PM 2.5 (ug/m^3)","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b32","n":"PM 2.5 (ug/m^3) - 5 (ug/m^3)","d":"sensor","ds":4,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"5b32","n":"PM 2.5 (ug/m^3) - 5 Air Quality","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Air Quality 1', '02': 'Air Quality 2', '03': 'Air Quality 3', '04': 'Air Quality 4', '05': 'Moderate', '06': 'Air Quality 6', '07': 'Air Quality 7', '08': 'Air Quality 8', '09': 'Air Quality 9', '0a': 'Poor', 'ff': 'Invalid'}.get(value[4:6], 'Unknown') }}","fi":"5_air_quality"}
 {"i":"5b32","n":"PM 2.5 (ug/m^3) - State","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Operating', '02': 'Error', '03': 'Calibrating'}.get(value[6:8], 'Unknown') }}","fi":"state"}
 {"i":"5b33","n":"NOx Index Idle Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b34","n":"Requested NOx Sensor Idle Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b35","n":"Request Update of NOx Index","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b36","n":"NOx Index","d":"sensor","ds":4,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"5b36","n":"NOx Index - NOx Air Quality","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Air Quality 1', '02': 'Air Quality 2', '03': 'Air Quality 3', '04': 'Air Quality 4', '05': 'Moderate', '06': 'Air Quality 6', '07': 'Air Quality 7', '08': 'Air Quality 8', '09': 'Air Quality 9', '0a': 'Poor', 'ff': 'Invalid'}.get(value[4:6], 'Unknown') }}","fi":"nox_air_quality"}
 {"i":"5b36","n":"NOx Index - State","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Operating', '02': 'Error', '03': 'Calibrating'}.get(value[6:8], 'Unknown') }}","fi":"state"}
 {"i":"5b37","n":"PM 1 Update Idle Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b38","n":"Requested PM 1 Sensor Idle Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b39","n":"Request Update of PM 1 (ug/m^3)","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b3a","n":"PM 1 (ug/m^3)","d":"sensor","ds":4,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"5b3a","n":"PM 1 (ug/m^3) - PM 1 Air Quality","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Air Quality 1', '02': 'Air Quality 2', '03': 'Air Quality 3', '04': 'Air Quality 4', '05': 'Moderate', '06': 'Air Quality 6', '07': 'Air Quality 7', '08': 'Air Quality 8', '09': 'Air Quality 9', '0a': 'Poor', 'ff': 'Invalid'}.get(value[4:6], 'Unknown') }}","fi":"pm_1_air_quality"}
 {"i":"5b3a","n":"PM 1 (ug/m^3) - State","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Operating', '02': 'Error', '03': 'Calibrating'}.get(value[6:8], 'Unknown') }}","fi":"state"}
 {"i":"5b3b","n":"PM 4 Update Idle Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b3c","n":"Requested PM 4 Sensor Idle Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b3d","n":"Request Update of PM 4 (ug/m^3)","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b3e","n":"Hood Notifications V2 - Air Quality Change Notification","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 72057594037927936) % 2 else '00' }}","fi":"air_quality_change_notification","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b3e","n":"Hood Notifications V2 - Expiry notification for Air Filter","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 144115188075855872) % 2 else '00' }}","fi":"expiry_notification_for_air_filter","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b3e","n":"Hood Notifications V2 - Expiry notification for Charcoal Filter","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 288230376151711744) % 2 else '00' }}","fi":"expiry_notification_for_charcoal_filter","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -2945,14 +2909,10 @@
 {"i":"5b3f","n":"PM 4 (ug/m^3) - PM 4 Air Quality","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Air Quality 1', '02': 'Air Quality 2', '03': 'Air Quality 3', '04': 'Air Quality 4', '05': 'Moderate', '06': 'Air Quality 6', '07': 'Air Quality 7', '08': 'Air Quality 8', '09': 'Air Quality 9', '0a': 'Poor', 'ff': 'Invalid'}.get(value[4:6], 'Unknown') }}","fi":"pm_4_air_quality"}
 {"i":"5b3f","n":"PM 4 (ug/m^3) - State","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Operating', '02': 'Error', '03': 'Calibrating'}.get(value[6:8], 'Unknown') }}","fi":"state"}
 {"i":"5b40","n":"PM 10 Update Idle Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b41","n":"Requested PM 10 Sensor Idle Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b42","n":"Request Update of PM 10 (ug/m^3)","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b43","n":"PM 10 (ug/m^3)","d":"sensor","ds":4,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"5b43","n":"PM 10 (ug/m^3) - PM 10 Air Quality","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Air Quality 1', '02': 'Air Quality 2', '03': 'Air Quality 3', '04': 'Air Quality 4', '05': 'Moderate', '06': 'Air Quality 6', '07': 'Air Quality 7', '08': 'Air Quality 8', '09': 'Air Quality 9', '0a': 'Poor', 'ff': 'Invalid'}.get(value[4:6], 'Unknown') }}","fi":"pm_10_air_quality"}
 {"i":"5b43","n":"PM 10 (ug/m^3) - State","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Operating', '02': 'Error', '03': 'Calibrating'}.get(value[6:8], 'Unknown') }}","fi":"state"}
 {"i":"5b44","n":"Environmental Temperature Update Idle Period in Minutes","d":"sensor","ds":1,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
-{"i":"5b45","n":"Requested Environmental Temperature Idle Update Period in Minutes","d":"sensor","ds":1,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
-{"i":"5b46","n":"Request Update of Environmental Temperature (F)","d":"sensor","ds":1,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
 {"i":"5b47","n":"Environmental Temperature (F)","d":"sensor","ds":4,"u":"°F","dc":"temperature","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"5b47","n":"Environmental Temperature - Temperature Air Quality","d":"sensor","ds":4,"u":"°F","dc":"enum","vt":"{{ {'00': 'Good', '01': 'Air Quality 1', '02': 'Air Quality 2', '03': 'Air Quality 3', '04': 'Air Quality 4', '05': 'Moderate', '06': 'Air Quality 6', '07': 'Air Quality 7', '08': 'Air Quality 8', '09': 'Air Quality 9', '0a': 'Poor', 'ff': 'Invalid'}.get(value[4:6], 'Unknown') }}","fi":"temperature_air_quality"}
 {"i":"5b47","n":"Environmental Temperature - State","d":"sensor","ds":4,"u":"°F","dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Operating', '02': 'Error', '03': 'Calibrating'}.get(value[6:8], 'Unknown') }}","fi":"state"}
@@ -2966,31 +2926,22 @@
 {"i":"5b4c","n":"Available Color Schemes - Traffic Light","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"traffic_light","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b4c","n":"Available Color Schemes - Profile","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"profile","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b4d","n":"Selected Color Scheme","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Traffic Light', '01': 'Profile'}.get(value[:2], 'Unknown') }}"}
-{"i":"5b4e","n":"Requested Color Scheme","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Traffic Light', '01': 'Profile'}.get(value[:2], 'Unknown') }}"}
 {"i":"5b4f","n":"PM 2.5 Index Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b50","n":"Requested PM 2.5 Index Sensor Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b51","n":"Request Update of PM 2.5 Index","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b52","n":"PM 2.5 Index - 5 Index","d":"sensor","ds":4,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"5b52","n":"PM 2.5 Index - 5 Air Quality","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Air Quality 1', '02': 'Air Quality 2', '03': 'Air Quality 3', '04': 'Air Quality 4', '05': 'Moderate', '06': 'Air Quality 6', '07': 'Air Quality 7', '08': 'Air Quality 8', '09': 'Air Quality 9', '0a': 'Poor', 'ff': 'Invalid'}.get(value[2:4], 'Unknown') }}","fi":"5_air_quality"}
 {"i":"5b52","n":"PM 2.5 Index - State","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Operating', '02': 'Error', '03': 'Calibrating'}.get(value[4:6], 'Unknown') }}","fi":"state"}
 {"i":"5b52","n":"PM 2.5 Index - padding","d":"sensor","ds":4,"vt":"{{ value[6:8] | int(base=16) }}","fi":"padding"}
 {"i":"5b53","n":"PM 1 Index Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b54","n":"Requested PM 1 Index Sensor Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b55","n":"Request Update of PM 1 Index","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b56","n":"PM 1 Index","d":"sensor","ds":4,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"5b56","n":"PM 1 Index - PM 1 Air Quality","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Air Quality 1', '02': 'Air Quality 2', '03': 'Air Quality 3', '04': 'Air Quality 4', '05': 'Moderate', '06': 'Air Quality 6', '07': 'Air Quality 7', '08': 'Air Quality 8', '09': 'Air Quality 9', '0a': 'Poor', 'ff': 'Invalid'}.get(value[2:4], 'Unknown') }}","fi":"pm_1_air_quality"}
 {"i":"5b56","n":"PM 1 Index - State","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Operating', '02': 'Error', '03': 'Calibrating'}.get(value[4:6], 'Unknown') }}","fi":"state"}
 {"i":"5b56","n":"PM 1 Index - padding","d":"sensor","ds":4,"vt":"{{ value[6:8] | int(base=16) }}","fi":"padding"}
 {"i":"5b57","n":"PM 4 Index Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b58","n":"Requested PM 4 Index Sensor Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b59","n":"Request Update of PM 4 Index","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b5a","n":"PM 4 Index","d":"sensor","ds":4,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"5b5a","n":"PM 4 Index - PM 4 Air Quality","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Air Quality 1', '02': 'Air Quality 2', '03': 'Air Quality 3', '04': 'Air Quality 4', '05': 'Moderate', '06': 'Air Quality 6', '07': 'Air Quality 7', '08': 'Air Quality 8', '09': 'Air Quality 9', '0a': 'Poor', 'ff': 'Invalid'}.get(value[2:4], 'Unknown') }}","fi":"pm_4_air_quality"}
 {"i":"5b5a","n":"PM 4 Index - State","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Operating', '02': 'Error', '03': 'Calibrating'}.get(value[4:6], 'Unknown') }}","fi":"state"}
 {"i":"5b5a","n":"PM 4 Index - padding","d":"sensor","ds":4,"vt":"{{ value[6:8] | int(base=16) }}","fi":"padding"}
 {"i":"5b5b","n":"PM 10 Index Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b5c","n":"Requested PM 10 Index Sensor Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b5d","n":"Request Update of PM 10 Index","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b5e","n":"PM 10 Index","d":"sensor","ds":4,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"5b5e","n":"PM 10 Index - PM 10 Air Quality","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Air Quality 1', '02': 'Air Quality 2', '03': 'Air Quality 3', '04': 'Air Quality 4', '05': 'Moderate', '06': 'Air Quality 6', '07': 'Air Quality 7', '08': 'Air Quality 8', '09': 'Air Quality 9', '0a': 'Poor', 'ff': 'Invalid'}.get(value[2:4], 'Unknown') }}","fi":"pm_10_air_quality"}
 {"i":"5b5e","n":"PM 10 Index - State","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Operating', '02': 'Error', '03': 'Calibrating'}.get(value[4:6], 'Unknown') }}","fi":"state"}

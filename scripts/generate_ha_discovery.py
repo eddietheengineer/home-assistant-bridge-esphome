@@ -765,6 +765,14 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
         erd_data = erd.get('data', [])
         data_size = get_erd_byte_size(erd_data) or 1
 
+        # Skip "Request" ERDs that lack a proper request/status pair.
+        # Unpaired request ERDs exposed as sensors would allow uncontrolled
+        # writes — only generate them when pair_role='request' with a
+        # valid paired_erd pointing to a status ERD.
+        if 'Request' in name:
+            if not (pair_role == 'request' and paired_erd_str and paired_erd_str in erd_by_id):
+                continue
+
         # Skip status ERD if its paired request ERD is a controllable domain
         # (switch/select/number) — the request ERD will handle both state+command.
         if pair_role == 'status' and paired_erd_str and paired_erd_str in erd_by_id:

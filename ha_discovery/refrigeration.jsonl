@@ -142,7 +142,6 @@
 {"i":"103e","n":"Desired Temperature Setpoint (Kelvin) Upper Compartment","d":"sensor","ds":2,"u":"K","dc":"temperature","sf":32,"vt":"{{ (value | int(base=16)) / 32 | round(3) }}"}
 {"i":"103f","n":"Desired Temperature Setpoint (Kelvin) Lower Compartment","d":"sensor","ds":2,"u":"K","dc":"temperature","sf":32,"vt":"{{ (value | int(base=16)) / 32 | round(3) }}"}
 {"i":"1040","n":"Desired Temperature Setpoint (Kelvin) Middle Compartment","d":"sensor","ds":2,"u":"K","dc":"temperature","sf":32,"vt":"{{ (value | int(base=16)) / 32 | round(3) }}"}
-{"i":"1041","n":"Water Filter Reset Request","d":"button","ds":1,"dc":"restart"}
 {"i":"1042","n":"Food Mode Upper Compartment (Desired)","d":"sensor","ds":1,"vt":"{{ {'00': 'Fridge', '01': 'Pantry', '02': 'Chill', '03': 'Freezer', '04': 'Soft Freeze', '05': 'Deep Freeze', '06': 'Cellar Wine', '07': 'Red Wine', '08': 'White Wine', '09': 'Sparkling Wine', '0a': 'Beverage', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
 {"i":"1043","n":"Food Mode Lower Compartment (Desired)","d":"sensor","ds":1,"vt":"{{ {'00': 'Fridge', '01': 'Pantry', '02': 'Chill', '03': 'Freezer', '04': 'Soft Freeze', '05': 'Deep Freeze', '06': 'Cellar Wine', '07': 'Red Wine', '08': 'White Wine', '09': 'Sparkling Wine', '0a': 'Beverage', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
 {"i":"1044","n":"Food Mode Middle Compartment (Desired)","d":"sensor","ds":1,"vt":"{{ {'00': 'Fridge', '01': 'Pantry', '02': 'Chill', '03': 'Freezer', '04': 'Soft Freeze', '05': 'Deep Freeze', '06': 'Cellar Wine', '07': 'Red Wine', '08': 'White Wine', '09': 'Sparkling Wine', '0a': 'Beverage', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
@@ -252,7 +251,6 @@
 {"i":"1057","n":"Food Mode Presets Configuration - Lower Compartment Food Mode","d":"sensor","ds":30,"dc":"enum","vt":"{{ {'00': 'Fridge', '01': 'Pantry', '02': 'Chill', '03': 'Freezer', '04': 'Soft Freeze', '05': 'Deep Freeze', '06': 'Cellar Wine', '07': 'Red Wine', '08': 'White Wine', '09': 'Sparkling Wine', 'ff': 'Not Applicable'}.get(value[56:58], 'Unknown') }}","fi":"lower_compartment_food_mode"}
 {"i":"1057","n":"Food Mode Presets Configuration - Middle Compartment Food Mode","d":"sensor","ds":30,"dc":"enum","vt":"{{ {'00': 'Fridge', '01': 'Pantry', '02': 'Chill', '03': 'Freezer', '04': 'Soft Freeze', '05': 'Deep Freeze', '06': 'Cellar Wine', '07': 'Red Wine', '08': 'White Wine', '09': 'Sparkling Wine', 'ff': 'Not Applicable'}.get(value[58:60], 'Unknown') }}","fi":"middle_compartment_food_mode"}
 {"i":"1058","n":"Food Mode Preset (Actual/Status)","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"1059","n":"Food Mode Preset (Desired/Requested)","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"105a","n":"Refrigeration Notifications - Wine Chiller Upper Zone High Temperature Alert","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 72057594037927936) % 2 else '00' }}","fi":"wine_chiller_upper_zone_high_temperature_alert","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"105a","n":"Refrigeration Notifications - Wine Chiller Upper Zone Low Temperature Alert","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 144115188075855872) % 2 else '00' }}","fi":"wine_chiller_upper_zone_low_temperature_alert","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"105a","n":"Refrigeration Notifications - Wine Chiller Lower Zone High Temperature Alert","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 288230376151711744) % 2 else '00' }}","fi":"wine_chiller_lower_zone_high_temperature_alert","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -476,8 +474,6 @@
 {"i":"1164","n":"Water Filter Status Details - Days to Expiration","d":"sensor","ds":12,"vt":"{{ (value[16:24] | int(base=16)) - 4294967296 if (value[16:24] | int(base=16)) >= 2147483648 else (value[16:24] | int(base=16)) }}","fi":"days_to_expiration"}
 {"i":"1165","n":"Water Filter Expiration Limits - Initial Gallons to Expiration","d":"sensor","ds":8,"vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"1165","n":"Water Filter Expiration Limits - Initial Days to Expiration","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"initial_days_to_expiration"}
-{"i":"1166","n":"Water Filter Reset Request","d":"button","ds":1,"dc":"restart"}
-{"i":"1167","n":"Requested Water Valve Position","d":"sensor","ds":1,"vt":"{{ {'00': 'Bypass', '01': 'Closed', '02': 'Open/Filtered'}.get(value[:2], 'Unknown') }}"}
 {"i":"1168","n":"Valve Manual Override Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1169","n":"Continuous Flow Alert - Low Limit Continuous Flow","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"low_limit_continuous_flow","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1169","n":"Continuous Flow Alert - Medium Limit Continuous Flow","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"medium_limit_continuous_flow","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -491,8 +487,6 @@
 {"i":"116c","n":"System Fault Alert - Thermistor","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"thermistor","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"116d","n":"Daily Water Usage","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"116e","n":"Leak Validity Confirmation","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Leak Confirmation Inactive', '01': 'Leak Invalid/Rejected', '02': 'Leak Valid/Confirmed'}.get(value[:2], 'Unknown') }}"}
-{"i":"116f","n":"Unlock Request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"1170","n":"Go Box Mode Request","d":"sensor","ds":1,"vt":"{{ {'00': 'Standby', '01': 'Fresh', '02': 'Freeze'}.get(value[:2], 'Unknown') }}"}
 {"i":"1171","n":"Keypad Pin Number","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"1172","n":"Package Zone Status - Zone 1 Occupied","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 1) % 2 else '00' }}","fi":"zone_1_occupied","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1172","n":"Package Zone Status - Zone 2 Occupied","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 2) % 2 else '00' }}","fi":"zone_2_occupied","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -652,38 +646,13 @@
 {"i":"1303","n":"Nutrient Cartridge Level 3 - Cartridge State","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Order', '02': 'Replace', '03': 'Error'}.get(value[2:4], 'Unknown') }}","fi":"cartridge_state"}
 {"i":"1304","n":"Water Filter Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Order', '02': 'Replace', '03': 'Error', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
 {"i":"1305","n":"Waste Tank Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Check', '02': 'Replace', '03': 'Error'}.get(value[:2], 'Unknown') }}"}
-{"i":"1306","n":"Grow State Request - Grow Requested State","d":"sensor","ds":12,"dc":"enum","vt":"{{ {'00': 'Stop', '01': 'Start'}.get(value[0:2], 'Unknown') }}"}
-{"i":"1306","n":"Grow State Request - Zone Request Section 1","d":"sensor","ds":12,"dc":"enum","vt":"{{ {'00': 'Start', '01': 'Continue'}.get(value[2:4], 'Unknown') }}","fi":"zone_request_section_1"}
-{"i":"1306","n":"Grow State Request - Zone Request Section 2","d":"sensor","ds":12,"dc":"enum","vt":"{{ {'00': 'Start', '01': 'Continue'}.get(value[4:6], 'Unknown') }}","fi":"zone_request_section_2"}
-{"i":"1306","n":"Grow State Request - Zone Request Section 3","d":"sensor","ds":12,"dc":"enum","vt":"{{ {'00': 'Start', '01': 'Continue'}.get(value[6:8], 'Unknown') }}","fi":"zone_request_section_3"}
-{"i":"1306","n":"Grow State Request - Request ID","d":"sensor","ds":12,"vt":"{{ value[8:16] | int(base=16) }}","fi":"request_id"}
-{"i":"1306","n":"Grow State Request - Data ID","d":"sensor","ds":12,"vt":"{{ value[16:24] | int(base=16) }}","fi":"data_id"}
 {"i":"1307","n":"Grow State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Stopped', '01': 'Running'}.get(value[:2], 'Unknown') }}"}
-{"i":"1308","n":"Displayed Grow Chamber Request","d":"sensor","ds":1,"vt":"{{ {'00': 'None', '01': 'Section 1', '02': 'Section 2', '03': 'Section 3', '04': 'Stop'}.get(value[:2], 'Unknown') }}"}
 {"i":"1309","n":"Displayed Grow Chamber","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Stopped Unknown Section', '01': 'Section 1', '02': 'Section 2', '03': 'Section 3', '04': 'Stopped between Section 1 and 2', '05': 'Stopped between Section 2 and 3', '06': 'Stopped between Section 3 and 1', '07': 'Moving'}.get(value[:2], 'Unknown') }}"}
-{"i":"130a","n":"Display Light Intensity Setting Request","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"130b","n":"Actual Display Light Intensity","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"130c","n":"In Home Grower Door Status - Top Right Door status","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Closed', '01': 'Open'}.get(value[0:2], 'Unknown') }}"}
 {"i":"130c","n":"In Home Grower Door Status - Top Left Door status","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Closed', '01': 'Open'}.get(value[2:4], 'Unknown') }}","fi":"top_left_door_status"}
 {"i":"130c","n":"In Home Grower Door Status - Bottom Right Door status","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Closed', '01': 'Open'}.get(value[4:6], 'Unknown') }}","fi":"bottom_right_door_status"}
 {"i":"130c","n":"In Home Grower Door Status - Bottom Left Door status","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Closed', '01': 'Open'}.get(value[6:8], 'Unknown') }}","fi":"bottom_left_door_status"}
-{"i":"130d","n":"Grow Request Response - Result","d":"sensor","ds":8,"dc":"enum","vt":"{{ {'00': 'NoRequest', '01': 'Accepted', '02': 'InvalidRequestId', '03': 'InvalidDataId', '04': 'InvalidCrc'}.get(value[0:2], 'Unknown') }}"}
-{"i":"130d","n":"Grow Request Response - Padding","d":"sensor","ds":8,"vt":"{{ value[2:8] | int(base=16) }}","fi":"padding"}
-{"i":"130d","n":"Grow Request Response - Request ID","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"request_id"}
-{"i":"130e","n":"Mixing Spraying Data Request - Top Spray Period In Minutes","d":"sensor","ds":10,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"130e","n":"Mixing Spraying Data Request - Top Spray Time In SecondsX10","d":"sensor","ds":10,"vt":"{{ value[2:4] | int(base=16) }}","fi":"top_spray_time_in_secondsx10"}
-{"i":"130e","n":"Mixing Spraying Data Request - Bottom Spray Period In Minutes","d":"sensor","ds":10,"vt":"{{ value[4:6] | int(base=16) }}","fi":"bottom_spray_period_in_minutes"}
-{"i":"130e","n":"Mixing Spraying Data Request - Bottom Spray Time In SecondsX10","d":"sensor","ds":10,"vt":"{{ value[6:8] | int(base=16) }}","fi":"bottom_spray_time_in_secondsx10"}
-{"i":"130e","n":"Mixing Spraying Data Request - Nutrient MilliliterX10[0]","d":"sensor","ds":10,"vt":"{{ value[8:10] | int(base=16) }}","fi":"nutrient_milliliterx10_0"}
-{"i":"130e","n":"Mixing Spraying Data Request - Nutrient MilliliterX10[1]","d":"sensor","ds":10,"vt":"{{ value[10:12] | int(base=16) }}","fi":"nutrient_milliliterx10_1"}
-{"i":"130e","n":"Mixing Spraying Data Request - Nutrient MilliliterX10[2]","d":"sensor","ds":10,"vt":"{{ value[12:14] | int(base=16) }}","fi":"nutrient_milliliterx10_2"}
-{"i":"130e","n":"Mixing Spraying Data Request - Nutrient MilliliterX10[3]","d":"sensor","ds":10,"vt":"{{ value[14:16] | int(base=16) }}","fi":"nutrient_milliliterx10_3"}
-{"i":"130e","n":"Mixing Spraying Data Request - Nutrient MilliliterX10[4]","d":"sensor","ds":10,"vt":"{{ value[16:18] | int(base=16) }}","fi":"nutrient_milliliterx10_4"}
-{"i":"130e","n":"Mixing Spraying Data Request - Nutrient MilliliterX10[5]","d":"sensor","ds":10,"vt":"{{ value[18:20] | int(base=16) }}","fi":"nutrient_milliliterx10_5"}
-{"i":"130f","n":"Growing Data Integrity Request - Data Major","d":"sensor","ds":8,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"130f","n":"Growing Data Integrity Request - Data Minor","d":"sensor","ds":8,"vt":"{{ value[2:4] | int(base=16) }}","fi":"data_minor"}
-{"i":"130f","n":"Growing Data Integrity Request - CRC","d":"sensor","ds":8,"vt":"{{ value[4:8] | int(base=16) }}","fi":"crc"}
-{"i":"130f","n":"Growing Data Integrity Request - Request Id","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"request_id"}
 {"i":"1310","n":"Actual Growing Data Integrity - Actual Data Major","d":"sensor","ds":8,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"1310","n":"Actual Growing Data Integrity - Actual Data Minor","d":"sensor","ds":8,"vt":"{{ value[2:4] | int(base=16) }}","fi":"actual_data_minor"}
 {"i":"1310","n":"Actual Growing Data Integrity - Actual CRC","d":"sensor","ds":8,"vt":"{{ value[4:8] | int(base=16) }}","fi":"actual_crc"}
@@ -1424,27 +1393,8 @@
 {"i":"131d","n":"Nutrient Cartridge Level 6 - Cartridge Type","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Not Used', '01': 'Nutrient', '02': 'Cleaning Solution'}.get(value[0:2], 'Unknown') }}"}
 {"i":"131d","n":"Nutrient Cartridge Level 6 - Cartridge State","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Order', '02': 'Replace', '03': 'Error'}.get(value[2:4], 'Unknown') }}","fi":"cartridge_state"}
 {"i":"131e","n":"Air Filter Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Order', '02': 'Replace', '03': 'Error', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
-{"i":"131f","n":"Reset Water Filter Timer Request - Request Type","d":"sensor","ds":8,"dc":"enum","vt":"{{ {'00': 'No action required', '01': 'Reset Filter'}.get(value[0:2], 'Unknown') }}"}
-{"i":"131f","n":"Reset Water Filter Timer Request - padding","d":"sensor","ds":8,"vt":"{{ value[2:8] | int(base=16) }}","fi":"padding"}
-{"i":"131f","n":"Reset Water Filter Timer Request - Request Id","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"request_id"}
-{"i":"1320","n":"Reset Air Filter Timer Request - Request Type","d":"sensor","ds":8,"dc":"enum","vt":"{{ {'00': 'No action required', '01': 'Reset Filter'}.get(value[0:2], 'Unknown') }}"}
-{"i":"1320","n":"Reset Air Filter Timer Request - padding","d":"sensor","ds":8,"vt":"{{ value[2:8] | int(base=16) }}","fi":"padding"}
-{"i":"1320","n":"Reset Air Filter Timer Request - Request Id","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"request_id"}
-{"i":"1321","n":"Reset Nutrient Cartridge Request - Request Type","d":"sensor","ds":8,"dc":"enum","vt":"{{ {'00': 'No action required', '01': 'Reset Filter'}.get(value[0:2], 'Unknown') }}"}
-{"i":"1321","n":"Reset Nutrient Cartridge Request - Nutrient Cartridge Id","d":"sensor","ds":8,"dc":"enum","vt":"{{ {'00': 'All Nutrient Cartridges', '01': 'Nutrient Cartridge 1', '02': 'Nutrient Cartridge 2', '03': 'Nutrient Cartridge 3', '04': 'Nutrient Cartridge 4', '05': 'Nutrient Cartridge 5', '06': 'Nutrient Cartridge 6'}.get(value[2:4], 'Unknown') }}","fi":"nutrient_cartridge_id"}
-{"i":"1321","n":"Reset Nutrient Cartridge Request - padding","d":"sensor","ds":8,"vt":"{{ value[4:8] | int(base=16) }}","fi":"padding"}
-{"i":"1321","n":"Reset Nutrient Cartridge Request - Request Id","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"request_id"}
-{"i":"1322","n":"Clean Cycle Request - Request Type","d":"sensor","ds":8,"dc":"enum","vt":"{{ {'00': 'No action required', '01': 'Start Clean Cycle'}.get(value[0:2], 'Unknown') }}"}
-{"i":"1322","n":"Clean Cycle Request - padding","d":"sensor","ds":8,"vt":"{{ value[2:8] | int(base=16) }}","fi":"padding"}
-{"i":"1322","n":"Clean Cycle Request - Request ID","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"request_id"}
-{"i":"1323","n":"Clean Cycle Request Result - Request result","d":"sensor","ds":8,"dc":"enum","vt":"{{ {'00': 'Approved', '01': 'Rejected'}.get(value[0:2], 'Unknown') }}"}
-{"i":"1323","n":"Clean Cycle Request Result - padding","d":"sensor","ds":8,"vt":"{{ value[2:8] | int(base=16) }}","fi":"padding"}
-{"i":"1323","n":"Clean Cycle Request Result - Request ID","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"request_id"}
 {"i":"1324","n":"Clean Cycle State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not cleaning', '01': 'In progress', '02': 'Paused', '03': 'Error'}.get(value[:2], 'Unknown') }}"}
 {"i":"1325","n":"Days Since Last Cleaning Cycle","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"1326","n":"Paused Request Result","d":"sensor","ds":8,"dc":"enum","vt":"{{ {'00': 'Approved', '01': 'Rejected'}.get(value[0:2], 'Unknown') }}"}
-{"i":"1326","n":"Paused Request Result - padding","d":"sensor","ds":8,"vt":"{{ value[2:8] | int(base=16) }}","fi":"padding"}
-{"i":"1326","n":"Paused Request Result - Request ID","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"request_id"}
 {"i":"1327","n":"Paused Mode","d":"binary_sensor","ds":1,"p":"1315","r":"status","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1328","n":"In Home Grower Notifications - Water Filter Order Alert","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 72057594037927936) % 2 else '00' }}","fi":"water_filter_order_alert","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1328","n":"In Home Grower Notifications - Water Filter Replace Alert","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 144115188075855872) % 2 else '00' }}","fi":"water_filter_replace_alert","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1985,4 +1935,3 @@
 {"i":"132c","n":"Packed Debug ERDs 4 - Packed ERDs Data[126]","d":"sensor","ds":127,"vt":"{{ value[252:254] | int(base=16) }}","fi":"packed_erds_data_126"}
 {"i":"140d","n":"Power Outage Count","d":"sensor","ds":4,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"140e","n":"System Startup Time in Minutes After Last Power Outage","d":"sensor","ds":4,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
-{"i":"142c","n":"SBC Request To Power Off Barcode Scanner","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
