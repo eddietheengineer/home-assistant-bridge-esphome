@@ -236,15 +236,27 @@ static void cleanup_run(ha_discovery_manager_t* self)
     }
 
     /* Clean pass — no topics found. */
+    if (self->cleanup_wait_start_ms != 0) {
+        /* Already in the final wait period; skip pass accounting. */
+        goto wait_check;
+    }
+
     self->cleanup_clean_passes++;
     ESP_LOGI(TAG, "Cleanup pass %u completed with no topics found", self->cleanup_clean_passes);
 
-    if (self->cleanup_clean_passes == 1) {
-        /* First clean pass done. Start the final wait period. */
-        self->cleanup_wait_start_ms = self->get_time_ms();
-        ESP_LOGI(TAG, "Waiting %lu seconds before discovery...", (unsigned long)(HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS / 1000));
+    if (self->cleanup_clean_passes < 2) {
+        /* Run another validation pass to confirm nothing was missed. */
+        self->cleanup_current_component = 0;
+        self->cleanup_received_topics = false;
+        self->cleanup_pass_found_topics = false;
         return;
     }
+
+    /* Two consecutive clean passes. Start the final wait period. */
+    self->cleanup_wait_start_ms = self->get_time_ms();
+    ESP_LOGI(TAG, "Waiting %lu seconds before discovery...", (unsigned long)(HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS / 1000));
+
+wait_check:
 
     /* Check if the final wait period has elapsed. */
     uint32_t now = self->get_time_ms();
