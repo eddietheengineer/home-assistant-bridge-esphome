@@ -10,22 +10,8 @@
 {"i":"4026","n":"Actual Setpoint Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"4028","n":"Timed Mode Hours Remaining","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"402a","n":"Water Heater Mixing Valve Tank Capacity","d":"sensor","ds":1,"vt":"{{ {'00': 'Normal', '01': 'High', '02': 'X-High'}.get(value[:2], 'Unknown') }}"}
-{"i":"402b","n":"Water Heater Mixing Valve Available Tank Capacities - Normal","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"normal","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"402b","n":"Water Heater Mixing Valve Available Tank Capacities - High","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"high","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"402b","n":"Water Heater Mixing Valve Available Tank Capacities - X-High","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"x_high","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4030","n":"Notifications","d":"sensor","ds":32}
-{"i":"4040","n":"Available Modes - Hybrid","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"hybrid","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"4040","n":"Available Modes - Standard electric","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"standard_electric","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"4040","n":"Available Modes - E-heat","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"e_heat","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"4040","n":"Available Modes - HiDemand","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"hidemand","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"4040","n":"Available Modes - Vacation","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 16) % 2 else '00' }}","fi":"vacation","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4041","n":"Tank size","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"4047","n":"Min/max allowed setpoint - Minimum setpoint","d":"sensor","ds":4,"u":"°F","dc":"temperature","sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
-{"i":"4047","n":"Min/max allowed setpoint - Maximum setpoint","d":"sensor","ds":4,"u":"°F","sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"maximum_setpoint"}
-{"i":"4048","n":"Min/max allowed vacation setpoint - Minimum setpoint","d":"sensor","ds":4,"u":"°F","dc":"temperature","sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
-{"i":"4048","n":"Min/max allowed vacation setpoint - Maximum setpoint","d":"sensor","ds":4,"u":"°F","sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"maximum_setpoint"}
-{"i":"4049","n":"Max allowed vacation hours","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"404a","n":"Max allowed standard electric hours","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"404c","n":"Anode depleted mass - Mass (most significant 32 bits)","d":"sensor","ds":8,"vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"404c","n":"Anode depleted mass - Mass (least significant 32 bits)","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"mass_least_significant_32_bits"}
 {"i":"404d","n":"Anode hours of service","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}

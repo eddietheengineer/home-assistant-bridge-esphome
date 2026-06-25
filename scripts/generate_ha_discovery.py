@@ -726,6 +726,10 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 opts: str, field_id: str, mode: str = '',
                 payload_on: str = '', payload_off: str = '',
                 state_on: str = '', state_off: str = '') -> None:
+        # Skip availability/allowability metadata — not actionable in HA.
+        combined = (name + ' ' + field_id).lower()
+        if 'allowed' in combined or 'available' in combined:
+            return
         entries.append({
             'erd_id': erd_id_int,
             'name': name,

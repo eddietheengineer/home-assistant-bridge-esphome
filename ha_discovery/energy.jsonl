@@ -1,5 +1,4 @@
 {"i":"d001","n":"DSM Override Status","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"d002","n":"DSM Override Allowed","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"d003","n":"End Of Cycle (Tub 0)","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"d004","n":"Cycle Time Remaining","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
 {"i":"d005","n":"DSM Power Usage - Instantaneous Power","d":"sensor","ds":11,"u":"W","dc":"power","sc":"measurement","vt":"{{ value[0:4] | int(base=16) }}"}
@@ -9,10 +8,6 @@
 {"i":"d005","n":"DSM Power Usage - Water Usage","d":"sensor","ds":11,"u":"W","vt":"{{ value[18:22] | int(base=16) }}","fi":"water_usage"}
 {"i":"d006","n":"Demand Response Status","d":"sensor","ds":1,"vt":"{{ {'00': 'Not in demand response mode', '01': 'In Demand Response mode', '02': 'In Temporary Load Reduction mode', '03': 'In appliances load reduction mode (Option 3 is controlled by the appliance and it cannot be triggered by the cloud)', '04': 'In Temporary Load Increase mode', '05': 'In Temperature Offset mode', 'ff': 'Invalid'}.get(value[:2], 'Unknown') }}"}
 {"i":"d007","n":"Appliance Cumulative Energy","d":"sensor","ds":4,"u":"Wh","dc":"energy","sc":"total","vt":"{{ value | int(base=16) }}"}
-{"i":"d008","n":"Available Demand Response Modes - Demand Response Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"demand_response_available","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"d008","n":"Available Demand Response Modes - Temporary Load Reduction Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"temporary_load_reduction_available","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"d008","n":"Available Demand Response Modes - Temporary Load Increase Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"temporary_load_increase_available","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"d008","n":"Available Demand Response Modes - Temporary Temperature Offset Available","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"temporary_temperature_offset_available","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"d00b","n":"Temporary Temperature Offset Demand Response","d":"number","ds":44,"u":"°F","dc":"temperature","p":"d00c","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%088x' % (value | int) }}","m":"box"}
 {"i":"d00e","n":"Cost of power cost/comfort slider","d":"number","ds":1,"u":"W","dc":"power","sc":"measurement","p":"d00f","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"d014","n":"Appliance Energy Usage Update Period in Minutes","d":"sensor","ds":1,"u":"Wh","dc":"energy","sc":"total","vt":"{{ value | int(base=16) }}"}

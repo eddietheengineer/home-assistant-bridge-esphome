@@ -25,10 +25,6 @@
 {"i":"003c","n":"Auxiliary Version","d":"sensor","ds":4,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}"}
 {"i":"004f","n":"Enhanced Sabbath Mode Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0050","n":"Timer","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
-{"i":"0051","n":"Available Sound Levels - Off","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"off","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"0051","n":"Available Sound Levels - Low","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 512) % 2 else '00' }}","fi":"low","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"0051","n":"Available Sound Levels - Medium","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 1024) % 2 else '00' }}","fi":"medium","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"0051","n":"Available Sound Levels - High","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 2048) % 2 else '00' }}","fi":"high","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0060","n":"Configuration Hash","d":"sensor","ds":32}
 {"i":"0099","n":"Brand ID","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'GEA - Covers all GEA Brands (GE, Profile, Cafe, Monogram, Hotpoint)', '02': 'Haier', '03': 'Mabe', '04': 'Fisher & Paykel', '05': 'GE', '06': 'Profile', '07': 'Cafe', '08': 'Monogram', '09': 'Hotpoint', '0a': 'Haier FPA', '0b': 'Adora', '0c': 'Allied', '0d': 'Lennox', '0e': 'FirstBuild'}.get(value[:2], 'Unknown') }}"}
 {"i":"009c","n":"Matter Product ID","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
@@ -55,7 +51,6 @@
 {"i":"0504","n":"Camera Stream Termination Reason","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'NotTerminated', '01': 'UserStopped', '02': 'WifiDisconnected', '03': 'CookModeInvalid', '04': 'Timeout', '05': 'CameraMissing', '06': 'AuthenticationFailed', '07': 'ProcessCheckFailed', '08': 'SabbathModeOn'}.get(value[:2], 'Unknown') }}"}
 {"i":"0505","n":"Image Upload Inference ID - PictureId","d":"sensor","ds":32,"vt":"{{ value[0:32] | int(base=16) }}"}
 {"i":"0505","n":"Image Upload Inference ID - InferenceId","d":"sensor","ds":32,"vt":"{{ value[32:64] | int(base=16) }}","fi":"inferenceid"}
-{"i":"0507","n":"Image Capture Currently Available","d":"sensor","ds":1,"u":"A","dc":"current","vt":"{{ {'00': 'Unavailable', '01': 'Available', '02': 'Available With Privacy Filter'}.get(value[:2], 'Unknown') }}"}
 {"i":"0600","n":"Supported Enhanced Features - Supported Feature Count","d":"sensor","ds":32,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"0600","n":"Supported Enhanced Features - padding","d":"sensor","ds":32,"vt":"{{ value[2:4] | int(base=16) }}","fi":"padding"}
 {"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[0]","d":"sensor","ds":32,"vt":"{{ value[4:8] | int(base=16) }}","fi":"supported_digital_feature_0"}
