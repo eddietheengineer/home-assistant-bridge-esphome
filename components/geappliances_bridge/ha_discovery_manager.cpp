@@ -42,8 +42,10 @@ static const char* const TAG = "ha_discovery";
 /* Cleanup: discover and remove old HA discovery topics               */
 /* ------------------------------------------------------------------ */
 
-/* How long to wait for topic collection (milliseconds). */
-#define HA_DISCOVERY_CLEANUP_TIMEOUT_MS 5000
+/* Idle timeout: if no new matching topic arrives within this window,
+ * assume the broker has delivered all retained messages and we can
+ * proceed to discovery. */
+#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 5000
 
 /* Callback for homeassistant/# subscription during cleanup.
  * When a matching topic arrives, immediately publish an empty retained
@@ -81,13 +83,16 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
         mqtt_client_publish_raw(self->mqtt_client, topic, "", 0, true);
     }
 
+    /* Record activity time so the idle timer resets. */
+    self->cleanup_last_activity_ms = self->get_time_ms();
+
     ESP_LOGD(TAG, "Removed old topic: %s", topic);
 }
 
 static void cleanup_start(ha_discovery_manager_t* self)
 {
     self->cleanup_subscribed = false;
-    self->cleanup_deadline_ms = self->get_time_ms() + HA_DISCOVERY_CLEANUP_TIMEOUT_MS;
+    self->cleanup_last_activity_ms = self->get_time_ms();
     self->last_publish_ms = self->get_time_ms();
 
     ESP_LOGI(TAG, "Starting HA discovery cleanup...");
@@ -105,11 +110,11 @@ static void cleanup_run(ha_discovery_manager_t* self)
         return;
     }
 
-    /* Check if we've exceeded the deadline. */
+    /* Check if we've been idle long enough — no new matching topics
+     * have arrived, so the broker has delivered all retained messages. */
     uint32_t now = self->get_time_ms();
-    if (now >= self->cleanup_deadline_ms) {
-        /* Time's up, proceed to discovery. */
-        ESP_LOGI(TAG, "Cleanup timeout reached, proceeding to discovery");
+    if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
+        ESP_LOGI(TAG, "Cleanup idle timeout reached, proceeding to discovery");
         self->cleanup_subscribed = false;
         self->state = ha_discovery_state_discovering;
         self->current_category = 0;

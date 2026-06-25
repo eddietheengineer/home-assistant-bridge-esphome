@@ -148,8 +148,8 @@ typedef struct {
   uint32_t current_offset;         // Byte offset within decompressed chunk
   uint32_t current_decomp_size;    // Size of current decompressed chunk
 
-  /* Cleanup state: collect old discovery topics to remove. */
-  uint32_t cleanup_deadline_ms;       // When to stop collecting topics
+  /* Cleanup state: discover and remove old discovery topics. */
+  uint32_t cleanup_last_activity_ms;  // Last time a topic was received
   bool cleanup_subscribed;            // Whether we've subscribed to homeassistant/#
 #endif
 } ha_discovery_manager_t;
