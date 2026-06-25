@@ -74,6 +74,8 @@ static const char* const HA_DISCOVERY_COMPONENT_TYPES[] = {
 #define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 2000
 /* Short timeout for component types with no topics — skip quickly. */
 #define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS 500
+/* Wait after a clean pass before starting discovery publishing. */
+#define HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS 5000
 
 /* Flush queued cleanup topics: publish empty retained payloads to remove them.
  * Called from cleanup_run() during idle periods, not from the MQTT callback,
@@ -130,10 +132,12 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
         self->cleanup_topic_queue[self->cleanup_queue_count][sizeof(self->cleanup_topic_queue[0]) - 1] = '\0';
         self->cleanup_queue_count++;
         self->cleanup_received_topics = true;
+        self->cleanup_pass_found_topics = true;
     } else {
         /* Queue full — publish immediately as fallback. */
         mqtt_client_publish_raw(self->mqtt_client, topic, "", 0, true);
         ESP_LOGD(TAG, "Removed old topic (queue full): %s", topic);
+        self->cleanup_pass_found_topics = true;
     }
 
     /* Record activity time so the idle timer resets. */
@@ -147,7 +151,9 @@ static void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_last_activity_ms = self->get_time_ms();
     self->cleanup_queue_count = 0;
     self->cleanup_received_topics = false;
-    self->cleanup_validation_pass = false;
+    self->cleanup_clean_passes = 0;
+    self->cleanup_pass_found_topics = false;
+    self->cleanup_wait_start_ms = 0;
 
     ESP_LOGI(TAG, "Starting HA discovery cleanup...");
 }
@@ -219,18 +225,36 @@ static void cleanup_run(ha_discovery_manager_t* self)
         return;
     }
 
-    /* All component types cleaned. */
-    if (!self->cleanup_validation_pass) {
-        /* First pass done. Do a validation pass to confirm nothing was missed. */
-        ESP_LOGI(TAG, "First cleanup pass complete, running validation pass...");
-        self->cleanup_validation_pass = true;
+    /* All component types processed for this pass. */
+    if (self->cleanup_pass_found_topics) {
+        /* Topics were found and cleared — loop again to verify. */
+        ESP_LOGI(TAG, "Cleanup pass found topics, running another pass...");
         self->cleanup_current_component = 0;
         self->cleanup_received_topics = false;
+        self->cleanup_pass_found_topics = false;
         return;
     }
 
-    /* Validation pass complete. Proceed to discovery. */
-    ESP_LOGI(TAG, "Cleanup validation complete, proceeding to discovery");
+    /* Clean pass — no topics found. */
+    self->cleanup_clean_passes++;
+    ESP_LOGI(TAG, "Cleanup pass %u completed with no topics found", self->cleanup_clean_passes);
+
+    if (self->cleanup_clean_passes == 1) {
+        /* First clean pass done. Start the final wait period. */
+        self->cleanup_wait_start_ms = self->get_time_ms();
+        ESP_LOGI(TAG, "Waiting %lu seconds before discovery...", (unsigned long)(HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS / 1000));
+        return;
+    }
+
+    /* Check if the final wait period has elapsed. */
+    uint32_t now = self->get_time_ms();
+    if (now - self->cleanup_wait_start_ms < HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS) {
+        /* Still waiting. */
+        return;
+    }
+
+    /* Final wait complete. Proceed to discovery. */
+    ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
     self->cleanup_subscribed = false;
     self->state = ha_discovery_state_discovering;
     self->current_category = 0;
