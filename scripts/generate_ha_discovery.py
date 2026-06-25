@@ -158,6 +158,24 @@ def _is_signed_type(type_str: str) -> bool:
     """Return True if the type string represents a signed integer (e.g. 'i8', 'i16', 'i32')."""
     return bool(re.match(r'^i\d+$', type_str))
 
+def _compute_number_range(data_type: str, scaling_factor: int) -> Tuple[float, float, float]:
+    """Return (min, max, step) for a number entity based on data type and scale factor.
+
+    Returns user-facing values (after scaling), not raw byte values.
+    E.g. u16 with sf=10 -> (0, 6553.5, 0.1)
+    """
+    bounds = {
+        'u8': (0, 255),
+        'i8': (-128, 127),
+        'u16': (0, 65535),
+        'i16': (-32768, 32767),
+        'u32': (0, 4294967295),
+        'i32': (-2147483648, 2147483647),
+    }
+    raw_min, raw_max = bounds.get(data_type, (0, 255))
+    step = 1.0 / scaling_factor
+    return (raw_min / scaling_factor, raw_max / scaling_factor, step)
+
 
 def _get_primary_data_type(erd_data: List[Dict]) -> str:
     """Return the type of the primary (first non-reserved, non-bitfield) data field."""
@@ -747,7 +765,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 paired_id: int, role: str, val_tmpl: str, cmd_tmpl: str,
                 opts: str, field_id: str, mode: str = '',
                 payload_on: str = '', payload_off: str = '',
-                state_on: str = '', state_off: str = '') -> None:
+                state_on: str = '', state_off: str = '',
+                min_val: float = 0.0, max_val: float = 0.0, step_val: float = 1.0) -> None:
         # Skip availability/allowability metadata — not actionable in HA.
         combined = (name + ' ' + field_id).lower()
         if 'allowed' in combined or 'available' in combined:
@@ -772,6 +791,9 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             'payload_off': payload_off,
             'state_on': state_on,
             'state_off': state_off,
+            'min_val': min_val,
+            'max_val': max_val,
+            'step_val': step_val,
         })
 
     processed_status = set()
@@ -817,6 +839,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
 
         if classification == 'single':
             vt, ct, opts = '', '', ''
+            min_val, max_val, step_val = 0.0, 0.0, 1.0
 
             if ha_domain == 'sensor':
                 # Detect enum from either device_class or data field type.
@@ -855,6 +878,17 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     signed = _is_signed_type(_get_primary_data_type(erd_data))
                     vt = _compute_sensor_value_template(scaling_factor, data_size, signed)
                 ct = _number_command_template(data_size, scaling_factor, signed)
+                # Compute min/max/step for number entities
+                if pf:
+                    n_type = pf.get('type', 'u8')
+                    n_scale = int(erd_by_id[paired_erd_str].get('scaling_factor') or 1)
+                elif paired_erd_str and paired_erd_str in erd_by_id:
+                    n_type = _get_primary_data_type(erd_by_id[paired_erd_str].get('data', []))
+                    n_scale = int(erd_by_id[paired_erd_str].get('scaling_factor') or 1)
+                else:
+                    n_type = _get_primary_data_type(erd_data)
+                    n_scale = scaling_factor
+                min_val, max_val, step_val = _compute_number_range(n_type, n_scale)
             # button: no templates
 
             # For switch/binary_sensor, set payload_on/off and state_on/off to hex
@@ -871,7 +905,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     state_class, scaling_factor, data_size, paired_erd_id,
                     pair_role, vt, ct, opts, '',
                     'box' if ha_domain == 'number' else '',
-                    p_on, p_off, s_on, s_off)
+                    p_on, p_off, s_on, s_off,
+                    min_val, max_val, step_val)
 
         elif classification == 'byte_offset':
             nr_fields = _get_non_reserved_fields(erd_data)
@@ -1014,6 +1049,9 @@ def generate_ha_discovery_jsonl_by_category(erds: List[Dict]) -> Dict[str, str]:
                 obj['dc'] = e['device_class']
             if e['state_class']:                  obj['sc'] = e['state_class']
             if e['scaling_factor'] != 1:          obj['sf'] = e['scaling_factor']
+            if e['domain'] == 'number' and e.get('min_val') is not None:      obj['mn'] = e['min_val']
+            if e['domain'] == 'number' and e.get('max_val') is not None:      obj['mx'] = e['max_val']
+            if e['domain'] == 'number' and e.get('step_val') is not None:     obj['st'] = e['step_val']
             if e['paired_erd_id']:                obj['p']  = f'{e["paired_erd_id"]:04x}'
             if e['pair_role']:                    obj['r']  = e['pair_role']
             if e['value_template']:               obj['vt'] = e['value_template']

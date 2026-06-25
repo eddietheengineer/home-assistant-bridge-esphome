@@ -540,6 +540,9 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     self->payload_off_buf[0] = '\0';
     self->state_on_buf[0] = '\0';
     self->state_off_buf[0] = '\0';
+    self->min_buf[0] = '\0';
+    self->max_buf[0] = '\0';
+    self->step_buf[0] = '\0';
 
     if (json_get_str(line, "fi", &val, &len)) json_unescape(val, len, self->field_id_buf, sizeof(self->field_id_buf));
     if (json_get_str(line, "p", &val, &len)) json_unescape(val, len, self->paired_erd_buf, sizeof(self->paired_erd_buf));
@@ -555,6 +558,9 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     if (json_get_str(line, "poff", &val, &len)) json_unescape(val, len, self->payload_off_buf, sizeof(self->payload_off_buf));
     if (json_get_str(line, "son", &val, &len)) json_unescape(val, len, self->state_on_buf, sizeof(self->state_on_buf));
     if (json_get_str(line, "soff", &val, &len)) json_unescape(val, len, self->state_off_buf, sizeof(self->state_off_buf));
+    if (json_get_str(line, "mn", &val, &len)) json_unescape(val, len, self->min_buf, sizeof(self->min_buf));
+    if (json_get_str(line, "mx", &val, &len)) json_unescape(val, len, self->max_buf, sizeof(self->max_buf));
+    if (json_get_str(line, "st", &val, &len)) json_unescape(val, len, self->step_buf, sizeof(self->step_buf));
 
     uint16_t erd_id = (uint16_t)strtoul(erd_id_hex, NULL, 16);
 
@@ -696,24 +702,44 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             if (n < 0 || n >= space) goto too_large;
             pos += n; space -= n;
         }
-        if (self->data_type_buf[0]) {
-            if (strcmp(self->data_type_buf, "u8") == 0) {
-                n = snprintf(payload + pos, space, "\"min\":0,\"max\":255,");
-            } else if (strcmp(self->data_type_buf, "i8") == 0) {
-                n = snprintf(payload + pos, space, "\"min\":-128,\"max\":127,");
-            } else if (strcmp(self->data_type_buf, "u16") == 0) {
-                n = snprintf(payload + pos, space, "\"min\":0,\"max\":65535,");
-            } else if (strcmp(self->data_type_buf, "i16") == 0) {
-                n = snprintf(payload + pos, space, "\"min\":-32768,\"max\":32767,");
-            } else if (strcmp(self->data_type_buf, "u32") == 0) {
-                n = snprintf(payload + pos, space, "\"min\":0,\"max\":4294967295,");
-            } else if (strcmp(self->data_type_buf, "i32") == 0) {
-                n = snprintf(payload + pos, space, "\"min\":-2147483648,\"max\":2147483647,");
+        /* Number domain: use mn/mx/st from JSONL (scaled values). */
+        if (strcmp(self->domain_buf, "number") == 0) {
+            if (self->min_buf[0]) {
+                n = snprintf(payload + pos, space, "\"min\":%s,", self->min_buf);
+                if (n < 0 || n >= space) goto too_large;
+                pos += n; space -= n;
             }
-            if (n < 0 || n >= space) goto too_large;
-            pos += n; space -= n;
+            if (self->max_buf[0]) {
+                n = snprintf(payload + pos, space, "\"max\":%s,", self->max_buf);
+                if (n < 0 || n >= space) goto too_large;
+                pos += n; space -= n;
+            }
+            if (self->step_buf[0]) {
+                n = snprintf(payload + pos, space, "\"step\":%s,", self->step_buf);
+                if (n < 0 || n >= space) goto too_large;
+                pos += n; space -= n;
+            }
+            /* Fallback to dt-based ranges if mn/mx not set. */
+            if (!self->min_buf[0] && self->data_type_buf[0]) {
+                if (strcmp(self->data_type_buf, "u8") == 0) {
+                    n = snprintf(payload + pos, space, "\"min\":0,\"max\":255,");
+                } else if (strcmp(self->data_type_buf, "i8") == 0) {
+                    n = snprintf(payload + pos, space, "\"min\":-128,\"max\":127,");
+                } else if (strcmp(self->data_type_buf, "u16") == 0) {
+                    n = snprintf(payload + pos, space, "\"min\":0,\"max\":65535,");
+                } else if (strcmp(self->data_type_buf, "i16") == 0) {
+                    n = snprintf(payload + pos, space, "\"min\":-32768,\"max\":32767,");
+                } else if (strcmp(self->data_type_buf, "u32") == 0) {
+                    n = snprintf(payload + pos, space, "\"min\":0,\"max\":4294967295,");
+                } else if (strcmp(self->data_type_buf, "i32") == 0) {
+                    n = snprintf(payload + pos, space, "\"min\":-2147483648,\"max\":2147483647,");
+                }
+                if (n < 0 || n >= space) goto too_large;
+                pos += n; space -= n;
+            }
         }
-        if (self->scale_factor_buf[0] && strcmp(self->domain_buf, "number") == 0) {
+        /* Fallback step from scale_factor if st not set (for non-number domains). */
+        if (self->scale_factor_buf[0] && !self->step_buf[0] && strcmp(self->domain_buf, "number") == 0) {
             n = snprintf(payload + pos, space, "\"step\":%s,", self->scale_factor_buf);
             if (n < 0 || n >= space) goto too_large;
             pos += n; space -= n;

@@ -548,7 +548,7 @@
 {"i":"121c","n":"Current Flowmeter Ounces Dispensed","d":"sensor","ds":2,"sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"121d","n":"Last Flowmeter Ounces Dispensed","d":"sensor","ds":2,"sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"121e","n":"Dimmable Lighting 0 Percent Level","d":"sensor","ds":1,"p":"121f","r":"request","vt":"{{ value | int(base=16) }}"}
-{"i":"121f","n":"Dimmable Lighting 0 Percent Level Setting","d":"number","ds":1,"p":"121e","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"121f","n":"Dimmable Lighting 0 Percent Level Setting","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"p":"121e","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"1220","n":"Dimmable Lighting 0 Configuration - Fresh Food Back Light","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"fresh_food_back_light","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1220","n":"Dimmable Lighting 0 Configuration - Fresh Food Top Light","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"fresh_food_top_light","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1220","n":"Dimmable Lighting 0 Configuration - Freezer Back Light","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"freezer_back_light","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -603,7 +603,7 @@
 {"i":"122e","n":"V2 Refrigeration Notification - Primary Feature Pan High Temperature Alert","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[32:64] | int(base=16)) // 324518553658426726783156020576256) % 2 else '00' }}","fi":"primary_feature_pan_high_temperature_alert","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"122e","n":"V2 Refrigeration Notification - Secondary Feature Pan High Temperature Alert","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[32:64] | int(base=16)) // 649037107316853453566312041152512) % 2 else '00' }}","fi":"secondary_feature_pan_high_temperature_alert","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1255","n":"Kitchen Illumination Feature Enable","d":"switch","ds":1,"p":"1256","r":"request","vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"1258","n":"Door Alarm Timer Timeout","d":"number","ds":1,"u":"min","dc":"duration","p":"1259","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"1258","n":"Door Alarm Timer Timeout","d":"number","ds":1,"u":"min","dc":"duration","mn":0.0,"mx":255.0,"st":1.0,"p":"1259","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"125a","n":"Door Alarm Timer Timeout Range Data - Door Alarm Timer Maximum Setting in Minutes","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"125a","n":"Door Alarm Timer Timeout Range Data - Door Alarm Timer Default Setting in Minutes","d":"sensor","ds":2,"u":"min","vt":"{{ value[2:4] | int(base=16) }}","fi":"door_alarm_timer_default_setting_in_minutes"}
 {"i":"125b","n":"Fresh Food Door 3 Status","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -613,7 +613,7 @@
 {"i":"1263","n":"Barcode Scanner Device Power","d":"switch","ds":1,"p":"1264","r":"request","vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1267","n":"Single Door Status","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1268","n":"Recess Light Resolved Brightness Status","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"1269","n":"Recess Light SBC Brightness","d":"number","ds":1,"p":"126a","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"1269","n":"Recess Light SBC Brightness","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"p":"126a","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"1273","n":"Ambient Humidity Percent","d":"sensor","ds":2,"u":"%","dc":"humidity","sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"1279","n":"Fresh Food Door 2 Opening Counts","d":"sensor","ds":4,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"127a","n":"Fresh Food Door 1 Opening Counts","d":"sensor","ds":4,"sc":"total","vt":"{{ value | int(base=16) }}"}
@@ -629,11 +629,11 @@
 {"i":"128e","n":"Total Single Door Open Time In Seconds","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
 {"i":"128f","n":"Total Single Door Open Counts","d":"sensor","ds":4,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"129e","n":"Recess Light User Brightness Level","d":"sensor","ds":1,"p":"129f","r":"request","vt":"{{ value | int(base=16) }}"}
-{"i":"129f","n":"Recess Light User Brightness Level Setting","d":"number","ds":1,"p":"129e","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"129f","n":"Recess Light User Brightness Level Setting","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"p":"129e","r":"status","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"12a6","n":"Freezer Ice Rate Is Active","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"12b9","n":"Variable Cube Size Setting Data - Number of Cube Size Settings","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"12b9","n":"Variable Cube Size Setting Data - Cube Size Default Setting","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"cube_size_default_setting"}
-{"i":"12ba","n":"Variable Cube Size","d":"number","ds":1,"p":"12bb","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"12ba","n":"Variable Cube Size","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"p":"12bb","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"12d0","n":"Turbo Cool Cycles Count","d":"sensor","ds":2,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"12d1","n":"Turbo Freeze Cycles Count","d":"sensor","ds":2,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"12ec","n":"Fridge Focus Camera Enable","d":"switch","ds":1,"p":"12ed","r":"request","vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}

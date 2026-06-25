@@ -136,6 +136,9 @@ typedef struct {
   char options_buf[256];
   char data_type_buf[16];
   char scale_factor_buf[16];
+  char min_buf[32];
+  char max_buf[32];
+  char step_buf[32];
   char mode_buf[16];
   char payload_on_buf[16];
   char payload_off_buf[16];
