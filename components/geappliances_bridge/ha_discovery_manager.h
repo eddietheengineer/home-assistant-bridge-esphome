@@ -158,6 +158,7 @@ typedef struct {
   bool cleanup_subscribed;            // Whether we've subscribed
   uint16_t cleanup_current_component; // Index into ha_discovery_component_types[]
   bool cleanup_received_topics;       // Whether we received any topics for current component
+  bool cleanup_validation_pass;       // Whether we're in the validation pass (second iteration)
 
   /* Cleanup topic queue: buffer topic names for batched publishing.
    * Each entry is a pointer into the shared topic_buf, so we queue

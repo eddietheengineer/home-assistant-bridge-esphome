@@ -147,6 +147,7 @@ static void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_last_activity_ms = self->get_time_ms();
     self->cleanup_queue_count = 0;
     self->cleanup_received_topics = false;
+    self->cleanup_validation_pass = false;
 
     ESP_LOGI(TAG, "Starting HA discovery cleanup...");
 }
@@ -218,8 +219,18 @@ static void cleanup_run(ha_discovery_manager_t* self)
         return;
     }
 
-    /* All component types cleaned. Proceed to discovery. */
-    ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
+    /* All component types cleaned. */
+    if (!self->cleanup_validation_pass) {
+        /* First pass done. Do a validation pass to confirm nothing was missed. */
+        ESP_LOGI(TAG, "First cleanup pass complete, running validation pass...");
+        self->cleanup_validation_pass = true;
+        self->cleanup_current_component = 0;
+        self->cleanup_received_topics = false;
+        return;
+    }
+
+    /* Validation pass complete. Proceed to discovery. */
+    ESP_LOGI(TAG, "Cleanup validation complete, proceeding to discovery");
     self->cleanup_subscribed = false;
     self->state = ha_discovery_state_discovering;
     self->current_category = 0;
