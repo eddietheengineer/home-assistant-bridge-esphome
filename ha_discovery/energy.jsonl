@@ -1,6 +1,6 @@
 {"i":"d001","n":"DSM Override Status","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"d002","n":"DSM Override Allowed","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"d003","n":"End Of Cycle (Tub 0)","d":"binary_sensor","ds":1}
+{"i":"d003","n":"End Of Cycle (Tub 0)","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"d004","n":"Cycle Time Remaining","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
 {"i":"d005","n":"DSM Power Usage - Instantaneous Power","d":"sensor","ds":11,"u":"W","dc":"power","sc":"measurement","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"d005","n":"DSM Power Usage - Watt Seconds Since Clear","d":"sensor","ds":11,"u":"W","vt":"{{ value[4:12] | int(base=16) }}","fi":"watt_seconds_since_clear"}
@@ -488,7 +488,7 @@
 {"i":"d02e","n":"Requested Appliance Cold Water Usage Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"d02f","n":"Requested Appliance Gas Usage Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"d030","n":"Appliance Cumulative Energy","d":"sensor","ds":4,"u":"kWh","dc":"energy","sc":"total","sf":1000,"vt":"{{ (value | int(base=16)) / 1000 | round(3) }}"}
-{"i":"d203","n":"End of cycle (Tub 1)","d":"binary_sensor","ds":1}
+{"i":"d203","n":"End of cycle (Tub 1)","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"d204","n":"Cycle Time Remaining Tub 1","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
 {"i":"d205","n":"DSM Power Usage Tub 1 - Instantaneous Power","d":"sensor","ds":11,"u":"W","dc":"power","sc":"measurement","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"d205","n":"DSM Power Usage Tub 1 - Watt Seconds Since Clear","d":"sensor","ds":11,"u":"W","vt":"{{ value[4:12] | int(base=16) }}","fi":"watt_seconds_since_clear"}

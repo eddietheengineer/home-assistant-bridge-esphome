@@ -556,11 +556,22 @@ def _infer_unit_from_field_name(field_name: str, parent_unit: str) -> str:
 def _compute_binary_sensor_value_template(data_size: int) -> str:
     """Return value_template for a binary_sensor ERD.
 
-    For single-byte ERDs the raw hex payload ('00'/'01') already matches
-    payload_on/payload_off, so no template is needed.  For multi-byte ERDs
-    we slice the first two hex characters to extract just the first byte.
+    The MQTT payload is raw hex (e.g. '00', '01'). HA's default payload_on/off
+    are 'ON'/'OFF', so we always need a template to convert.
+    For multi-byte ERDs we slice the first two hex chars to get the first byte.
     """
-    return '{{ value[:2] }}' if data_size > 1 else ''
+    hex_chars = data_size * 2
+    tmpl = f"value[:{hex_chars}]" if hex_chars > 2 else "value"
+    return f"{{{{ 'ON' if {tmpl} | int(base=16) != 0 else 'OFF' }}}}"
+def _compute_switch_value_template(data_size: int) -> str:
+    """Return value_template for a switch ERD reading from its paired status topic.
+
+    The status topic publishes raw hex (e.g. '00', '01'). Convert to ON/OFF
+    for HA switch payload_on/payload_off defaults.
+    """
+    hex_chars = data_size * 2
+    tmpl = f"value[:{hex_chars}]" if hex_chars > 2 else "value"
+    return f"{{{{ 'ON' if {tmpl} | int(base=16) != 0 else 'OFF' }}}}"
 
 
 def _select_options_and_templates(enum_values: Dict[str, str], data_size: int):
@@ -758,7 +769,9 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             elif ha_domain == 'switch':
                 if paired_erd_str and paired_erd_str in erd_by_id:
                     s_size = get_erd_byte_size(erd_by_id[paired_erd_str].get('data', [])) or 1
-                    vt = _compute_binary_sensor_value_template(s_size)
+                    vt = _compute_switch_value_template(s_size)
+                else:
+                    vt = _compute_switch_value_template(data_size)
             elif ha_domain == 'select':
                 ev = get_first_enum_values(erd_data)
                 if ev:

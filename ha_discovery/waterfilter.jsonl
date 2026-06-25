@@ -3,6 +3,6 @@
 {"i":"8007","n":"Water Softener Low Salt Alert","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Cleared - Salt is good', '01': 'Set - Low Salt Indicated'}.get(value[:2], 'Unknown') }}"}
 {"i":"800d","n":"Water Softener Average Daily Water Usage","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
 {"i":"800e","n":"Water Softener Daily Water Usage","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
-{"i":"8032","n":"Water Softener Shutoff Valve Installed","d":"binary_sensor","ds":1}
+{"i":"8032","n":"Water Softener Shutoff Valve Installed","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"8033","n":"Water Softener Shutoff Valve Actual State","d":"sensor","ds":1,"vt":"{{ {'00': 'Open', '01': 'Closed', '02': 'Transition'}.get(value[:2], 'Unknown') }}"}
 {"i":"8034","n":"Water Softener Shutoff Valve Requested State","d":"sensor","ds":1,"vt":"{{ {'00': 'Open', '01': 'Closed', '02': 'Transition (written only by application)'}.get(value[:2], 'Unknown') }}"}

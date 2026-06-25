@@ -1,4 +1,4 @@
-{"i":"4008","n":"Mixing valve home state request","d":"binary_sensor","ds":1}
+{"i":"4008","n":"Mixing valve home state request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"4009","n":"Mixing valve home state","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Mixing valve normal operation', '01': 'Mixing valve full cold', '02': 'Mixing valve cycling to cold', '03': 'Mixing valve cycling to normal position'}.get(value[:2], 'Unknown') }}"}
 {"i":"400a","n":"Mixing valve step offset","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"400b","n":"Mixing valve absolute position","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
@@ -128,7 +128,7 @@
 {"i":"406e","n":"T6 Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ (value | int(base=16)) / 10 | round(1) }}"}
 {"i":"4081","n":"Anode alarm active","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Alarm not active', '01': 'Alarm active'}.get(value[:2], 'Unknown') }}"}
 {"i":"4082","n":"Accessory low battery alarm active","d":"sensor","ds":1,"dc":"battery","vt":"{{ {'00': 'Alarm not active', '01': 'Alarm active'}.get(value[:2], 'Unknown') }}"}
-{"i":"4083","n":"Accessory leak detected alarm active","d":"binary_sensor","ds":1,"dc":"moisture"}
+{"i":"4083","n":"Accessory leak detected alarm active","d":"binary_sensor","ds":1,"dc":"moisture","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"40b8","n":"Groundwater Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"40b9","n":"T7 Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"40ba","n":"MC CPU Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
@@ -149,9 +149,9 @@
 {"i":"4107","n":"Water Heater Reset Information","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
 {"i":"411d","n":"Water Heater Dad Mode Delay In Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"4125","n":"Water Heater Current Cost Of Power","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown cost', '01': 'Cost lower than average', '02': 'Average cost', '03': 'Cost higher than average'}.get(value[:2], 'Unknown') }}"}
-{"i":"4220","n":"Water Heater Boost Mode State - Status/Actual","d":"binary_sensor","ds":1}
-{"i":"4221","n":"Water Heater Boost Mode State - Requested/Desired","d":"binary_sensor","ds":1}
+{"i":"4220","n":"Water Heater Boost Mode State - Status/Actual","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"4221","n":"Water Heater Boost Mode State - Requested/Desired","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"4222","n":"Shutoff Water Valve Position/State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not fitted', '01': 'Open', '02': 'Closed', '03': 'Transition'}.get(value[:2], 'Unknown') }}"}
-{"i":"4223","n":"Requested Water Valve Position","d":"binary_sensor","ds":1}
-{"i":"4225","n":"Water Heater Active State - Status/Actual","d":"binary_sensor","ds":1}
-{"i":"4226","n":"Water Heater Active State - Requested/Desired","d":"binary_sensor","ds":1}
+{"i":"4223","n":"Requested Water Valve Position","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"4225","n":"Water Heater Active State - Status/Actual","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"4226","n":"Water Heater Active State - Requested/Desired","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}

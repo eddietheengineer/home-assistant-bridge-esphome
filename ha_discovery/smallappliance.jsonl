@@ -1,4 +1,4 @@
-{"i":"9000","n":"Coffee Brewer Brewing","d":"binary_sensor","ds":1}
+{"i":"9000","n":"Coffee Brewer Brewing","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9001","n":"Coffee Brewer Brew Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
 {"i":"9002","n":"Coffee Brewer Brew Temperature Limits - Minimum Temperature (F)","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"9002","n":"Coffee Brewer Brew Temperature Limits - Maximum Temperature (F)","d":"sensor","ds":2,"u":"°F","vt":"{{ value[2:4] | int(base=16) }}","fi":"maximum_temperature_f"}
@@ -37,7 +37,7 @@
 {"i":"9016","n":"Coffee Brewer Brew Strength Request","d":"sensor","ds":1,"vt":"{{ {'00': 'Reserved', '01': 'Light', '02': 'Medium', '03': 'Dark', '04': 'Gold', '05': 'Iced Coffee'}.get(value[:2], 'Unknown') }}"}
 {"i":"9017","n":"Coffee Brewer Brew Temperature Request","d":"sensor","ds":1,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
 {"i":"9018","n":"Coffee Brewer Brew Cups Request","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"9019","n":"Coffee Brewer Descaling","d":"binary_sensor","ds":1}
+{"i":"9019","n":"Coffee Brewer Descaling","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"901a","n":"Coffee Brewer Start Descale","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"901b","n":"Coffee Brewer Cancel Descale","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"901c","n":"Espresso Maker Supported Brew Types - Espresso Supported","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"espresso_supported"}
@@ -71,7 +71,7 @@
 {"i":"9024","n":"Espresso Maker Current Standby Timeout - Standby Timeout Seconds Min","d":"sensor","ds":6,"vt":"{{ value[4:8] | int(base=16) }}","fi":"standby_timeout_seconds_min"}
 {"i":"9024","n":"Espresso Maker Current Standby Timeout - Standby Timeout Seconds Max","d":"sensor","ds":6,"vt":"{{ value[8:12] | int(base=16) }}","fi":"standby_timeout_seconds_max"}
 {"i":"9025","n":"Espresso Maker Requested Standby Timeout","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"9027","n":"Espresso Maker Emptying Status","d":"binary_sensor","ds":1}
+{"i":"9027","n":"Espresso Maker Emptying Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9029","n":"Espresso Maker Current Americano Brew Parameters - Temperature (C * 10)","d":"sensor","ds":16,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"9029","n":"Espresso Maker Current Americano Brew Parameters - Grind Time (Seconds * 10)","d":"sensor","ds":16,"vt":"{{ value[4:8] | int(base=16) }}","fi":"grind_time_seconds_10"}
 {"i":"9029","n":"Espresso Maker Current Americano Brew Parameters - Volume Milliliters","d":"sensor","ds":16,"vt":"{{ value[8:10] | int(base=16) }}","fi":"volume_milliliters"}
@@ -86,12 +86,12 @@
 {"i":"902a","n":"Espresso Maker Requested Americano Brew Parameters - Grind Time (Seconds * 10)","d":"sensor","ds":6,"vt":"{{ value[4:8] | int(base=16) }}","fi":"grind_time_seconds_10"}
 {"i":"902a","n":"Espresso Maker Requested Americano Brew Parameters - Volume Milliliters","d":"sensor","ds":6,"vt":"{{ value[8:10] | int(base=16) }}","fi":"volume_milliliters"}
 {"i":"902a","n":"Espresso Maker Requested Americano Brew Parameters - Padding","d":"sensor","ds":6,"vt":"{{ value[10:12] | int(base=16) }}","fi":"padding"}
-{"i":"902b","n":"Espresso Maker Grind Hopper Presence Status","d":"binary_sensor","ds":1}
-{"i":"902c","n":"Espresso Maker Empty Waste Bin","d":"binary_sensor","ds":1}
-{"i":"902d","n":"Espresso Maker Bean Status","d":"binary_sensor","ds":1}
+{"i":"902b","n":"Espresso Maker Grind Hopper Presence Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"902c","n":"Espresso Maker Empty Waste Bin","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"902d","n":"Espresso Maker Bean Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"902e","n":"Espresso Maker Set the Water Hardness Setting","d":"sensor","ds":1,"vt":"{{ {'00': 'Very Soft', '01': 'Soft', '02': 'Hard', '03': 'Very Hard'}.get(value[:2], 'Unknown') }}"}
-{"i":"902f","n":"Espresso Maker Service Door/Brew Module Status","d":"binary_sensor","ds":1,"dc":"door"}
-{"i":"9030","n":"Espresso Maker Descale Needed Status","d":"binary_sensor","ds":1}
+{"i":"902f","n":"Espresso Maker Service Door/Brew Module Status","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"9030","n":"Espresso Maker Descale Needed Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9031","n":"Espresso Maker Steam Knob Position","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Off', '01': 'Steam', '02': 'Hot Water'}.get(value[:2], 'Unknown') }}"}
 {"i":"9032","n":"Espresso Maker Current Lungo Brew Parameters - Temperature (C * 10)","d":"sensor","ds":16,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"9032","n":"Espresso Maker Current Lungo Brew Parameters - Grind Time (Seconds * 10)","d":"sensor","ds":16,"vt":"{{ value[4:8] | int(base=16) }}","fi":"grind_time_seconds_10"}
@@ -211,10 +211,10 @@
 {"i":"9043","n":"Espresso Maker Supported Features - Steam Supported","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 67108864) % 2 else '00' }}","fi":"steam_supported"}
 {"i":"9044","n":"Espresso Maker Volume Until Descale Needed","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
 {"i":"9045","n":"Espresso Maker Lifetime Coffee Ground","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
-{"i":"9046","n":"Espresso Maker Overpressure Detected","d":"binary_sensor","ds":1}
-{"i":"9047","n":"Espresso Maker is Making Espresso","d":"binary_sensor","ds":1}
-{"i":"9048","n":"Espresso Maker Grinder Blocked","d":"binary_sensor","ds":1}
-{"i":"9049","n":"Espresso Maker Grinder Overheated","d":"binary_sensor","ds":1}
+{"i":"9046","n":"Espresso Maker Overpressure Detected","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"9047","n":"Espresso Maker is Making Espresso","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"9048","n":"Espresso Maker Grinder Blocked","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"9049","n":"Espresso Maker Grinder Overheated","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"904a","n":"Espresso Maker Current MyCup/MyBrew Parameters - Temperature (C * 10)","d":"sensor","ds":6,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"904a","n":"Espresso Maker Current MyCup/MyBrew Parameters - Brew Type","d":"sensor","ds":6,"dc":"enum","vt":"{{ {'00': 'Espresso', '01': 'Americano', '02': 'Lungo', '03': 'Hot Water', '04': 'Steam', '05': 'Ristretto', '06': 'Doppio', '07': 'Triple Shot', '08': 'Red Eye', '09': 'MyBrew/MyCup'}.get(value[4:6], 'Unknown') }}","fi":"brew_type"}
 {"i":"904a","n":"Espresso Maker Current MyCup/MyBrew Parameters - Volume Milliliters","d":"sensor","ds":6,"vt":"{{ value[6:8] | int(base=16) }}","fi":"volume_milliliters"}
@@ -226,9 +226,9 @@
 {"i":"904d","n":"Coffee Brewer Current Grind Setting - Grind Setting","d":"sensor","ds":3,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"904d","n":"Coffee Brewer Current Grind Setting - Min Grind Setting","d":"sensor","ds":3,"vt":"{{ value[2:4] | int(base=16) }}","fi":"min_grind_setting"}
 {"i":"904d","n":"Coffee Brewer Current Grind Setting - Max Grind Setting","d":"sensor","ds":3,"vt":"{{ value[4:6] | int(base=16) }}","fi":"max_grind_setting"}
-{"i":"904e","n":"Tank Missing or Unlocked","d":"binary_sensor","ds":1}
-{"i":"904f","n":"Brew Basket Missing or Unlocked","d":"binary_sensor","ds":1}
-{"i":"9050","n":"Disable Grinder Requested State","d":"binary_sensor","ds":1}
+{"i":"904e","n":"Tank Missing or Unlocked","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"904f","n":"Brew Basket Missing or Unlocked","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"9050","n":"Disable Grinder Requested State","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9051","n":"Coffee Brewer Current Brew Settings - Setting Gold","d":"sensor","ds":12,"u":"s","dc":"duration","vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
 {"i":"9051","n":"Coffee Brewer Current Brew Settings - Setting Bloom Dwell","d":"sensor","ds":12,"u":"s","vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"setting_bloom_dwell"}
 {"i":"9051","n":"Coffee Brewer Current Brew Settings - Setting Bloom Pump","d":"sensor","ds":12,"u":"s","vt":"{{ '01' if value[4:6] != '00' else '00' }}","fi":"setting_bloom_pump"}
@@ -251,7 +251,7 @@
 {"i":"9052","n":"Coffee Brewer Request Brew Settings - Bloom Dwell Time (Seconds)","d":"sensor","ds":14,"u":"s","vt":"{{ value[20:24] | int(base=16) }}","fi":"bloom_dwell_time_seconds"}
 {"i":"9052","n":"Coffee Brewer Request Brew Settings - Padding","d":"sensor","ds":14,"u":"s","vt":"{{ value[24:26] | int(base=16) }}","fi":"padding"}
 {"i":"9052","n":"Coffee Brewer Request Brew Settings - Action","d":"sensor","ds":14,"u":"s","dc":"enum","vt":"{{ {'00': 'Update Settings', '01': 'Start Brew'}.get(value[26:28], 'Unknown') }}","fi":"action"}
-{"i":"9053","n":"Disable Grinder Current State","d":"binary_sensor","ds":1}
+{"i":"9053","n":"Disable Grinder Current State","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9054","n":"Coffee Brewer Favorite Brew 1 Current Settings - Setting Gold","d":"sensor","ds":12,"u":"s","dc":"duration","vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
 {"i":"9054","n":"Coffee Brewer Favorite Brew 1 Current Settings - Setting Bloom Dwell","d":"sensor","ds":12,"u":"s","vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"setting_bloom_dwell"}
 {"i":"9054","n":"Coffee Brewer Favorite Brew 1 Current Settings - Setting Bloom Pump","d":"sensor","ds":12,"u":"s","vt":"{{ '01' if value[4:6] != '00' else '00' }}","fi":"setting_bloom_pump"}
@@ -345,21 +345,21 @@
 {"i":"905f","n":"Coffee Brewer Supported Features v1 - Favorites Supported","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 2) % 2 else '00' }}","fi":"favorites_supported"}
 {"i":"9100","n":"Ice Maker Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Making ice', '01': 'Defrosting', '02': 'Cleaning', '03': 'Ice bin full', '04': 'Add water', '05': 'Ice bin missing', '06': 'Idle', '07': 'Missing water source', '08': 'Lid Open'}.get(value[:2], 'Unknown') }}"}
 {"i":"9101","n":"Ice Maker Light","d":"sensor","ds":1,"vt":"{{ {'00': 'Off', '01': 'On', '02': 'Dim'}.get(value[:2], 'Unknown') }}"}
-{"i":"9102","n":"Ice Maker Cloud Schedule Enabled","d":"binary_sensor","ds":1}
-{"i":"9104","n":"Ice Maker Filter Status","d":"binary_sensor","ds":1}
+{"i":"9102","n":"Ice Maker Cloud Schedule Enabled","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"9104","n":"Ice Maker Filter Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9105","n":"Under Counter Ice Maker Notifications - Clean soon","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 1) % 2 else '00' }}","fi":"clean_soon"}
 {"i":"9105","n":"Under Counter Ice Maker Notifications - Clean now","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 2) % 2 else '00' }}","fi":"clean_now"}
 {"i":"9105","n":"Under Counter Ice Maker Notifications - Replace filter soon","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 4) % 2 else '00' }}","fi":"replace_filter_soon"}
 {"i":"9105","n":"Under Counter Ice Maker Notifications - Replace filter now","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 8) % 2 else '00' }}","fi":"replace_filter_now"}
 {"i":"9105","n":"Under Counter Ice Maker Notifications - Door alarm active","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 16) % 2 else '00' }}","fi":"door_alarm_active"}
-{"i":"9106","n":"Ice Maker Cleaning Required","d":"binary_sensor","ds":1}
-{"i":"9107","n":"Ice Maker Power","d":"binary_sensor","ds":1}
+{"i":"9106","n":"Ice Maker Cleaning Required","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"9107","n":"Ice Maker Power","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9108","n":"Ice Maker Ice Production","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"9109","n":"Ice Maker Cube Size","d":"sensor","ds":1,"vt":"{{ {'00': 'Small', '01': 'Standard', '02': 'Large'}.get(value[:2], 'Unknown') }}"}
 {"i":"910a","n":"Under Counter Ice Maker Bin Full","d":"sensor","ds":1,"sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"910b","n":"Ice Maker Filter Life Used Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"910c","n":"Ice Maker Clean Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Clean', '01': 'Clean soon (order supplies)', '02': 'Clean now'}.get(value[:2], 'Unknown') }}"}
-{"i":"910f","n":"Door Status","d":"binary_sensor","ds":1,"dc":"door"}
+{"i":"910f","n":"Door Status","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"911d","n":"Ice Maker Filter Status Reset","d":"button","ds":1,"dc":"restart"}
 {"i":"9132","n":"Tank Drain Frequency Setting","d":"sensor","ds":1,"vt":"{{ {'00': 'Normal', '01': 'More Frequent', '02': 'Very Frequent'}.get(value[:2], 'Unknown') }}"}
 {"i":"9133","n":"Harvest Time Adjustment Setting","d":"sensor","ds":1,"vt":"{{ {'00': 'Normal', '01': 'Longer', '02': 'Longest'}.get(value[:2], 'Unknown') }}"}
@@ -401,12 +401,12 @@
 {"i":"9200","n":"Toaster Oven Supported Cook Modes - Cookie with Preferences Supported","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 8388608) % 2 else '00' }}","fi":"cookie_with_preferences_supported"}
 {"i":"9200","n":"Toaster Oven Supported Cook Modes - Pizza with Preferences Supported","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 256) % 2 else '00' }}","fi":"pizza_with_preferences_supported"}
 {"i":"9200","n":"Toaster Oven Supported Cook Modes - Convection Bake Supported","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 512) % 2 else '00' }}","fi":"convection_bake_supported"}
-{"i":"9201","n":"Toaster Oven Cavity Light Current State","d":"binary_sensor","ds":1}
-{"i":"9202","n":"Toaster Oven Cavity Light Requested State","d":"binary_sensor","ds":1}
+{"i":"9201","n":"Toaster Oven Cavity Light Current State","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"9202","n":"Toaster Oven Cavity Light Requested State","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9203","n":"SDA Current Display Brightness Setting","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Low', '01': 'Medium', '02': 'High'}.get(value[:2], 'Unknown') }}"}
 {"i":"9204","n":"SDA Requested Display Brightness Setting","d":"sensor","ds":1,"vt":"{{ {'00': 'Low', '01': 'Medium', '02': 'High'}.get(value[:2], 'Unknown') }}"}
-{"i":"9205","n":"Toaster Oven Door Status","d":"binary_sensor","ds":1,"dc":"door"}
-{"i":"9206","n":"Toaster Oven Door Alarm Status","d":"binary_sensor","ds":1,"dc":"door"}
+{"i":"9205","n":"Toaster Oven Door Status","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"9206","n":"Toaster Oven Door Alarm Status","d":"binary_sensor","ds":1,"dc":"door","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9207","n":"Toaster Oven Current Cooking Parameters - Shade","d":"sensor","ds":12,"u":"s","dc":"duration","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"9207","n":"Toaster Oven Current Cooking Parameters - Size","d":"sensor","ds":12,"u":"s","dc":"enum","vt":"{{ {'00': 'Small', '01': 'Medium', '02': 'Large'}.get(value[2:4], 'Unknown') }}","fi":"size"}
 {"i":"9207","n":"Toaster Oven Current Cooking Parameters - Temperature (F)","d":"sensor","ds":12,"u":"s","vt":"{{ value[4:8] | int(base=16) }}","fi":"temperature_f"}
@@ -723,7 +723,7 @@
 {"i":"9223","n":"Toaster Oven Requested Toast Mode Cooking Parameters - Padding[0]","d":"sensor","ds":12,"u":"s","vt":"{{ value[18:20] | int(base=16) }}","fi":"padding_0"}
 {"i":"9223","n":"Toaster Oven Requested Toast Mode Cooking Parameters - Padding[1]","d":"sensor","ds":12,"u":"s","vt":"{{ value[20:22] | int(base=16) }}","fi":"padding_1"}
 {"i":"9223","n":"Toaster Oven Requested Toast Mode Cooking Parameters - Padding[2]","d":"sensor","ds":12,"u":"s","vt":"{{ value[22:24] | int(base=16) }}","fi":"padding_2"}
-{"i":"9224","n":"Toaster Oven Door Alarm Silence","d":"binary_sensor","ds":1}
+{"i":"9224","n":"Toaster Oven Door Alarm Silence","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9225","n":"Toaster Oven Reset Cooking Parameters for the Selected Cooking Mode","d":"button","ds":1,"dc":"restart"}
 {"i":"9226","n":"Toaster Oven Current Crisp Finish Mode Cooking Parameters","d":"sensor","ds":28,"u":"s","dc":"duration","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"9226","n":"Toaster Oven Current Crisp Finish Mode Cooking Parameters - Temperature Used","d":"binary_sensor","ds":28,"vt":"{{ '01' if ((value[52:56] | int(base=16)) // 256) % 2 else '00' }}","fi":"temperature_used"}
@@ -748,11 +748,11 @@
 {"i":"9227","n":"Toaster Oven Requested Crisp Finish Mode Cooking Parameters - Padding[0]","d":"sensor","ds":12,"u":"s","vt":"{{ value[18:20] | int(base=16) }}","fi":"padding_0"}
 {"i":"9227","n":"Toaster Oven Requested Crisp Finish Mode Cooking Parameters - Padding[1]","d":"sensor","ds":12,"u":"s","vt":"{{ value[20:22] | int(base=16) }}","fi":"padding_1"}
 {"i":"9227","n":"Toaster Oven Requested Crisp Finish Mode Cooking Parameters - Padding[2]","d":"sensor","ds":12,"u":"s","vt":"{{ value[22:24] | int(base=16) }}","fi":"padding_2"}
-{"i":"9228","n":"Toaster Oven Cancel Operation","d":"binary_sensor","ds":1}
-{"i":"9229","n":"Toaster Oven Current Preheat Enabled Setting","d":"binary_sensor","ds":1}
-{"i":"922a","n":"Toaster Oven Requested Preheat Enabled Setting","d":"binary_sensor","ds":1}
-{"i":"922b","n":"Toaster Oven Current Convection Fan State","d":"binary_sensor","ds":1}
-{"i":"922c","n":"Toaster Oven Requested Convection Fan State","d":"binary_sensor","ds":1}
+{"i":"9228","n":"Toaster Oven Cancel Operation","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"9229","n":"Toaster Oven Current Preheat Enabled Setting","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"922a","n":"Toaster Oven Requested Preheat Enabled Setting","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"922b","n":"Toaster Oven Current Convection Fan State","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"922c","n":"Toaster Oven Requested Convection Fan State","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"922d","n":"Toaster Oven Time Remaining for Remote Start","d":"sensor","ds":2,"u":"s","dc":"duration","vt":"{{ value | int(base=16) }}"}
 {"i":"922e","n":"Toaster Oven Add More Time - Add Cook Time Seconds","d":"sensor","ds":8,"vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"922e","n":"Toaster Oven Add More Time - Request ID","d":"sensor","ds":8,"vt":"{{ value[8:16] | int(base=16) }}","fi":"request_id"}
@@ -869,7 +869,7 @@
 {"i":"9303","n":"Mixer Control Settings Limits - Torque Profile Max Delta Torque (mN-m)","d":"sensor","ds":18,"u":"s","vt":"{{ (value[16:20] | int(base=16)) - 65536 if (value[16:20] | int(base=16)) >= 32768 else (value[16:20] | int(base=16)) }}","fi":"torque_profile_max_delta_torque_mn_m"}
 {"i":"9303","n":"Mixer Control Settings Limits - Torque Profile Min Baseline Sample Time (Seconds)","d":"sensor","ds":18,"u":"s","vt":"{{ value[20:24] | int(base=16) }}","fi":"torque_profile_min_baseline_sample_time_seconds"}
 {"i":"9303","n":"Mixer Control Settings Limits - Torque Profile Max Baseline Sample Time (Seconds)","d":"sensor","ds":18,"u":"s","vt":"{{ value[24:28] | int(base=16) }}","fi":"torque_profile_max_baseline_sample_time_seconds"}
-{"i":"9304","n":"Mixer Pause Mixing Cycle","d":"binary_sensor","ds":1}
+{"i":"9304","n":"Mixer Pause Mixing Cycle","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9305","n":"Mixer State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Idle', '01': 'Mixing', '02': 'Paused'}.get(value[:2], 'Unknown') }}"}
 {"i":"9306","n":"Mixer Notifications - Out of Balance","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"out_of_balance"}
 {"i":"9306","n":"Mixer Notifications - Sudden Stop","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 512) % 2 else '00' }}","fi":"sudden_stop"}
@@ -896,11 +896,11 @@
 {"i":"930a","n":"Cycle Timer Absolute Time Modification - Padding","d":"sensor","ds":8,"u":"min","vt":"{{ value[6:8] | int(base=16) }}","fi":"padding"}
 {"i":"930a","n":"Cycle Timer Absolute Time Modification - Sequence Number","d":"sensor","ds":8,"u":"min","vt":"{{ value[8:16] | int(base=16) }}","fi":"sequence_number"}
 {"i":"930b","n":"Scale Mode Current Units","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Metric', '01': 'US Standard'}.get(value[:2], 'Unknown') }}"}
-{"i":"930c","n":"Scale Mode Requested Units","d":"binary_sensor","ds":1}
+{"i":"930c","n":"Scale Mode Requested Units","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"930d","n":"Scale Current Target Weight","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"930e","n":"Scale Requested Target Weight","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
-{"i":"930f","n":"Scale Mode Enable","d":"binary_sensor","ds":1}
-{"i":"9310","n":"Tare Scale","d":"binary_sensor","ds":1}
+{"i":"930f","n":"Scale Mode Enable","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
+{"i":"9310","n":"Tare Scale","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9311","n":"Scale Action Availability - Enable Scale Mode Available","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"enable_scale_mode_available"}
 {"i":"9311","n":"Scale Action Availability - Modify Scale Units Available","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 512) % 2 else '00' }}","fi":"modify_scale_units_available"}
 {"i":"9311","n":"Scale Action Availability - Set Target Weight Available","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 1024) % 2 else '00' }}","fi":"set_target_weight_available"}
@@ -970,15 +970,15 @@
 {"i":"9402","n":"Supported States - Awaiting Start","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"awaiting_start"}
 {"i":"9402","n":"Supported States - Cooking","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"cooking"}
 {"i":"9402","n":"Supported States - Keep Warm","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"keep_warm"}
-{"i":"9404","n":"Smoke","d":"switch","ds":1,"p":"9403","r":"request"}
+{"i":"9404","n":"Smoke","d":"switch","ds":1,"p":"9403","r":"request","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9405","n":"Pause Smoke Status - Pause Smoke Option Editable","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"pause_smoke_option_editable"}
 {"i":"9405","n":"Pause Smoke Status - Smoke Paused","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"smoke_paused"}
-{"i":"9406","n":"Smoke Paused Request","d":"binary_sensor","ds":1}
+{"i":"9406","n":"Smoke Paused Request","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9407","n":"Cook Time Remaining","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
 {"i":"9408","n":"Total Elapsed Cooking Time","d":"sensor","ds":2,"u":"min","dc":"duration","vt":"{{ value | int(base=16) }}"}
 {"i":"9409","n":"Actual Cavity Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
 {"i":"940a","n":"Probe Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","vt":"{{ value | int(base=16) }}"}
-{"i":"940b","n":"Probe Present","d":"binary_sensor","ds":1}
+{"i":"940b","n":"Probe Present","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"940c","n":"Target Cavity Temperature Limits - Target Cavity Temperature Min (F)","d":"sensor","ds":4,"u":"°F","dc":"temperature","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"940c","n":"Target Cavity Temperature Limits - Target Cavity Temperature Max (F)","d":"sensor","ds":4,"u":"°F","vt":"{{ value[4:8] | int(base=16) }}","fi":"target_cavity_temperature_max_f"}
 {"i":"940d","n":"Probe Temperature Limits - Probe Temperature Min (F)","d":"sensor","ds":4,"u":"°F","dc":"temperature","vt":"{{ value[0:4] | int(base=16) }}"}
@@ -987,7 +987,7 @@
 {"i":"940e","n":"Cook Time Limits - Cook Time Max (minutes)","d":"sensor","ds":4,"u":"min","vt":"{{ value[4:8] | int(base=16) }}","fi":"cook_time_max_minutes"}
 {"i":"940f","n":"Smoke Level Limits - Smoke Level Min","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"940f","n":"Smoke Level Limits - Smoke Level Max","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"smoke_level_max"}
-{"i":"9410","n":"Remote Configure Enabled","d":"binary_sensor","ds":1}
+{"i":"9410","n":"Remote Configure Enabled","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9411","n":"Custom Mode Current Parameters - Cavity Temperature (F)","d":"sensor","ds":8,"u":"min","dc":"duration","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"9411","n":"Custom Mode Current Parameters - Cook Time (Minutes)","d":"sensor","ds":8,"u":"min","vt":"{{ value[4:8] | int(base=16) }}","fi":"cook_time_minutes"}
 {"i":"9411","n":"Custom Mode Current Parameters - Probe Target Temperature (F)","d":"sensor","ds":8,"u":"min","vt":"{{ value[8:10] | int(base=16) }}","fi":"probe_target_temperature_f"}
@@ -1054,7 +1054,7 @@
 {"i":"9420","n":"Salmon Mode Requested Parameters - Smoke Level","d":"sensor","ds":8,"u":"min","vt":"{{ value[10:12] | int(base=16) }}","fi":"smoke_level"}
 {"i":"9421","n":"Auto Warm Enable Current Setting - Auto Warm Setting Editable","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"auto_warm_setting_editable"}
 {"i":"9421","n":"Auto Warm Enable Current Setting - Auto Warm Setting Status","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"auto_warm_setting_status"}
-{"i":"9422","n":"Auto Warm Enable Requested Setting","d":"binary_sensor","ds":1}
+{"i":"9422","n":"Auto Warm Enable Requested Setting","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9423","n":"Auto Warm Current Time - Auto Warm Time Option Editable","d":"sensor","ds":4,"u":"min","dc":"duration","vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
 {"i":"9423","n":"Auto Warm Current Time - Padding","d":"sensor","ds":4,"u":"min","vt":"{{ value[2:4] | int(base=16) }}","fi":"padding"}
 {"i":"9423","n":"Auto Warm Current Time - Auto Warm Time (Minutes)","d":"sensor","ds":4,"u":"min","vt":"{{ value[4:8] | int(base=16) }}","fi":"auto_warm_time_minutes"}
@@ -1082,7 +1082,7 @@
 {"i":"9433","n":"Igniter Temperature Limits - Igniter Temperature Min (F)","d":"sensor","ds":4,"u":"°F","dc":"temperature","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"9433","n":"Igniter Temperature Limits - Igniter Temperature Max (F)","d":"sensor","ds":4,"u":"°F","vt":"{{ value[4:8] | int(base=16) }}","fi":"igniter_temperature_max_f"}
 {"i":"9434","n":"Reset Cooking Parameters","d":"button","ds":1,"dc":"restart"}
-{"i":"9435","n":"Restore Factory Defaults","d":"binary_sensor","ds":1}
+{"i":"9435","n":"Restore Factory Defaults","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"9436","n":"Smoker Type","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Arden Indoor Smoker'}.get(value[:2], 'Unknown') }}"}
 {"i":"9437","n":"Smoker Push Notifications - Cooking Started","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"cooking_started"}
 {"i":"9437","n":"Smoker Push Notifications - Cooking Complete","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 512) % 2 else '00' }}","fi":"cooking_complete"}
@@ -1138,4 +1138,4 @@
 {"i":"9508","n":"Time Until Next Feed - Timer Active","d":"sensor","ds":4,"u":"min","dc":"duration","vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
 {"i":"9508","n":"Time Until Next Feed - Padding","d":"sensor","ds":4,"u":"min","vt":"{{ value[2:4] | int(base=16) }}","fi":"padding"}
 {"i":"9508","n":"Time Until Next Feed (Minutes)","d":"sensor","ds":4,"u":"min","vt":"{{ value[4:8] | int(base=16) }}","fi":"time_until_next_feed_minutes"}
-{"i":"9509","n":"Crock Present","d":"binary_sensor","ds":1}
+{"i":"9509","n":"Crock Present","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
