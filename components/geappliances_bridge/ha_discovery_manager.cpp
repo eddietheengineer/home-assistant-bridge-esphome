@@ -70,10 +70,10 @@ static const char* const HA_DISCOVERY_COMPONENT_TYPES[] = {
 /* Cleanup: discover and remove old HA discovery topics               */
 /* ------------------------------------------------------------------ */
 
-/* Idle timeout when topics were received for current component type. */
-#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 5000
+/* Idle timeout after last topic for current component type. */
+#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 2000
 /* Short timeout for component types with no topics — skip quickly. */
-#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS 1000
+#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS 500
 
 /* Flush queued cleanup topics: publish empty retained payloads to remove them.
  * Called from cleanup_run() during idle periods, not from the MQTT callback,
