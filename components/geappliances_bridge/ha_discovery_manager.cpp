@@ -983,6 +983,16 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
             if (xSemaphoreTake(self->done_sem, 0) == pdTRUE) {
                 self->build_done = true;
                 self->task_handle = NULL;
+
+                /* Free task resources immediately after build completes.
+                 * This returns ~3 KB (stack + TCB) to the heap during the
+                 * cleanup + discovery phases — the period of highest memory
+                 * pressure. cleanup_resources() at the end will be a no-op
+                 * since these are set to NULL. */
+                free(self->task_stack);
+                free(self->task_tcb);
+                self->task_stack = NULL;
+                self->task_tcb = NULL;
             } else {
                 return;  /* Build not done yet. */
             }
