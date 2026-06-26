@@ -257,17 +257,17 @@ class GeappliancesBridge : public Component, public IBridgeServices {
    * polling bridge and subscription bridge share the same ERD client;
    * overflow corrupts adjacent heap metadata causing
    * prvCheckTasksWaitingTermination crashes (see erd_bridge_poll.cpp). */
-  uint8_t client_queue_buffer_[8192];
+  uint8_t client_queue_buffer_[4096];
 
   // GEA2 components (only used when gea2_uart_ is set)
   esphome_uart_adapter_t gea2_uart_adapter_;
 
   tiny_gea2_interface_t gea2_interface_;
   uint8_t gea2_receive_buffer_[255];
-  uint8_t gea2_send_queue_buffer_[10000];
+  uint8_t gea2_send_queue_buffer_[4096];
 
   tiny_gea2_erd_client_t gea2_erd_client_;
-  uint8_t gea2_client_queue_buffer_[8096];
+  uint8_t gea2_client_queue_buffer_[4096];
 
   // Event fired once per millisecond to drive GEA2 interface's internal timers.
   // Published manually inside the GEA2 tight loop (not via a timer_group_ periodic
