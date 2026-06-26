@@ -241,6 +241,11 @@ const char* configured_device_id_{nullptr};
 // Before
 void set_device_id(const std::string &device_id) { this->configured_device_id_ = device_id; }
 // After
+// Lifetime: stores a pointer into the caller's std::string. Safe because
+// ESPHome's YAML config strings are stored as std::string members on the
+// component or as string literals, outliving the bridge component.
+// Do NOT pass a temporary std::string (e.g. set_device_id("literal") is fine
+// via implicit conversion, but set_device_id(std::string("x")) is NOT).
 void set_device_id(const std::string &device_id) { this->configured_device_id_ = device_id.c_str(); }
 ```
 
