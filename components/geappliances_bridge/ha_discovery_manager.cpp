@@ -153,6 +153,7 @@ static void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_component_removed_count = 0;
     self->cleanup_pass_number = 1;
     self->cleanup_wait_start_ms = 0;
+    self->cleanup_component_skip = 0;
 
     ESP_LOGI(TAG, "Starting HA discovery cleanup...");
 }
@@ -165,10 +166,10 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
         /* NULL sentinel means we've processed all types. */
         if (component == NULL) break;
-
-        /* Skip components that had 0 removals on the previous pass. */
-        if (self->cleanup_component_skip) {
-            self->cleanup_component_skip = false;
+        /* Skip components that had 0 removals on a previous pass.
+         * Once a component has no retained topics, it won't magically
+         * have some later — the bitmap persists across passes. */
+        if (self->cleanup_component_skip & (1 << self->cleanup_current_component)) {
             self->cleanup_current_component++;
             continue;
         }
@@ -217,7 +218,9 @@ static void cleanup_run(ha_discovery_manager_t* self)
                 self->cleanup_current_component + 1,
                 sizeof(HA_DISCOVERY_COMPONENT_TYPES) / sizeof(HA_DISCOVERY_COMPONENT_TYPES[0]) - 1,
                 component, self->cleanup_component_removed_count, self->cleanup_pass_number);
-            self->cleanup_component_skip = (self->cleanup_component_removed_count == 0);
+            if (self->cleanup_component_removed_count == 0) {
+                self->cleanup_component_skip |= (1 << self->cleanup_current_component);
+            }
             self->cleanup_component_removed_count = 0;
             self->cleanup_current_component++;
             self->cleanup_received_topics = false;
@@ -244,7 +247,6 @@ static void cleanup_run(ha_discovery_manager_t* self)
         self->cleanup_pass_found_topics = false;
         self->cleanup_pass_removed_count = 0;
         self->cleanup_component_removed_count = 0;
-        self->cleanup_component_skip = false;
         return;
     }
 
@@ -264,7 +266,6 @@ static void cleanup_run(ha_discovery_manager_t* self)
         self->cleanup_received_topics = false;
         self->cleanup_pass_found_topics = false;
         self->cleanup_component_removed_count = 0;
-        self->cleanup_component_skip = false;
         return;
     }
 
