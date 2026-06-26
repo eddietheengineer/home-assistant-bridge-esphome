@@ -1180,8 +1180,8 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
     if (self->state != ha_discovery_state_idle) return;
 
 #ifdef USE_ESP_IDF
-    static constexpr int STACK_SIZE_BIG = 4 * 1024;
-    static constexpr int STACK_SIZE_SMALL = 2 * 1024;
+    static constexpr int STACK_SIZE_BIG = 2 * 1024;
+    static constexpr int STACK_SIZE_SMALL = 1024;
 
     self->task_stack = (StackType_t*)heap_caps_malloc(STACK_SIZE_BIG, MALLOC_CAP_8BIT);
     if (!self->task_stack) {

@@ -54,13 +54,13 @@ typedef enum {
 #define HA_DISCOVERY_PUBLISH_INTERVAL_MS 50
 
 /* Decompression buffer size per chunk (max chunk is ~14KB). */
-#define HA_DISCOVERY_DECOMP_BUF_SIZE 16384
+#define HA_DISCOVERY_DECOMP_BUF_SIZE 14336
 
 /* Line buffer size for JSONL parsing (max line is ~14KB). */
-#define HA_DISCOVERY_LINE_BUF_SIZE 16384
+#define HA_DISCOVERY_LINE_BUF_SIZE 14336
 
 /* Payload buffer for building discovery payloads. */
-#define HA_DISCOVERY_PAYLOAD_BUF_SIZE 16384
+#define HA_DISCOVERY_PAYLOAD_BUF_SIZE 8192
 
 /*!
  * @brief Home Assistant MQTT Discovery manager.
@@ -172,7 +172,7 @@ typedef struct {
    * Each entry is a pointer into the shared topic_buf, so we queue
    * offsets into topic_buf as we receive messages, then publish them
    * in batches from the main loop to avoid blocking the MQTT task. */
-#define HA_DISCOVERY_CLEANUP_QUEUE_SIZE 64
+#define HA_DISCOVERY_CLEANUP_QUEUE_SIZE 16
   char cleanup_topic_queue[HA_DISCOVERY_CLEANUP_QUEUE_SIZE][128];
   uint16_t cleanup_queue_count;
 #endif
