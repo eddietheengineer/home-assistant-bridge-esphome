@@ -1191,11 +1191,16 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
 
 #ifdef USE_ESP_IDF
     static constexpr int STACK_SIZE_BIG = 4 * 1024;
-    static constexpr int STACK_SIZE_SMALL = 1024;
+    static constexpr int STACK_SIZE_SMALL = 2 * 1024;
 
+    int stack_size = STACK_SIZE_BIG;
     self->task_stack = (StackType_t*)heap_caps_malloc(STACK_SIZE_BIG, MALLOC_CAP_8BIT);
     if (!self->task_stack) {
+        ESP_LOGW(TAG, "HA discovery: big stack allocation failed, falling back to %d bytes", STACK_SIZE_SMALL);
         self->task_stack = (StackType_t*)heap_caps_malloc(STACK_SIZE_SMALL, MALLOC_CAP_8BIT);
+        if (self->task_stack) {
+            stack_size = STACK_SIZE_SMALL;
+        }
     }
 
     self->task_tcb = (StaticTask_t*)heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_8BIT);
@@ -1214,7 +1219,7 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
     self->task_handle = xTaskCreateStatic(
         build_task,
         "ha_discovery_build",
-        STACK_SIZE_BIG,
+        stack_size,
         self,
         1,
         self->task_stack,
