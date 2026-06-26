@@ -124,7 +124,7 @@ void GeappliancesBridge::initialize_mqtt_client_()
   }
 
   ESP_LOGI(TAG, "Initializing MQTT client adapter with device ID: %s",
-           this->device_identity_manager_.get_device_id().c_str());
+           this->device_identity_manager_.get_device_id());
 
   // For manual device_id configs where autodiscovery is skipped (gea2_uart only,
   // no GEA3 uart), mark the protocol as GEA2 so run_protocol_stack_() enables
@@ -137,7 +137,7 @@ void GeappliancesBridge::initialize_mqtt_client_()
 
   // Bind the adapter to the device ID.
   esphome_mqtt_client_adapter_init(&this->mqtt_client_adapter_,
-                                   this->device_identity_manager_.get_device_id().c_str());
+                                   this->device_identity_manager_.get_device_id());
 
   // Wire up the ERD registry: clears any stale registrations and sets up
   // the MQTT adapter with a single pointer for valid-ERD filtering and

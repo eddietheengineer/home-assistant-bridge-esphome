@@ -85,7 +85,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_gea3_uart(uart::UARTComponent *uart) { this->uart_ = uart; }
   void set_gea2_uart(uart::UARTComponent *uart) { this->gea2_uart_ = uart; }
   void set_client_address(uint8_t address) { this->client_address_ = address; }
-  void set_device_id(const std::string &device_id) { this->configured_device_id_ = device_id; }
+  void set_device_id(const std::string &device_id) { this->configured_device_id_ = device_id.c_str(); }
   void set_mode(uint8_t mode) { this->mode_ = static_cast<BridgeMode>(mode); }
   void set_polling_interval(uint32_t polling_interval) { this->polling_interval_ms_ = polling_interval; }
   void set_appliance_api_parsing(bool appliance_api_parsing) { this->appliance_api_parsing_ = appliance_api_parsing; }
@@ -151,7 +151,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   uart::UARTComponent *uart_{nullptr};
   uart::UARTComponent *gea2_uart_{nullptr};
-  std::string configured_device_id_;
+  const char* configured_device_id_{nullptr};
   uint8_t client_address_{0xE4};
 
   bool mqtt_client_adapter_initialized_{false};
