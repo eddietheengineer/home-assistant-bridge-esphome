@@ -979,23 +979,29 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 
     /* Wait for build task to finish (first call). */
     if (self->state == ha_discovery_state_building) {
-        if (!self->build_done && self->done_sem) {
-            if (xSemaphoreTake(self->done_sem, 0) == pdTRUE) {
-                self->build_done = true;
-                self->task_handle = NULL;
+        if (xSemaphoreTake(self->done_sem, 0) == pdTRUE) {
+            self->build_done = true;
 
-                /* Free task resources immediately after build completes.
-                 * This returns ~3 KB (stack + TCB) to the heap during the
-                 * cleanup + discovery phases — the period of highest memory
-                 * pressure. cleanup_resources() at the end will be a no-op
-                 * since these are set to NULL. */
-                free(self->task_stack);
-                free(self->task_tcb);
-                self->task_stack = NULL;
-                self->task_tcb = NULL;
-            } else {
-                return;  /* Build not done yet. */
-            }
+            /* After vTaskDelete() the TCB is on xTasksWaitingTermination.
+             * The idle task runs prvCheckTasksWaitingTermination to unlink
+             * the TCB's list items via uxListRemove(). We MUST yield here
+             * so the idle task can finish before freeing the TCB — freeing
+             * it mid-uxListRemove causes a load access fault. */
+            esp_task_wdt_reset();
+            vTaskDelay(pdMS_TO_TICKS(100));
+
+            /* Free task resources after the idle task has unlinked the TCB.
+             * This returns ~3 KB (stack + TCB) to the heap during the
+             * cleanup + discovery phases — the period of highest memory
+             * pressure. cleanup_resources() at the end will be a no-op
+             * since these are set to NULL. */
+            free(self->task_stack);
+            free(self->task_tcb);
+            self->task_stack = NULL;
+            self->task_tcb = NULL;
+            self->task_handle = NULL;
+        } else {
+            return;  /* Build not done yet. */
         }
         if (!self->build_done) return;
 
