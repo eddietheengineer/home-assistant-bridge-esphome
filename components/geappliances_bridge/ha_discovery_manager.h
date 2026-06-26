@@ -162,7 +162,7 @@ typedef struct {
   uint16_t cleanup_current_component; // Index into ha_discovery_component_types[]
   bool cleanup_received_topics;       // Whether we received any topics for current component
   uint8_t cleanup_clean_passes;       // Consecutive passes with no topics found
-  uint16_t cleanup_component_skip;        // Per-component skip bitmap (1 bit per component type)
+  uint32_t cleanup_component_skip;        // Per-component skip bitmap (1 bit per component type)
   bool cleanup_pass_found_topics;      // Whether any topics were found during current pass
   uint16_t cleanup_component_removed_count; // Topics removed for current component
   uint8_t cleanup_pass_number;              // Current pass number (starts at 1)

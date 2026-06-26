@@ -48,19 +48,25 @@ static const char* const TAG = "ha_discovery";
  * subscribe to one component type at a time, wait for idle, clear,
  * then move to the next. */
 static const char* const HA_DISCOVERY_COMPONENT_TYPES[] = {
+    "alarm_control_panel",
     "binary_sensor",
-    "sensor",
-    "select",
-    "switch",
-    "number",
     "button",
-    "light",
     "camera",
-    "update",
     "climate",
     "cover",
+    "date",
+    "datetime",
+    "event",
     "fan",
+    "light",
     "lock",
+    "number",
+    "select",
+    "sensor",
+    "switch",
+    "text",
+    "time",
+    "update",
     "vacuum",
     "valve",
     NULL  /* sentinel */
@@ -169,7 +175,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
         /* Skip components that had 0 removals on a previous pass.
          * Once a component has no retained topics, it won't magically
          * have some later — the bitmap persists across passes. */
-        if (self->cleanup_component_skip & (1 << self->cleanup_current_component)) {
+        if (self->cleanup_component_skip & (1u << self->cleanup_current_component)) {
             self->cleanup_current_component++;
             continue;
         }
@@ -219,7 +225,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
                 sizeof(HA_DISCOVERY_COMPONENT_TYPES) / sizeof(HA_DISCOVERY_COMPONENT_TYPES[0]) - 1,
                 component, self->cleanup_component_removed_count, self->cleanup_pass_number);
             if (self->cleanup_component_removed_count == 0) {
-                self->cleanup_component_skip |= (1 << self->cleanup_current_component);
+                self->cleanup_component_skip |= (1u << self->cleanup_current_component);
             }
             self->cleanup_component_removed_count = 0;
             self->cleanup_current_component++;
