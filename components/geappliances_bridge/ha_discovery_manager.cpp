@@ -265,6 +265,13 @@ wait_check:
 
     /* Final wait complete. Proceed to discovery. */
     ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
+    {
+        size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        size_t largest_free = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+        ESP_LOGI(TAG, "Heap before discovery: free=%u, largest_block=%u, fragmentation=%.1f%%",
+            (unsigned)free_heap, (unsigned)largest_free,
+            (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
+    }
     self->cleanup_subscribed = false;
     self->state = ha_discovery_state_discovering;
     self->current_category = 0;
@@ -1004,6 +1011,15 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
             return;  /* Build not done yet. */
         }
         if (!self->build_done) return;
+
+        /* Heap after build task freed its stack/TCB. */
+        {
+            size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+            size_t largest_free = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+            ESP_LOGI(TAG, "Heap after build: free=%u, largest_block=%u, fragmentation=%.1f%%",
+                (unsigned)free_heap, (unsigned)largest_free,
+                (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
+        }
 
         /* Transition to cleaning. */
         self->state = ha_discovery_state_cleaning;
