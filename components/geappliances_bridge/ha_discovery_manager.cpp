@@ -93,6 +93,7 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
 
         ESP_LOGD(TAG, "Removed old topic: %s", self->cleanup_topic_queue[0]);
         self->cleanup_pass_removed_count++;
+        self->cleanup_component_removed_count++;
 
         /* Shift remaining entries down. */
         for (uint16_t i = 1; i < self->cleanup_queue_count; i++) {
@@ -110,9 +111,9 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
 }
 
 /* Callback for homeassistant/{component}/{device_id}/# subscription during cleanup.
- * Instead of publishing immediately (which blocks the MQTT task), we queue the
- * topic name and flush it from cleanup_run() in batches. This prevents the
- * ESP-IDF MQTT inbound queue from overflowing during the initial burst. */
+ * Queues the topic name for batched publishing from the main loop. This keeps
+ * the callback short — no outbound publish call — so the MQTT task's inbound
+ * queue drains fast and retained message bursts don't overflow. */
 static void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
@@ -125,16 +126,15 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     /* If the payload is empty, it's our own echo from a previous clear — skip. */
     if (payload_len == 0) return;
 
-    /* Publish the clear immediately. esp_mqtt_client_publish() is non-blocking
-     * (enqueues in the outbound queue), so this is safe from the callback context.
-     * Immediate publish frees the inbound slot for the next retained message,
-     * preventing the ESP-IDF inbound event queue from overflowing and dropping
-     * messages that we'd never see. */
-    mqtt_client_publish_raw(self->mqtt_client, topic, "", 0, true);
+    /* Queue the topic name for publishing from the main loop. */
+    if (self->cleanup_queue_count < HA_DISCOVERY_CLEANUP_QUEUE_SIZE) {
+        strncpy(self->cleanup_topic_queue[self->cleanup_queue_count], topic, 127);
+        self->cleanup_topic_queue[self->cleanup_queue_count][127] = '\0';
+        self->cleanup_queue_count++;
+    }
+
     self->cleanup_received_topics = true;
     self->cleanup_pass_found_topics = true;
-    self->cleanup_pass_removed_count++;
-    self->cleanup_component_removed_count++;
 
     /* Record activity time so the idle timer resets. */
     self->cleanup_last_activity_ms = self->get_time_ms();
@@ -166,6 +166,16 @@ static void cleanup_run(ha_discovery_manager_t* self)
         /* NULL sentinel means we've processed all types. */
         if (component == NULL) break;
 
+        /* Skip components that had 0 removals on the previous pass. */
+        if (self->cleanup_component_skip) {
+            self->cleanup_component_skip = false;
+            self->cleanup_current_component++;
+            continue;
+        }
+
+        /* Flush any queued topics before subscribing to the next component. */
+        cleanup_flush_queue(self);
+
         /* Subscribe to this component type for our device.
          * homeassistant/{component}/{device_id}/# scopes to one component
          * type at a time, avoiding inbound queue overflow. */
@@ -193,6 +203,8 @@ static void cleanup_run(ha_discovery_manager_t* self)
             ? HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS
             : HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS;
         if (now - self->cleanup_last_activity_ms >= timeout) {
+            /* Flush any remaining queued topics before unsubscribing. */
+            cleanup_flush_queue(self);
 
             /* Unsubscribe from current component type. */
             if (self->mqtt_client) {
@@ -205,6 +217,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
                 self->cleanup_current_component + 1,
                 sizeof(HA_DISCOVERY_COMPONENT_TYPES) / sizeof(HA_DISCOVERY_COMPONENT_TYPES[0]) - 1,
                 component, self->cleanup_component_removed_count, self->cleanup_pass_number);
+            self->cleanup_component_skip = (self->cleanup_component_removed_count == 0);
             self->cleanup_component_removed_count = 0;
             self->cleanup_current_component++;
             self->cleanup_received_topics = false;
@@ -212,6 +225,9 @@ static void cleanup_run(ha_discovery_manager_t* self)
             /* Move to the next component type. */
             continue;
         }
+
+        /* Flush queued topics while waiting for the idle timeout. */
+        cleanup_flush_queue(self);
 
         /* Still receiving messages for this component type. */
         return;
@@ -228,6 +244,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
         self->cleanup_pass_found_topics = false;
         self->cleanup_pass_removed_count = 0;
         self->cleanup_component_removed_count = 0;
+        self->cleanup_component_skip = false;
         return;
     }
 
@@ -247,6 +264,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
         self->cleanup_received_topics = false;
         self->cleanup_pass_found_topics = false;
         self->cleanup_component_removed_count = 0;
+        self->cleanup_component_skip = false;
         return;
     }
 

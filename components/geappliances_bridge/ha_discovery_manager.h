@@ -162,6 +162,7 @@ typedef struct {
   uint16_t cleanup_current_component; // Index into ha_discovery_component_types[]
   bool cleanup_received_topics;       // Whether we received any topics for current component
   uint8_t cleanup_clean_passes;       // Consecutive passes with no topics found
+  bool cleanup_component_skip;         // Skip this component on next pass (0 removed last time)
   bool cleanup_pass_found_topics;      // Whether any topics were found during current pass
   uint16_t cleanup_component_removed_count; // Topics removed for current component
   uint8_t cleanup_pass_number;              // Current pass number (starts at 1)
@@ -172,7 +173,7 @@ typedef struct {
    * Each entry is a pointer into the shared topic_buf, so we queue
    * offsets into topic_buf as we receive messages, then publish them
    * in batches from the main loop to avoid blocking the MQTT task. */
-#define HA_DISCOVERY_CLEANUP_QUEUE_SIZE 16
+#define HA_DISCOVERY_CLEANUP_QUEUE_SIZE 64
   char cleanup_topic_queue[HA_DISCOVERY_CLEANUP_QUEUE_SIZE][128];
   uint16_t cleanup_queue_count;
 #endif
