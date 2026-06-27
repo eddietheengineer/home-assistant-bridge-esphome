@@ -1212,7 +1212,7 @@ def find_erd_definitions_json() -> Optional[Path]:
 def fetch_erd_definitions_from_github() -> Optional[dict]:
     """Fetch ERD definitions from GitHub as fallback."""
     import urllib.request as urllib
-    url = "https://raw.githubusercontent.com/geappliances/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
+    url = "https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
     print(f"Fetching ERD definitions from GitHub: {url}", file=sys.stderr)
     try:
         with urllib.urlopen(url, timeout=10) as response:

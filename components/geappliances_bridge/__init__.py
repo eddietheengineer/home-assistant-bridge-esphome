@@ -173,7 +173,7 @@ def load_appliance_types() -> dict[int, str]:
 
     # If local paths failed, try fetching from GitHub as fallback
     if data is None:
-        url = "https://raw.githubusercontent.com/geappliances/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
+        url = "https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
         _LOGGER.info("Fetching ERD definitions from GitHub: %s", url)
 
         try:

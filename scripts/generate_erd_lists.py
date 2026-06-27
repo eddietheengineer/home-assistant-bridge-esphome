@@ -536,7 +536,8 @@ def main():
         if local.exists():
             return local
         # Fetch from GitHub as last resort (ESPHome Docker, clean cache, etc.)
-        url = f"https://raw.githubusercontent.com/geappliances/public-appliance-api-documentation/main/{filename}"
+        # Use eddietheengineer fork which has ha_domain metadata for HA discovery.
+        url = f"https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/main/{filename}"
         print(f"Local {filename} not found, fetching from GitHub: {url}", file=sys.stderr)
         try:
             tmp = Path("/tmp") / filename
