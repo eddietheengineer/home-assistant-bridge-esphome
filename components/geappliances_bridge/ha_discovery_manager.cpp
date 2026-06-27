@@ -168,6 +168,7 @@ static void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_last_activity_ms = self->get_time_ms();
     self->cleanup_queue_count = 0;
     self->cleanup_received_topics = false;
+    self->cleanup_flushed_once = false;
     self->cleanup_clean_passes = 0;
     self->cleanup_pass_found_topics = false;
     self->cleanup_pass_removed_count = 0;
@@ -208,6 +209,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
                 mqtt_client_subscribe(self->mqtt_client, sub_topic,
                     cleanup_topic_callback, self);
                 self->cleanup_subscribed = true;
+                self->cleanup_flushed_once = false;
                 self->cleanup_last_activity_ms = self->get_time_ms();
                 ESP_LOGI(TAG, "  [%u/%u] Subscribing to %s (pass %u)",
                     self->cleanup_current_component + 1,
@@ -224,6 +226,13 @@ static void cleanup_run(ha_discovery_manager_t* self)
         uint32_t timeout = self->cleanup_received_topics
             ? HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS
             : HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS;
+        if (!self->cleanup_flushed_once) {
+            /* Must flush at least once after subscribing before declaring */
+            /* the component empty — retained messages may still be in flight. */
+            cleanup_flush_queue(self);
+            self->cleanup_flushed_once = true;
+            return;
+        }
         if (now - self->cleanup_last_activity_ms >= timeout) {
             /* Flush any remaining queued topics before unsubscribing. */
             cleanup_flush_queue(self);

@@ -162,6 +162,7 @@ typedef struct {
   bool cleanup_subscribed;            // Whether we've subscribed
   uint16_t cleanup_current_component; // Index into ha_discovery_component_types[]
   bool cleanup_received_topics;       // Whether we received any topics for current component
+  bool cleanup_flushed_once;          // Whether we flushed at least once after subscribing
   uint8_t cleanup_clean_passes;       // Consecutive passes with no topics found
   uint32_t cleanup_component_skip;        // Per-component skip bitmap (1 bit per component type)
   bool cleanup_pass_found_topics;      // Whether any topics were found during current pass
