@@ -786,9 +786,12 @@ def _deduplicate_field_ids(entries: List[Dict]) -> None:
                 if m:
                     offset = int(m.group(1))
                 else:
-                    # For entries without value_template (e.g. byte_offset fields),
-                    # use data_size as a fallback disambiguator
-                    offset = entry.get('data_size', 0)
+                    # For entries without value_template (e.g. buttons, enum options),
+                    # use a collision counter to guarantee uniqueness within the ERD.
+                    counter_key = f'__dedup_counter__{fid}'
+                    counter = claimed.get(counter_key, 0) + 1
+                    claimed[counter_key] = counter
+                    offset = counter
                 new_fid = f'{fid}_{offset}'
                 # Guard against the new id also colliding with another claimed id
                 suffix = 0

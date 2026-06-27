@@ -113,7 +113,7 @@ typedef struct {
   char line_buf[HA_DISCOVERY_LINE_BUF_SIZE];
 
   /* Payload buffer for building discovery payloads. */
-  char topic_buf[136];
+  char topic_buf[192];
   char payload_buf[HA_DISCOVERY_PAYLOAD_BUF_SIZE];
 
   /* Rate limiting. */
@@ -145,7 +145,7 @@ typedef struct {
   char payload_off_buf[16];
   char state_on_buf[16];
   char state_off_buf[16];
-  char unique_id_buf[128];
+  char unique_id_buf[160];
   char state_topic_buf[128];
   char command_topic_buf[128];
   char actual_state_topic_buf[128];
