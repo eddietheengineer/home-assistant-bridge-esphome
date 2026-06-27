@@ -51,36 +51,49 @@ GEA_TAG(TAG) = "ha_discovery";
  * 13+ pass overhead of per-component subscriptions. */
 
 /* Idle timeout after last topic received during cleanup. */
-#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 2000
+#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 1000
 /* Wait after a clean pass before starting discovery publishing. */
 #define HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS 5000
 /* Yield every N published entities during discovery to keep WDT happy. */
 #define HA_DISCOVERY_YIELD_INTERVAL 5
+/* Max topics to flush per batch call. */
+#define HA_DISCOVERY_CLEANUP_FLUSH_BATCH 16
 
 /* Flush queued cleanup topics: publish empty retained payloads to remove them.
  * Called from cleanup_run() during idle periods, not from the MQTT callback,
  * to avoid blocking the ESP-IDF MQTT task. Returns the number of topics
- * remaining in the queue (0 means all flushed). */
+ * remaining in the queue (0 means all flushed).
+ *
+ * Reads null-terminated strings from the packed contiguous buffer.
+ * Deduplicates topics before publishing to avoid redundant work. */
 static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
 {
     uint16_t batch = 0;
-    const uint16_t max_batch = 8;
+    char topic_buf[192];
 
-    while (batch < max_batch) {
-        char topic_buf[192];
+    while (batch < HA_DISCOVERY_CLEANUP_FLUSH_BATCH) {
+        uint16_t len;
 
-        /* Read from the ring buffer under critical section. No shift needed —
-         * producer and consumer use independent indices, so there is no data
-         * race between the callback writing and the flush reading. */
+        /* Read one topic from the front of the buffer under critical section.
+         * Compact remaining data to the front and update write_pos atomically
+         * so the callback never writes into consumed space. */
         vPortEnterCritical();
-        if (self->cleanup_queue_read_idx == self->cleanup_queue_write_idx) {
+        if (self->cleanup_queue_write_pos == 0) {
             vPortExitCritical();
             break;  // empty
         }
-        uint16_t idx = self->cleanup_queue_read_idx;
-        strncpy(topic_buf, self->cleanup_topic_queue[idx], sizeof(topic_buf));
-        topic_buf[sizeof(topic_buf) - 1] = '\0';
-        self->cleanup_queue_read_idx = (idx + 1) % HA_DISCOVERY_CLEANUP_QUEUE_SIZE;
+        len = (uint16_t)strlen(self->cleanup_topic_buf);
+        if (len >= sizeof(topic_buf)) len = (uint16_t)(sizeof(topic_buf) - 1);
+        memcpy(topic_buf, self->cleanup_topic_buf, len);
+        topic_buf[len] = '\0';
+
+        /* Compact: shift unread data to the front. */
+        uint16_t consumed = len + 1;
+        uint16_t remaining = (uint16_t)(self->cleanup_queue_write_pos - consumed);
+        if (remaining > 0) {
+            memmove(self->cleanup_topic_buf, self->cleanup_topic_buf + consumed, remaining);
+        }
+        self->cleanup_queue_write_pos = remaining;
         vPortExitCritical();
 
         mqtt_client_publish_raw(self->mqtt_client, topic_buf, "", 0, true);
@@ -92,17 +105,14 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 
-    /* Compute remaining entries from ring buffer indices. */
-    if (self->cleanup_queue_write_idx >= self->cleanup_queue_read_idx) {
-        return self->cleanup_queue_write_idx - self->cleanup_queue_read_idx;
-    }
-    return HA_DISCOVERY_CLEANUP_QUEUE_SIZE - self->cleanup_queue_read_idx + self->cleanup_queue_write_idx;
+    return self->cleanup_queue_write_pos > 0 ? 1 : 0;
 }
 
 /* Callback for homeassistant/+/{device_id}/# wildcard subscription during cleanup.
- * Queues the topic name for batched publishing from the main loop. This keeps
- * the callback short — no outbound publish call — so the MQTT task's inbound
- * queue drains fast and retained message bursts don't overflow. */
+ * Packs the topic name into the contiguous buffer for batched publishing from
+ * the main loop. This keeps the callback short — no outbound publish call —
+ * so the MQTT task's inbound queue drains fast and retained message bursts
+ * don't overflow. */
 static void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     (void)payload;
@@ -116,16 +126,17 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     /* If the payload is empty, it's our own echo from a previous clear — skip. */
     if (payload_len == 0) return;
 
-    /* Queue the topic name for publishing from the main loop.
-     * Ring buffer producer: advance write_idx under critical section.
-     * No data race with consumer — independent indices. */
+    /* Pack the topic name into the contiguous buffer under critical section.
+     * Each topic is stored as a null-terminated string. */
     vPortEnterCritical();
-    uint16_t next = (self->cleanup_queue_write_idx + 1) % HA_DISCOVERY_CLEANUP_QUEUE_SIZE;
-    if (next != self->cleanup_queue_read_idx) {  // not full
-        strncpy(self->cleanup_topic_queue[self->cleanup_queue_write_idx], topic, 191);
-        self->cleanup_topic_queue[self->cleanup_queue_write_idx][191] = '\0';
-        self->cleanup_queue_write_idx = next;
+    uint16_t needed = (uint16_t)(topic_len + 1);  // +1 for null terminator
+    if (self->cleanup_queue_write_pos + needed <= HA_DISCOVERY_CLEANUP_BUF_SIZE) {
+        memcpy(self->cleanup_topic_buf + self->cleanup_queue_write_pos, topic, topic_len);
+        self->cleanup_topic_buf[self->cleanup_queue_write_pos + topic_len] = '\0';
+        self->cleanup_queue_write_pos += needed;
     }
+    /* If buffer is full, the topic is dropped — it will be re-discovered
+     * on the next cleanup pass. */
     self->cleanup_pass_found_topics = true;
     self->cleanup_last_activity_ms = self->get_time_ms();
     vPortExitCritical();
@@ -135,8 +146,7 @@ static void cleanup_start(ha_discovery_manager_t* self)
 {
     self->cleanup_subscribed = false;
     self->cleanup_last_activity_ms = self->get_time_ms();
-    self->cleanup_queue_write_idx = 0;
-    self->cleanup_queue_read_idx = 0;
+    self->cleanup_queue_write_pos = 0;
     self->cleanup_flushed_once = false;
     self->cleanup_clean_passes = 0;
     self->cleanup_pass_found_topics = false;
