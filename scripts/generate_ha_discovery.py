@@ -1105,9 +1105,9 @@ _FILTER_PATTERNS = [
     ("latched_key", re.compile(
         r"(?i)latched key status"
     )),
-    # DIP switch status. Hardware configuration, not user-facing.
+    # DIP switch status/settings. Hardware configuration, not user-facing.
     ("dip_switch", re.compile(
-        r"(?i)dip switch status"
+        r"(?i)dip switch (status|settings)"
     )),
     # Unused/reserved fields. Placeholder data, never meaningful.
     ("unused_reserved", re.compile(
