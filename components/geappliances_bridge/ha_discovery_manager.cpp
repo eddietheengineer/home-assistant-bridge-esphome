@@ -272,8 +272,10 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
     /* Check if we've been idle long enough. */
     if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
-        /* Flush any remaining queued topics before unsubscribing. */
-        cleanup_flush_queue(self);
+        /* Flush entire queue before unsubscribing. */
+        while (self->cleanup_queue_count > 0) {
+            cleanup_flush_queue(self);
+        }
 
         /* Unsubscribe. */
         if (self->mqtt_client) {
@@ -349,8 +351,11 @@ wait_check:
         return;
     }
 
-    /* Still receiving messages. Flush queued topics while waiting. */
-    cleanup_flush_queue(self);
+    /* Still receiving messages. Flush queued topics while waiting.
+     * Drain the buffer in batches to keep the callback from filling up. */
+    while (self->cleanup_queue_count > 0) {
+        cleanup_flush_queue(self);
+    }
 }
 
 /* ------------------------------------------------------------------ */
