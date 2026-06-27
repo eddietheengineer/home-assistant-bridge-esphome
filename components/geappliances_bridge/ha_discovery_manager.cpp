@@ -101,7 +101,7 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
         char topic_buf[128];
 
         /* Snapshot queue state under critical section to avoid race with callback. */
-        taskENTER_CRITICAL();
+        vPortEnterCritical();
         count = self->cleanup_queue_count;
         if (count > 0) {
             strncpy(topic_buf, self->cleanup_topic_queue[0], sizeof(topic_buf));
@@ -113,7 +113,7 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
             }
             self->cleanup_queue_count--;
         }
-        taskEXIT_CRITICAL();
+        vPortExitCritical();
 
         if (count == 0) break;
 
@@ -149,7 +149,7 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
 
     /* Queue the topic name for publishing from the main loop.
      * Use critical section to avoid race with cleanup_flush_queue. */
-    taskENTER_CRITICAL();
+    vPortEnterCritical();
     if (self->cleanup_queue_count < HA_DISCOVERY_CLEANUP_QUEUE_SIZE) {
         strncpy(self->cleanup_topic_queue[self->cleanup_queue_count], topic, 127);
         self->cleanup_topic_queue[self->cleanup_queue_count][127] = '\0';
@@ -158,7 +158,7 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     self->cleanup_received_topics = true;
     self->cleanup_pass_found_topics = true;
     self->cleanup_last_activity_ms = self->get_time_ms();
-    taskEXIT_CRITICAL();
+    vPortExitCritical();
 }
 
 static void cleanup_start(ha_discovery_manager_t* self)
@@ -1109,7 +1109,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                      * malformed discovery payloads. */
                     ESP_LOGE(TAG, "Decompression failed for category '%s' chunk %u (offset %u, size %u)",
                         cat->name, self->current_chunk, chunk->offset, chunk->size);
-                    self->state = ha_discovery_state_error;
+                    self->state = ha_discovery_state_failed;
                     return;
                 }
                 self->current_decomp_size = (uint32_t)dst_size;
