@@ -79,38 +79,39 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
         char topic_buf[256];
         char suffix_buf[128];
         int domain_index;
-        size_t consumed;
+        uint16_t consumed;
 
-        /* Read and compact under critical section. */
         vPortEnterCritical();
         if (self->cleanup_queue_count == 0) {
             vPortExitCritical();
             break;  // empty
         }
 
-        /* Read domain index and suffix from the front of the buffer. */
-        domain_index = (int)(uint8_t)self->cleanup_topic_buf[0];
-        strncpy(suffix_buf, self->cleanup_topic_buf + 1, sizeof(suffix_buf) - 1);
-        suffix_buf[sizeof(suffix_buf) - 1] = '\0';
-
-        /* Compute bytes consumed by this entry: [domain_index:1][suffix][null:1]. */
-        consumed = 1 + strlen(suffix_buf) + 1;
-
-        /* Safety clamp: prevent underflow if buffer is corrupted. */
-        if (consumed > self->cleanup_queue_write_pos) {
-            consumed = self->cleanup_queue_write_pos;
+        /* Read domain index and suffix from the ring buffer at read_pos. */
+        uint16_t pos = self->cleanup_queue_read_pos;
+        domain_index = (int)(uint8_t)self->cleanup_topic_buf[pos];
+        
+        /* Read suffix (null-terminated). Handle potential wrap-around. */
+        uint16_t suffix_start = (pos + 1) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
+        size_t suffix_len = 0;
+        while (suffix_len < sizeof(suffix_buf) - 1 &&
+               self->cleanup_topic_buf[(suffix_start + suffix_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE] != '\0') {
+            suffix_buf[suffix_len] = self->cleanup_topic_buf[(suffix_start + suffix_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE];
+            suffix_len++;
         }
+        suffix_buf[suffix_len] = '\0';
 
-        /* Compact: shift remaining data to front. */
-        memmove(self->cleanup_topic_buf, self->cleanup_topic_buf + consumed,
-                self->cleanup_queue_write_pos - consumed);
-        self->cleanup_queue_write_pos -= (uint16_t)consumed;
+        /* Compute bytes consumed: [domain_index:1][suffix][null:1] */
+        consumed = (uint16_t)(1 + suffix_len + 1);
+
+        /* Advance read_pos with modulo wrap. */
+        self->cleanup_queue_read_pos = (pos + consumed) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
         self->cleanup_queue_count--;
         vPortExitCritical();
 
+        /* Reconstruct full topic outside critical section. */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-        /* Reconstruct full topic: "homeassistant/{domain}/{device_id}/{suffix}/config" */
         snprintf(topic_buf, sizeof(topic_buf), "homeassistant/%s/%s/%s/config",
                  HA_DOMAIN_STRINGS[domain_index], self->device_id, suffix_buf);
 #pragma GCC diagnostic pop
@@ -120,7 +121,6 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
         self->cleanup_pass_removed_count++;
         batch++;
 
-        /* Yield between batches to let the MQTT task process inbound messages. */
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 
@@ -128,7 +128,7 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
 }
 
 /* Callback for homeassistant/+/{device_id}/# wildcard subscription during cleanup.
- * Parses the topic, packs domain enum + suffix into the compacting buffer,
+ * Parses the topic, packs domain enum + suffix into the ring buffer,
  * and queues for batched publishing from the main loop. This keeps the callback
  * short — no outbound publish call — so the MQTT task's inbound queue drains fast
  * and retained message bursts don't overflow. */
@@ -165,26 +165,49 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     const char* suffix_end = topic + topic_len - 7;  // before "/config"
     size_t suffix_len = (size_t)(suffix_end - suffix_start);
 
-    /* Pack into buffer: [domain_index:1][suffix:variable][null:1] */
-    size_t needed = 1 + suffix_len + 1;
+    /* Pack: [domain_index:1][suffix:variable][null:1] */
+    uint16_t needed = (uint16_t)(1 + suffix_len + 1);
 
     vPortEnterCritical();
-    if (self->cleanup_queue_write_pos + needed <= HA_DISCOVERY_CLEANUP_BUF_SIZE) {
-        self->cleanup_topic_buf[self->cleanup_queue_write_pos] = (char)(uint8_t)domain_index;
-        memcpy(self->cleanup_topic_buf + self->cleanup_queue_write_pos + 1, suffix_start, suffix_len);
-        self->cleanup_topic_buf[self->cleanup_queue_write_pos + 1 + suffix_len] = '\0';
-        self->cleanup_queue_write_pos += (uint16_t)needed;
-        self->cleanup_queue_count++;
+
+    /* Check if buffer has room. For a ring buffer, we need 'needed' consecutive bytes
+     * starting at write_pos, not reaching read_pos. Reserve 1 byte to distinguish
+     * full from empty. */
+    uint16_t avail;
+    if (self->cleanup_queue_read_pos > self->cleanup_queue_write_pos) {
+        avail = (uint16_t)(self->cleanup_queue_read_pos - self->cleanup_queue_write_pos - 1);
     } else {
+        avail = (uint16_t)(HA_DISCOVERY_CLEANUP_BUF_SIZE - self->cleanup_queue_write_pos - 1 +
+                           self->cleanup_queue_read_pos);
+    }
+
+    if (avail >= needed) {
+        uint16_t pos = self->cleanup_queue_write_pos;
+
+        /* Check if entry fits without wrapping. If not, we can't split entries
+         * across the boundary — skip this topic (will be caught on next pass). */
+        if (pos + needed <= HA_DISCOVERY_CLEANUP_BUF_SIZE) {
+            self->cleanup_topic_buf[pos] = (char)(uint8_t)domain_index;
+            memcpy(self->cleanup_topic_buf + pos + 1, suffix_start, suffix_len);
+            self->cleanup_topic_buf[pos + 1 + suffix_len] = '\0';
+            self->cleanup_queue_write_pos = (pos + needed) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
+            self->cleanup_queue_count++;
+        } else {
+            /* Entry would wrap — drop it */
+            self->cleanup_dropped_count++;
+        }
+    } else {
+        /* Buffer full — drop this topic */
         self->cleanup_dropped_count++;
     }
+
     self->cleanup_pass_found_topics = true;
     self->cleanup_last_activity_ms = self->get_time_ms();
     vPortExitCritical();
 }
-
 CLEANUP_FN void cleanup_start(ha_discovery_manager_t* self)
 {
+    self->cleanup_queue_read_pos = 0;
     self->cleanup_queue_write_pos = 0;
     self->cleanup_queue_count = 0;
     self->cleanup_dropped_count = 0;
@@ -262,8 +285,8 @@ static void cleanup_run(ha_discovery_manager_t* self)
             mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
         }
         self->cleanup_subscribed = false;
-        ESP_LOGI(TAG, "  Pass %u: %u topics removed",
-            self->cleanup_pass_number, self->cleanup_pass_removed_count);
+        ESP_LOGI(TAG, "  Pass %u: %u topics removed, %u dropped",
+            self->cleanup_pass_number, self->cleanup_pass_removed_count, self->cleanup_dropped_count);
 
         if (self->cleanup_pass_found_topics) {
             /* Topics were found and cleared — loop again to verify. */

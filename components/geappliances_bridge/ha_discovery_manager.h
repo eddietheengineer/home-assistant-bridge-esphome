@@ -189,18 +189,20 @@ typedef struct {
   uint8_t cleanup_pass_number;        // Current pass number (starts at 1)
   uint32_t cleanup_wait_start_ms;     // Start time of final wait before discovery
 
-  /* Cleanup topic queue: compacting buffer of packed topic entries.
+  /* Cleanup topic queue: ring buffer with domain-enum packing.
    * Each entry: [domain_index:1][suffix:variable][null:1]
-   * At ~22 bytes avg, 12KB holds ~550 topics (vs 128 with fixed slots). */
+   * Uses read_pos/write_pos indices — no memmove needed.
+   * At ~22 bytes avg, 12KB holds ~550 topics. */
 #ifdef HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
   #define HA_DISCOVERY_CLEANUP_BUF_SIZE HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
 #else
   #define HA_DISCOVERY_CLEANUP_BUF_SIZE 12288
 #endif
   char cleanup_topic_buf[HA_DISCOVERY_CLEANUP_BUF_SIZE];
-  uint16_t cleanup_queue_write_pos;  // Next write byte offset (= total bytes used)
-  uint16_t cleanup_queue_count;      // Number of entries in buffer
-  uint16_t cleanup_dropped_count;    // Topics dropped due to buffer full
+  uint16_t cleanup_queue_read_pos;    // Byte offset where next topic is read
+  uint16_t cleanup_queue_write_pos;   // Byte offset where next topic is written
+  uint16_t cleanup_queue_count;       // Number of entries in buffer
+  uint16_t cleanup_dropped_count;     // Topics dropped due to buffer full
 
   /* Domain topic prefix: pre-computed "homeassistant/{domain}/{device_id}/"
    * to avoid repeated snprintf during discovery publish. */

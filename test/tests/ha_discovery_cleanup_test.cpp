@@ -33,8 +33,8 @@ static ha_discovery_manager_t make_manager(const char* device_id)
     mgr.get_time_ms = test_get_time_ms;
     mgr.state = ha_discovery_state_cleaning;
     mgr.mqtt_client = NULL;
+    mgr.cleanup_queue_read_pos = 0;
     mgr.cleanup_queue_write_pos = 0;
-    mgr.cleanup_queue_count = 0;
     mgr.cleanup_dropped_count = 0;
     mgr.cleanup_pass_found_topics = false;
     mgr.cleanup_last_activity_ms = 0;
@@ -93,8 +93,8 @@ TEST(ha_discovery_cleanup, pack_valid_topic)
     CHECK(mgr.cleanup_pass_found_topics);
 
     /* Verify packed data: domain_index=1 (binary_sensor), suffix="3218_washzones" */
-    CHECK_EQUAL((char)1, mgr.cleanup_topic_buf[0]);
-    STRNCMP_EQUAL("3218_washzones", mgr.cleanup_topic_buf + 1, 14);
+    CHECK_EQUAL((char)1, mgr.cleanup_topic_buf[mgr.cleanup_queue_read_pos]);
+    STRNCMP_EQUAL("3218_washzones", mgr.cleanup_topic_buf + mgr.cleanup_queue_read_pos + 1, 14);
 }
 
 TEST(ha_discovery_cleanup, pack_multiple_topics)
@@ -151,25 +151,25 @@ TEST(ha_discovery_cleanup, drain_and_refill)
     uint16_t initial_count = mgr.cleanup_queue_count;
     CHECK(initial_count > 0);
 
-    /* Simulate drain by compacting all entries out. */
+    /* Simulate drain by reading from ring buffer. */
     while (mgr.cleanup_queue_count > 0) {
-        char suffix_buf[192];
-        strncpy(suffix_buf, mgr.cleanup_topic_buf + 1, sizeof(suffix_buf) - 1);
-        suffix_buf[sizeof(suffix_buf) - 1] = '\0';
-
-        size_t consumed = 1 + strlen(suffix_buf) + 1;
-        if (consumed > mgr.cleanup_queue_write_pos) {
-            consumed = mgr.cleanup_queue_write_pos;
+        uint16_t pos = mgr.cleanup_queue_read_pos;
+        char suffix_buf[128];
+        uint16_t suffix_start = (pos + 1) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
+        size_t suffix_len = 0;
+        while (suffix_len < sizeof(suffix_buf) - 1 &&
+               mgr.cleanup_topic_buf[(suffix_start + suffix_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE] != '\0') {
+            suffix_buf[suffix_len] = mgr.cleanup_topic_buf[(suffix_start + suffix_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE];
+            suffix_len++;
         }
+        suffix_buf[suffix_len] = '\0';
 
-        memmove(mgr.cleanup_topic_buf, mgr.cleanup_topic_buf + consumed,
-                mgr.cleanup_queue_write_pos - consumed);
-        mgr.cleanup_queue_write_pos -= (uint16_t)consumed;
+        uint16_t consumed = (uint16_t)(1 + suffix_len + 1);
+        mgr.cleanup_queue_read_pos = (pos + consumed) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
         mgr.cleanup_queue_count--;
     }
 
     CHECK_EQUAL(0, mgr.cleanup_queue_count);
-    CHECK_EQUAL(0, mgr.cleanup_queue_write_pos);
 
     /* Refill — should succeed without drops. */
     for (uint32_t i = 0; i < 20; i++) {
@@ -241,20 +241,20 @@ TEST(ha_discovery_cleanup, cleanup_start_resets_fields)
 {
     ha_discovery_manager_t mgr = make_manager("Dishwasher_PDT715");
 
+    mgr.cleanup_queue_read_pos = 50;
     mgr.cleanup_queue_write_pos = 100;
     mgr.cleanup_queue_count = 50;
     mgr.cleanup_dropped_count = 10;
 
     cleanup_start(&mgr);
 
+    CHECK_EQUAL(0, mgr.cleanup_queue_read_pos);
     CHECK_EQUAL(0, mgr.cleanup_queue_write_pos);
     CHECK_EQUAL(0, mgr.cleanup_queue_count);
     CHECK_EQUAL(0, mgr.cleanup_dropped_count);
 }
 
 /* Flush reconstruction verification                                     */
-/* ------------------------------------------------------------------ */
-
 TEST(ha_discovery_cleanup, flush_reconstructs_topic_correctly)
 {
     ha_discovery_manager_t mgr = make_manager("Dishwasher_PDT715");
@@ -266,12 +266,18 @@ TEST(ha_discovery_cleanup, flush_reconstructs_topic_correctly)
 
     CHECK_EQUAL(1, mgr.cleanup_queue_count);
 
-    /* Verify reconstruction by reading the packed data and rebuilding. */
-    int domain_index = (int)(uint8_t)mgr.cleanup_topic_buf[0];
+    /* Verify reconstruction by reading from ring buffer at read_pos. */
+    uint16_t pos = mgr.cleanup_queue_read_pos;
+    int domain_index = (int)(uint8_t)mgr.cleanup_topic_buf[pos];
     char suffix_buf[128];
-    strncpy(suffix_buf, mgr.cleanup_topic_buf + 1, sizeof(suffix_buf) - 1);
-    suffix_buf[sizeof(suffix_buf) - 1] = '\0';
-
+    uint16_t suffix_start = (pos + 1) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
+    size_t suffix_len = 0;
+    while (suffix_len < sizeof(suffix_buf) - 1 &&
+           mgr.cleanup_topic_buf[(suffix_start + suffix_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE] != '\0') {
+        suffix_buf[suffix_len] = mgr.cleanup_topic_buf[(suffix_start + suffix_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE];
+        suffix_len++;
+    }
+    suffix_buf[suffix_len] = '\0';
     char reconstructed[256];
     snprintf(reconstructed, sizeof(reconstructed), "homeassistant/%s/%s/%s/config",
              HA_DOMAIN_STRINGS[domain_index], mgr.device_id, suffix_buf);
@@ -295,28 +301,97 @@ TEST(ha_discovery_cleanup, flush_batch_limit)
     uint16_t initial_count = mgr.cleanup_queue_count;
     CHECK(initial_count > 16);
 
-    /* Simulate flushing 16 entries (the batch limit) by compacting them out.
-     * This verifies the batch limit logic without needing a mock MQTT client. */
+    /* Simulate flushing 16 entries (the batch limit) by reading from ring buffer. */
     uint16_t flushed = 0;
     while (flushed < 16 && mgr.cleanup_queue_count > 0) {
+        uint16_t pos = mgr.cleanup_queue_read_pos;
         char suffix_buf[128];
-        strncpy(suffix_buf, mgr.cleanup_topic_buf + 1, sizeof(suffix_buf) - 1);
-        suffix_buf[sizeof(suffix_buf) - 1] = '\0';
-
-        size_t consumed = 1 + strlen(suffix_buf) + 1;
-        if (consumed > mgr.cleanup_queue_write_pos) {
-            consumed = mgr.cleanup_queue_write_pos;
+        uint16_t suffix_start = (pos + 1) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
+        size_t suffix_len = 0;
+        while (suffix_len < sizeof(suffix_buf) - 1 &&
+               mgr.cleanup_topic_buf[(suffix_start + suffix_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE] != '\0') {
+            suffix_buf[suffix_len] = mgr.cleanup_topic_buf[(suffix_start + suffix_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE];
+            suffix_len++;
         }
+        suffix_buf[suffix_len] = '\0';
 
-        memmove(mgr.cleanup_topic_buf, mgr.cleanup_topic_buf + consumed,
-                mgr.cleanup_queue_write_pos - consumed);
-        mgr.cleanup_queue_write_pos -= (uint16_t)consumed;
+        uint16_t consumed = (uint16_t)(1 + suffix_len + 1);
+        mgr.cleanup_queue_read_pos = (pos + consumed) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
         mgr.cleanup_queue_count--;
         flushed++;
     }
 
     CHECK_EQUAL(16, flushed);
     CHECK_EQUAL(initial_count - 16, mgr.cleanup_queue_count);
+}
+/* ------------------------------------------------------------------ */
+/* Ring buffer wrap-around                                              */
+/* ------------------------------------------------------------------ */
+
+TEST(ha_discovery_cleanup, ring_buffer_wraparound)
+{
+    ha_discovery_manager_t mgr = make_manager("Dishwasher_PDT715");
+
+    /* First round: pack 10 topics. */
+    for (uint32_t i = 0; i < 10; i++) {
+        char topic[128];
+        snprintf(topic, sizeof(topic),
+            "homeassistant/sensor/Dishwasher_PDT715/round1_field_%u/config", i);
+        cleanup_topic_callback(topic, "{\"data\":1}", 10, &mgr);
+    }
+    CHECK_EQUAL(10, mgr.cleanup_queue_count);
+
+    /* Drain all 10. */
+    while (mgr.cleanup_queue_count > 0) {
+        uint16_t pos = mgr.cleanup_queue_read_pos;
+        char suffix_buf[128];
+        uint16_t suffix_start = (pos + 1) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
+        size_t suffix_len = 0;
+        while (suffix_len < sizeof(suffix_buf) - 1 &&
+               mgr.cleanup_topic_buf[(suffix_start + suffix_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE] != '\0') {
+            suffix_buf[suffix_len] = mgr.cleanup_topic_buf[(suffix_start + suffix_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE];
+            suffix_len++;
+        }
+        suffix_buf[suffix_len] = '\0';
+        uint16_t consumed = (uint16_t)(1 + suffix_len + 1);
+        mgr.cleanup_queue_read_pos = (pos + consumed) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
+        mgr.cleanup_queue_count--;
+    }
+    CHECK_EQUAL(0, mgr.cleanup_queue_count);
+
+    /* Second round: pack 10 more topics. */
+    for (uint32_t i = 0; i < 10; i++) {
+        char topic[128];
+        snprintf(topic, sizeof(topic),
+            "homeassistant/sensor/Dishwasher_PDT715/round2_field_%u/config", i);
+        cleanup_topic_callback(topic, "{\"data\":1}", 10, &mgr);
+    }
+
+    CHECK_EQUAL(10, mgr.cleanup_queue_count);
+    CHECK_EQUAL(0, mgr.cleanup_dropped_count);
+
+    /* Verify we can still read them correctly. */
+    while (mgr.cleanup_queue_count > 0) {
+        uint16_t pos = mgr.cleanup_queue_read_pos;
+        int domain_index = (int)(uint8_t)mgr.cleanup_topic_buf[pos];
+        char suffix_buf[128];
+        uint16_t suffix_start = (pos + 1) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
+        size_t suffix_len = 0;
+        while (suffix_len < sizeof(suffix_buf) - 1 &&
+               mgr.cleanup_topic_buf[(suffix_start + suffix_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE] != '\0') {
+            suffix_buf[suffix_len] = mgr.cleanup_topic_buf[(suffix_start + suffix_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE];
+            suffix_len++;
+        }
+        suffix_buf[suffix_len] = '\0';
+
+        CHECK(domain_index >= 0 && domain_index < HA_DOMAIN_COUNT);
+        CHECK(strlen(suffix_buf) > 0);
+
+        uint16_t consumed = (uint16_t)(1 + suffix_len + 1);
+        mgr.cleanup_queue_read_pos = (pos + consumed) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
+        mgr.cleanup_queue_count--;
+    }
+    CHECK_EQUAL(0, mgr.cleanup_queue_count);
 }
 
 /* ------------------------------------------------------------------ */
