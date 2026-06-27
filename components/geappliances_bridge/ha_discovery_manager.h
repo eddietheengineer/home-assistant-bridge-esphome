@@ -181,7 +181,9 @@ typedef struct {
    * Uses a single wildcard subscription (homeassistant/+/{device_id}/#)
    * instead of per-component subscriptions to avoid 13+ passes. */
   uint32_t cleanup_last_activity_ms;  // Last time a topic was received
-  bool cleanup_subscribed;            // Whether we've subscribed
+  bool cleanup_subscribed;            // Whether we've subscribed to current domain/window
+  uint8_t cleanup_current_domain;     // Current domain index being cleaned (0-20)
+  uint8_t cleanup_current_window;     // Current suffix window (0='0'-'4', 1='5'-'9', 2='a'-'f', 3=rest)
   bool cleanup_flushed_once;          // Whether we flushed at least once after subscribing
   uint8_t cleanup_clean_passes;       // Consecutive passes with no topics found
   bool cleanup_pass_found_topics;     // Whether any topics were found during current pass
@@ -200,7 +202,6 @@ typedef struct {
   #define HA_DISCOVERY_CLEANUP_BUF_SIZE 12288
 #endif
   char cleanup_topic_buf[HA_DISCOVERY_CLEANUP_BUF_SIZE];
-  uint16_t cleanup_queue_read_pos;    // Byte offset where next topic is read
   uint16_t cleanup_queue_write_pos;   // Byte offset where next topic is written
   uint16_t cleanup_queue_count;       // Number of entries in buffer
   uint16_t cleanup_dropped_count;     // Topics dropped due to buffer full
