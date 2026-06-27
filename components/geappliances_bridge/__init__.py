@@ -388,28 +388,8 @@ async def to_code(config: dict[str, Any]) -> None:
         )
         raise
 
-    # Generate HA discovery compressed data when enabled
-    if config.get(CONF_GENERATE_DEVICE_CONFIG, False):
-        try:
-            _LOGGER.info("Compressing HA MQTT discovery data...")
-            subprocess.run(
-                [sys.executable, os.path.join(scripts_dir, "compress_ha_discovery.py")],
-                cwd=repo_root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            _LOGGER.info("HA MQTT discovery data compressed successfully")
-        except subprocess.CalledProcessError as e:
-            _LOGGER.warning(
-                "HA discovery compression failed: %s. "
-                "Discovery will not be available.", e.stderr if e.stderr else str(e)
-            )
-        except FileNotFoundError as e:
-            _LOGGER.warning(
-                "HA discovery compression script not found: %s. "
-                "Discovery will not be available.", str(e)
-            )
+    # HA discovery compression is now handled by generate_erd_lists.py
+    # (in-process, after JSONL generation). No separate step needed.
     await cg.register_component(var, config)
 
     # Get optional GEA3 UART component reference

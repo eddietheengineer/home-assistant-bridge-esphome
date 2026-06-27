@@ -185,6 +185,18 @@ def generate_header(input_dir: Path) -> str:
     lines.append('')
     
     return '\n'.join(lines)
+def generate_header_to_file(input_dir: Path, output_dir: Path) -> None:
+    """Generate the compressed header and write it to output_dir/ha_discovery_data.h.
+
+    Used by generate_erd_lists.py for in-process generation.
+    output_dir is the repo root (parent of ha_discovery/).
+    """
+    output_file = output_dir / 'components' / 'geappliances_bridge' / 'ha_discovery_data.h'
+    header = generate_header(input_dir)
+    print(f"Writing compressed header to {output_file}")
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_file, 'w') as f:
+        f.write(header)
 
 
 def main():
@@ -194,6 +206,7 @@ def main():
     input_dir = repo_root / 'ha_discovery'
     output_file = repo_root / 'components' / 'geappliances_bridge' / 'ha_discovery_data.h'
 
+    print(f"DEBUG: repo_root={repo_root}, input_dir={input_dir}", file=sys.stderr)
     if not input_dir.exists():
         print(f"Error: {input_dir} does not exist. Run generate_ha_discovery.py first.", file=sys.stderr)
         sys.exit(1)
