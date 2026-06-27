@@ -174,7 +174,8 @@ typedef struct {
   /* Cleanup topic queue: buffer topic names for batched publishing. */
 #define HA_DISCOVERY_CLEANUP_QUEUE_SIZE 64
   char cleanup_topic_queue[HA_DISCOVERY_CLEANUP_QUEUE_SIZE][128];
-  uint16_t cleanup_queue_count;
+  uint16_t cleanup_queue_write_idx;  // Producer (callback) write position
+  uint16_t cleanup_queue_read_idx;   // Consumer (flush) read position
 #endif
 } ha_discovery_manager_t;
 

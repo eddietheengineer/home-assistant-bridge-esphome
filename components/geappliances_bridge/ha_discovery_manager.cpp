@@ -95,30 +95,21 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
     const uint16_t max_batch = 8;
 
     while (batch < max_batch) {
-        uint16_t count;
         char topic_buf[128];
 
-        /* Snapshot queue state under critical section to avoid race with
-         * callback. Only the count read, topic copy, and count decrement
-         * need to be atomic — the shift loop runs outside to minimize
-         * interrupt latency. */
+        /* Read from the ring buffer under critical section. No shift needed —
+         * producer and consumer use independent indices, so there is no data
+         * race between the callback writing and the flush reading. */
         vPortEnterCritical();
-        count = self->cleanup_queue_count;
-        if (count > 0) {
-            strncpy(topic_buf, self->cleanup_topic_queue[0], sizeof(topic_buf));
-            topic_buf[sizeof(topic_buf) - 1] = '\0';
-            self->cleanup_queue_count--;
+        if (self->cleanup_queue_read_idx == self->cleanup_queue_write_idx) {
+            vPortExitCritical();
+            break;  // empty
         }
+        uint16_t idx = self->cleanup_queue_read_idx;
+        strncpy(topic_buf, self->cleanup_topic_queue[idx], sizeof(topic_buf));
+        topic_buf[sizeof(topic_buf) - 1] = '\0';
+        self->cleanup_queue_read_idx = (idx + 1) % HA_DISCOVERY_CLEANUP_QUEUE_SIZE;
         vPortExitCritical();
-
-        if (count == 0) break;
-
-        /* Shift remaining entries down. Callback can safely write during
-         * this — it is bounded by the already-decremented count. */
-        for (uint16_t i = 1; i < count; i++) {
-            memcpy(self->cleanup_topic_queue[i - 1], self->cleanup_topic_queue[i],
-                   sizeof(self->cleanup_topic_queue[0]));
-        }
 
         mqtt_client_publish_raw(self->mqtt_client, topic_buf, "", 0, true);
         ESP_LOGD(TAG, "Removed old topic: %s", topic_buf);
@@ -130,7 +121,11 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 
-    return self->cleanup_queue_count;
+    /* Compute remaining entries from ring buffer indices. */
+    if (self->cleanup_queue_write_idx >= self->cleanup_queue_read_idx) {
+        return self->cleanup_queue_write_idx - self->cleanup_queue_read_idx;
+    }
+    return HA_DISCOVERY_CLEANUP_QUEUE_SIZE - self->cleanup_queue_read_idx + self->cleanup_queue_write_idx;
 }
 
 /* Callback for homeassistant/{component}/{device_id}/# subscription during cleanup.
@@ -151,12 +146,14 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     if (payload_len == 0) return;
 
     /* Queue the topic name for publishing from the main loop.
-     * Use critical section to avoid race with cleanup_flush_queue. */
+     * Ring buffer producer: advance write_idx under critical section.
+     * No data race with consumer — independent indices. */
     vPortEnterCritical();
-    if (self->cleanup_queue_count < HA_DISCOVERY_CLEANUP_QUEUE_SIZE) {
-        strncpy(self->cleanup_topic_queue[self->cleanup_queue_count], topic, 127);
-        self->cleanup_topic_queue[self->cleanup_queue_count][127] = '\0';
-        self->cleanup_queue_count++;
+    uint16_t next = (self->cleanup_queue_write_idx + 1) % HA_DISCOVERY_CLEANUP_QUEUE_SIZE;
+    if (next != self->cleanup_queue_read_idx) {  // not full
+        strncpy(self->cleanup_topic_queue[self->cleanup_queue_write_idx], topic, 127);
+        self->cleanup_topic_queue[self->cleanup_queue_write_idx][127] = '\0';
+        self->cleanup_queue_write_idx = next;
     }
     self->cleanup_received_topics = true;
     self->cleanup_pass_found_topics = true;
@@ -169,7 +166,8 @@ static void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_subscribed = false;
     self->cleanup_current_component = 0;
     self->cleanup_last_activity_ms = self->get_time_ms();
-    self->cleanup_queue_count = 0;
+    self->cleanup_queue_write_idx = 0;
+    self->cleanup_queue_read_idx = 0;
     self->cleanup_received_topics = false;
     self->cleanup_flushed_once = false;
     self->cleanup_clean_passes = 0;
