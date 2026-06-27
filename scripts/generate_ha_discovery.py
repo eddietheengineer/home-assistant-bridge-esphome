@@ -1130,7 +1130,7 @@ def _should_filter_entity(name: str) -> bool:
 # JSONL generation
 # ---------------------------------------------------------------------------
 
-def generate_ha_discovery_jsonl_by_category(erds: List[Dict], filter_config_topics: bool = False) -> Dict[str, str]:
+def generate_ha_discovery_jsonl_by_category(erds: List[Dict], filter_config_topics: bool = True) -> Dict[str, str]:
     """Generate compact JSONL content grouped by appliance category.
 
     Returns a dict mapping category name -> JSONL string content.
@@ -1258,8 +1258,10 @@ def main():
     """Main entry point for the script."""
     import argparse
     parser = argparse.ArgumentParser(description="Generate HA discovery JSONL files.")
-    parser.add_argument("--filter-config-topics", action="store_true", default=False,
-                        help="Filter out internal metadata, diagnostics, and commissioning entities.")
+    parser.add_argument("--filter-config-topics", action="store_true", default=True,
+                        help="Filter out internal metadata, diagnostics, and commissioning entities (default: true).")
+    parser.add_argument("--no-filter-config-topics", action="store_false", dest="filter_config_topics",
+                        help="Disable filtering of internal/diagnostic entities.")
     parser.add_argument("--erd-definitions", default=None,
                         help="Path to appliance_api_erd_definitions.json (bypasses auto-search).")
     args = parser.parse_args()

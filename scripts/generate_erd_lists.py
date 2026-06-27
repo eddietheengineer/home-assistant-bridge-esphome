@@ -515,8 +515,14 @@ def main():
     parser.add_argument(
         "--filter-config-topics",
         action="store_true",
-        default=False,
-        help="Filter out internal metadata, diagnostics, and commissioning entities from HA discovery.",
+        default=True,
+        help="Filter out internal metadata, diagnostics, and commissioning entities from HA discovery (default: true).",
+    )
+    parser.add_argument(
+        "--no-filter-config-topics",
+        action="store_false",
+        dest="filter_config_topics",
+        help="Disable filtering of internal/diagnostic entities from HA discovery.",
     )
     args = parser.parse_args()
 

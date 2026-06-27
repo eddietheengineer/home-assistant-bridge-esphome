@@ -311,7 +311,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_MQTT_PUBLISH_RATE_SENSOR): cv.Schema({
             cv.Optional("name", default="MQTT Publish Rate"): cv.string,
         }).extend(sensor.sensor_schema(state_class="measurement")),
-        cv.Optional(CONF_FILTER_CONFIG_TOPICS, default=False): cv.boolean,
+        cv.Optional(CONF_FILTER_CONFIG_TOPICS, default=True): cv.boolean,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
@@ -360,8 +360,8 @@ async def to_code(config: dict[str, Any]) -> None:
         cmd.extend(["--erd-definitions", erd_defs_path])
     if api_json_path:
         cmd.extend(["--appliance-api", api_json_path])
-    if config.get(CONF_FILTER_CONFIG_TOPICS, False):
-        cmd.append("--filter-config-topics")
+    if not config.get(CONF_FILTER_CONFIG_TOPICS, True):
+        cmd.append("--no-filter-config-topics")
 
     try:
         _LOGGER.info("Generating ERD lists and feature API lists...")

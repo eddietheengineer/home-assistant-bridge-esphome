@@ -63,7 +63,7 @@ geappliances_bridge:
   # polling_interval: 10000               # Default: 10000 ms (10 seconds), used when in polling mode
   # appliance_api_parsing: true           # Default: true, restricts polling to appliance-supported ERDs
   # throttle_rate_seconds: 0              # Default: 0 (disabled), min seconds between publishes per ERD (0-255)
-  # generate_device_config: false         # Default: false (currently disabled)
+  # filter_config_topics: true           # Default: true, filters internal/diagnostic entities from HA discovery
 
 ```
 
@@ -114,6 +114,7 @@ The `appliance_api_parsing` parameter is **optional** (default: `true`). When en
 - **`custom_erds`** (default: none) — A list of additional ERD IDs to poll beyond the standard list. Useful for ERDs not yet in the appliance API documentation.
 - **`throttle_rate_seconds`** (default: `0`) — Minimum interval in seconds between MQTT publishes for any individual ERD. Set to 0 to disable (publish on every update). Range: 0–255. Useful for reducing MQTT traffic when the appliance generates frequent updates.
 - **`generate_device_config`** (default: `false`) — Currently disabled
+- **`filter_config_topics`** (default: `true`) — Filters out internal/diagnostic entities (firmware metadata, commissioning state, usage profiles, cycle definitions, fault data, etc.) from Home Assistant MQTT discovery. Reduces entity count by ~19% (from ~9,310 to ~7,520) and firmware data by ~8.8%. Set to `false` to include all entities.
 
 ## Development
 
