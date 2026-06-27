@@ -13,12 +13,14 @@ Generates the following files:
      appliance_api_parsing is enabled.
 """
 
+import argparse
 import json
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set
 
 
 def parse_erd_id(erd_id_str: str) -> int:
@@ -432,18 +434,103 @@ def generate_appliance_api_feature_lists_header(appliance_api_data: Dict) -> str
     return "\n".join(lines)
 
 
+def find_json_file(filename: str, component_dir: str) -> Optional[str]:
+    """Search for a JSON file from the public-appliance-api-documentation library.
+
+    Tries multiple locations in order of preference, matching the strategy
+    used by load_appliance_types() in __init__.py.
+    """
+    search_paths = []
+    seen = set()
+
+    # 1. Local submodule (development checkout)
+    p = os.path.normpath(os.path.join(component_dir, "..", "..", "lib",
+                                      "public-appliance-api-documentation", filename))
+    search_paths.append(p)
+    seen.add(p)
+
+    # 2. ESPHome library cache in user home
+    home_dir = os.path.expanduser("~")
+    p = os.path.join(home_dir, ".esphome", "external_files", "libraries",
+                     "public-appliance-api-documentation", filename)
+    if p not in seen:
+        search_paths.append(p)
+        seen.add(p)
+
+    # 3. ESPHome library cache in /config (Home Assistant add-on)
+    p = os.path.join("/config", ".esphome", "external_files", "libraries",
+                     "public-appliance-api-documentation", filename)
+    if p not in seen:
+        search_paths.append(p)
+        seen.add(p)
+
+    # 4. ESPHome library cache relative to component (build directory)
+    p = os.path.normpath(os.path.join(component_dir, "..", "..", ".esphome",
+                                      "external_files", "libraries",
+                                      "public-appliance-api-documentation", filename))
+    if p not in seen:
+        search_paths.append(p)
+        seen.add(p)
+
+    # 5. Parent lib directory (alternative location)
+    parent_dir = os.path.dirname(os.path.dirname(component_dir))
+    p = os.path.normpath(os.path.join(parent_dir, "lib",
+                                      "public-appliance-api-documentation", filename))
+    if p not in seen:
+        search_paths.append(p)
+        seen.add(p)
+
+    for path in search_paths:
+        if os.path.exists(path):
+            return path
+
+    return None
+
 
 def main():
     """Main entry point for the script."""
-    # Determine paths relative to script location
+    parser = argparse.ArgumentParser(
+        description="Generate C header files from appliance API documentation."
+    )
+    parser.add_argument(
+        "--erd-definitions",
+        help="Path to appliance_api_erd_definitions.json",
+    )
+    parser.add_argument(
+        "--appliance-api",
+        help="Path to appliance_api.json",
+    )
+    parser.add_argument(
+        "--component-dir",
+        default=os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                             "..", "components", "geappliances_bridge")),
+        help="Path to the geappliances_bridge component directory",
+    )
+    parser.add_argument(
+        "--output-dir",
+        help="Override output directory for generated headers (default: component-dir)",
+    )
+    args = parser.parse_args()
+
     script_dir = Path(__file__).parent
     repo_root = script_dir.parent
+    component_dir = os.path.normpath(args.component_dir)
+    output_dir = os.path.normpath(args.output_dir) if args.output_dir else component_dir
+
+    # Resolve JSON file paths: CLI arg > auto-search > default from repo layout
+    def resolve_json(filename, cli_arg):
+        if cli_arg and os.path.exists(cli_arg):
+            return Path(cli_arg)
+        found = find_json_file(filename, component_dir)
+        if found:
+            return Path(found)
+        return repo_root / "lib" / "public-appliance-api-documentation" / filename
 
     # -------------------------------------------------------------------------
     # Generate erd_lists.h from appliance_api_erd_definitions.json
     # -------------------------------------------------------------------------
-    json_file = repo_root / 'lib' / 'public-appliance-api-documentation' / 'appliance_api_erd_definitions.json'
-    output_file = repo_root / 'components' / 'geappliances_bridge' / 'erd_lists.h'
+    json_file = resolve_json("appliance_api_erd_definitions.json", args.erd_definitions)
+    output_file = Path(output_dir) / "erd_lists.h"
 
     if not json_file.exists():
         print(f"Error: Could not find {json_file}", file=sys.stderr)
@@ -493,8 +580,8 @@ def main():
     # -------------------------------------------------------------------------
     # Generate appliance_api_feature_lists.h from appliance_api.json
     # -------------------------------------------------------------------------
-    api_json_file = repo_root / 'lib' / 'public-appliance-api-documentation' / 'appliance_api.json'
-    api_output_file = repo_root / 'components' / 'geappliances_bridge' / 'appliance_api_feature_lists.h'
+    api_json_file = resolve_json("appliance_api.json", args.appliance_api)
+    api_output_file = Path(output_dir) / "appliance_api_feature_lists.h"
 
     if not api_json_file.exists():
         print(f"Error: Could not find {api_json_file}", file=sys.stderr)
