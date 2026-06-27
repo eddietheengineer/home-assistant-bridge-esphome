@@ -178,6 +178,8 @@ typedef struct {
   uint32_t cleanup_offset;        /* Current offset within decompressed chunk */
   uint32_t cleanup_decomp_size;   /* Decompressed size of current chunk */
   uint16_t cleanup_direct_removed; /* Topics cleared via direct publish */
+  bool cleanup_phase1_done;         /* Phase 1 (direct) completed — one-way gate */
+  bool cleanup_phase2_started;      /* Phase 2 callback cleanup initialized — one-way gate */
   uint32_t cleanup_last_publish_ms; /* Last publish time for rate limiting */
 
   /* Cleanup topic queue: buffer topic names for batched publishing. */

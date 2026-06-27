@@ -186,6 +186,8 @@ static void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_offset = 0;
     self->cleanup_decomp_size = 0;
     self->cleanup_direct_removed = 0;
+    self->cleanup_phase1_done = false;
+    self->cleanup_phase2_started = false;
     self->cleanup_last_publish_ms = 0;
 
     ESP_LOGI(TAG, "Starting HA discovery cleanup...");
@@ -203,10 +205,15 @@ static void cleanup_run(ha_discovery_manager_t* self)
 {
 #ifdef USE_ESP_IDF
     /* Phase 1: Direct cleanup — iterate JSONL and publish empty retained
-     * payloads to clear all known discovery topics. This is reliable and
-     * doesn't depend on the MQTT inbound queue. */
-    if (self->cleanup_category < ha_discovery_category_count) {
-        const ha_discovery_category_t* cat = &ha_discovery_categories[self->cleanup_category];
+     * payloads to clear all known discovery topics. One-way gate: once
+     * Phase 1 completes it never re-enters, avoiding infinite loops. */
+    if (!self->cleanup_phase1_done) {
+        /* All categories processed — mark Phase 1 done. */
+        if (self->cleanup_category >= ha_discovery_category_count) {
+            self->cleanup_phase1_done = true;
+            ESP_LOGI(TAG, "Direct cleanup: cleared %u known topics", self->cleanup_direct_removed);
+        } else {
+            const ha_discovery_category_t* cat = &ha_discovery_categories[self->cleanup_category];
 
         /* Skip categories that don't apply to this appliance. */
         if (!should_process_category(cat->name, self->appliance_type)) {
@@ -280,34 +287,35 @@ static void cleanup_run(ha_discovery_manager_t* self)
         self->cleanup_offset = 0;
         self->cleanup_decomp_size = 0;
         return;
-    }
+        }  // else (cleanup_category < ha_discovery_category_count)
+    }  // if (!self->cleanup_phase1_done)
 
-    /* Phase 1 complete. Transition to Phase 2: callback-based cleanup
-     * for any remaining old topics not in the JSONL. */
-    ESP_LOGI(TAG, "Direct cleanup: cleared %u known topics", self->cleanup_direct_removed);
 #else
     /* Non-ESP-IDF: skip direct cleanup, go straight to callback phase. */
+    self->cleanup_phase1_done = true;
     (void)self->cleanup_direct_removed;
 #endif
 
+    /* Reset for callback-based cleanup — only once on first entry. */
+    if (!self->cleanup_phase2_started) {
+        self->cleanup_current_component = 0;
+        self->cleanup_subscribed = false;
+        self->cleanup_received_topics = false;
+        self->cleanup_flushed_once = false;
+        self->cleanup_empty_flush_cycles = 0;
+        self->cleanup_component_skip = 0;
+        self->cleanup_pass_found_topics = false;
+        self->cleanup_component_removed_count = 0;
+        self->cleanup_pass_number = 1;
+        self->cleanup_pass_removed_count = 0;
+        self->cleanup_clean_passes = 0;
+        self->cleanup_wait_start_ms = 0;
+        self->cleanup_last_activity_ms = self->get_time_ms();
+        self->cleanup_queue_count = 0;
+        self->cleanup_phase2_started = true;
 
-    /* Reset for callback-based cleanup. */
-    self->cleanup_current_component = 0;
-    self->cleanup_subscribed = false;
-    self->cleanup_received_topics = false;
-    self->cleanup_flushed_once = false;
-    self->cleanup_empty_flush_cycles = 0;
-    self->cleanup_component_skip = 0;
-    self->cleanup_pass_found_topics = false;
-    self->cleanup_component_removed_count = 0;
-    self->cleanup_pass_number = 1;
-    self->cleanup_pass_removed_count = 0;
-    self->cleanup_clean_passes = 0;
-    self->cleanup_wait_start_ms = 0;
-    self->cleanup_last_activity_ms = self->get_time_ms();
-    self->cleanup_queue_count = 0;
-
-    ESP_LOGI(TAG, "Scanning for remaining old topics...");
+        ESP_LOGI(TAG, "Scanning for remaining old topics...");
+    }
 
     /* Phase 2: callback-based cleanup for remaining old topics. */
     while (self->cleanup_current_component < sizeof(HA_DISCOVERY_COMPONENT_TYPES) / sizeof(HA_DISCOVERY_COMPONENT_TYPES[0])) {
