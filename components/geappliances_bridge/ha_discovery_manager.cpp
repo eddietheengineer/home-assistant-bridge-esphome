@@ -283,6 +283,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
         self->cleanup_pass_number++;
         self->cleanup_current_component = 0;
         self->cleanup_received_topics = false;
+        self->cleanup_flushed_once = false;
         self->cleanup_pass_found_topics = false;
         self->cleanup_pass_removed_count = 0;
         self->cleanup_component_removed_count = 0;
