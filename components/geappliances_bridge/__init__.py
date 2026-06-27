@@ -90,99 +90,98 @@ def sanitize_appliance_name(name: str) -> str:
     return result
 
 
+def _find_json_paths(component_dir: str) -> list[tuple[str, str]]:
+    """Search for JSON files from the public-appliance-api-documentation library.
+
+    Returns a list of (location_name, resolved_path) tuples for both
+    appliance_api_erd_definitions.json and appliance_api.json, in search order.
+    Only paths that actually exist on disk are returned.
+    """
+    results: list[tuple[str, str]] = []
+    seen: set[str] = set()
+
+    for filename in ("appliance_api_erd_definitions.json", "appliance_api.json"):
+        # Path 1: Local submodule (for local development)
+        p = os.path.normpath(os.path.join(
+            component_dir, "..", "..", "lib", "public-appliance-api-documentation", filename))
+        if p not in seen and os.path.exists(p):
+            results.append(("local submodule", p))
+            seen.add(p)
+
+        # Path 2: ESPHome library cache in user home
+        p = os.path.join(os.path.expanduser("~"), ".esphome", "external_files", "libraries",
+                         "public-appliance-api-documentation", filename)
+        if p not in seen and os.path.exists(p):
+            results.append(("ESPHome cache (home)", p))
+            seen.add(p)
+
+        # Path 3: ESPHome library cache in /config (Home Assistant add-on)
+        p = os.path.join("/config", ".esphome", "external_files", "libraries",
+                         "public-appliance-api-documentation", filename)
+        if p not in seen and os.path.exists(p):
+            results.append(("ESPHome cache (/config)", p))
+            seen.add(p)
+
+        # Path 3b: ESPHome library cache in /data (Docker container)
+        p = os.path.join("/data", ".esphome", "external_files", "libraries",
+                         "public-appliance-api-documentation", filename)
+        if p not in seen and os.path.exists(p):
+            results.append(("ESPHome cache (/data)", p))
+            seen.add(p)
+
+        # Path 4: ESPHome library cache relative to component
+        p = os.path.normpath(os.path.join(
+            component_dir, "..", "..", ".esphome", "external_files", "libraries",
+            "public-appliance-api-documentation", filename))
+        if p not in seen and os.path.exists(p):
+            results.append(("ESPHome cache (relative)", p))
+            seen.add(p)
+
+        # Path 5: Parent lib directory
+        parent_dir = os.path.dirname(os.path.dirname(component_dir))
+        p = os.path.normpath(os.path.join(
+            parent_dir, "lib", "public-appliance-api-documentation", filename))
+        if p not in seen and os.path.exists(p):
+            results.append(("parent library path", p))
+            seen.add(p)
+
+    return results
+
 def load_appliance_types() -> dict[int, str]:
     """Load appliance type mappings from the API documentation library.
 
-    Tries multiple locations to find the appliance type definitions JSON:
-    1. Local submodule directory (for development with checked out repo)
-    2. ESPHome library cache in user's home directory (~/.esphome/external_files/libraries/)
-    3. ESPHome library cache in /config directory (Home Assistant add-on)
-    4. ESPHome library cache relative to component (build directory)
-    5. Parent directories (alternative library location)
-    6. GitHub as fallback (when no local copy is available)
+    Tries multiple locations to find the appliance type definitions JSON,
+    falling back to GitHub if no local copy is available.
 
     Returns:
         Dictionary mapping appliance type IDs (int) to names (str)
     """
-    # ESPHome downloads libraries to .esphome/external_files/libraries
-    # We need to check multiple possible locations
-    
-    data = None
-    json_filename = "appliance_api_erd_definitions.json"
-    
-    # Try to find the JSON file in common locations
-    search_paths = []
-    seen_paths = set()  # Track paths to avoid duplicates
-    
-    # Path 1: Local submodule (for local development)
     component_dir = os.path.dirname(__file__)
-    local_submodule_path = os.path.normpath(os.path.join(
-        component_dir, "..", "..", "lib", "public-appliance-api-documentation", json_filename
-    ))
-    search_paths.append(("local submodule", local_submodule_path))
-    seen_paths.add(local_submodule_path)
-    
-    # Path 2: ESPHome library cache in user's home directory
-    home_dir = os.path.expanduser("~")
-    esphome_cache_path = os.path.join(
-        home_dir, ".esphome", "external_files", "libraries",
-        "public-appliance-api-documentation", json_filename
-    )
-    if esphome_cache_path not in seen_paths:
-        search_paths.append(("ESPHome cache (home)", esphome_cache_path))
-        seen_paths.add(esphome_cache_path)
-    
-    # Path 3: ESPHome library cache in /config (Home Assistant add-on)
-    config_esphome_cache_path = os.path.join(
-        "/config", ".esphome", "external_files", "libraries",
-        "public-appliance-api-documentation", json_filename
-    )
-    if config_esphome_cache_path not in seen_paths:
-        search_paths.append(("ESPHome cache (/config)", config_esphome_cache_path))
-        seen_paths.add(config_esphome_cache_path)
-    
-    # Path 4: ESPHome library cache relative to component
-    # Sometimes ESPHome puts libraries relative to the build directory
-    build_cache_path = os.path.normpath(os.path.join(
-        component_dir, "..", "..", ".esphome", "external_files", "libraries",
-        "public-appliance-api-documentation", json_filename
-    ))
-    if build_cache_path not in seen_paths:
-        search_paths.append(("ESPHome cache (relative)", build_cache_path))
-        seen_paths.add(build_cache_path)
-    
-    # Path 5: Check parent directories for the library
-    parent_dir = os.path.dirname(os.path.dirname(component_dir))
-    alt_library_path = os.path.normpath(os.path.join(
-        parent_dir, "lib", "public-appliance-api-documentation", json_filename
-    ))
-    if alt_library_path not in seen_paths:
-        search_paths.append(("parent library path", alt_library_path))
-        seen_paths.add(alt_library_path)
-    
-    # Try each path
-    for location_name, json_path in search_paths:
-        if os.path.exists(json_path):
-            try:
-                with open(json_path, 'r') as f:
-                    data = json.load(f)
-                _LOGGER.info("Loaded appliance types from %s: %s", location_name, json_path)
-                break
-            except Exception as e:
-                _LOGGER.warning("Failed to load from %s (%s): %s", location_name, json_path, str(e))
-    
+    data = None
+
+    for location_name, json_path in _find_json_paths(component_dir):
+        if not json_path.endswith("appliance_api_erd_definitions.json"):
+            continue
+        try:
+            with open(json_path, 'r') as f:
+                data = json.load(f)
+            _LOGGER.info("Loaded appliance types from %s: %s", location_name, json_path)
+            break
+        except Exception as e:
+            _LOGGER.warning("Failed to load from %s (%s): %s", location_name, json_path, str(e))
+
     # If local paths failed, try fetching from GitHub as fallback
     if data is None:
         url = "https://raw.githubusercontent.com/geappliances/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
         _LOGGER.info("Fetching ERD definitions from GitHub: %s", url)
-        
+
         try:
             with urllib.request.urlopen(url, timeout=5) as response:
                 data = json.loads(response.read().decode('utf-8'))
             _LOGGER.info("Successfully fetched appliance types from GitHub (fallback)")
         except urllib.error.HTTPError as e:
             _LOGGER.error(
-                "HTTP error fetching appliance API documentation (status %d): %s. Using fallback mapping.", 
+                "HTTP error fetching appliance API documentation (status %d): %s. Using fallback mapping.",
                 e.code, str(e)
             )
             return {
@@ -191,7 +190,7 @@ def load_appliance_types() -> dict[int, str]:
             }
         except urllib.error.URLError as e:
             _LOGGER.error(
-                "Network error fetching appliance API documentation: %s. Using fallback mapping.", 
+                "Network error fetching appliance API documentation: %s. Using fallback mapping.",
                 str(e.reason)
             )
             return {
@@ -200,14 +199,14 @@ def load_appliance_types() -> dict[int, str]:
             }
         except Exception as e:
             _LOGGER.error(
-                "Unexpected error fetching appliance API documentation: %s. Using fallback mapping.", 
+                "Unexpected error fetching appliance API documentation: %s. Using fallback mapping.",
                 str(e)
             )
             return {
                 0: "Unknown",
                 255: "Unknown"
             }
-    
+
     # Parse the data
     try:
         # Find the ERD with id "0x0008" (Appliance Type)
@@ -223,12 +222,12 @@ def load_appliance_types() -> dict[int, str]:
                         int_key = int(key)
                         sanitized = sanitize_appliance_name(value)
                         mapping[int_key] = sanitized
-                    
+
                     _LOGGER.info("Loaded %d appliance type mappings", len(mapping))
                     return mapping
     except Exception as e:
         _LOGGER.error("Failed to parse appliance types: %s", str(e))
-    
+
     # Fallback mapping
     _LOGGER.warning("Using fallback appliance type mapping")
     return {
@@ -335,34 +334,76 @@ async def to_code(config: dict[str, Any]) -> None:
             "polling_onlypublish_onchange is deprecated and will be removed in a future release. "
             "The component now always publishes only on change."
 )
-    # Generate HA discovery data when enabled
+    # Generate required headers from appliance API documentation.
+    # erd_lists.h and appliance_api_feature_lists.h are always required.
+    # generate_erd_lists.py also calls generate_ha_discovery.py as a side effect.
+    component_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.normpath(os.path.join(component_dir, "..", ".."))
+    scripts_dir = os.path.join(repo_root, "scripts")
+
+    # Resolve JSON file paths using the same multi-path search as load_appliance_types().
+    # This is critical for ESPHome external component builds where the repo is copied
+    # to a cache directory and git submodules are not initialized.
+    erd_defs_path = None
+    api_json_path = None
+    for location_name, json_path in _find_json_paths(component_dir):
+        if json_path.endswith("appliance_api_erd_definitions.json"):
+            erd_defs_path = json_path
+        elif json_path.endswith("appliance_api.json"):
+            api_json_path = json_path
+
+    cmd = [sys.executable, os.path.join(scripts_dir, "generate_erd_lists.py"),
+           "--component-dir", component_dir]
+    if erd_defs_path:
+        cmd.extend(["--erd-definitions", erd_defs_path])
+    if api_json_path:
+        cmd.extend(["--appliance-api", api_json_path])
+
+    try:
+        _LOGGER.info("Generating ERD lists and feature API lists...")
+        result = subprocess.run(
+            cmd,
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        _LOGGER.info("ERD lists generated successfully")
+    except subprocess.CalledProcessError as e:
+        _LOGGER.error(
+            "ERD lists generation failed: %s. "
+            "Build will fail without erd_lists.h and appliance_api_feature_lists.h.",
+            e.stderr if e.stderr else str(e)
+        )
+        raise
+    except FileNotFoundError as e:
+        _LOGGER.error(
+            "ERD lists generation script not found: %s. "
+            "Build will fail without erd_lists.h and appliance_api_feature_lists.h.",
+            str(e)
+        )
+        raise
+
+    # Generate HA discovery compressed data when enabled
     if config.get(CONF_GENERATE_DEVICE_CONFIG, False):
-        _LOGGER.info("Generating HA MQTT discovery data...")
-        component_dir = os.path.dirname(os.path.abspath(__file__))
-        repo_root = os.path.normpath(os.path.join(component_dir, "..", ".."))
-        scripts_dir = os.path.join(repo_root, "scripts")
         try:
-            subprocess.run(
-                [sys.executable, os.path.join(scripts_dir, "generate_ha_discovery.py")],
-                cwd=repo_root,
-                check=True,
-                capture_output=True,
-            )
+            _LOGGER.info("Compressing HA MQTT discovery data...")
             subprocess.run(
                 [sys.executable, os.path.join(scripts_dir, "compress_ha_discovery.py")],
                 cwd=repo_root,
                 check=True,
                 capture_output=True,
+                text=True,
             )
-            _LOGGER.info("HA MQTT discovery data generated successfully")
+            _LOGGER.info("HA MQTT discovery data compressed successfully")
         except subprocess.CalledProcessError as e:
             _LOGGER.warning(
-                "HA discovery generation failed: %s. "
-                "Discovery will not be available.", e.stderr.decode() if e.stderr else str(e)
+                "HA discovery compression failed: %s. "
+                "Discovery will not be available.", e.stderr if e.stderr else str(e)
             )
         except FileNotFoundError as e:
             _LOGGER.warning(
-                "HA discovery generation scripts not found: %s. "
+                "HA discovery compression script not found: %s. "
                 "Discovery will not be available.", str(e)
             )
     await cg.register_component(var, config)
