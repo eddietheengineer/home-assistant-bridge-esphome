@@ -33,6 +33,7 @@ Each JSONL line has these keys:
 """
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -1227,6 +1228,8 @@ def main():
     parser = argparse.ArgumentParser(description="Generate HA discovery JSONL files.")
     parser.add_argument("--filter-config-topics", action="store_true", default=False,
                         help="Filter out internal metadata, diagnostics, and commissioning entities.")
+    parser.add_argument("--erd-definitions", default=None,
+                        help="Path to appliance_api_erd_definitions.json (bypasses auto-search).")
     args = parser.parse_args()
 
     script_dir = Path(__file__).parent
@@ -1234,7 +1237,11 @@ def main():
     output_dir = repo_root / 'ha_discovery'
 
     # Try to find the JSON file locally
-    json_file = find_erd_definitions_json()
+    json_file = None
+    if args.erd_definitions and os.path.exists(args.erd_definitions):
+        json_file = Path(args.erd_definitions)
+    else:
+        json_file = find_erd_definitions_json()
     data = None
 
     if json_file is not None:

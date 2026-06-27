@@ -93,10 +93,12 @@ $(ERD_LISTS_HEADER) $(APPLIANCE_API_FEATURE_LISTS_HEADER): $(ERD_DEFINITIONS_JSO
 	@python3 scripts/generate_erd_lists.py
 
 # Generate ha_discovery_data.h from JSONL files before building
+# JSONL files are created by generate_erd_lists.py (which calls generate_ha_discovery.py).
+# So we depend on the ERD lists header rule, not on the wildcard (which is empty
+# when ha_discovery/ doesn't exist yet).
 HA_DISCOVERY_DATA_HEADER := components/geappliances_bridge/ha_discovery_data.h
-HA_DISCOVERY_JSONL := $(wildcard ha_discovery/*.jsonl)
 
-$(HA_DISCOVERY_DATA_HEADER): $(ERD_LISTS_HEADER) $(HA_DISCOVERY_JSONL) scripts/compress_ha_discovery.py
+$(HA_DISCOVERY_DATA_HEADER): $(ERD_LISTS_HEADER) scripts/compress_ha_discovery.py
 	@echo Generating HA discovery compressed data...
 	@python3 scripts/compress_ha_discovery.py
 

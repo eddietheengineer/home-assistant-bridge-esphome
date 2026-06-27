@@ -636,7 +636,14 @@ def main():
         ha_cmd = [sys.executable, str(ha_discovery_script)]
         if args.filter_config_topics:
             ha_cmd.append("--filter-config-topics")
-        subprocess.run(ha_cmd, check=True)
+        # Pass the resolved ERD definitions path so generate_ha_discovery.py
+        # uses the same file (e.g. /tmp fallback from GitHub) instead of
+        # doing its own independent search which may fail in ESPHome cache.
+        ha_cmd.extend(["--erd-definitions", str(json_file)])
+        result = subprocess.run(ha_cmd, check=True, cwd=repo_root,
+                                capture_output=True, text=True)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
     else:
         print(f"\nWarning: {ha_discovery_script} not found, skipping HA discovery generation", file=sys.stderr)
 
