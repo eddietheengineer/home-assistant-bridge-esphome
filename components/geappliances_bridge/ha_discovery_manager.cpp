@@ -83,7 +83,9 @@ static const char* const HA_DISCOVERY_COMPONENT_TYPES[] = {
 /* Idle timeout after last topic for current component type. */
 #define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 2000
 /* Short timeout for component types with no topics — skip quickly. */
-#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS 500
+#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS 2000
+/* Number of flush cycles to do before declaring a component empty. */
+#define HA_DISCOVERY_CLEANUP_EMPTY_FLUSH_CYCLES 4
 /* Wait after a clean pass before starting discovery publishing. */
 #define HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS 5000
 
@@ -169,6 +171,7 @@ static void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_queue_count = 0;
     self->cleanup_received_topics = false;
     self->cleanup_flushed_once = false;
+    self->cleanup_empty_flush_cycles = 0;
     self->cleanup_clean_passes = 0;
     self->cleanup_pass_found_topics = false;
     self->cleanup_pass_removed_count = 0;
@@ -210,6 +213,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
                     cleanup_topic_callback, self);
                 self->cleanup_subscribed = true;
                 self->cleanup_flushed_once = false;
+                self->cleanup_empty_flush_cycles = 0;
                 self->cleanup_last_activity_ms = self->get_time_ms();
                 ESP_LOGI(TAG, "  [%u/%u] Subscribing to %s (pass %u)",
                     self->cleanup_current_component + 1,
@@ -221,11 +225,9 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
         /* Check if we've been idle long enough — no new matching topics
          * have arrived, so the broker has delivered all retained messages
-         * for this component type. Use short timeout for empty components. */
+         * for this component type. */
         uint32_t now = self->get_time_ms();
-        uint32_t timeout = self->cleanup_received_topics
-            ? HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS
-            : HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS;
+
         if (!self->cleanup_flushed_once) {
             /* Must flush at least once after subscribing before declaring */
             /* the component empty — retained messages may still be in flight. */
@@ -237,30 +239,26 @@ static void cleanup_run(ha_discovery_manager_t* self)
             self->cleanup_last_activity_ms = self->get_time_ms();
             return;
         }
-        if (now - self->cleanup_last_activity_ms >= timeout) {
-            /* Flush any remaining queued topics before unsubscribing. */
+
+        if (!self->cleanup_received_topics) {
+            /* No topics received yet. Do multiple flush cycles to give the */
+            /* MQTT task time to drain retained messages from the broker. */
+            /* The 32-event inbound queue can overflow when many retained */
+            /* messages arrive at once, so we need patience. */
             cleanup_flush_queue(self);
-
-            /* Unsubscribe from current component type. */
-            if (self->mqtt_client) {
-                char sub_topic[128];
-                snprintf(sub_topic, sizeof(sub_topic), "homeassistant/%s/%s/#", component, self->device_id);
-                mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
+            self->cleanup_empty_flush_cycles++;
+            self->cleanup_last_activity_ms = self->get_time_ms();
+            if (self->cleanup_empty_flush_cycles >= HA_DISCOVERY_CLEANUP_EMPTY_FLUSH_CYCLES) {
+                /* Enough flush cycles — declare empty and move on. */
+                goto unsubscribe_component;
             }
-            self->cleanup_subscribed = false;
-            ESP_LOGI(TAG, "  [%u/%u] %s: %u topics removed (pass %u)",
-                self->cleanup_current_component + 1,
-                sizeof(HA_DISCOVERY_COMPONENT_TYPES) / sizeof(HA_DISCOVERY_COMPONENT_TYPES[0]) - 1,
-                component, self->cleanup_component_removed_count, self->cleanup_pass_number);
-            if (self->cleanup_component_removed_count == 0) {
-                self->cleanup_component_skip |= (1u << self->cleanup_current_component);
-            }
-            self->cleanup_component_removed_count = 0;
-            self->cleanup_current_component++;
-            self->cleanup_received_topics = false;
+            return;
+        }
 
-            /* Move to the next component type. */
-            continue;
+        /* Topics were received. Wait for the full idle timeout before */
+        /* declaring the component done. */
+        if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
+            goto unsubscribe_component;
         }
 
         /* Flush queued topics while waiting for the idle timeout. */
@@ -268,6 +266,32 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
         /* Still receiving messages for this component type. */
         return;
+
+        /* Unsubscribe and move to the next component type. */
+    unsubscribe_component:
+        /* Flush any remaining queued topics before unsubscribing. */
+        cleanup_flush_queue(self);
+
+        /* Unsubscribe from current component type. */
+        if (self->mqtt_client) {
+            char sub_topic[128];
+            snprintf(sub_topic, sizeof(sub_topic), "homeassistant/%s/%s/#", component, self->device_id);
+            mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
+        }
+        self->cleanup_subscribed = false;
+        ESP_LOGI(TAG, "  [%u/%u] %s: %u topics removed (pass %u)",
+            self->cleanup_current_component + 1,
+            sizeof(HA_DISCOVERY_COMPONENT_TYPES) / sizeof(HA_DISCOVERY_COMPONENT_TYPES[0]) - 1,
+            component, self->cleanup_component_removed_count, self->cleanup_pass_number);
+        if (self->cleanup_component_removed_count == 0) {
+            self->cleanup_component_skip |= (1u << self->cleanup_current_component);
+        }
+        self->cleanup_component_removed_count = 0;
+        self->cleanup_current_component++;
+        self->cleanup_received_topics = false;
+
+        /* Move to the next component type. */
+        continue;
     }
 
     /* All component types processed for this pass. */
