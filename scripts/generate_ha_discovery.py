@@ -761,6 +761,46 @@ def _get_primary_field(erd_by_id: Dict[str, Dict], paired_erd_str: str):
     return None
 
 
+def _deduplicate_field_ids(entries: List[Dict]) -> None:
+    """Ensure field_id is unique within each ERD by appending byte offset on collision.
+
+    When _leaf_field_name strips a disambiguating prefix (e.g. 'Index 0' vs 'Index 1')
+    or when field_id_buf truncation causes collisions, this pass appends the byte
+    offset to the field_id to make it unique within its ERD.
+    """
+    by_erd: Dict[int, List[Dict]] = {}
+    for entry in entries:
+        by_erd.setdefault(entry['erd_id'], []).append(entry)
+
+    for erd_id, group in by_erd.items():
+        # Track all field_ids already claimed (original or renamed)
+        claimed: Dict[str, Dict] = {}
+        for entry in group:
+            fid = entry.get('field_id', '')
+            if not fid:
+                continue
+            if fid in claimed:
+                # Collision — extract byte offset from value_template for disambiguation
+                vt = entry.get('value_template', '')
+                m = re.search(r'value\[(\d+):(\d+)\]', vt)
+                if m:
+                    offset = int(m.group(1))
+                else:
+                    # For entries without value_template (e.g. byte_offset fields),
+                    # use data_size as a fallback disambiguator
+                    offset = entry.get('data_size', 0)
+                new_fid = f'{fid}_{offset}'
+                # Guard against the new id also colliding with another claimed id
+                suffix = 0
+                while new_fid in claimed:
+                    suffix += 1
+                    new_fid = f'{fid}_{offset}_{suffix}'
+                entry['field_id'] = new_fid
+                claimed[new_fid] = entry
+            else:
+                claimed[fid] = entry
+
+
 def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
     """Process all ERDs with ha_domain metadata and return a list of entry dicts.
 
@@ -1031,6 +1071,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                         collect(erd_id_int, param_name, ha_domain, unit, device_class,
                                 state_class, scaling_factor, data_size, paired_erd_id,
                                 pair_role, p_vt, '', '', param_fid, '', '', '', '', '')
+    _deduplicate_field_ids(entries)
     return entries
 
 

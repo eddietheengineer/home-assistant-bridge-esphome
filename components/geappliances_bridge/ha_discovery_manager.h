@@ -113,7 +113,7 @@ typedef struct {
   char line_buf[HA_DISCOVERY_LINE_BUF_SIZE];
 
   /* Payload buffer for building discovery payloads. */
-  char topic_buf[128];
+  char topic_buf[136];
   char payload_buf[HA_DISCOVERY_PAYLOAD_BUF_SIZE];
 
   /* Rate limiting. */
@@ -125,10 +125,10 @@ typedef struct {
   /* Entity field buffers (used by process_jsonl_line to avoid stack overflow).
    * Templates are NOT stored here — they are embedded directly from the raw
    * JSONL line into the payload buffer with proper re-escaping. */
-  char entity_name_buf[128];
+  char entity_name_buf[160];
   char erd_id_hex_buf[8];
   char domain_buf[32];
-  char field_id_buf[16];
+  char field_id_buf[72];
   char paired_erd_buf[8];
   char role_buf[16];
   char unit_buf[32];
