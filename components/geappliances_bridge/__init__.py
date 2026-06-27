@@ -122,6 +122,13 @@ def _find_json_paths(component_dir: str) -> list[tuple[str, str]]:
             results.append(("ESPHome cache (/config)", p))
             seen.add(p)
 
+        # Path 3b: ESPHome library cache in /data (Docker container)
+        p = os.path.join("/data", ".esphome", "external_files", "libraries",
+                         "public-appliance-api-documentation", filename)
+        if p not in seen and os.path.exists(p):
+            results.append(("ESPHome cache (/data)", p))
+            seen.add(p)
+
         # Path 4: ESPHome library cache relative to component
         p = os.path.normpath(os.path.join(
             component_dir, "..", "..", ".esphome", "external_files", "libraries",
