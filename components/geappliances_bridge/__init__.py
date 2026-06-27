@@ -335,34 +335,57 @@ async def to_code(config: dict[str, Any]) -> None:
             "polling_onlypublish_onchange is deprecated and will be removed in a future release. "
             "The component now always publishes only on change."
 )
-    # Generate HA discovery data when enabled
+    # Generate required headers from appliance API documentation.
+    # erd_lists.h and appliance_api_feature_lists.h are always required.
+    # generate_erd_lists.py also calls generate_ha_discovery.py as a side effect.
+    component_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.normpath(os.path.join(component_dir, "..", ".."))
+    scripts_dir = os.path.join(repo_root, "scripts")
+    try:
+        _LOGGER.info("Generating ERD lists and feature API lists...")
+        result = subprocess.run(
+            [sys.executable, os.path.join(scripts_dir, "generate_erd_lists.py")],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        _LOGGER.info("ERD lists generated successfully")
+    except subprocess.CalledProcessError as e:
+        _LOGGER.error(
+            "ERD lists generation failed: %s. "
+            "Build will fail without erd_lists.h and appliance_api_feature_lists.h.",
+            e.stderr if e.stderr else str(e)
+        )
+        raise
+    except FileNotFoundError as e:
+        _LOGGER.error(
+            "ERD lists generation script not found: %s. "
+            "Build will fail without erd_lists.h and appliance_api_feature_lists.h.",
+            str(e)
+        )
+        raise
+
+    # Generate HA discovery compressed data when enabled
     if config.get(CONF_GENERATE_DEVICE_CONFIG, False):
-        _LOGGER.info("Generating HA MQTT discovery data...")
-        component_dir = os.path.dirname(os.path.abspath(__file__))
-        repo_root = os.path.normpath(os.path.join(component_dir, "..", ".."))
-        scripts_dir = os.path.join(repo_root, "scripts")
         try:
-            subprocess.run(
-                [sys.executable, os.path.join(scripts_dir, "generate_ha_discovery.py")],
-                cwd=repo_root,
-                check=True,
-                capture_output=True,
-            )
+            _LOGGER.info("Compressing HA MQTT discovery data...")
             subprocess.run(
                 [sys.executable, os.path.join(scripts_dir, "compress_ha_discovery.py")],
                 cwd=repo_root,
                 check=True,
                 capture_output=True,
+                text=True,
             )
-            _LOGGER.info("HA MQTT discovery data generated successfully")
+            _LOGGER.info("HA MQTT discovery data compressed successfully")
         except subprocess.CalledProcessError as e:
             _LOGGER.warning(
-                "HA discovery generation failed: %s. "
-                "Discovery will not be available.", e.stderr.decode() if e.stderr else str(e)
+                "HA discovery compression failed: %s. "
+                "Discovery will not be available.", e.stderr if e.stderr else str(e)
             )
         except FileNotFoundError as e:
             _LOGGER.warning(
-                "HA discovery generation scripts not found: %s. "
+                "HA discovery compression script not found: %s. "
                 "Discovery will not be available.", str(e)
             )
     await cg.register_component(var, config)
