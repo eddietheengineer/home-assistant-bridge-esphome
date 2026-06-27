@@ -1326,20 +1326,14 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
         esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(100));
 
-        /* Only free TCB/stack if the task has actually terminated.
-         * If the task is still on xTasksWaitingTermination, the idle task
-         * will free it; freeing it ourselves causes a crash. */
-        eTaskState state = eTaskGetState(self->task_handle);
-        if (state == eDeleted) {
-            free(self->task_stack);
-            free(self->task_tcb);
-            self->task_stack = NULL;
-            self->task_tcb = NULL;
-        } else if (state == eReady || state == eRunning) {
-            ESP_LOGW(TAG, "Build task still alive during cleanup, leaking resources");
-            self->task_stack = NULL;
-            self->task_tcb = NULL;
-        }
+        /* After the semaphore take + delay, the build task has called
+         * vTaskDelete() and the idle task has had time to unlink the TCB.
+         * Free stack/TCB unconditionally — same as the normal path in
+         * ha_discovery_manager_run(). free(NULL) is a no-op. */
+        free(self->task_stack);
+        free(self->task_tcb);
+        self->task_stack = NULL;
+        self->task_tcb = NULL;
         self->task_handle = NULL;
     }
 
