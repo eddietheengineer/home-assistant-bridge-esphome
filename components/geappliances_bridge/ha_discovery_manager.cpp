@@ -184,18 +184,15 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     if (avail >= needed) {
         uint16_t pos = self->cleanup_queue_write_pos;
 
-        /* Check if entry fits without wrapping. If not, we can't split entries
-         * across the boundary — skip this topic (will be caught on next pass). */
-        if (pos + needed <= HA_DISCOVERY_CLEANUP_BUF_SIZE) {
-            self->cleanup_topic_buf[pos] = (char)(uint8_t)domain_index;
-            memcpy(self->cleanup_topic_buf + pos + 1, suffix_start, suffix_len);
-            self->cleanup_topic_buf[pos + 1 + suffix_len] = '\0';
-            self->cleanup_queue_write_pos = (pos + needed) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
-            self->cleanup_queue_count++;
-        } else {
-            /* Entry would wrap — drop it */
-            self->cleanup_dropped_count++;
+        /* Write entry, allowing it to wrap around the buffer boundary. */
+        self->cleanup_topic_buf[pos] = (char)(uint8_t)domain_index;
+        for (uint16_t i = 0; i < suffix_len; i++) {
+            self->cleanup_topic_buf[(pos + 1 + i) % HA_DISCOVERY_CLEANUP_BUF_SIZE] =
+                suffix_start[i];
         }
+        self->cleanup_topic_buf[(pos + 1 + suffix_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE] = '\0';
+        self->cleanup_queue_write_pos = (pos + needed) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
+        self->cleanup_queue_count++;
     } else {
         /* Buffer full — drop this topic */
         self->cleanup_dropped_count++;

@@ -332,17 +332,19 @@ TEST(ha_discovery_cleanup, ring_buffer_wraparound)
 {
     ha_discovery_manager_t mgr = make_manager("Dishwasher_PDT715");
 
-    /* First round: pack 10 topics. */
-    for (uint32_t i = 0; i < 10; i++) {
+    /* Fill the buffer until full, then drain all but the last entry
+     * so that write_pos is near the end of the buffer. */
+    uint16_t num_packed = 0;
+    while (num_packed < 100) {
         char topic[128];
         snprintf(topic, sizeof(topic),
-            "homeassistant/sensor/Dishwasher_PDT715/round1_field_%u/config", i);
+            "homeassistant/sensor/Dishwasher_PDT715/field_%u/config", num_packed);
         cleanup_topic_callback(topic, "{\"data\":1}", 10, &mgr);
+        num_packed++;
     }
-    CHECK_EQUAL(10, mgr.cleanup_queue_count);
 
-    /* Drain all 10. */
-    while (mgr.cleanup_queue_count > 0) {
+    /* Drain all but the last entry. */
+    while (mgr.cleanup_queue_count > 1) {
         uint16_t pos = mgr.cleanup_queue_read_pos;
         char suffix_buf[128];
         uint16_t suffix_start = (pos + 1) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
@@ -357,20 +359,27 @@ TEST(ha_discovery_cleanup, ring_buffer_wraparound)
         mgr.cleanup_queue_read_pos = (pos + consumed) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
         mgr.cleanup_queue_count--;
     }
-    CHECK_EQUAL(0, mgr.cleanup_queue_count);
 
-    /* Second round: pack 10 more topics. */
+    uint16_t write_pos_before = mgr.cleanup_queue_write_pos;
+    CHECK(mgr.cleanup_queue_count == 1);
+
+    /* Pack more topics — the next entry should wrap around the boundary. */
+    uint32_t wrapped = 0;
     for (uint32_t i = 0; i < 10; i++) {
         char topic[128];
         snprintf(topic, sizeof(topic),
-            "homeassistant/sensor/Dishwasher_PDT715/round2_field_%u/config", i);
+            "homeassistant/sensor/Dishwasher_PDT715/wrap_field_%u/config", i);
         cleanup_topic_callback(topic, "{\"data\":1}", 10, &mgr);
+        if (mgr.cleanup_queue_write_pos < write_pos_before) {
+            wrapped++;
+            write_pos_before = mgr.cleanup_queue_write_pos;
+        }
     }
 
-    CHECK_EQUAL(10, mgr.cleanup_queue_count);
-    CHECK_EQUAL(0, mgr.cleanup_dropped_count);
+    /* Verify at least one entry wrapped. */
+    CHECK(wrapped > 0);
 
-    /* Verify we can still read them correctly. */
+    /* Verify all entries are readable with correct data. */
     while (mgr.cleanup_queue_count > 0) {
         uint16_t pos = mgr.cleanup_queue_read_pos;
         int domain_index = (int)(uint8_t)mgr.cleanup_topic_buf[pos];
