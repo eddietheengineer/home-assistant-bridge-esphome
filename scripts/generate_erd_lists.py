@@ -512,6 +512,12 @@ def main():
         "--output-dir",
         help="Override output directory for generated headers (default: component-dir)",
     )
+    parser.add_argument(
+        "--filter-config-topics",
+        action="store_true",
+        default=False,
+        help="Filter out internal metadata, diagnostics, and commissioning entities from HA discovery.",
+    )
     args = parser.parse_args()
 
     script_dir = Path(__file__).parent
@@ -623,13 +629,14 @@ def main():
     print(f"\nWriting generated header to {api_output_file}")
     with open(api_output_file, 'w') as f:
         f.write(api_header_content)
-
-
     # Generate HA discovery JSONL files
     ha_discovery_script = script_dir / 'generate_ha_discovery.py'
     if ha_discovery_script.exists():
         print(f"\nGenerating HA discovery JSONL files...")
-        subprocess.run([sys.executable, str(ha_discovery_script)], check=True)
+        ha_cmd = [sys.executable, str(ha_discovery_script)]
+        if args.filter_config_topics:
+            ha_cmd.append("--filter-config-topics")
+        subprocess.run(ha_cmd, check=True)
     else:
         print(f"\nWarning: {ha_discovery_script} not found, skipping HA discovery generation", file=sys.stderr)
 

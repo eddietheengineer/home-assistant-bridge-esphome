@@ -40,6 +40,7 @@ CONF_ERD_CACHE_ENTRIES_SENSOR = "erd_cache_entries_sensor"
 CONF_ERD_CACHE_UPDATES_SENSOR = "erd_cache_updates_sensor"
 CONF_MQTT_PUBLISH_RATE_SENSOR = "mqtt_publish_rate_sensor"
 CONF_THROTTLE_RATE_SECONDS = "throttle_rate_seconds"
+CONF_FILTER_CONFIG_TOPICS = "filter_config_topics"
 
 
 
@@ -310,6 +311,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_MQTT_PUBLISH_RATE_SENSOR): cv.Schema({
             cv.Optional("name", default="MQTT Publish Rate"): cv.string,
         }).extend(sensor.sensor_schema(state_class="measurement")),
+        cv.Optional(CONF_FILTER_CONFIG_TOPICS, default=False): cv.boolean,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
@@ -358,6 +360,8 @@ async def to_code(config: dict[str, Any]) -> None:
         cmd.extend(["--erd-definitions", erd_defs_path])
     if api_json_path:
         cmd.extend(["--appliance-api", api_json_path])
+    if config.get(CONF_FILTER_CONFIG_TOPICS, False):
+        cmd.append("--filter-config-topics")
 
     try:
         _LOGGER.info("Generating ERD lists and feature API lists...")
