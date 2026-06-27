@@ -95,7 +95,7 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
     const uint16_t max_batch = 8;
 
     while (batch < max_batch) {
-        char topic_buf[128];
+        char topic_buf[192];
 
         /* Read from the ring buffer under critical section. No shift needed —
          * producer and consumer use independent indices, so there is no data
@@ -151,8 +151,8 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     vPortEnterCritical();
     uint16_t next = (self->cleanup_queue_write_idx + 1) % HA_DISCOVERY_CLEANUP_QUEUE_SIZE;
     if (next != self->cleanup_queue_read_idx) {  // not full
-        strncpy(self->cleanup_topic_queue[self->cleanup_queue_write_idx], topic, 127);
-        self->cleanup_topic_queue[self->cleanup_queue_write_idx][127] = '\0';
+        strncpy(self->cleanup_topic_queue[self->cleanup_queue_write_idx], topic, 191);
+        self->cleanup_topic_queue[self->cleanup_queue_write_idx][191] = '\0';
         self->cleanup_queue_write_idx = next;
     }
     self->cleanup_received_topics = true;
