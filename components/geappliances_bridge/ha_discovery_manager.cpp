@@ -98,22 +98,27 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
         uint16_t count;
         char topic_buf[128];
 
-        /* Snapshot queue state under critical section to avoid race with callback. */
+        /* Snapshot queue state under critical section to avoid race with
+         * callback. Only the count read, topic copy, and count decrement
+         * need to be atomic — the shift loop runs outside to minimize
+         * interrupt latency. */
         vPortEnterCritical();
         count = self->cleanup_queue_count;
         if (count > 0) {
             strncpy(topic_buf, self->cleanup_topic_queue[0], sizeof(topic_buf));
             topic_buf[sizeof(topic_buf) - 1] = '\0';
-            /* Shift remaining entries down. */
-            for (uint16_t i = 1; i < count; i++) {
-                memcpy(self->cleanup_topic_queue[i - 1], self->cleanup_topic_queue[i],
-                       sizeof(self->cleanup_topic_queue[0]));
-            }
             self->cleanup_queue_count--;
         }
         vPortExitCritical();
 
         if (count == 0) break;
+
+        /* Shift remaining entries down. Callback can safely write during
+         * this — it is bounded by the already-decremented count. */
+        for (uint16_t i = 1; i < count; i++) {
+            memcpy(self->cleanup_topic_queue[i - 1], self->cleanup_topic_queue[i],
+                   sizeof(self->cleanup_topic_queue[0]));
+        }
 
         mqtt_client_publish_raw(self->mqtt_client, topic_buf, "", 0, true);
         ESP_LOGD(TAG, "Removed old topic: %s", topic_buf);
