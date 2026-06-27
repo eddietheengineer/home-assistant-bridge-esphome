@@ -172,10 +172,15 @@ typedef struct {
   uint16_t cleanup_pass_removed_count; // Topics removed during current pass
   uint32_t cleanup_wait_start_ms;     // Start time of final wait before discovery
 
-  /* Cleanup topic queue: buffer topic names for batched publishing.
-   * Each entry is a pointer into the shared topic_buf, so we queue
-   * offsets into topic_buf as we receive messages, then publish them
-   * in batches from the main loop to avoid blocking the MQTT task. */
+  /* Direct cleanup: clear known topics from embedded JSONL. */
+  uint8_t cleanup_category;       /* Current category index */
+  uint8_t cleanup_chunk;          /* Current chunk index within category */
+  uint32_t cleanup_offset;        /* Current offset within decompressed chunk */
+  uint32_t cleanup_decomp_size;   /* Decompressed size of current chunk */
+  uint16_t cleanup_direct_removed; /* Topics cleared via direct publish */
+  uint32_t cleanup_last_publish_ms; /* Last publish time for rate limiting */
+
+  /* Cleanup topic queue: buffer topic names for batched publishing. */
 #define HA_DISCOVERY_CLEANUP_QUEUE_SIZE 64
   char cleanup_topic_queue[HA_DISCOVERY_CLEANUP_QUEUE_SIZE][128];
   uint16_t cleanup_queue_count;
