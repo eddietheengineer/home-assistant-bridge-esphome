@@ -639,14 +639,23 @@ def main():
         import generate_ha_discovery as gen
         import compress_ha_discovery as comp
 
-        # Use the same resolved ERD definitions path
+        # DEBUG: log paths for ESPHome cache troubleshooting (stdout for ESPHome visibility)
+        print(f"DEBUG HA discovery: json_file={json_file}, exists={json_file.exists()}")
+        print(f"DEBUG HA discovery: script_dir={script_dir}, repo_root={repo_root}")
+        print(f"DEBUG HA discovery: component_dir={component_dir}, output_dir={output_dir}")
+
+        # Load ERD definitions: try local file first, always fall back to GitHub
         erd_data = None
         if json_file.exists():
-            with open(json_file, 'r') as f:
-                erd_data = json.load(f)
-        else:
+            try:
+                with open(json_file, 'r') as f:
+                    erd_data = json.load(f)
+                print(f"Loaded ERD definitions from {json_file}", file=sys.stderr)
+            except Exception as e:
+                print(f"Failed to load ERD definitions from {json_file}: {e}", file=sys.stderr)
+                erd_data = None
+        if erd_data is None:
             erd_data = gen.fetch_erd_definitions_from_github()
-
         if erd_data is not None:
             erds = erd_data.get('erds', [])
             print(f"Found {len(erds)} ERD definitions", file=sys.stderr)
