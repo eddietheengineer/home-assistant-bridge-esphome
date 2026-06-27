@@ -25,7 +25,7 @@ esp32:
 
 # External component configuration
 external_components:
-  - source: github://joshualongenecker/home-assistant-bridge-esphome
+  - source: github://eddietheengineer/home-assistant-bridge-esphome@develop
     components: [ geappliances_bridge ]
 
 # MQTT configuration for Home Assistant
@@ -61,10 +61,9 @@ geappliances_bridge:
   # device_id: "YourDeviceId"             # Optional: Uncomment to use a custom device ID
   # mode: auto                            # Default: auto   Options: auto, subscribe, poll
   # polling_interval: 10000               # Default: 10000 ms (10 seconds), used when in polling mode
-  # polling_onlypublish_onchange: true   # Deprecated: always on, kept for backward compatibility
   # appliance_api_parsing: true           # Default: true, restricts polling to appliance-supported ERDs
   # throttle_rate_seconds: 0              # Default: 0 (disabled), min seconds between publishes per ERD (0-255)
-  # generate_device_config: false         # Deprecated: no-op, kept for backward compatibility
+  # generate_device_config: false         # Default: false (currently disabled)
 
 ```
 
@@ -114,7 +113,7 @@ The `appliance_api_parsing` parameter is **optional** (default: `true`). When en
 - **`adapter_address`** (default: `0xE4`) — The bridge's address on the GEA bus.
 - **`custom_erds`** (default: none) — A list of additional ERD IDs to poll beyond the standard list. Useful for ERDs not yet in the appliance API documentation.
 - **`throttle_rate_seconds`** (default: `0`) — Minimum interval in seconds between MQTT publishes for any individual ERD. Set to 0 to disable (publish on every update). Range: 0–255. Useful for reducing MQTT traffic when the appliance generates frequent updates.
-- **`generate_device_config`** (default: `false`) — Deprecated, no-op. Kept for backward compatibility.
+- **`generate_device_config`** (default: `false`) — Currently disabled
 
 ## Development
 
