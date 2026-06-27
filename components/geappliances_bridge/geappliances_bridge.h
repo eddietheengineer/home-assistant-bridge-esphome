@@ -152,7 +152,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   uart::UARTComponent *uart_{nullptr};
   uart::UARTComponent *gea2_uart_{nullptr};
-  char configured_device_id_{0};
+  char configured_device_id_[64]{0};
   uint8_t client_address_{0xE4};
 
   bool mqtt_client_adapter_initialized_{false};
