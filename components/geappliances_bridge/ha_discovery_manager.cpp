@@ -231,6 +231,10 @@ static void cleanup_run(ha_discovery_manager_t* self)
             /* the component empty — retained messages may still be in flight. */
             cleanup_flush_queue(self);
             self->cleanup_flushed_once = true;
+            /* Reset activity timer so the idle timeout starts from the */
+            /* flush, not from subscribe — gives the MQTT task time to */
+            /* drain retained messages that were queued after subscribe. */
+            self->cleanup_last_activity_ms = self->get_time_ms();
             return;
         }
         if (now - self->cleanup_last_activity_ms >= timeout) {
