@@ -137,6 +137,8 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     (void)payload;
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
 
+    /* Diagnostic: count all callbacks received. */
+    self->cleanup_pass_received_count++;
     /* Only remove config topics. */
     size_t topic_len = strlen(topic);
     if (topic_len < 7) return;
@@ -211,6 +213,7 @@ CLEANUP_FN void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_flushed_once = false;
     self->cleanup_clean_passes = 0;
     self->cleanup_pass_found_topics = false;
+    self->cleanup_pass_received_count = 0;
     self->cleanup_pass_removed_count = 0;
     self->cleanup_pass_number = 1;
     self->cleanup_wait_start_ms = 0;
@@ -272,27 +275,23 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
     /* Check if we've been idle long enough. */
     if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
-        /* Flush entire queue before unsubscribing. */
+        /* Flush entire queue. */
         while (self->cleanup_queue_count > 0) {
             cleanup_flush_queue(self);
         }
 
-        /* Unsubscribe. */
-        if (self->mqtt_client) {
-            char sub_topic[128];
-            snprintf(sub_topic, sizeof(sub_topic), "homeassistant/+/%s/#", self->device_id);
-            mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
-        }
-        self->cleanup_subscribed = false;
-        ESP_LOGI(TAG, "  Pass %u: %u topics removed, %u dropped",
-            self->cleanup_pass_number, self->cleanup_pass_removed_count, self->cleanup_dropped_count);
+        ESP_LOGI(TAG, "  Pass %u: %u received, %u removed, %u dropped, %u in queue",
+            self->cleanup_pass_number, self->cleanup_pass_received_count, self->cleanup_pass_removed_count, self->cleanup_dropped_count, self->cleanup_queue_count);
 
         if (self->cleanup_pass_found_topics) {
-            /* Topics were found and cleared — loop again to verify. */
+            /* Topics were found and cleared — continue without unsubscribing.
+             * Keep the subscription alive so retained messages continue flowing. */
             self->cleanup_pass_number++;
+            self->cleanup_pass_received_count = 0;
             self->cleanup_pass_found_topics = false;
             self->cleanup_pass_removed_count = 0;
             self->cleanup_flushed_once = false;
+            self->cleanup_last_activity_ms = self->get_time_ms();
             return;
         }
 
@@ -306,11 +305,13 @@ static void cleanup_run(ha_discovery_manager_t* self)
         ESP_LOGI(TAG, "  Cleanup pass %u completed with no topics found", self->cleanup_pass_number);
 
         if (self->cleanup_clean_passes < 2) {
-            /* Run another validation pass to confirm nothing was missed. */
+            /* Run another validation pass — keep subscription alive. */
             self->cleanup_pass_number++;
+            self->cleanup_pass_received_count = 0;
             self->cleanup_pass_found_topics = false;
             self->cleanup_pass_removed_count = 0;
             self->cleanup_flushed_once = false;
+            self->cleanup_last_activity_ms = self->get_time_ms();
             return;
         }
 
@@ -326,8 +327,15 @@ wait_check:
             return;
         }
 
+        /* Unsubscribe before proceeding to discovery. */
+        if (self->mqtt_client) {
+            char sub_topic[128];
+            snprintf(sub_topic, sizeof(sub_topic), "homeassistant/+/%s/#", self->device_id);
+            mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
+        }
+        self->cleanup_subscribed = false;
+
         /* Final wait complete. Proceed to discovery. */
-        ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
         if (self->cleanup_dropped_count > 0) {
             ESP_LOGW(TAG, "  Dropped %u topics due to buffer full during cleanup",
                 (unsigned)self->cleanup_dropped_count);

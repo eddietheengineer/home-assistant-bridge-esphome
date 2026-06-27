@@ -185,7 +185,8 @@ typedef struct {
   bool cleanup_flushed_once;          // Whether we flushed at least once after subscribing
   uint8_t cleanup_clean_passes;       // Consecutive passes with no topics found
   bool cleanup_pass_found_topics;     // Whether any topics were found during current pass
-  uint16_t cleanup_pass_removed_count; // Topics removed during current pass
+  uint16_t cleanup_pass_received_count;  // Topics received by callback during current pass
+  uint16_t cleanup_pass_removed_count;   // Topics removed during current pass
   uint8_t cleanup_pass_number;        // Current pass number (starts at 1)
   uint32_t cleanup_wait_start_ms;     // Start time of final wait before discovery
 
