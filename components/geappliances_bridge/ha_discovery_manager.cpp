@@ -30,6 +30,9 @@
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 #ifndef USE_ESP_IDF_STUBS
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 #define MINIZ_NO_ARCHIVE_APIS
 #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
 #define MINIZ_NO_STDIO
@@ -79,8 +82,6 @@ static const char* const HA_DISCOVERY_COMPONENT_TYPES[] = {
 
 /* Idle timeout after last topic for current component type. */
 #define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 2000
-/* Short timeout for component types with no topics — skip quickly. */
-#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS 500
 /* Wait after a clean pass before starting discovery publishing. */
 #define HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS 5000
 
@@ -93,28 +94,38 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
     uint16_t batch = 0;
     const uint16_t max_batch = 8;
 
-    while (self->cleanup_queue_count > 0 && batch < max_batch) {
-        /* Pop from the front of the queue by shifting. */
-        mqtt_client_publish_raw(self->mqtt_client,
-            self->cleanup_topic_queue[0], "", 0, true);
+    while (batch < max_batch) {
+        char topic_buf[128];
 
-        ESP_LOGD(TAG, "Removed old topic: %s", self->cleanup_topic_queue[0]);
+        /* Read from the ring buffer under critical section. No shift needed —
+         * producer and consumer use independent indices, so there is no data
+         * race between the callback writing and the flush reading. */
+        vPortEnterCritical();
+        if (self->cleanup_queue_read_idx == self->cleanup_queue_write_idx) {
+            vPortExitCritical();
+            break;  // empty
+        }
+        uint16_t idx = self->cleanup_queue_read_idx;
+        strncpy(topic_buf, self->cleanup_topic_queue[idx], sizeof(topic_buf));
+        topic_buf[sizeof(topic_buf) - 1] = '\0';
+        self->cleanup_queue_read_idx = (idx + 1) % HA_DISCOVERY_CLEANUP_QUEUE_SIZE;
+        vPortExitCritical();
+
+        mqtt_client_publish_raw(self->mqtt_client, topic_buf, "", 0, true);
+        ESP_LOGD(TAG, "Removed old topic: %s", topic_buf);
         self->cleanup_pass_removed_count++;
         self->cleanup_component_removed_count++;
-
-        /* Shift remaining entries down. */
-        for (uint16_t i = 1; i < self->cleanup_queue_count; i++) {
-            memcpy(self->cleanup_topic_queue[i - 1], self->cleanup_topic_queue[i],
-                   sizeof(self->cleanup_topic_queue[0]));
-        }
-        self->cleanup_queue_count--;
         batch++;
 
         /* Yield between batches to let the MQTT task process inbound messages. */
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 
-    return self->cleanup_queue_count;
+    /* Compute remaining entries from ring buffer indices. */
+    if (self->cleanup_queue_write_idx >= self->cleanup_queue_read_idx) {
+        return self->cleanup_queue_write_idx - self->cleanup_queue_read_idx;
+    }
+    return HA_DISCOVERY_CLEANUP_QUEUE_SIZE - self->cleanup_queue_read_idx + self->cleanup_queue_write_idx;
 }
 
 /* Callback for homeassistant/{component}/{device_id}/# subscription during cleanup.
@@ -134,18 +145,20 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     /* If the payload is empty, it's our own echo from a previous clear — skip. */
     if (payload_len == 0) return;
 
-    /* Queue the topic name for publishing from the main loop. */
-    if (self->cleanup_queue_count < HA_DISCOVERY_CLEANUP_QUEUE_SIZE) {
-        strncpy(self->cleanup_topic_queue[self->cleanup_queue_count], topic, 127);
-        self->cleanup_topic_queue[self->cleanup_queue_count][127] = '\0';
-        self->cleanup_queue_count++;
+    /* Queue the topic name for publishing from the main loop.
+     * Ring buffer producer: advance write_idx under critical section.
+     * No data race with consumer — independent indices. */
+    vPortEnterCritical();
+    uint16_t next = (self->cleanup_queue_write_idx + 1) % HA_DISCOVERY_CLEANUP_QUEUE_SIZE;
+    if (next != self->cleanup_queue_read_idx) {  // not full
+        strncpy(self->cleanup_topic_queue[self->cleanup_queue_write_idx], topic, 127);
+        self->cleanup_topic_queue[self->cleanup_queue_write_idx][127] = '\0';
+        self->cleanup_queue_write_idx = next;
     }
-
     self->cleanup_received_topics = true;
     self->cleanup_pass_found_topics = true;
-
-    /* Record activity time so the idle timer resets. */
     self->cleanup_last_activity_ms = self->get_time_ms();
+    vPortExitCritical();
 }
 
 static void cleanup_start(ha_discovery_manager_t* self)
@@ -153,8 +166,10 @@ static void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_subscribed = false;
     self->cleanup_current_component = 0;
     self->cleanup_last_activity_ms = self->get_time_ms();
-    self->cleanup_queue_count = 0;
+    self->cleanup_queue_write_idx = 0;
+    self->cleanup_queue_read_idx = 0;
     self->cleanup_received_topics = false;
+    self->cleanup_flushed_once = false;
     self->cleanup_clean_passes = 0;
     self->cleanup_pass_found_topics = false;
     self->cleanup_pass_removed_count = 0;
@@ -204,14 +219,27 @@ static void cleanup_run(ha_discovery_manager_t* self)
             return;
         }
 
-        /* Check if we've been idle long enough — no new matching topics
-         * have arrived, so the broker has delivered all retained messages
-         * for this component type. Use short timeout for empty components. */
         uint32_t now = self->get_time_ms();
-        uint32_t timeout = self->cleanup_received_topics
-            ? HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS
-            : HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS;
-        if (now - self->cleanup_last_activity_ms >= timeout) {
+
+        /* Must flush at least once after subscribing before declaring
+         * the component empty — retained messages may still be in flight. */
+        if (!self->cleanup_flushed_once) {
+            cleanup_flush_queue(self);
+            self->cleanup_flushed_once = true;
+            /* Reset activity timer so the idle timeout starts from the
+             * flush, not from subscribe — gives the MQTT task time to
+             * drain retained messages that were queued after subscribe. */
+            self->cleanup_last_activity_ms = self->get_time_ms();
+            return;
+        }
+
+        /* Check if we've been idle long enough. Use the long timeout for
+         * all passes — the 32-event ESP-IDF MQTT inbound queue overflows
+         * on large components (binary_sensor: 288 dropped, switch: 104
+         * dropped), so the callback may not fire for a while even though
+         * retained messages exist. Components that survive the timeout
+         * with no topics are permanently skipped via the skip bitmap. */
+        if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
             /* Flush any remaining queued topics before unsubscribing. */
             cleanup_flush_queue(self);
 
@@ -242,6 +270,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
         /* Still receiving messages for this component type. */
         return;
+
     }
 
     /* All component types processed for this pass. */
@@ -252,6 +281,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
         self->cleanup_pass_number++;
         self->cleanup_current_component = 0;
         self->cleanup_received_topics = false;
+        self->cleanup_flushed_once = false;
         self->cleanup_pass_found_topics = false;
         self->cleanup_pass_removed_count = 0;
         self->cleanup_component_removed_count = 0;
@@ -1090,11 +1120,14 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 
                 size_t dst_size = sizeof(self->decomp_buf);
                 if (chunk_decompress(self, src, chunk->size, self->decomp_buf, &dst_size) != 0) {
-                    /* Decompression failed, skip this chunk. */
-                    self->current_chunk++;
-                    self->current_offset = 0;
-                    self->current_decomp_size = 0;
-                    continue;
+                    /* Decompression failed — log and transition to error state.
+                     * Corrupt data would produce garbage JSONL that the consumer
+                     * cannot parse, so abort discovery rather than risk publishing
+                     * malformed discovery payloads. */
+                    ESP_LOGE(TAG, "Decompression failed for category '%s' chunk %u (offset %u, size %u)",
+                        cat->name, self->current_chunk, chunk->offset, chunk->size);
+                    self->state = ha_discovery_state_failed;
+                    return;
                 }
                 self->current_decomp_size = (uint32_t)dst_size;
                 self->current_offset = 0;
@@ -1290,6 +1323,15 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
         }
         esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(100));
+
+        /* After the semaphore take + delay, the build task has called
+         * vTaskDelete() and the idle task has had time to unlink the TCB.
+         * Free stack/TCB unconditionally — same as the normal path in
+         * ha_discovery_manager_run(). free(NULL) is a no-op. */
+        free(self->task_stack);
+        free(self->task_tcb);
+        self->task_stack = NULL;
+        self->task_tcb = NULL;
         self->task_handle = NULL;
     }
 

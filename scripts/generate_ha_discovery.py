@@ -72,6 +72,20 @@ VALID_DEVICE_CLASSES = {
     },
 }
 
+
+def _decimal_places(scaling_factor: int) -> int:
+    """Return the number of decimal places needed to represent 1/scaling_factor exactly.
+
+    For powers of 10 this is simply the number of digits (e.g. 10 -> 1, 100 -> 2).
+    For other factors (e.g. 32) it finds the smallest dp where round(1/sf, dp) == 1/sf.
+    """
+    if scaling_factor <= 0:
+        return 0
+    for dp in range(1, 10):
+        if round(1.0 / scaling_factor, dp) == 1.0 / scaling_factor:
+            return dp
+    return 3  # fallback
+
 def _is_valid_device_class(domain: str, device_class: str) -> bool:
     """Check if device_class is valid for the given HA domain."""
     if not device_class:
@@ -446,7 +460,7 @@ def _byte_subfield_value_template(field: Dict, erd_scaling: int) -> str:
             max_val = 2 ** (size * 8)
             half_val = max_val // 2
             if erd_scaling and erd_scaling > 1:
-                dp = {10: 1, 100: 2}.get(erd_scaling, 3)
+                dp = _decimal_places(erd_scaling)
                 return (f"{{{{ ((value[{hex_start}:{hex_end}] | int(base=16)) - {max_val}"
                         f" if (value[{hex_start}:{hex_end}] | int(base=16)) >= {half_val}"
                         f" else (value[{hex_start}:{hex_end}] | int(base=16)))"
@@ -456,7 +470,7 @@ def _byte_subfield_value_template(field: Dict, erd_scaling: int) -> str:
                         f" if (value[{hex_start}:{hex_end}] | int(base=16)) >= {half_val}"
                         f" else (value[{hex_start}:{hex_end}] | int(base=16)) }}}}")
         elif erd_scaling and erd_scaling > 1:
-            dp = {10: 1, 100: 2}.get(erd_scaling, 3)
+            dp = _decimal_places(erd_scaling)
             return (f"{{{{ (value[{hex_start}:{hex_end}] | int(base=16))"
                     f" / {erd_scaling} | round({dp}) }}}}")
         else:
@@ -538,7 +552,7 @@ def _compute_sensor_value_template(scaling_factor: int, data_size: int, signed: 
         max_val = 2 ** (data_size * 8)
         half_val = max_val // 2
         if scaling_factor > 1:
-            dp = {10: 1, 100: 2}.get(scaling_factor, 3)
+            dp = _decimal_places(scaling_factor)
             return (f'{{{{ ((value | int(base=16)) - {max_val}'
                     f' if (value | int(base=16)) >= {half_val}'
                     f' else (value | int(base=16))) / {scaling_factor} | round({dp}) }}}}')
@@ -815,20 +829,27 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
         data_size = get_erd_byte_size(erd_data) or 1
 
         # Skip "Request" ERDs that lack a proper request/status pair.
-        # Unpaired request ERDs exposed as sensors would allow uncontrolled
-        # writes — only generate them when pair_role='request' with a
-        # valid paired_erd pointing to a status ERD.
-        if 'Request' in name:
-            if not (pair_role == 'request' and paired_erd_str and paired_erd_str in erd_by_id):
+        # Only skip when the ERD is actually part of a request/status pair
+        # (pair_role == 'request') but has no valid paired_erd.
+        # Standalone ERDs with "Request" in their name (e.g., button commands)
+        # should NOT be skipped — they are legitimate write-only entities.
+        if pair_role == 'request' and 'Request' in name:
+            if not (paired_erd_str and paired_erd_str in erd_by_id):
                 continue
 
         # Skip status ERD if its paired request ERD is a controllable domain
         # (switch/select/number) — the request ERD will handle both state+command.
+        # Verify bidirectional pairing: the request ERD's paired_erd must point
+        # back to this status ERD, otherwise the pairing is asymmetric and the
+        # status ERD carries independent information (e.g., "Not Equipped").
         if pair_role == 'status' and paired_erd_str and paired_erd_str in erd_by_id:
             paired = erd_by_id[paired_erd_str]
             paired_role = paired.get('pair_role') or ''
             paired_domain = paired.get('ha_domain') or ''
-            if paired_role == 'request' and paired_domain in ('switch', 'select', 'number'):
+            paired_back = paired.get('paired_erd') or ''
+            if (paired_role == 'request'
+                    and paired_domain in ('switch', 'select', 'number')
+                    and paired_back == erd['id']):
                 processed_status.add(erd_id_int)
                 continue
 
