@@ -29,10 +29,10 @@
 #include "esp_task_wdt.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
+#ifndef USE_ESP_IDF_STUBS
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
-#ifndef USE_ESP_IDF_STUBS
 #define MINIZ_NO_ARCHIVE_APIS
 #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
 #define MINIZ_NO_STDIO
@@ -1318,6 +1318,8 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
             self->task_tcb = NULL;
         } else if (state == eReady || state == eRunning) {
             ESP_LOGW(TAG, "Build task still alive during cleanup, leaking resources");
+            self->task_stack = NULL;
+            self->task_tcb = NULL;
         }
         self->task_handle = NULL;
     }
