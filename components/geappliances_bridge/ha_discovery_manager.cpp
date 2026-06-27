@@ -83,7 +83,7 @@ static const char* const HA_DISCOVERY_COMPONENT_TYPES[] = {
 /* Idle timeout after last topic for current component type. */
 #define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 2000
 /* Short timeout for component types with no topics — skip quickly. */
-#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS 2000
+#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS 500
 /* Number of flush cycles to do before declaring a component empty. */
 #define HA_DISCOVERY_CLEANUP_EMPTY_FLUSH_CYCLES 4
 /* Wait after a clean pass before starting discovery publishing. */
@@ -180,152 +180,31 @@ static void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_wait_start_ms = 0;
     self->cleanup_component_skip = 0;
 
-    /* Direct cleanup fields. */
-    self->cleanup_category = 0;
-    self->cleanup_chunk = 0;
-    self->cleanup_offset = 0;
-    self->cleanup_decomp_size = 0;
-    self->cleanup_direct_removed = 0;
-    self->cleanup_phase1_done = false;
-    self->cleanup_phase2_started = false;
-    self->cleanup_last_publish_ms = 0;
-
     ESP_LOGI(TAG, "Starting HA discovery cleanup...");
 }
 
-/* Forward declarations for helpers used in direct cleanup. */
-#ifdef USE_ESP_IDF
-static int chunk_decompress(ha_discovery_manager_t* self, const uint8_t* compressed, size_t compressed_len,
-                           uint8_t* output, size_t* output_len);
-static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line);
-#endif
-static bool should_process_category(const char* category, uint8_t appliance_type);
-
 static void cleanup_run(ha_discovery_manager_t* self)
 {
-#ifdef USE_ESP_IDF
-    /* Phase 1: Direct cleanup — iterate JSONL and publish empty retained
-     * payloads to clear all known discovery topics. One-way gate: once
-     * Phase 1 completes it never re-enters, avoiding infinite loops. */
-    if (!self->cleanup_phase1_done) {
-        /* All categories processed — mark Phase 1 done. */
-        if (self->cleanup_category >= ha_discovery_category_count) {
-            self->cleanup_phase1_done = true;
-            ESP_LOGI(TAG, "Direct cleanup: cleared %u known topics", self->cleanup_direct_removed);
-        } else {
-        const ha_discovery_category_t* cat = &ha_discovery_categories[self->cleanup_category];
-
-        /* Process all categories during cleanup — not just the ones
-         * applicable to this appliance. A device may have previously
-         * published topics from a non-filtered JSONL (e.g. running
-         * with a different appliance type or unfiltered firmware),
-         * so we clean everything to ensure a clean slate. */
-
-        /* Decompress the current chunk if needed. */
-        if (self->cleanup_decomp_size == 0) {
-            if (self->cleanup_chunk >= cat->num_chunks) {
-                self->cleanup_category++;
-                self->cleanup_chunk = 0;
-                self->cleanup_offset = 0;
-                self->cleanup_decomp_size = 0;
-                return;
-            }
-            const ha_discovery_chunk_t* chunk = &cat->chunks[self->cleanup_chunk];
-            const uint8_t* src = cat->data + chunk->offset;
-            size_t dst_size = sizeof(self->decomp_buf);
-            if (chunk_decompress(self, src, chunk->size, self->decomp_buf, &dst_size) != 0) {
-                ESP_LOGE(TAG, "Decompression failed for direct cleanup category '%s' chunk %u",
-                    cat->name, self->cleanup_chunk);
-                /* Skip to next category. */
-                self->cleanup_category++;
-                self->cleanup_chunk = 0;
-                self->cleanup_offset = 0;
-                self->cleanup_decomp_size = 0;
-                return;
-            }
-            self->cleanup_decomp_size = (uint32_t)dst_size;
-            self->cleanup_offset = 0;
-        }
-
-        /* Parse lines and clear topics. */
-        const char* decomp = (const char*)self->decomp_buf;
-        while (self->cleanup_offset < self->cleanup_decomp_size) {
-            const char* line_start = decomp + self->cleanup_offset;
-            const char* line_end = line_start;
-            while ((uintptr_t)(line_end - decomp) < self->cleanup_decomp_size &&
-                   *line_end != '\n' && *line_end != '\r') {
-                line_end++;
-            }
-            size_t line_len = (size_t)(line_end - line_start);
-            if (line_len == 0) { self->cleanup_offset++; continue; }
-            if (line_len >= sizeof(self->line_buf) - 1) {
-                line_len = sizeof(self->line_buf) - 1;
-            }
-            memcpy(self->line_buf, line_start, line_len);
-            self->line_buf[line_len] = '\0';
-
-            /* Parse the line to construct the topic. */
-            if (process_jsonl_line(self, self->line_buf)) {
-                /* topic_buf now has the discovery topic. Publish empty payload. */
-                if (self->mqtt_client) {
-                    mqtt_client_publish_raw(self->mqtt_client, self->topic_buf, "", 0, true);
-                    self->cleanup_direct_removed++;
-                }
-            }
-
-            self->cleanup_offset = (uint32_t)(line_end - decomp) + 1;
-
-            /* Rate-limit: one clear per interval. */
-            return;
-        }
-
-        /* Done with this chunk. */
-        self->cleanup_chunk++;
-        self->cleanup_offset = 0;
-        self->cleanup_decomp_size = 0;
-        return;
-        }  // else (cleanup_category < ha_discovery_category_count)
-    }  // if (!self->cleanup_phase1_done)
-
-#else
-    /* Non-ESP-IDF: skip direct cleanup, go straight to callback phase. */
-    self->cleanup_phase1_done = true;
-    (void)self->cleanup_direct_removed;
-#endif
-
-    /* Reset for callback-based cleanup — only once on first entry. */
-    if (!self->cleanup_phase2_started) {
-        self->cleanup_current_component = 0;
-        self->cleanup_subscribed = false;
-        self->cleanup_received_topics = false;
-        self->cleanup_flushed_once = false;
-        self->cleanup_empty_flush_cycles = 0;
-        self->cleanup_component_skip = 0;
-        self->cleanup_pass_found_topics = false;
-        self->cleanup_component_removed_count = 0;
-        self->cleanup_pass_number = 1;
-        self->cleanup_pass_removed_count = 0;
-        self->cleanup_clean_passes = 0;
-        self->cleanup_wait_start_ms = 0;
-        self->cleanup_last_activity_ms = self->get_time_ms();
-        self->cleanup_queue_count = 0;
-        self->cleanup_phase2_started = true;
-
-        ESP_LOGI(TAG, "Scanning for remaining old topics...");
-    }
-
-    /* Phase 2: callback-based cleanup for remaining old topics. */
+    /* Find the next component type to clean. */
     while (self->cleanup_current_component < sizeof(HA_DISCOVERY_COMPONENT_TYPES) / sizeof(HA_DISCOVERY_COMPONENT_TYPES[0])) {
         const char* component = HA_DISCOVERY_COMPONENT_TYPES[self->cleanup_current_component];
 
+        /* NULL sentinel means we've processed all types. */
         if (component == NULL) break;
+        /* Skip components that had 0 removals on a previous pass.
+         * Once a component has no retained topics, it won't magically
+         * have some later — the bitmap persists across passes. */
         if (self->cleanup_component_skip & (1u << self->cleanup_current_component)) {
             self->cleanup_current_component++;
             continue;
         }
 
+        /* Flush any queued topics before subscribing to the next component. */
         cleanup_flush_queue(self);
 
+        /* Subscribe to this component type for our device.
+         * homeassistant/{component}/{device_id}/# scopes to one component
+         * type at a time, avoiding inbound queue overflow. */
         if (!self->cleanup_subscribed) {
             if (self->mqtt_client) {
                 char sub_topic[128];
@@ -346,13 +225,21 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
         uint32_t now = self->get_time_ms();
 
+        /* Must flush at least once after subscribing before declaring
+         * the component empty — retained messages may still be in flight. */
         if (!self->cleanup_flushed_once) {
             cleanup_flush_queue(self);
             self->cleanup_flushed_once = true;
+            /* Reset activity timer so the idle timeout starts from the
+             * flush, not from subscribe — gives the MQTT task time to
+             * drain retained messages that were queued after subscribe. */
             self->cleanup_last_activity_ms = self->get_time_ms();
             return;
         }
 
+        /* For components with no topics received yet, do multiple flush
+         * cycles to give the MQTT task time to drain between each one,
+         * as the 32-event inbound queue can overflow. */
         if (!self->cleanup_received_topics) {
             cleanup_flush_queue(self);
             self->cleanup_empty_flush_cycles++;
@@ -363,11 +250,17 @@ static void cleanup_run(ha_discovery_manager_t* self)
             return;
         }
 
+        /* Check if we've been idle long enough — no new matching topics
+         * have arrived, so the broker has delivered all retained messages
+         * for this component type. */
         if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
             goto unsubscribe_component;
         }
 
+        /* Flush queued topics while waiting for the idle timeout. */
         cleanup_flush_queue(self);
+
+        /* Still receiving messages for this component type. */
         return;
 
     unsubscribe_component:
@@ -393,6 +286,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
     /* All component types processed for this pass. */
     if (self->cleanup_pass_found_topics) {
+        /* Topics were found and cleared — loop again to verify. */
         ESP_LOGI(TAG, "Pass %u: removed %u topics, running another pass...",
             self->cleanup_pass_number, self->cleanup_pass_removed_count);
         self->cleanup_pass_number++;
@@ -404,7 +298,9 @@ static void cleanup_run(ha_discovery_manager_t* self)
         return;
     }
 
+    /* Clean pass — no topics found. */
     if (self->cleanup_wait_start_ms != 0) {
+        /* Already in the final wait period; skip pass accounting. */
         goto wait_check;
     }
 
@@ -412,6 +308,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
     ESP_LOGI(TAG, "Cleanup pass %u completed with no topics found", self->cleanup_pass_number);
 
     if (self->cleanup_clean_passes < 2) {
+        /* Run another validation pass to confirm nothing was missed. */
         self->cleanup_pass_number++;
         self->cleanup_current_component = 0;
         self->cleanup_received_topics = false;
@@ -420,19 +317,21 @@ static void cleanup_run(ha_discovery_manager_t* self)
         return;
     }
 
+    /* Two consecutive clean passes. Start the final wait period. */
     self->cleanup_wait_start_ms = self->get_time_ms();
     ESP_LOGI(TAG, "Waiting %lu seconds before discovery...", (unsigned long)(HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS / 1000));
 
 wait_check:
+
+    /* Check if the final wait period has elapsed. */
     uint32_t now = self->get_time_ms();
     if (now - self->cleanup_wait_start_ms < HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS) {
+        /* Still waiting. */
         return;
     }
 
-    /* All cleanup done. Proceed to discovery. */
-    uint16_t total_removed __attribute__((unused)) = self->cleanup_direct_removed + self->cleanup_pass_removed_count;
-    ESP_LOGI(TAG, "Cleanup complete: %u direct, %u via callback, %u total",
-        self->cleanup_direct_removed, self->cleanup_pass_removed_count, total_removed);
+    /* Final wait complete. Proceed to discovery. */
+    ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
     {
         size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
         size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
