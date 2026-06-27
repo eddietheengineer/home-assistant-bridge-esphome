@@ -213,16 +213,13 @@ static void cleanup_run(ha_discovery_manager_t* self)
             self->cleanup_phase1_done = true;
             ESP_LOGI(TAG, "Direct cleanup: cleared %u known topics", self->cleanup_direct_removed);
         } else {
-            const ha_discovery_category_t* cat = &ha_discovery_categories[self->cleanup_category];
+        const ha_discovery_category_t* cat = &ha_discovery_categories[self->cleanup_category];
 
-        /* Skip categories that don't apply to this appliance. */
-        if (!should_process_category(cat->name, self->appliance_type)) {
-            self->cleanup_category++;
-            self->cleanup_chunk = 0;
-            self->cleanup_offset = 0;
-            self->cleanup_decomp_size = 0;
-            return;
-        }
+        /* Process all categories during cleanup — not just the ones
+         * applicable to this appliance. A device may have previously
+         * published topics from a non-filtered JSONL (e.g. running
+         * with a different appliance type or unfiltered firmware),
+         * so we clean everything to ensure a clean slate. */
 
         /* Decompress the current chunk if needed. */
         if (self->cleanup_decomp_size == 0) {
