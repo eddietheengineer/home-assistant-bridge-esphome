@@ -29,6 +29,9 @@
 #include "esp_task_wdt.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 #ifndef USE_ESP_IDF_STUBS
 #define MINIZ_NO_ARCHIVE_APIS
 #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
@@ -93,21 +96,31 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
     uint16_t batch = 0;
     const uint16_t max_batch = 8;
 
-    while (self->cleanup_queue_count > 0 && batch < max_batch) {
-        /* Pop from the front of the queue by shifting. */
-        mqtt_client_publish_raw(self->mqtt_client,
-            self->cleanup_topic_queue[0], "", 0, true);
+    while (batch < max_batch) {
+        uint16_t count;
+        char topic_buf[128];
 
-        ESP_LOGD(TAG, "Removed old topic: %s", self->cleanup_topic_queue[0]);
+        /* Snapshot queue state under critical section to avoid race with callback. */
+        taskENTER_CRITICAL();
+        count = self->cleanup_queue_count;
+        if (count > 0) {
+            strncpy(topic_buf, self->cleanup_topic_queue[0], sizeof(topic_buf));
+            topic_buf[sizeof(topic_buf) - 1] = '\0';
+            /* Shift remaining entries down. */
+            for (uint16_t i = 1; i < count; i++) {
+                memcpy(self->cleanup_topic_queue[i - 1], self->cleanup_topic_queue[i],
+                       sizeof(self->cleanup_topic_queue[0]));
+            }
+            self->cleanup_queue_count--;
+        }
+        taskEXIT_CRITICAL();
+
+        if (count == 0) break;
+
+        mqtt_client_publish_raw(self->mqtt_client, topic_buf, "", 0, true);
+        ESP_LOGD(TAG, "Removed old topic: %s", topic_buf);
         self->cleanup_pass_removed_count++;
         self->cleanup_component_removed_count++;
-
-        /* Shift remaining entries down. */
-        for (uint16_t i = 1; i < self->cleanup_queue_count; i++) {
-            memcpy(self->cleanup_topic_queue[i - 1], self->cleanup_topic_queue[i],
-                   sizeof(self->cleanup_topic_queue[0]));
-        }
-        self->cleanup_queue_count--;
         batch++;
 
         /* Yield between batches to let the MQTT task process inbound messages. */
@@ -134,18 +147,18 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     /* If the payload is empty, it's our own echo from a previous clear — skip. */
     if (payload_len == 0) return;
 
-    /* Queue the topic name for publishing from the main loop. */
+    /* Queue the topic name for publishing from the main loop.
+     * Use critical section to avoid race with cleanup_flush_queue. */
+    taskENTER_CRITICAL();
     if (self->cleanup_queue_count < HA_DISCOVERY_CLEANUP_QUEUE_SIZE) {
         strncpy(self->cleanup_topic_queue[self->cleanup_queue_count], topic, 127);
         self->cleanup_topic_queue[self->cleanup_queue_count][127] = '\0';
         self->cleanup_queue_count++;
     }
-
     self->cleanup_received_topics = true;
     self->cleanup_pass_found_topics = true;
-
-    /* Record activity time so the idle timer resets. */
     self->cleanup_last_activity_ms = self->get_time_ms();
+    taskEXIT_CRITICAL();
 }
 
 static void cleanup_start(ha_discovery_manager_t* self)
@@ -1090,11 +1103,14 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 
                 size_t dst_size = sizeof(self->decomp_buf);
                 if (chunk_decompress(self, src, chunk->size, self->decomp_buf, &dst_size) != 0) {
-                    /* Decompression failed, skip this chunk. */
-                    self->current_chunk++;
-                    self->current_offset = 0;
-                    self->current_decomp_size = 0;
-                    continue;
+                    /* Decompression failed — log and transition to error state.
+                     * Corrupt data would produce garbage JSONL that the consumer
+                     * cannot parse, so abort discovery rather than risk publishing
+                     * malformed discovery payloads. */
+                    ESP_LOGE(TAG, "Decompression failed for category '%s' chunk %u (offset %u, size %u)",
+                        cat->name, self->current_chunk, chunk->offset, chunk->size);
+                    self->state = ha_discovery_state_error;
+                    return;
                 }
                 self->current_decomp_size = (uint32_t)dst_size;
                 self->current_offset = 0;
@@ -1290,6 +1306,19 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
         }
         esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(100));
+
+        /* Only free TCB/stack if the task has actually terminated.
+         * If the task is still on xTasksWaitingTermination, the idle task
+         * will free it; freeing it ourselves causes a crash. */
+        eTaskState state = eTaskGetState(self->task_handle);
+        if (state == eDeleted) {
+            free(self->task_stack);
+            free(self->task_tcb);
+            self->task_stack = NULL;
+            self->task_tcb = NULL;
+        } else if (state == eReady || state == eRunning) {
+            ESP_LOGW(TAG, "Build task still alive during cleanup, leaking resources");
+        }
         self->task_handle = NULL;
     }
 

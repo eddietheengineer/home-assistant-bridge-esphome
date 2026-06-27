@@ -721,5 +721,63 @@ class TestVersionTemplates(unittest.TestCase):
         version_entities = [e for e in entities if e['i'] == '324d']
         self.assertEqual(len(version_entities), 8,
                          f"Expected 8 Tub 1 version entities, got {len(version_entities)}")
+
+class TestEntityFiltering(unittest.TestCase):
+    """Test that entity filtering logic correctly includes/excludes entities."""
+
+    def setUp(self):
+        self.erds = load_erd_definitions()
+        self.erd_by_id = {e['id']: e for e in self.erds}
+
+    def test_unpaired_request_buttons_included(self):
+        """Button ERDs with 'Request' in name but no pair_role should be included."""
+        entities = load_all_entities()
+        button_erd_ids = {'1041', '1166', '2171'}
+        found = {e['i'] for e in entities if e['i'] in button_erd_ids}
+        missing = button_erd_ids - found
+        self.assertEqual(missing, set(),
+            f"Unpaired button ERDs incorrectly filtered out: {missing}")
+
+    def test_status_erd_with_bidirectional_pairing_suppressed(self):
+        """Status ERDs with bidirectional controllable pairing should be suppressed."""
+        entities = load_all_entities()
+        entity_ids = {e['i'] for e in entities}
+        for erd in self.erds:
+            if erd.get('pair_role') != 'status':
+                continue
+            paired_id = erd.get('paired_erd', '')
+            if not paired_id or paired_id not in self.erd_by_id:
+                continue
+            paired = self.erd_by_id[paired_id]
+            if paired.get('pair_role') != 'request':
+                continue
+            if paired.get('ha_domain') not in ('switch', 'select', 'number'):
+                continue
+            if paired.get('paired_erd') == erd['id']:
+                erd_hex = erd['id'].lower()
+                self.assertNotIn(erd_hex, entity_ids,
+                    f"Status ERD {erd['id']} ({erd.get('name')}) should be suppressed")
+
+    def test_status_erd_without_bidirectional_pairing_included(self):
+        """Status ERDs with asymmetric pairing should be included."""
+        entities = load_all_entities()
+        entity_ids = {e['i'] for e in entities}
+        self.assertIn('100e', entity_ids,
+            "0x100e (Turbo Freeze Status) should be included (asymmetric pairing)")
+        self.assertIn('100f', entity_ids,
+            "0x100f (Turbo Cool Status) should be included (asymmetric pairing)")
+
+    def test_filter_config_topics_excludes_internal_entities(self):
+        """filter_config_topics=True should exclude internal/diagnostic entities."""
+        entities_no_filter = load_all_entities(filter_config_topics=False)
+        entities_filtered = load_all_entities(filter_config_topics=True)
+        filtered_ids = {e['i'] + e.get('fi', '') for e in entities_filtered}
+        unfiltered_ids = {e['i'] + e.get('fi', '') for e in entities_no_filter}
+        self.assertTrue(len(filtered_ids) < len(unfiltered_ids),
+            "filter_config_topics should reduce entity count")
+        self.assertTrue(filtered_ids.issubset(unfiltered_ids),
+            "Filtered entities should be a subset of unfiltered")
+
+
 if __name__ == '__main__':
     unittest.main()
