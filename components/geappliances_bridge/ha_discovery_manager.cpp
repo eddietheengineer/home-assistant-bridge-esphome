@@ -64,8 +64,8 @@ GEA_TAG(TAG) = "ha_discovery";
  * to avoid blocking the ESP-IDF MQTT task. Returns the number of topics
  * remaining in the queue (0 means all flushed).
  *
- * Reads null-terminated strings from the packed contiguous buffer.
- * Deduplicates topics before publishing to avoid redundant work. */
+ * Uses a ring buffer with read_pos/write_pos — no compaction needed.
+ * Deduplicates topics within each flush call to avoid redundant publishes. */
 static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
 {
     uint16_t batch = 0;
@@ -74,26 +74,49 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
     while (batch < HA_DISCOVERY_CLEANUP_FLUSH_BATCH) {
         uint16_t len;
 
-        /* Read one topic from the front of the buffer under critical section.
-         * Compact remaining data to the front and update write_pos atomically
-         * so the callback never writes into consumed space. */
+        /* Read one topic from the ring buffer under critical section.
+         * O(1) — just advance read_pos, no compaction. */
         vPortEnterCritical();
-        if (self->cleanup_queue_write_pos == 0) {
+        if (self->cleanup_queue_count == 0) {
             vPortExitCritical();
             break;  // empty
         }
-        len = (uint16_t)strlen(self->cleanup_topic_buf);
-        if (len >= sizeof(topic_buf)) len = (uint16_t)(sizeof(topic_buf) - 1);
-        memcpy(topic_buf, self->cleanup_topic_buf, len);
-        topic_buf[len] = '\0';
+        /* Read the null-terminated string at read_pos, handling wrap-around. */
+        {
+            uint16_t pos = self->cleanup_queue_read_pos;
 
-        /* Compact: shift unread data to the front. */
-        uint16_t consumed = len + 1;
-        uint16_t remaining = (uint16_t)(self->cleanup_queue_write_pos - consumed);
-        if (remaining > 0) {
-            memmove(self->cleanup_topic_buf, self->cleanup_topic_buf + consumed, remaining);
+            /* Check if the string fits without wrapping. */
+            if (pos + sizeof(topic_buf) <= HA_DISCOVERY_CLEANUP_BUF_SIZE) {
+                /* String doesn't wrap — read directly. */
+                len = (uint16_t)strlen(self->cleanup_topic_buf + pos);
+                if (len >= sizeof(topic_buf)) len = (uint16_t)(sizeof(topic_buf) - 1);
+                memcpy(topic_buf, self->cleanup_topic_buf + pos, len);
+            } else {
+                /* String might wrap — read in two parts. */
+                uint16_t first_part = (uint16_t)(HA_DISCOVERY_CLEANUP_BUF_SIZE - pos);
+                if (first_part >= sizeof(topic_buf)) first_part = (uint16_t)(sizeof(topic_buf) - 1);
+                memcpy(topic_buf, self->cleanup_topic_buf + pos, first_part);
+                /* Find the null terminator — it should be in the first part
+                 * for any reasonable topic length. If not, wrap and continue. */
+                len = (uint16_t)strlen(topic_buf);
+                if (len == first_part) {
+                    /* Null terminator is after the wrap. */
+                    uint16_t wrapped = 0;
+                    while (wrapped < sizeof(topic_buf) - len - 1 &&
+                           self->cleanup_topic_buf[wrapped] != '\0') {
+                        topic_buf[len + wrapped] = self->cleanup_topic_buf[wrapped];
+                        wrapped++;
+                    }
+                    len += wrapped;
+                }
+            }
+            topic_buf[len] = '\0';
+
+            /* Advance read_pos past this topic (including null terminator). */
+            uint16_t consumed = len + 1;
+            self->cleanup_queue_read_pos = (pos + consumed) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
+            self->cleanup_queue_count--;
         }
-        self->cleanup_queue_write_pos = remaining;
         vPortExitCritical();
 
         mqtt_client_publish_raw(self->mqtt_client, topic_buf, "", 0, true);
@@ -105,14 +128,14 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 
-    return self->cleanup_queue_write_pos > 0 ? 1 : 0;
+    return self->cleanup_queue_count;
 }
 
 /* Callback for homeassistant/+/{device_id}/# wildcard subscription during cleanup.
- * Packs the topic name into the contiguous buffer for batched publishing from
- * the main loop. This keeps the callback short — no outbound publish call —
- * so the MQTT task's inbound queue drains fast and retained message bursts
- * don't overflow. */
+ * Packs the topic name into the ring buffer for batched publishing from the
+ * main loop. This keeps the callback short — no outbound publish call — so
+ * the MQTT task's inbound queue drains fast and retained message bursts don't
+ * overflow. */
 static void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     (void)payload;
@@ -126,14 +149,63 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     /* If the payload is empty, it's our own echo from a previous clear — skip. */
     if (payload_len == 0) return;
 
-    /* Pack the topic name into the contiguous buffer under critical section.
-     * Each topic is stored as a null-terminated string. */
+    /* Pack the topic name into the ring buffer under critical section.
+     * Each topic is stored as a null-terminated string. Check if there's
+     * enough space between write_pos and read_pos. */
     vPortEnterCritical();
+
+    /* Dedup: scan existing entries in the buffer for this topic.
+     * Walk from read_pos to write_pos, checking each null-terminated string. */
+    {
+        uint16_t scan = self->cleanup_queue_read_pos;
+        while (scan != self->cleanup_queue_write_pos) {
+            size_t s_len = strlen(self->cleanup_topic_buf + scan);
+            if (s_len == topic_len &&
+                strncmp(self->cleanup_topic_buf + scan, topic, topic_len) == 0) {
+                /* Duplicate found — skip adding. */
+                self->cleanup_pass_found_topics = true;
+                self->cleanup_last_activity_ms = self->get_time_ms();
+                vPortExitCritical();
+                return;
+            }
+            scan = (scan + (uint16_t)(s_len + 1)) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
+        }
+    }
+
     uint16_t needed = (uint16_t)(topic_len + 1);  // +1 for null terminator
-    if (self->cleanup_queue_write_pos + needed <= HA_DISCOVERY_CLEANUP_BUF_SIZE) {
-        memcpy(self->cleanup_topic_buf + self->cleanup_queue_write_pos, topic, topic_len);
-        self->cleanup_topic_buf[self->cleanup_queue_write_pos + topic_len] = '\0';
-        self->cleanup_queue_write_pos += needed;
+
+    /* Check if the buffer has room. We need 'needed' consecutive bytes
+     * starting at write_pos, not reaching read_pos.
+     * Available space = (read_pos - write_pos - 1) % BUF_SIZE.
+     * We reserve 1 byte to distinguish full from empty. */
+    uint16_t avail;
+    if (self->cleanup_queue_read_pos > self->cleanup_queue_write_pos) {
+        avail = (uint16_t)(self->cleanup_queue_read_pos - self->cleanup_queue_write_pos - 1);
+    } else {
+        avail = (uint16_t)(HA_DISCOVERY_CLEANUP_BUF_SIZE - self->cleanup_queue_write_pos - 1 +
+                           self->cleanup_queue_read_pos);
+    }
+
+    if (avail >= needed) {
+        uint16_t pos = self->cleanup_queue_write_pos;
+
+        /* Handle wrap-around: if the topic doesn't fit at the end of the buffer,
+         * it can't be stored (we don't split topics across the boundary). */
+        if (pos + needed <= HA_DISCOVERY_CLEANUP_BUF_SIZE) {
+            memcpy(self->cleanup_topic_buf + pos, topic, topic_len);
+            self->cleanup_topic_buf[pos + topic_len] = '\0';
+        } else {
+            /* Topic would wrap — check if it fits after wrapping.
+             * This is rare; most topics are < 192 bytes and the buffer is 12KB. */
+            uint16_t first_part = (uint16_t)(HA_DISCOVERY_CLEANUP_BUF_SIZE - pos);
+            memcpy(self->cleanup_topic_buf + pos, topic, first_part);
+            memcpy(self->cleanup_topic_buf, topic + first_part, topic_len - first_part);
+            /* Null terminator at the wrapped position. */
+            self->cleanup_topic_buf[(pos + topic_len) % HA_DISCOVERY_CLEANUP_BUF_SIZE] = '\0';
+        }
+
+        self->cleanup_queue_write_pos = (pos + needed) % HA_DISCOVERY_CLEANUP_BUF_SIZE;
+        self->cleanup_queue_count++;
     }
     /* If buffer is full, the topic is dropped — it will be re-discovered
      * on the next cleanup pass. */
@@ -146,7 +218,9 @@ static void cleanup_start(ha_discovery_manager_t* self)
 {
     self->cleanup_subscribed = false;
     self->cleanup_last_activity_ms = self->get_time_ms();
+    self->cleanup_queue_read_pos = 0;
     self->cleanup_queue_write_pos = 0;
+    self->cleanup_queue_count = 0;
     self->cleanup_flushed_once = false;
     self->cleanup_clean_passes = 0;
     self->cleanup_pass_found_topics = false;
