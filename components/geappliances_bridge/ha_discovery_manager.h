@@ -54,13 +54,13 @@ typedef enum {
 #define HA_DISCOVERY_PUBLISH_INTERVAL_MS 50
 
 /* Decompression buffer size per chunk (max chunk is ~14KB). */
-#define HA_DISCOVERY_DECOMP_BUF_SIZE 16384
+#define HA_DISCOVERY_DECOMP_BUF_SIZE 14336
 
 /* Line buffer size for JSONL parsing (max line is ~14KB). */
-#define HA_DISCOVERY_LINE_BUF_SIZE 16384
+#define HA_DISCOVERY_LINE_BUF_SIZE 14336
 
 /* Payload buffer for building discovery payloads. */
-#define HA_DISCOVERY_PAYLOAD_BUF_SIZE 16384
+#define HA_DISCOVERY_PAYLOAD_BUF_SIZE 8192
 
 /*!
  * @brief Home Assistant MQTT Discovery manager.
@@ -162,6 +162,7 @@ typedef struct {
   uint16_t cleanup_current_component; // Index into ha_discovery_component_types[]
   bool cleanup_received_topics;       // Whether we received any topics for current component
   uint8_t cleanup_clean_passes;       // Consecutive passes with no topics found
+  uint32_t cleanup_component_skip;        // Per-component skip bitmap (1 bit per component type)
   bool cleanup_pass_found_topics;      // Whether any topics were found during current pass
   uint16_t cleanup_component_removed_count; // Topics removed for current component
   uint8_t cleanup_pass_number;              // Current pass number (starts at 1)

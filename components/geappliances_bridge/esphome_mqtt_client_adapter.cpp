@@ -49,7 +49,7 @@ static void update_erd_write_result(
 
   char topic[128];
   snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/write_result",
-           self->device_id->c_str(), erd);
+          self->device_id, erd);
 
   // Use a stack buffer to avoid heap allocation.
   // Max error payload: "{\"error\":\"retries_exhausted\"}" = 28 chars + null.
@@ -101,14 +101,10 @@ extern "C" void esphome_mqtt_client_adapter_init(
   esphome_mqtt_client_adapter_t* self,
   const char* device_id)
 {
-  // Free previous device_id to prevent leak on re-init
-  if (self->device_id != nullptr) {
-    delete self->device_id;
-    self->device_id = nullptr;
-  }
-
   self->interface.api = &api;
-  self->device_id = new std::string(device_id);
+  /* Lifetime: stores a pointer into the caller's string. Safe because
+   * ESPHome's YAML config strings outlive the bridge component. */
+  self->device_id = device_id;
   self->erd_registry = nullptr;
 
   tiny_event_init(&self->on_write_request_event);
@@ -154,7 +150,7 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
 
   char topic[128];
   snprintf(topic, sizeof(topic), "geappliances/%s/erd/+/write",
-           self->device_id->c_str());
+          self->device_id);
 
   mqtt_client->subscribe(topic, [self](const std::string& topic, const std::string& payload) {
     // Parse ERD from topic: geappliances/{device_id}/erd/0x{ERD}/write
@@ -208,10 +204,7 @@ extern "C" void esphome_mqtt_client_adapter_notify_connected(
 extern "C" void esphome_mqtt_client_adapter_destroy(
   esphome_mqtt_client_adapter_t* self)
 {
-  if (self->device_id != nullptr) {
-    delete self->device_id;
-    self->device_id = nullptr;
-  }
+  self->device_id = nullptr;
 }
 
 extern "C" void esphome_mqtt_client_adapter_publish(

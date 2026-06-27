@@ -22,7 +22,6 @@
 #pragma once
 #include "esphome/components/mqtt/mqtt_client.h"
 
-#include <string>
 
 #include "erd_registry.h"
 
@@ -34,7 +33,7 @@ extern "C" {
 
 typedef struct {
   i_mqtt_client_t interface;
-  std::string* device_id;
+  const char* device_id;
   tiny_event_t on_write_request_event;
   tiny_event_t on_mqtt_disconnect_event;
   tiny_event_t on_mqtt_connect_event;

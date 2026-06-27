@@ -48,19 +48,25 @@ static const char* const TAG = "ha_discovery";
  * subscribe to one component type at a time, wait for idle, clear,
  * then move to the next. */
 static const char* const HA_DISCOVERY_COMPONENT_TYPES[] = {
+    "alarm_control_panel",
     "binary_sensor",
-    "sensor",
-    "select",
-    "switch",
-    "number",
     "button",
-    "light",
     "camera",
-    "update",
     "climate",
     "cover",
+    "date",
+    "datetime",
+    "event",
     "fan",
+    "light",
     "lock",
+    "number",
+    "select",
+    "sensor",
+    "switch",
+    "text",
+    "time",
+    "update",
     "vacuum",
     "valve",
     NULL  /* sentinel */
@@ -93,6 +99,7 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
 
         ESP_LOGD(TAG, "Removed old topic: %s", self->cleanup_topic_queue[0]);
         self->cleanup_pass_removed_count++;
+        self->cleanup_component_removed_count++;
 
         /* Shift remaining entries down. */
         for (uint16_t i = 1; i < self->cleanup_queue_count; i++) {
@@ -110,9 +117,9 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
 }
 
 /* Callback for homeassistant/{component}/{device_id}/# subscription during cleanup.
- * Instead of publishing immediately (which blocks the MQTT task), we queue the
- * topic name and flush it from cleanup_run() in batches. This prevents the
- * ESP-IDF MQTT inbound queue from overflowing during the initial burst. */
+ * Queues the topic name for batched publishing from the main loop. This keeps
+ * the callback short — no outbound publish call — so the MQTT task's inbound
+ * queue drains fast and retained message bursts don't overflow. */
 static void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
@@ -125,16 +132,15 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     /* If the payload is empty, it's our own echo from a previous clear — skip. */
     if (payload_len == 0) return;
 
-    /* Publish the clear immediately. esp_mqtt_client_publish() is non-blocking
-     * (enqueues in the outbound queue), so this is safe from the callback context.
-     * Immediate publish frees the inbound slot for the next retained message,
-     * preventing the ESP-IDF inbound event queue from overflowing and dropping
-     * messages that we'd never see. */
-    mqtt_client_publish_raw(self->mqtt_client, topic, "", 0, true);
+    /* Queue the topic name for publishing from the main loop. */
+    if (self->cleanup_queue_count < HA_DISCOVERY_CLEANUP_QUEUE_SIZE) {
+        strncpy(self->cleanup_topic_queue[self->cleanup_queue_count], topic, 127);
+        self->cleanup_topic_queue[self->cleanup_queue_count][127] = '\0';
+        self->cleanup_queue_count++;
+    }
+
     self->cleanup_received_topics = true;
     self->cleanup_pass_found_topics = true;
-    self->cleanup_pass_removed_count++;
-    self->cleanup_component_removed_count++;
 
     /* Record activity time so the idle timer resets. */
     self->cleanup_last_activity_ms = self->get_time_ms();
@@ -153,6 +159,7 @@ static void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_component_removed_count = 0;
     self->cleanup_pass_number = 1;
     self->cleanup_wait_start_ms = 0;
+    self->cleanup_component_skip = 0;
 
     ESP_LOGI(TAG, "Starting HA discovery cleanup...");
 }
@@ -165,6 +172,16 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
         /* NULL sentinel means we've processed all types. */
         if (component == NULL) break;
+        /* Skip components that had 0 removals on a previous pass.
+         * Once a component has no retained topics, it won't magically
+         * have some later — the bitmap persists across passes. */
+        if (self->cleanup_component_skip & (1u << self->cleanup_current_component)) {
+            self->cleanup_current_component++;
+            continue;
+        }
+
+        /* Flush any queued topics before subscribing to the next component. */
+        cleanup_flush_queue(self);
 
         /* Subscribe to this component type for our device.
          * homeassistant/{component}/{device_id}/# scopes to one component
@@ -193,6 +210,8 @@ static void cleanup_run(ha_discovery_manager_t* self)
             ? HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS
             : HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS;
         if (now - self->cleanup_last_activity_ms >= timeout) {
+            /* Flush any remaining queued topics before unsubscribing. */
+            cleanup_flush_queue(self);
 
             /* Unsubscribe from current component type. */
             if (self->mqtt_client) {
@@ -205,6 +224,9 @@ static void cleanup_run(ha_discovery_manager_t* self)
                 self->cleanup_current_component + 1,
                 sizeof(HA_DISCOVERY_COMPONENT_TYPES) / sizeof(HA_DISCOVERY_COMPONENT_TYPES[0]) - 1,
                 component, self->cleanup_component_removed_count, self->cleanup_pass_number);
+            if (self->cleanup_component_removed_count == 0) {
+                self->cleanup_component_skip |= (1u << self->cleanup_current_component);
+            }
             self->cleanup_component_removed_count = 0;
             self->cleanup_current_component++;
             self->cleanup_received_topics = false;
@@ -212,6 +234,9 @@ static void cleanup_run(ha_discovery_manager_t* self)
             /* Move to the next component type. */
             continue;
         }
+
+        /* Flush queued topics while waiting for the idle timeout. */
+        cleanup_flush_queue(self);
 
         /* Still receiving messages for this component type. */
         return;
@@ -265,6 +290,13 @@ wait_check:
 
     /* Final wait complete. Proceed to discovery. */
     ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
+    {
+        size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        size_t largest_free = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+        ESP_LOGI(TAG, "Heap before discovery: free=%u, largest_block=%u, fragmentation=%.1f%%",
+            (unsigned)free_heap, (unsigned)largest_free,
+            (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
+    }
     self->cleanup_subscribed = false;
     self->state = ha_discovery_state_discovering;
     self->current_category = 0;
@@ -914,8 +946,24 @@ static void build_task(void* arg)
 {
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
 
+    /* Fragmentation baseline: log heap state before build work. */
+    {
+        size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        size_t largest_free = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+        ESP_LOGI(TAG, "Heap before build: free=%u, largest_block=%u, fragmentation=%.1f%%",
+            (unsigned)free_heap, (unsigned)largest_free,
+            (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
+    }
+
     build_sorted_erd_list(self);
     build_device_json(self);
+
+    /* Stack watermark: verify 2KB stack is sufficient. */
+    {
+        UBaseType_t hw = uxTaskGetStackHighWaterMark(NULL);
+        ESP_LOGI(TAG, "build_task stack high_watermark: %lu words (%lu bytes)",
+            (unsigned long)hw, (unsigned long)(hw * sizeof(StackType_t)));
+    }
 
     if (self->done_sem) {
         xSemaphoreGive(self->done_sem);
@@ -963,15 +1011,40 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 
     /* Wait for build task to finish (first call). */
     if (self->state == ha_discovery_state_building) {
-        if (!self->build_done && self->done_sem) {
-            if (xSemaphoreTake(self->done_sem, 0) == pdTRUE) {
-                self->build_done = true;
-                self->task_handle = NULL;
-            } else {
-                return;  /* Build not done yet. */
-            }
+        if (xSemaphoreTake(self->done_sem, 0) == pdTRUE) {
+            self->build_done = true;
+
+            /* After vTaskDelete() the TCB is on xTasksWaitingTermination.
+             * The idle task runs prvCheckTasksWaitingTermination to unlink
+             * the TCB's list items via uxListRemove(). We MUST yield here
+             * so the idle task can finish before freeing the TCB — freeing
+             * it mid-uxListRemove causes a load access fault. */
+            esp_task_wdt_reset();
+            vTaskDelay(pdMS_TO_TICKS(100));
+
+            /* Free task resources after the idle task has unlinked the TCB.
+             * This returns ~3 KB (stack + TCB) to the heap during the
+             * cleanup + discovery phases — the period of highest memory
+             * pressure. cleanup_resources() at the end will be a no-op
+             * since these are set to NULL. */
+            free(self->task_stack);
+            free(self->task_tcb);
+            self->task_stack = NULL;
+            self->task_tcb = NULL;
+            self->task_handle = NULL;
+        } else {
+            return;  /* Build not done yet. */
         }
         if (!self->build_done) return;
+
+        /* Heap after build task freed its stack/TCB. */
+        {
+            size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+            size_t largest_free = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+            ESP_LOGI(TAG, "Heap after build: free=%u, largest_block=%u, fragmentation=%.1f%%",
+                (unsigned)free_heap, (unsigned)largest_free,
+                (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
+        }
 
         /* Transition to cleaning. */
         self->state = ha_discovery_state_cleaning;
@@ -1106,8 +1179,15 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         if (self->current_category >= ha_discovery_category_count) {
             cleanup_resources(self);
             self->state = ha_discovery_state_complete;
+
+            /* Fragmentation after discovery: log heap state post-completion. */
+            size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+            size_t largest_free = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
             ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
                 self->total_published, self->total_filtered);
+            ESP_LOGI(TAG, "Heap after discovery: free=%u, largest_block=%u, fragmentation=%.1f%%",
+                (unsigned)free_heap, (unsigned)largest_free,
+                (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
             break;
         }
     }
@@ -1157,14 +1237,9 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
     if (self->state != ha_discovery_state_idle) return;
 
 #ifdef USE_ESP_IDF
-    static constexpr int STACK_SIZE_BIG = 4 * 1024;
-    static constexpr int STACK_SIZE_SMALL = 2 * 1024;
+    static constexpr int STACK_SIZE = 4 * 1024;
 
-    self->task_stack = (StackType_t*)heap_caps_malloc(STACK_SIZE_BIG, MALLOC_CAP_8BIT);
-    if (!self->task_stack) {
-        self->task_stack = (StackType_t*)heap_caps_malloc(STACK_SIZE_SMALL, MALLOC_CAP_8BIT);
-    }
-
+    self->task_stack = (StackType_t*)heap_caps_malloc(STACK_SIZE, MALLOC_CAP_8BIT);
     self->task_tcb = (StaticTask_t*)heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_8BIT);
 
     if (!self->task_stack || !self->task_tcb) {
@@ -1181,7 +1256,7 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
     self->task_handle = xTaskCreateStatic(
         build_task,
         "ha_discovery_build",
-        STACK_SIZE_BIG,
+        STACK_SIZE,
         self,
         1,
         self->task_stack,
