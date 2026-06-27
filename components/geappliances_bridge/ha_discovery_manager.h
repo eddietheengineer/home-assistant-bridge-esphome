@@ -169,16 +169,14 @@ typedef struct {
   uint8_t cleanup_pass_number;        // Current pass number (starts at 1)
   uint32_t cleanup_wait_start_ms;     // Start time of final wait before discovery
 
-  /* Cleanup topic queue: packed contiguous ring buffer of null-terminated
-   * topic strings. Same 12KB footprint as the old 64x192 ring buffer, but
-   * with variable-length packing, capacity increases from ~64 to ~188 topics
-   * (avg ~65 bytes per topic). Uses read_pos/write_pos for O(1) read/write
-   * with no compaction. */
-#define HA_DISCOVERY_CLEANUP_BUF_SIZE 12288
-  char cleanup_topic_buf[HA_DISCOVERY_CLEANUP_BUF_SIZE];
-  uint16_t cleanup_queue_read_pos;   // Byte offset where next topic is read
-  uint16_t cleanup_queue_write_pos;  // Byte offset where next topic is written
-  uint16_t cleanup_queue_count;      // Number of topics currently in queue
+  /* Cleanup topic queue: fixed-size ring buffer for batched publishing.
+   * Each slot holds a null-terminated topic string. 128 slots x 192 bytes
+   * = 24,576 bytes. At ~65 bytes avg per topic, this holds all topics from
+   * a single wildcard subscription burst without overflow. */
+#define HA_DISCOVERY_CLEANUP_QUEUE_SIZE 128
+  char cleanup_topic_queue[HA_DISCOVERY_CLEANUP_QUEUE_SIZE][192];
+  uint16_t cleanup_queue_write_idx;  // Producer (callback) write position
+  uint16_t cleanup_queue_read_idx;   // Consumer (flush) read position
 
   /* Domain topic prefix: pre-computed "homeassistant/{domain}/{device_id}/"
    * to avoid repeated snprintf during discovery publish. */
