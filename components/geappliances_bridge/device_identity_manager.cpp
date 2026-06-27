@@ -18,7 +18,7 @@ std::string appliance_type_to_string(uint8_t appliance_type);
 namespace esphome {
 namespace geappliances_bridge {
 
-static const char* const TAG __attribute__((unused)) = "device_identity";
+GEA_TAG(TAG) = "device_identity";
 
 void DeviceIdentityManager::init(const char* configured_id,
                                   i_tiny_gea3_erd_client_t* erd_client,

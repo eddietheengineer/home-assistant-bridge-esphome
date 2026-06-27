@@ -15,6 +15,7 @@
 
 #include "ha_discovery_manager.h"
 #include "ha_discovery_data.h"
+#include "geappliances_bridge_log.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -36,7 +37,7 @@
 #endif
 #endif /* USE_ESP_IDF */
 
-static const char* const TAG __attribute__((unused)) = "ha_discovery";
+GEA_TAG(TAG) = "ha_discovery";
 
 /* ------------------------------------------------------------------ */
 /* Cleanup: discover and remove old HA discovery topics               */

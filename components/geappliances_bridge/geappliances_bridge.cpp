@@ -10,6 +10,8 @@
 #include "esp_task_wdt.h"
 #endif
 
+GEA_TAG(TAG) = "geappliances_bridge";
+
 namespace esphome {
 namespace geappliances_bridge {
 

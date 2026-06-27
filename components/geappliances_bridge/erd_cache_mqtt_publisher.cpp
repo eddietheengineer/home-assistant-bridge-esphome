@@ -5,6 +5,7 @@
 
 #include "erd_cache_mqtt_publisher.h"
 #include "erd_cache.h"
+#include "geappliances_bridge_log.h"
 #include "i_mqtt_client.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
@@ -13,7 +14,7 @@
 #include <cstdio>
 #include <string.h>
 
-static const char* const PUBLISHER_TAG __attribute__((unused)) = "erd_cache_mqtt_publisher";
+GEA_TAG(PUBLISHER_TAG) = "erd_cache_mqtt_publisher";
 #ifdef USE_ESP_IDF
 #include "esp_task_wdt.h"
 #endif
