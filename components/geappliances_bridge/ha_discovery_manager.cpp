@@ -84,8 +84,6 @@ static const char* const HA_DISCOVERY_COMPONENT_TYPES[] = {
 #define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 2000
 /* Short timeout for component types with no topics — skip quickly. */
 #define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS 500
-/* Number of flush cycles to do before declaring a component empty. */
-#define HA_DISCOVERY_CLEANUP_EMPTY_FLUSH_CYCLES 4
 /* Wait after a clean pass before starting discovery publishing. */
 #define HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS 5000
 
@@ -234,12 +232,15 @@ static void cleanup_run(ha_discovery_manager_t* self)
             return;
         }
 
-        /* Check if we've been idle long enough — no new matching topics
-         * have arrived, so the broker has delivered all retained messages
-         * for this component type. Use short timeout for empty components. */
-        uint32_t timeout = self->cleanup_received_topics
-            ? HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS
-            : HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS;
+        /* Check if we've been idle long enough. On the first pass through
+         * component types use the long timeout — the MQTT inbound queue
+         * (32 events) often overflows on large components like
+         * binary_sensor, so the callback may not fire for a while even
+         * though retained messages exist. On subsequent validation passes
+         * a short timeout is fine since we already know what's there. */
+        uint32_t timeout = (self->cleanup_pass_number > 1)
+            ? HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS
+            : HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS;
         if (now - self->cleanup_last_activity_ms >= timeout) {
             /* Flush any remaining queued topics before unsubscribing. */
             cleanup_flush_queue(self);
