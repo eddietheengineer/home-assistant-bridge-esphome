@@ -171,7 +171,6 @@ static void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_queue_count = 0;
     self->cleanup_received_topics = false;
     self->cleanup_flushed_once = false;
-    self->cleanup_empty_flush_cycles = 0;
     self->cleanup_clean_passes = 0;
     self->cleanup_pass_found_topics = false;
     self->cleanup_pass_removed_count = 0;
@@ -212,8 +211,6 @@ static void cleanup_run(ha_discovery_manager_t* self)
                 mqtt_client_subscribe(self->mqtt_client, sub_topic,
                     cleanup_topic_callback, self);
                 self->cleanup_subscribed = true;
-                self->cleanup_flushed_once = false;
-                self->cleanup_empty_flush_cycles = 0;
                 self->cleanup_last_activity_ms = self->get_time_ms();
                 ESP_LOGI(TAG, "  [%u/%u] Subscribing to %s (pass %u)",
                     self->cleanup_current_component + 1,
@@ -237,24 +234,36 @@ static void cleanup_run(ha_discovery_manager_t* self)
             return;
         }
 
-        /* For components with no topics received yet, do multiple flush
-         * cycles to give the MQTT task time to drain between each one,
-         * as the 32-event inbound queue can overflow. */
-        if (!self->cleanup_received_topics) {
-            cleanup_flush_queue(self);
-            self->cleanup_empty_flush_cycles++;
-            self->cleanup_last_activity_ms = self->get_time_ms();
-            if (self->cleanup_empty_flush_cycles >= HA_DISCOVERY_CLEANUP_EMPTY_FLUSH_CYCLES) {
-                goto unsubscribe_component;
-            }
-            return;
-        }
-
         /* Check if we've been idle long enough — no new matching topics
          * have arrived, so the broker has delivered all retained messages
-         * for this component type. */
-        if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
-            goto unsubscribe_component;
+         * for this component type. Use short timeout for empty components. */
+        uint32_t timeout = self->cleanup_received_topics
+            ? HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS
+            : HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS;
+        if (now - self->cleanup_last_activity_ms >= timeout) {
+            /* Flush any remaining queued topics before unsubscribing. */
+            cleanup_flush_queue(self);
+
+            /* Unsubscribe from current component type. */
+            if (self->mqtt_client) {
+                char sub_topic[128];
+                snprintf(sub_topic, sizeof(sub_topic), "homeassistant/%s/%s/#", component, self->device_id);
+                mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
+            }
+            self->cleanup_subscribed = false;
+            ESP_LOGI(TAG, "  [%u/%u] %s: %u topics removed (pass %u)",
+                self->cleanup_current_component + 1,
+                sizeof(HA_DISCOVERY_COMPONENT_TYPES) / sizeof(HA_DISCOVERY_COMPONENT_TYPES[0]) - 1,
+                component, self->cleanup_component_removed_count, self->cleanup_pass_number);
+            if (self->cleanup_component_removed_count == 0) {
+                self->cleanup_component_skip |= (1u << self->cleanup_current_component);
+            }
+            self->cleanup_component_removed_count = 0;
+            self->cleanup_current_component++;
+            self->cleanup_received_topics = false;
+
+            /* Move to the next component type. */
+            continue;
         }
 
         /* Flush queued topics while waiting for the idle timeout. */
@@ -263,25 +272,6 @@ static void cleanup_run(ha_discovery_manager_t* self)
         /* Still receiving messages for this component type. */
         return;
 
-    unsubscribe_component:
-        cleanup_flush_queue(self);
-        if (self->mqtt_client) {
-            char sub_topic[128];
-            snprintf(sub_topic, sizeof(sub_topic), "homeassistant/%s/%s/#", component, self->device_id);
-            mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
-        }
-        self->cleanup_subscribed = false;
-        ESP_LOGI(TAG, "  [%u/%u] %s: %u topics removed (pass %u)",
-            self->cleanup_current_component + 1,
-            sizeof(HA_DISCOVERY_COMPONENT_TYPES) / sizeof(HA_DISCOVERY_COMPONENT_TYPES[0]) - 1,
-            component, self->cleanup_component_removed_count, self->cleanup_pass_number);
-        if (self->cleanup_component_removed_count == 0) {
-            self->cleanup_component_skip |= (1u << self->cleanup_current_component);
-        }
-        self->cleanup_component_removed_count = 0;
-        self->cleanup_current_component++;
-        self->cleanup_received_topics = false;
-        continue;
     }
 
     /* All component types processed for this pass. */
