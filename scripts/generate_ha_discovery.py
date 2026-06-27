@@ -1109,6 +1109,10 @@ _FILTER_PATTERNS = [
     ("dip_switch", re.compile(
         r"(?i)dip switch"
     )),
+    # Most recent cycle status. Historical data, not actionable.
+    ("most_recent_cycle", re.compile(
+        r"(?i)most recent cycle status"
+    )),
     # Unused/reserved fields. Placeholder data, never meaningful.
     ("unused_reserved", re.compile(
         r"(?i)(unused|reserved)(\s*\[.*\])?"
