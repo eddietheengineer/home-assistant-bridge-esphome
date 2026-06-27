@@ -35,6 +35,8 @@
 #include "erd_cache.h"
 #include "erd_bridge_common.h"
 
+GEA_TAG(TAG) = "geappliances_bridge_bridge_init";
+
 namespace esphome {
 namespace geappliances_bridge {
 // ---------------------------------------------------------------------------

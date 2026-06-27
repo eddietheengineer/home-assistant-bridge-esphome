@@ -22,6 +22,8 @@ extern "C" {
 #include "tiny_utils.h"  // element_count macro
 }
 
+GEA_TAG(TAG) = "geappliances_bridge_startup_hsm";
+
 namespace esphome {
 namespace geappliances_bridge {
 

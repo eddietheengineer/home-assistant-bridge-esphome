@@ -1,4 +1,5 @@
 #include "esphome_mqtt_client_adapter.h"
+#include "geappliances_bridge_log.h"
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 
@@ -11,7 +12,7 @@ extern "C" {
 #include <cstring>
 #include <string>
 
-static const char *const TAG __attribute__((unused)) = "geappliances_bridge.mqtt";
+GEA_TAG(TAG) = "geappliances_bridge.mqtt";
 
 
 static void register_erd(i_mqtt_client_t* _self, tiny_erd_t erd)

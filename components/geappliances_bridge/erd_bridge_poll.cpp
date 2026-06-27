@@ -16,12 +16,13 @@
 
 #include "erd_bridge_common.h"
 #include "erd_lists.h"
+#include "geappliances_bridge_log.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/application.h"
 #include "erd_cache.h"
 
-static const char* const TAG __attribute__((unused)) = "erd_bridge_poll";
+GEA_TAG(TAG) = "erd_bridge_poll";
 
 // ============================================================================
 // Polling bridge — forward declarations

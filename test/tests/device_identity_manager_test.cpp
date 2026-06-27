@@ -48,7 +48,7 @@ TEST_GROUP(device_identity_manager)
 
   void init_with_configured_id(const std::string& id)
   {
-    manager.init(id, &erd_client.interface, 0xC0);
+    manager.init(id.c_str(), &erd_client.interface, 0xC0);
   }
 
   void init_without_configured_id()
@@ -135,7 +135,7 @@ TEST(device_identity_manager, init_with_configured_id_still_reads_erds)
   // State is READING_APPLIANCE_TYPE (not COMPLETE shortcut).
   CHECK_EQUAL(DEVICE_ID_STATE_READING_APPLIANCE_TYPE, manager.get_state());
   // But get_device_id() returns the configured ID.
-  CHECK(strcmp(manager.get_device_id().c_str(), "my-custom-device") == 0);
+  CHECK(strcmp(manager.get_device_id(), "my-custom-device") == 0);
 }
 
 TEST(device_identity_manager, init_without_configured_id_starts_reading_appliance_type)
@@ -177,7 +177,7 @@ TEST(device_identity_manager, on_erd_read_completed_processes_model_number)
   trigger_appliance_type_read_completed(at_data, 1);
   trigger_model_number_read_completed("GTCH2230", 8);
 
-  CHECK(strcmp(manager.get_model_number().c_str(), "GTCH2230") == 0);
+  CHECK(strcmp(manager.get_model_number(), "GTCH2230") == 0);
   CHECK_EQUAL(DEVICE_ID_STATE_READING_SERIAL_NUMBER, manager.get_state());
 }
 
@@ -191,9 +191,9 @@ TEST(device_identity_manager, on_erd_read_completed_processes_serial_number_and_
   trigger_model_number_read_completed("GTCH2230", 8);
   trigger_serial_number_read_completed("SN123456", 8);
 
-  CHECK(strcmp(manager.get_serial_number().c_str(), "SN123456") == 0);
+  CHECK(strcmp(manager.get_serial_number(), "SN123456") == 0);
   CHECK_EQUAL(DEVICE_ID_STATE_COMPLETE, manager.get_state());
-  CHECK(strcmp(manager.get_device_id().c_str(), "Dishwasher_GTCH2230_SN123456") == 0);
+  CHECK(strcmp(manager.get_device_id(), "Dishwasher_GTCH2230_SN123456") == 0);
 }
 
 TEST(device_identity_manager, on_erd_read_completed_trims_trailing_null_bytes)
@@ -207,7 +207,7 @@ TEST(device_identity_manager, on_erd_read_completed_trims_trailing_null_bytes)
   uint8_t model_data[] = "ABC\0\0\0";
   trigger_model_number_read_completed(model_data, 6);
 
-  CHECK(strcmp(manager.get_model_number().c_str(), "ABC") == 0);
+  CHECK(strcmp(manager.get_model_number(), "ABC") == 0);
 }
 
 TEST(device_identity_manager, on_erd_read_completed_handles_empty_appliance_type_data)
@@ -285,7 +285,7 @@ TEST(device_identity_manager, on_erd_read_failed_never_uses_fallback)
   }
 
   CHECK_EQUAL(DEVICE_ID_STATE_READING_APPLIANCE_TYPE, manager.get_state());
-  CHECK(strcmp(manager.get_device_id().c_str(), "") == 0);
+  CHECK(strcmp(manager.get_device_id(), "") == 0);
 }
 
 /* ------------------------------------------------------------------ */
@@ -304,7 +304,7 @@ TEST(device_identity_manager, configured_device_id_returned_after_all_erds_read)
   trigger_serial_number_read_completed("SN123456", 8);
 
   CHECK_EQUAL(DEVICE_ID_STATE_COMPLETE, manager.get_state());
-  CHECK(strcmp(manager.get_device_id().c_str(), "my-custom-device") == 0);
+  CHECK(strcmp(manager.get_device_id(), "my-custom-device") == 0);
 }
 
 TEST(device_identity_manager, configured_id_returned_before_erds_complete)
@@ -313,7 +313,7 @@ TEST(device_identity_manager, configured_id_returned_before_erds_complete)
   expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
   init_with_configured_id("my-custom-device");
 
-  CHECK(strcmp(manager.get_device_id().c_str(), "my-custom-device") == 0);
+  CHECK(strcmp(manager.get_device_id(), "my-custom-device") == 0);
 }
 
 TEST(device_identity_manager, configured_id_empty_string_is_treated_as_not_configured)
@@ -340,7 +340,7 @@ TEST(device_identity_manager, device_id_sanitizes_special_characters_in_serial_n
   uint8_t serial_data[] = "SN+123#456/7";
   trigger_serial_number_read_completed(serial_data, sizeof(serial_data) - 1);
 
-  CHECK(strcmp(manager.get_device_id().c_str(), "Dishwasher_ABC_SN_123_456_7") == 0);
+  CHECK(strcmp(manager.get_device_id(), "Dishwasher_ABC_SN_123_456_7") == 0);
 }
 
 TEST(device_identity_manager, device_id_sanitizes_spaces_in_serial_number)
@@ -355,7 +355,7 @@ TEST(device_identity_manager, device_id_sanitizes_spaces_in_serial_number)
   uint8_t serial_data[] = "A B C";
   trigger_serial_number_read_completed(serial_data, 5);
 
-  CHECK(strcmp(manager.get_device_id().c_str(), "Dishwasher_ABC_A_B_C") == 0);
+  CHECK(strcmp(manager.get_device_id(), "Dishwasher_ABC_A_B_C") == 0);
 }
 
 /* ------------------------------------------------------------------ */
@@ -373,16 +373,16 @@ TEST(device_identity_manager, full_happy_path_from_init_to_complete)
 
   uint8_t model_data[] = "GFW12345";
   trigger_model_number_read_completed(model_data, 8);
-  CHECK(strcmp(manager.get_model_number().c_str(), "GFW12345") == 0);
+  CHECK(strcmp(manager.get_model_number(), "GFW12345") == 0);
   CHECK_EQUAL(DEVICE_ID_STATE_READING_SERIAL_NUMBER, manager.get_state());
 
   uint8_t serial_data[] = "WH20230001";
   trigger_serial_number_read_completed(serial_data, 10);
 
   CHECK_EQUAL(DEVICE_ID_STATE_COMPLETE, manager.get_state());
-  CHECK(strcmp(manager.get_device_id().c_str(), "Microwave_GFW12345_WH20230001") == 0);
-  CHECK(strcmp(manager.get_model_number().c_str(), "GFW12345") == 0);
-  CHECK(strcmp(manager.get_serial_number().c_str(), "WH20230001") == 0);
+  CHECK(strcmp(manager.get_device_id(), "Microwave_GFW12345_WH20230001") == 0);
+  CHECK(strcmp(manager.get_model_number(), "GFW12345") == 0);
+  CHECK(strcmp(manager.get_serial_number(), "WH20230001") == 0);
 }
 
 /* ------------------------------------------------------------------ */
@@ -394,7 +394,7 @@ TEST(device_identity_manager, get_device_id_returns_empty_before_completion)
   expect_successful_read(0xC0, ERD_APPLIANCE_TYPE);
   init_without_configured_id();
 
-  CHECK(strcmp(manager.get_device_id().c_str(), "") == 0);
+  CHECK(strcmp(manager.get_device_id(), "") == 0);
 }
 
 TEST(device_identity_manager, state_is_reading_appliance_type_for_value_0)
@@ -435,7 +435,7 @@ TEST(device_identity_manager, sanitize_replaces_dollar_sign)
   uint8_t serial_data[] = "$SN$";
   trigger_serial_number_read_completed(serial_data, sizeof(serial_data) - 1);
 
-  CHECK(strcmp(manager.get_device_id().c_str(), "Dishwasher_ABC__SN_") == 0);
+  CHECK(strcmp(manager.get_device_id(), "Dishwasher_ABC__SN_") == 0);
 }
 
 TEST(device_identity_manager, sanitize_handles_control_characters)
@@ -450,7 +450,7 @@ TEST(device_identity_manager, sanitize_handles_control_characters)
   uint8_t serial_data[] = {0x01, 'S', 'N', 0x1F};
   trigger_serial_number_read_completed(serial_data, 4);
 
-  CHECK(strcmp(manager.get_device_id().c_str(), "Dishwasher_ABC__SN_") == 0);
+  CHECK(strcmp(manager.get_device_id(), "Dishwasher_ABC__SN_") == 0);
 }
 
 TEST(device_identity_manager, sanitize_handles_high_bytes_above_0x7E)
@@ -465,5 +465,5 @@ TEST(device_identity_manager, sanitize_handles_high_bytes_above_0x7E)
   uint8_t serial_data[] = {0x7F, 'S', 'N', 0xFF};
   trigger_serial_number_read_completed(serial_data, 4);
 
-  CHECK(strcmp(manager.get_device_id().c_str(), "Dishwasher_ABC__SN_") == 0);
+  CHECK(strcmp(manager.get_device_id(), "Dishwasher_ABC__SN_") == 0);
 }

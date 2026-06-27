@@ -8,6 +8,7 @@
  */
 
 #include "erd_write_bridge.h"
+#include "geappliances_bridge_log.h"
 #include "esphome/core/log.h"
 #include "tiny_gea_constants.h"
 #include "erd_bridge_common.h"
@@ -19,7 +20,7 @@ enum {
   signal_write_failed
 };
 
-static const char* const TAG __attribute__((unused)) = "erd_write_bridge";
+GEA_TAG(TAG) = "erd_write_bridge";
 
 // ============================================================================
 // State machine

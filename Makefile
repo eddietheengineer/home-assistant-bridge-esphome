@@ -135,6 +135,6 @@ clean:
 .PHONY: pytest
 pytest:
 	@echo Running Python tests...
-	@python3 -m pytest scripts/test_generate_erd_lists.py -v
+	@python3 -m pytest scripts/test_generate_erd_lists.py scripts/test_ha_discovery.py -v
 
 -include $(DEPS)

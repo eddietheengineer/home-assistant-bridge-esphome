@@ -863,6 +863,10 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 ev, fs = _get_first_enum_field_info(erd_data)
                 if ev:
                     opts, vt, ct = _select_options_and_templates(ev, fs)
+                else:
+                    # No enum values to populate options; skip rather than emit
+                    # a broken select entity.
+                    continue
             elif ha_domain == 'number':
                 pf = _get_primary_field(erd_by_id, paired_erd_str)
                 if pf:

@@ -12,15 +12,11 @@
 
 #include <cstdint>
 
+#include "geappliances_bridge_log.h"
+
 extern "C" {
 #include "tiny_gea3_erd_client.h"
 }
-
-// ---------------------------------------------------------------------------
-// Logging tag — shared across all bridge translation units
-// ---------------------------------------------------------------------------
-
-[[maybe_unused]] static constexpr const char* TAG = "geappliances_bridge";
 
 // ---------------------------------------------------------------------------
 // Well-known GEA ERD identifiers

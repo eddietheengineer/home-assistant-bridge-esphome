@@ -15,7 +15,7 @@
 namespace esphome {
 namespace geappliances_bridge {
 
-static const char* const TAG __attribute__((unused)) = "feature_bit";
+GEA_TAG(TAG) = "feature_bit";
 
 // =============================================================================
 // Public API
