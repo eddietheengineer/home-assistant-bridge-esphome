@@ -40,6 +40,7 @@ CONF_ERD_CACHE_ENTRIES_SENSOR = "erd_cache_entries_sensor"
 CONF_ERD_CACHE_UPDATES_SENSOR = "erd_cache_updates_sensor"
 CONF_MQTT_PUBLISH_RATE_SENSOR = "mqtt_publish_rate_sensor"
 CONF_THROTTLE_RATE_SECONDS = "throttle_rate_seconds"
+CONF_FILTER_CONFIG_TOPICS = "filter_config_topics"
 
 
 
@@ -172,7 +173,7 @@ def load_appliance_types() -> dict[int, str]:
 
     # If local paths failed, try fetching from GitHub as fallback
     if data is None:
-        url = "https://raw.githubusercontent.com/geappliances/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
+        url = "https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
         _LOGGER.info("Fetching ERD definitions from GitHub: %s", url)
 
         try:
@@ -310,6 +311,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_MQTT_PUBLISH_RATE_SENSOR): cv.Schema({
             cv.Optional("name", default="MQTT Publish Rate"): cv.string,
         }).extend(sensor.sensor_schema(state_class="measurement")),
+        cv.Optional(CONF_FILTER_CONFIG_TOPICS, default=True): cv.boolean,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
@@ -358,6 +360,8 @@ async def to_code(config: dict[str, Any]) -> None:
         cmd.extend(["--erd-definitions", erd_defs_path])
     if api_json_path:
         cmd.extend(["--appliance-api", api_json_path])
+    if not config.get(CONF_FILTER_CONFIG_TOPICS, True):
+        cmd.append("--no-filter-config-topics")
 
     try:
         _LOGGER.info("Generating ERD lists and feature API lists...")
@@ -384,28 +388,8 @@ async def to_code(config: dict[str, Any]) -> None:
         )
         raise
 
-    # Generate HA discovery compressed data when enabled
-    if config.get(CONF_GENERATE_DEVICE_CONFIG, False):
-        try:
-            _LOGGER.info("Compressing HA MQTT discovery data...")
-            subprocess.run(
-                [sys.executable, os.path.join(scripts_dir, "compress_ha_discovery.py")],
-                cwd=repo_root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            _LOGGER.info("HA MQTT discovery data compressed successfully")
-        except subprocess.CalledProcessError as e:
-            _LOGGER.warning(
-                "HA discovery compression failed: %s. "
-                "Discovery will not be available.", e.stderr if e.stderr else str(e)
-            )
-        except FileNotFoundError as e:
-            _LOGGER.warning(
-                "HA discovery compression script not found: %s. "
-                "Discovery will not be available.", str(e)
-            )
+    # HA discovery compression is now handled by generate_erd_lists.py
+    # (in-process, after JSONL generation). No separate step needed.
     await cg.register_component(var, config)
 
     # Get optional GEA3 UART component reference

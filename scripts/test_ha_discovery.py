@@ -31,9 +31,6 @@ import jinja2
 
 JINJA2_ENV = jinja2.Environment()
 
-# Path to generated JSONL files
-HA_DISCOVERY_DIR = Path(__file__).parent.parent / 'ha_discovery'
-
 # All category files
 CATEGORIES = [
     'common', 'airconditioning', 'refrigeration', 'laundry',
@@ -42,58 +39,64 @@ CATEGORIES = [
 ]
 
 
-def load_all_entities() -> List[Dict[str, Any]]:
-    """Load all entities from all category JSONL files."""
+def _get_erd_definitions() -> List[Dict[str, Any]]:
+    """Load ERD definitions, trying local submodule then GitHub fallback."""
+    json_file = Path(__file__).parent.parent / 'lib' / 'public-appliance-api-documentation' / 'appliance_api_erd_definitions.json'
+    if json_file.exists():
+        with open(json_file) as f:
+            data = json.load(f)
+        return data.get('erds', [])
+    # Fallback: fetch from GitHub (eddietheengineer fork has ha_domain metadata)
+    import urllib.request
+    url = "https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
+    with urllib.request.urlopen(url, timeout=30) as resp:
+        data = json.loads(resp.read().decode('utf-8'))
+    return data.get('erds', [])
+
+
+def load_all_entities(filter_config_topics: bool = False) -> List[Dict[str, Any]]:
+    """Generate all entities in-memory from ERD definitions."""
+    erds = _get_erd_definitions()
+    jsonl_by_cat = gen.generate_ha_discovery_jsonl_by_category(erds, filter_config_topics)
     entities: List[Dict[str, Any]] = []
-    for cat in CATEGORIES:
-        path = HA_DISCOVERY_DIR / f'{cat}.jsonl'
-        if not path.exists():
-            continue
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                obj = json.loads(line)
-                obj['_category'] = cat
-                entities.append(obj)
+    for cat, content in jsonl_by_cat.items():
+        for line in content.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            obj = json.loads(line)
+            obj['_category'] = cat
+            entities.append(obj)
     return entities
 
 
 def load_erd_definitions() -> List[Dict[str, Any]]:
     """Load ERD definitions from the JSON file."""
-    json_file = Path(__file__).parent.parent / 'lib' / 'public-appliance-api-documentation' / 'appliance_api_erd_definitions.json'
-    with open(json_file) as f:
-        data = json.load(f)
-    return data.get('erds', [])
+    return _get_erd_definitions()
 
 
 class TestJSONLStructure(unittest.TestCase):
-    """Test that all JSONL files have valid structure."""
+    """Test that all generated entities have valid structure."""
 
-    def test_all_categories_exist(self):
-        """All expected category files exist."""
-        for cat in CATEGORIES:
-            path = HA_DISCOVERY_DIR / f'{cat}.jsonl'
-            self.assertTrue(path.exists(), f'{cat}.jsonl not found')
+    def setUp(self):
+        self.entities = load_all_entities()
 
-    def test_all_lines_valid_json(self):
-        """Every line in every JSONL file is valid JSON."""
+    def test_all_categories_have_entities(self):
+        """All expected categories have entities."""
+        categories_with_entities = set(e['_category'] for e in self.entities)
         for cat in CATEGORIES:
-            path = HA_DISCOVERY_DIR / f'{cat}.jsonl'
-            with open(path) as f:
-                for i, line in enumerate(f, 1):
-                    line = line.strip()
-                    if not line:
-                        continue
-                    with self.subTest(category=cat, line=i):
-                        obj = json.loads(line)
-                        self.assertIsInstance(obj, dict)
+            self.assertIn(cat, categories_with_entities,
+                f'{cat} has no entities')
+
+    def test_all_entities_valid_json(self):
+        """Every entity is a valid dict with expected fields."""
+        for obj in self.entities:
+            with self.subTest(entity=obj.get('n', '?'), erd=obj.get('i', '?')):
+                self.assertIsInstance(obj, dict)
 
     def test_required_fields_present(self):
         """Every entity has the required fields: i, n, d, ds."""
-        entities = load_all_entities()
-        for obj in entities:
+        for obj in self.entities:
             with self.subTest(entity=obj.get('n', '?'), erd=obj.get('i', '?')):
                 self.assertIn('i', obj, f'Missing "i" in {obj.get("n")}')
                 self.assertIn('n', obj, f'Missing "n" in {obj.get("i")}')
@@ -103,28 +106,24 @@ class TestJSONLStructure(unittest.TestCase):
     def test_valid_domains(self):
         """Every entity has a valid HA domain."""
         valid_domains = {'sensor', 'binary_sensor', 'switch', 'select', 'number', 'button'}
-        entities = load_all_entities()
-        for obj in entities:
+        for obj in self.entities:
             with self.subTest(entity=obj.get('n', '?')):
                 self.assertIn(obj['d'], valid_domains,
                     f'{obj["n"]} has invalid domain {obj["d"]}')
 
     def test_data_size_positive(self):
         """Every entity has a positive data size."""
-        entities = load_all_entities()
-        for obj in entities:
+        for obj in self.entities:
             with self.subTest(entity=obj.get('n', '?')):
                 self.assertGreater(obj['ds'], 0,
                     f'{obj["n"]} has non-positive data_size {obj["ds"]}')
+
     def test_no_duplicate_unique_ids(self):
         """No two entities share the same (erd_id, field_id) combination."""
-        entities = load_all_entities()
         seen: Dict[Tuple[str, str], str] = {}
-        for obj in entities:
+        for obj in self.entities:
             key = (obj['i'], obj.get('fi', ''))
             if key in seen:
-                # Allow duplicates only if they have the same name (same entity
-                # emitted from different categories is OK)
                 if seen[key] == obj['n']:
                     continue
                 self.fail(
@@ -134,11 +133,10 @@ class TestJSONLStructure(unittest.TestCase):
 
     def test_total_entity_count(self):
         """Verify total entity count is reasonable (not zero, not excessive)."""
-        entities = load_all_entities()
-        self.assertGreater(len(entities), 5000,
-            f'Expected >5000 entities, got {len(entities)}')
-        self.assertLess(len(entities), 20000,
-            f'Expected <20000 entities, got {len(entities)}')
+        self.assertGreater(len(self.entities), 5000,
+            f'Expected >5000 entities, got {len(self.entities)}')
+        self.assertLess(len(self.entities), 20000,
+            f'Expected <20000 entities, got {len(self.entities)}')
 
 
 class TestJinja2Templates(unittest.TestCase):

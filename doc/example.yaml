@@ -67,8 +67,9 @@ geappliances_bridge:
   # mode: auto                            # Default: auto   Options: auto, subscribe, poll
   # polling_interval: 10000               # Default: 10000 ms (10 seconds), used when in polling mode
   # appliance_api_parsing: true           # Default: true, restricts polling to appliance-supported ERDs
+  # filter_config_topics: true           # Default: true, filters internal/diagnostic entities from HA discovery
   # throttle_rate_seconds: 0              # Default: 0 (disabled), minimum seconds between publishes per ERD (0-255)
-  # generate_device_config: false         # Default: false, generates MQTT Autodiscovery payloads (experimental)
+  # generate_device_config: false         # Default: true, generates MQTT Autodiscovery payloads (experimental)
 
   # Optional diagnostic sensors:
   # erd_cache_entries_sensor:

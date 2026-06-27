@@ -33,6 +33,7 @@ Each JSONL line has these keys:
 """
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -1013,18 +1014,150 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
 
 
 # ---------------------------------------------------------------------------
+# Config topic filtering
+# ---------------------------------------------------------------------------
+
+# Compiled regex patterns for filtering out entities that are internal
+# metadata, diagnostics, or commissioning state — not useful to end users.
+# Each tuple is (category_name, compiled_regex).
+_FILTER_PATTERNS = [
+    # OS/board-level diagnostics (RAM, disk, packet stats, uptime).
+    # Never useful to end users.
+    ("diagnostics", re.compile(
+        r"(?i)(linux diagnostics|GEA.*interface diagnostic|non-volatile usage warning|reset reason|seconds since last reset|program counter.*failed assertion|fault code)"
+    )),
+    # Internal firmware metadata: config hashes, SHA-256 schedule hashes,
+    # boot loader versions, supported image types.
+    ("firmware", re.compile(
+        r"(?i)(configuration hash|schedule hash|SHA-256|boot loader version|supported image types|ready to enter boot|engineering revision setup)"
+    )),
+    # CSM (Control State Machine) fault data. Internal diagnostics.
+    ("csm_fault", re.compile(
+        r"(?i)csm fault data"
+    )),
+    # Matter/Alexa one-time commissioning state. Not useful after setup.
+    ("commissioning", re.compile(
+        r"(?i)(Alexa.*registration|Alexa.*status|Matter.*device|Matter.*commissioning|Matter.*onboarding|Matter.*product ID|Matter.*temperature display|Matter.*keypad lockout|voice module)"
+    )),
+    # Mobile app push notification flags. Irrelevant in HA context.
+    ("push_notifications", re.compile(
+        r"(?i)(push notification)"
+    )),
+    # Min/max bounds for settings. Used internally; redundant in HA where
+    # number/slider controls handle bounds.
+    ("limits", re.compile(
+        r"(?i)(limit|min.*max|allowable.*range|range data|expiration limit|target temperature range)"
+    )),
+    # Metadata about which settings can be changed. Not actionable.
+    ("availability", re.compile(
+        r"(?i)(modification available|action available|editable|available.*mode|action availability|available.*setting|availability)"
+    )),
+    # Feature capability flags. Static metadata.
+    ("supported_features", re.compile(
+        r"(?i)(supported.*feature|supported.*state|supported.*equipment|supported.*sound theme|supported.*enhanced|supported.*notification|supported.*setting|supported.*device)"
+    )),
+    # Request-side mirrors of status ERDs. The status ERD handles both
+    # read+write via pairing.
+    ("request_parameters", re.compile(
+        r"(?i)(requested.*parameter|request.*setting|request.*mask|request.*configuration)"
+    )),
+    # Appliance clock. Redundant with system time.
+    ("clock", re.compile(
+        r"(?i)(clock time|NTP|time zone|daylight saving|calendar)"
+    )),
+    # Network diagnostics. Redundant with router info.
+    ("network", re.compile(
+        r"(?i)(WiFi.*status|network.*status|signal.*strength|BLE.*master|Bluetooth.*master)"
+    )),
+    # Utility pricing schedule internals. Rarely useful to end users.
+    ("energy_pricing", re.compile(
+        r"(?i)(electrical.*pricing|demand response|time of use.*pricing|pricing.*structure)"
+    )),
+    # Camera/image capture. Specialized, not for most users.
+    ("camera", re.compile(
+        r"(?i)(still frame|image upload|camera.*configuration|camera.*stream|inference ID|cook cam.*upload)"
+    )),
+    # Sound/beep configuration. Niche preference.
+    ("sound", re.compile(
+        r"(?i)(sound level|sound theme|available sound|number of sound level)"
+    )),
+    # GE's proprietary cloud feature deployment. Irrelevant for local HA.
+    ("enhanced_cloud", re.compile(
+        r"(?i)(enhanced feature|CEC|core-enhanced-cloud|request enabled enhanced|current enabled enhanced)"
+    )),
+    # Usage profile data. Internal telemetry, not actionable.
+    ("usage_profile", re.compile(
+        r"(?i)usage profile"
+    )),
+    # Current report data (AC, inverter). Internal diagnostics.
+    ("current_report", re.compile(
+        r"(?i)current report"
+    )),
+    # Feature configuration. Internal metadata.
+    ("feature_configuration", re.compile(
+        r"(?i)feature configuration"
+    )),
+    # Cycle definitions. Internal program metadata.
+    ("cycle_definition", re.compile(
+        r"(?i)cycle definition"
+    )),
+    # Latched key status. Internal keypad state.
+    ("latched_key", re.compile(
+        r"(?i)latched key status"
+    )),
+    # DIP switch. Hardware configuration, not user-facing.
+    ("dip_switch", re.compile(
+        r"(?i)dip switch"
+    )),
+    # Most recent cycle status. Historical data, not actionable.
+    ("most_recent_cycle", re.compile(
+        r"(?i)most recent cycle status"
+    )),
+    # Unused/reserved fields. Placeholder data, never meaningful.
+    ("unused_reserved", re.compile(
+        r"(?i)(unused|reserved)(\s*\[.*\])?"
+    )),
+]
+
+
+def _should_filter_entity(name: str) -> bool:
+    """Return True if the entity should be filtered out when
+    filter_config_topics is enabled.
+
+    Checks the entity name against the compiled filter patterns.
+    """
+    for _, pattern in _FILTER_PATTERNS:
+        if pattern.search(name):
+            return True
+    return False
+# ---------------------------------------------------------------------------
 # JSONL generation
 # ---------------------------------------------------------------------------
 
-def generate_ha_discovery_jsonl_by_category(erds: List[Dict]) -> Dict[str, str]:
+def generate_ha_discovery_jsonl_by_category(erds: List[Dict], filter_config_topics: bool = True) -> Dict[str, str]:
     """Generate compact JSONL content grouped by appliance category.
 
     Returns a dict mapping category name -> JSONL string content.
     Each JSONL line is a compact JSON object with the pre-computed ha-discovery
     fields for one entity.  Fields that equal their default value are omitted to
     reduce file size.
+
+    When filter_config_topics is True, entities matching internal metadata,
+    diagnostics, commissioning, and other non-user-facing patterns are excluded.
     """
     entries = _collect_ha_discovery_entries(erds)
+
+    if filter_config_topics:
+        filtered = []
+        filtered_count = 0
+        for entry in entries:
+            if _should_filter_entity(entry['name']):
+                filtered_count += 1
+            else:
+                filtered.append(entry)
+        entries = filtered
+        if filtered_count:
+            print(f"  Filtered out {filtered_count} entities (filter_config_topics=True)", file=sys.stderr)
 
     categorized: Dict[str, list] = {cat: [] for cat in CATEGORIES}
     for entry in entries:
@@ -1115,7 +1248,7 @@ def find_erd_definitions_json() -> Optional[Path]:
 def fetch_erd_definitions_from_github() -> Optional[dict]:
     """Fetch ERD definitions from GitHub as fallback."""
     import urllib.request as urllib
-    url = "https://raw.githubusercontent.com/geappliances/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
+    url = "https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
     print(f"Fetching ERD definitions from GitHub: {url}", file=sys.stderr)
     try:
         with urllib.urlopen(url, timeout=10) as response:
@@ -1127,12 +1260,26 @@ def fetch_erd_definitions_from_github() -> Optional[dict]:
 
 def main():
     """Main entry point for the script."""
+    import argparse
+    parser = argparse.ArgumentParser(description="Generate HA discovery JSONL files.")
+    parser.add_argument("--filter-config-topics", action="store_true", default=True,
+                        help="Filter out internal metadata, diagnostics, and commissioning entities (default: true).")
+    parser.add_argument("--no-filter-config-topics", action="store_false", dest="filter_config_topics",
+                        help="Disable filtering of internal/diagnostic entities.")
+    parser.add_argument("--erd-definitions", default=None,
+                        help="Path to appliance_api_erd_definitions.json (bypasses auto-search).")
+    args = parser.parse_args()
+
     script_dir = Path(__file__).parent
     repo_root = script_dir.parent
     output_dir = repo_root / 'ha_discovery'
 
     # Try to find the JSON file locally
-    json_file = find_erd_definitions_json()
+    json_file = None
+    if args.erd_definitions and os.path.exists(args.erd_definitions):
+        json_file = Path(args.erd_definitions)
+    else:
+        json_file = find_erd_definitions_json()
     data = None
 
     if json_file is not None:
@@ -1160,7 +1307,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate JSONL by category
-    jsonl_by_cat = generate_ha_discovery_jsonl_by_category(erds)
+    jsonl_by_cat = generate_ha_discovery_jsonl_by_category(erds, args.filter_config_topics)
     total_entries = 0
     for cat, content in jsonl_by_cat.items():
         outfile = output_dir / f'{cat}.jsonl'
@@ -1173,7 +1320,5 @@ def main():
     print(f"\nTotal entities generated: {total_entries}", file=sys.stderr)
     print(f"Output directory: {output_dir}", file=sys.stderr)
     print("Done!", file=sys.stderr)
-
-
 if __name__ == '__main__':
     main()
