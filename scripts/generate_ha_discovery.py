@@ -1024,12 +1024,16 @@ _FILTER_PATTERNS = [
     # OS/board-level diagnostics (RAM, disk, packet stats, uptime).
     # Never useful to end users.
     ("diagnostics", re.compile(
-        r"(?i)(linux diagnostics|GEA.*interface diagnostic|non-volatile usage warning)"
+        r"(?i)(linux diagnostics|GEA.*interface diagnostic|non-volatile usage warning|reset reason|seconds since last reset|program counter.*failed assertion|fault code)"
     )),
     # Internal firmware metadata: config hashes, SHA-256 schedule hashes,
     # boot loader versions, supported image types.
     ("firmware", re.compile(
-        r"(?i)(configuration hash|schedule hash|SHA-256|boot loader version|supported image types|ready to enter boot)"
+        r"(?i)(configuration hash|schedule hash|SHA-256|boot loader version|supported image types|ready to enter boot|engineering revision setup)"
+    )),
+    # CSM (Control State Machine) fault data. Internal diagnostics.
+    ("csm_fault", re.compile(
+        r"(?i)csm fault data"
     )),
     # Matter/Alexa one-time commissioning state. Not useful after setup.
     ("commissioning", re.compile(
@@ -1042,15 +1046,15 @@ _FILTER_PATTERNS = [
     # Min/max bounds for settings. Used internally; redundant in HA where
     # number/slider controls handle bounds.
     ("limits", re.compile(
-        r"(?i)(limit|min.*max|allowable.*range|range data|expiration limit)"
+        r"(?i)(limit|min.*max|allowable.*range|range data|expiration limit|target temperature range)"
     )),
     # Metadata about which settings can be changed. Not actionable.
     ("availability", re.compile(
-        r"(?i)(modification available|action available|editable|available.*mode|action availability|available.*setting)"
+        r"(?i)(modification available|action available|editable|available.*mode|action availability|available.*setting|availability)"
     )),
     # Feature capability flags. Static metadata.
     ("supported_features", re.compile(
-        r"(?i)(supported.*feature|supported.*state|supported.*equipment|supported.*sound theme|supported.*enhanced)"
+        r"(?i)(supported.*feature|supported.*state|supported.*equipment|supported.*sound theme|supported.*enhanced|supported.*notification|supported.*setting|supported.*device)"
     )),
     # Request-side mirrors of status ERDs. The status ERD handles both
     # read+write via pairing.
@@ -1080,6 +1084,34 @@ _FILTER_PATTERNS = [
     # GE's proprietary cloud feature deployment. Irrelevant for local HA.
     ("enhanced_cloud", re.compile(
         r"(?i)(enhanced feature|CEC|core-enhanced-cloud|request enabled enhanced|current enabled enhanced)"
+    )),
+    # Usage profile data. Internal telemetry, not actionable.
+    ("usage_profile", re.compile(
+        r"(?i)usage profile"
+    )),
+    # Current report data (AC, inverter). Internal diagnostics.
+    ("current_report", re.compile(
+        r"(?i)current report"
+    )),
+    # Feature configuration. Internal metadata.
+    ("feature_configuration", re.compile(
+        r"(?i)feature configuration"
+    )),
+    # Cycle definitions. Internal program metadata.
+    ("cycle_definition", re.compile(
+        r"(?i)cycle definition"
+    )),
+    # Latched key status. Internal keypad state.
+    ("latched_key", re.compile(
+        r"(?i)latched key status"
+    )),
+    # DIP switch status. Hardware configuration, not user-facing.
+    ("dip_switch", re.compile(
+        r"(?i)dip switch status"
+    )),
+    # Unused/reserved fields. Placeholder data, never meaningful.
+    ("unused_reserved", re.compile(
+        r"(?i)(unused|reserved)(\s*\[.*\])?"
     )),
 ]
 
