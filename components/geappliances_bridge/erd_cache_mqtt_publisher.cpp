@@ -13,7 +13,7 @@
 #include <cstdio>
 #include <string.h>
 
-static const char* const PUBLISHER_TAG = "erd_cache_mqtt_publisher";
+static const char* const PUBLISHER_TAG __attribute__((unused)) = "erd_cache_mqtt_publisher";
 #ifdef USE_ESP_IDF
 #include "esp_task_wdt.h"
 #endif

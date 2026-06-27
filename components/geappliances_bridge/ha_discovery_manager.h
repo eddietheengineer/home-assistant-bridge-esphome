@@ -25,6 +25,7 @@
 #ifdef USE_ESP_IDF
 #  ifdef USE_ESP_IDF_STUBS
 #    include "esp-idf/freertos_stub.h"
+#    include "miniz_tinfl.h"
 #  else
 #    include "freertos/FreeRTOS.h"
 #    include "freertos/task.h"

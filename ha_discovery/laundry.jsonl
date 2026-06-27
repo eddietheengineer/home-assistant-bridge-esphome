@@ -761,7 +761,6 @@
 {"i":"2103","n":"Washer Remote My Cycle Data 13 - Fabric softener","d":"sensor","ds":32,"vt":"{{ value[26:28] | int(base=16) }}","fi":"fabric_softener"}
 {"i":"2103","n":"Washer Remote My Cycle Data 13 - Flex dispense stage","d":"sensor","ds":32,"vt":"{{ value[28:30] | int(base=16) }}","fi":"flex_dispense_stage"}
 {"i":"2103","n":"Washer Remote My Cycle Data 13 - Flex dispense method","d":"sensor","ds":32,"vt":"{{ value[30:32] | int(base=16) }}","fi":"flex_dispense_method"}
-{"i":"2106","n":"Water Level Option Current","d":"select","ds":1,"p":"212d","r":"status"}
 {"i":"2107","n":"Water Level Option Allowable - Low","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"low","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"2107","n":"Water Level Option Allowable - Med","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"med","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"2107","n":"Water Level Option Allowable - High","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"high","pon":"01","poff":"00","son":"01","soff":"00"}

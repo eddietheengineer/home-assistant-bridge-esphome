@@ -116,7 +116,8 @@ class DeviceIdentityManager {
   std::string sanitize_for_mqtt_topic_(const char* input);
 
   DeviceIdState state_{DEVICE_ID_STATE_READING_APPLIANCE_TYPE};
-  const char* configured_device_id_{nullptr};
+  bool has_configured_device_id_{false};
+  char configured_device_id_[64];
   char generated_device_id_[64];
   uint8_t appliance_type_{0};
   char model_number_[64];

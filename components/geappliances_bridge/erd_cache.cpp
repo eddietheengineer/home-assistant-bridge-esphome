@@ -8,7 +8,7 @@
 #include <cstring>
 #include <new>
 
-static const char* const TAG = "erd_cache";
+static const char* const TAG __attribute__((unused)) = "erd_cache";
 
 static bool s_overflow_warned = false;
 

@@ -25,7 +25,7 @@
 #ifndef i_mqtt_client_h
 #define i_mqtt_client_h
 
-#include <cstddef>
+#include <stddef.h>
 
 #include "i_tiny_event.h"
 #include "i_tiny_gea3_erd_client.h"

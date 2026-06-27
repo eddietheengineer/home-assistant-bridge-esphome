@@ -36,7 +36,7 @@
 #endif
 #endif /* USE_ESP_IDF */
 
-static const char* const TAG = "ha_discovery";
+static const char* const TAG __attribute__((unused)) = "ha_discovery";
 
 /* ------------------------------------------------------------------ */
 /* Cleanup: discover and remove old HA discovery topics               */
@@ -122,6 +122,7 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
  * queue drains fast and retained message bursts don't overflow. */
 static void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
+    (void)payload;
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
 
     /* Only remove config topics. */
@@ -291,8 +292,8 @@ wait_check:
     /* Final wait complete. Proceed to discovery. */
     ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
     {
-        size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-        size_t largest_free = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+        size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
         ESP_LOGI(TAG, "Heap before discovery: free=%u, largest_block=%u, fragmentation=%.1f%%",
             (unsigned)free_heap, (unsigned)largest_free,
             (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
@@ -511,7 +512,7 @@ static int chunk_decompress(ha_discovery_manager_t* self, const uint8_t* compres
                            uint8_t* output, size_t* output_len)
 {
 #ifdef USE_ESP_IDF_STUBS
-    (void)compressed; (void)compressed_len; (void)output; (void)output_len;
+    (void)self; (void)compressed; (void)compressed_len; (void)output; (void)output_len;
     return -1;
 #else
     tinfl_init(&self->decomp_state);
@@ -948,8 +949,8 @@ static void build_task(void* arg)
 
     /* Fragmentation baseline: log heap state before build work. */
     {
-        size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-        size_t largest_free = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+        size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
         ESP_LOGI(TAG, "Heap before build: free=%u, largest_block=%u, fragmentation=%.1f%%",
             (unsigned)free_heap, (unsigned)largest_free,
             (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
@@ -960,7 +961,7 @@ static void build_task(void* arg)
 
     /* Stack watermark: verify 2KB stack is sufficient. */
     {
-        UBaseType_t hw = uxTaskGetStackHighWaterMark(NULL);
+        UBaseType_t hw __attribute__((unused)) = uxTaskGetStackHighWaterMark(NULL);
         ESP_LOGI(TAG, "build_task stack high_watermark: %lu words (%lu bytes)",
             (unsigned long)hw, (unsigned long)(hw * sizeof(StackType_t)));
     }
@@ -1039,8 +1040,8 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 
         /* Heap after build task freed its stack/TCB. */
         {
-            size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-            size_t largest_free = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+            size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+            size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
             ESP_LOGI(TAG, "Heap after build: free=%u, largest_block=%u, fragmentation=%.1f%%",
                 (unsigned)free_heap, (unsigned)largest_free,
                 (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
@@ -1165,7 +1166,6 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
             self->current_decomp_size = 0;
 
             /* Log category completion. */
-            uint32_t cat_discovered = self->total_discovered;
             /* We don't track per-category discovered easily, so skip the log. */
 
             /* Yield after finishing a chunk. */
@@ -1181,8 +1181,8 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
             self->state = ha_discovery_state_complete;
 
             /* Fragmentation after discovery: log heap state post-completion. */
-            size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-            size_t largest_free = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+            size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+            size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
             ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
                 self->total_published, self->total_filtered);
             ESP_LOGI(TAG, "Heap after discovery: free=%u, largest_block=%u, fragmentation=%.1f%%",
