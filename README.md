@@ -57,13 +57,22 @@ uart:
 geappliances_bridge:
   gea3_uart_id: gea3_uart
   gea2_uart_id: gea2_uart
-  # adapter_address: 0xE4                 # Default: 0xE4, bridge's bus address
   # device_id: "YourDeviceId"             # Optional: Uncomment to use a custom device ID
   # mode: auto                            # Default: auto   Options: auto, subscribe, poll
   # polling_interval: 10000               # Default: 10000 ms (10 seconds), used when in polling mode
   # appliance_api_parsing: true           # Default: true, restricts polling to appliance-supported ERDs
-  # throttle_rate_seconds: 0              # Default: 0 (disabled), min seconds between publishes per ERD (0-255)
-  # generate_device_config: false         # Default: false (currently disabled)
+  # throttle_rate_seconds: 0              # Default: 0 (disabled), minimum seconds between publishes per ERD (0-255)
+  # generate_device_config: false         # Default: false, generates MQTT Autodiscovery payloads (experimental)
+
+  # Optional diagnostic sensors:
+  # erd_cache_entries_sensor:
+  #   name: "ERD Cache Entries"           # Number of Erds registered by the appliance
+  # erd_publish_rate_sensor:
+  #   name: "ERD Publish Rate"            # Number of read or subscribe responses from the appliance per minute
+  # erd_cache_updates_sensor:
+  #   name: "ERD Cache Update Rate"       # Number of appliance messages that have changed payloads per minute
+  # mqtt_publish_rate_sensor:
+  #   name: "MQTT Publish Rate"           # Number of MQTT messages published per minute
 
 ```
 
