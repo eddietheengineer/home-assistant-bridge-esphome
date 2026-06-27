@@ -59,31 +59,61 @@ GEA_TAG(TAG) = "ha_discovery";
 /* Max topics to flush per batch call. */
 #define HA_DISCOVERY_CLEANUP_FLUSH_BATCH 16
 
+/* Expose cleanup functions for unit testing when HA_DISCOVERY_TEST_EXPORT is defined. */
+#ifdef HA_DISCOVERY_TEST_EXPORT
+#  define CLEANUP_FN
+#else
+#  define CLEANUP_FN static
+#endif
+
 /* Flush queued cleanup topics: publish empty retained payloads to remove them.
  * Called from cleanup_run() during idle periods, not from the MQTT callback,
  * to avoid blocking the ESP-IDF MQTT task. Returns the number of topics
  * remaining in the queue (0 means all flushed). */
-static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
+CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
 {
     uint16_t batch = 0;
     const uint16_t max_batch = 16;
 
     while (batch < max_batch) {
-        char topic_buf[192];
+        char topic_buf[256];
+        char suffix_buf[128];
+        int domain_index;
+        size_t consumed;
 
-        /* Read from the ring buffer under critical section. No shift needed —
-         * producer and consumer use independent indices, so there is no data
-         * race between the callback writing and the flush reading. */
+        /* Read and compact under critical section. */
         vPortEnterCritical();
-        if (self->cleanup_queue_read_idx == self->cleanup_queue_write_idx) {
+        if (self->cleanup_queue_count == 0) {
             vPortExitCritical();
             break;  // empty
         }
-        uint16_t idx = self->cleanup_queue_read_idx;
-        strncpy(topic_buf, self->cleanup_topic_queue[idx], sizeof(topic_buf));
-        topic_buf[sizeof(topic_buf) - 1] = '\0';
-        self->cleanup_queue_read_idx = (idx + 1) % HA_DISCOVERY_CLEANUP_QUEUE_SIZE;
+
+        /* Read domain index and suffix from the front of the buffer. */
+        domain_index = (int)(uint8_t)self->cleanup_topic_buf[0];
+        strncpy(suffix_buf, self->cleanup_topic_buf + 1, sizeof(suffix_buf) - 1);
+        suffix_buf[sizeof(suffix_buf) - 1] = '\0';
+
+        /* Compute bytes consumed by this entry: [domain_index:1][suffix][null:1]. */
+        consumed = 1 + strlen(suffix_buf) + 1;
+
+        /* Safety clamp: prevent underflow if buffer is corrupted. */
+        if (consumed > self->cleanup_queue_write_pos) {
+            consumed = self->cleanup_queue_write_pos;
+        }
+
+        /* Compact: shift remaining data to front. */
+        memmove(self->cleanup_topic_buf, self->cleanup_topic_buf + consumed,
+                self->cleanup_queue_write_pos - consumed);
+        self->cleanup_queue_write_pos -= (uint16_t)consumed;
+        self->cleanup_queue_count--;
         vPortExitCritical();
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+        /* Reconstruct full topic: "homeassistant/{domain}/{device_id}/{suffix}/config" */
+        snprintf(topic_buf, sizeof(topic_buf), "homeassistant/%s/%s/%s/config",
+                 HA_DOMAIN_STRINGS[domain_index], self->device_id, suffix_buf);
+#pragma GCC diagnostic pop
 
         mqtt_client_publish_raw(self->mqtt_client, topic_buf, "", 0, true);
         ESP_LOGD(TAG, "Removed old topic: %s", topic_buf);
@@ -94,18 +124,15 @@ static uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 
-    /* Compute remaining entries from ring buffer indices. */
-    if (self->cleanup_queue_write_idx >= self->cleanup_queue_read_idx) {
-        return self->cleanup_queue_write_idx - self->cleanup_queue_read_idx;
-    }
-    return HA_DISCOVERY_CLEANUP_QUEUE_SIZE - self->cleanup_queue_read_idx + self->cleanup_queue_write_idx;
+    return self->cleanup_queue_count;
 }
 
 /* Callback for homeassistant/+/{device_id}/# wildcard subscription during cleanup.
- * Queues the topic name for batched publishing from the main loop. This keeps
- * the callback short — no outbound publish call — so the MQTT task's inbound
- * queue drains fast and retained message bursts don't overflow. */
-static void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
+ * Parses the topic, packs domain enum + suffix into the compacting buffer,
+ * and queues for batched publishing from the main loop. This keeps the callback
+ * short — no outbound publish call — so the MQTT task's inbound queue drains fast
+ * and retained message bursts don't overflow. */
+CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     (void)payload;
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
@@ -118,25 +145,49 @@ static void cleanup_topic_callback(const char* topic, const char* payload, size_
     /* If the payload is empty, it's our own echo from a previous clear — skip. */
     if (payload_len == 0) return;
 
-    /* Queue the topic name for publishing from the main loop.
-     * Ring buffer producer: advance write_idx under critical section.
-     * No data race with consumer — independent indices. */
+    /* Parse topic: "homeassistant/{domain}/{device_id}/{suffix}/config"
+     * Skip "homeassistant/" (14 chars), extract domain up to next /. */
+    const char* p = topic + 14;  // skip "homeassistant/"
+    const char* domain_end = strchr(p, '/');
+    if (!domain_end) return;
+
+    size_t domain_len = (size_t)(domain_end - p);
+    int domain_index = ha_domain_to_index(p, domain_len);
+    if (domain_index < 0) return;  // unknown domain, skip
+
+    /* Skip past /{device_id}/ to find suffix start. */
+    const char* device_id_start = domain_end + 1;
+    const char* device_id_end = strchr(device_id_start, '/');
+    if (!device_id_end) return;
+
+    /* Suffix is between device_id_end+1 and topic_len-7 (strip /config). */
+    const char* suffix_start = device_id_end + 1;
+    const char* suffix_end = topic + topic_len - 7;  // before "/config"
+    size_t suffix_len = (size_t)(suffix_end - suffix_start);
+
+    /* Pack into buffer: [domain_index:1][suffix:variable][null:1] */
+    size_t needed = 1 + suffix_len + 1;
+
     vPortEnterCritical();
-    uint16_t next = (self->cleanup_queue_write_idx + 1) % HA_DISCOVERY_CLEANUP_QUEUE_SIZE;
-    if (next != self->cleanup_queue_read_idx) {  // not full
-        strncpy(self->cleanup_topic_queue[self->cleanup_queue_write_idx], topic, 191);
-        self->cleanup_topic_queue[self->cleanup_queue_write_idx][191] = '\0';
-        self->cleanup_queue_write_idx = next;
+    if (self->cleanup_queue_write_pos + needed <= HA_DISCOVERY_CLEANUP_BUF_SIZE) {
+        self->cleanup_topic_buf[self->cleanup_queue_write_pos] = (char)(uint8_t)domain_index;
+        memcpy(self->cleanup_topic_buf + self->cleanup_queue_write_pos + 1, suffix_start, suffix_len);
+        self->cleanup_topic_buf[self->cleanup_queue_write_pos + 1 + suffix_len] = '\0';
+        self->cleanup_queue_write_pos += (uint16_t)needed;
+        self->cleanup_queue_count++;
+    } else {
+        self->cleanup_dropped_count++;
     }
     self->cleanup_pass_found_topics = true;
     self->cleanup_last_activity_ms = self->get_time_ms();
     vPortExitCritical();
 }
 
-static void cleanup_start(ha_discovery_manager_t* self)
+CLEANUP_FN void cleanup_start(ha_discovery_manager_t* self)
 {
-    self->cleanup_queue_write_idx = 0;
-    self->cleanup_queue_read_idx = 0;
+    self->cleanup_queue_write_pos = 0;
+    self->cleanup_queue_count = 0;
+    self->cleanup_dropped_count = 0;
     self->cleanup_flushed_once = false;
     self->cleanup_clean_passes = 0;
     self->cleanup_pass_found_topics = false;
@@ -255,6 +306,10 @@ wait_check:
 
         /* Final wait complete. Proceed to discovery. */
         ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
+        if (self->cleanup_dropped_count > 0) {
+            ESP_LOGW(TAG, "  Dropped %u topics due to buffer full during cleanup",
+                (unsigned)self->cleanup_dropped_count);
+        }
         {
             size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
             size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);

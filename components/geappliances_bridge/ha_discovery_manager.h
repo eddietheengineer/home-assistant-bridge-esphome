@@ -63,6 +63,26 @@ typedef enum {
 /* Payload buffer for building discovery payloads. */
 #define HA_DISCOVERY_PAYLOAD_BUF_SIZE 8192
 
+/* Home Assistant domain strings for topic reconstruction during cleanup.
+ * Used to pack/unpack topics in the compacting cleanup buffer. */
+#define HA_DOMAIN_COUNT 21
+
+static const char* const HA_DOMAIN_STRINGS[HA_DOMAIN_COUNT] = {
+    "alarm_control_panel", "binary_sensor", "button", "camera", "climate",
+    "cover", "date", "datetime", "event", "fan", "light", "lock", "number",
+    "select", "sensor", "switch", "text", "time", "update", "vacuum", "valve"
+};
+
+static inline int ha_domain_to_index(const char* str, size_t len) {
+    for (int i = 0; i < HA_DOMAIN_COUNT; i++) {
+        if (strlen(HA_DOMAIN_STRINGS[i]) == len &&
+            strncmp(HA_DOMAIN_STRINGS[i], str, len) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 /*!
  * @brief Home Assistant MQTT Discovery manager.
  *
@@ -169,14 +189,18 @@ typedef struct {
   uint8_t cleanup_pass_number;        // Current pass number (starts at 1)
   uint32_t cleanup_wait_start_ms;     // Start time of final wait before discovery
 
-  /* Cleanup topic queue: fixed-size ring buffer for batched publishing.
-   * Each slot holds a null-terminated topic string. 128 slots x 192 bytes
-   * = 24,576 bytes. At ~65 bytes avg per topic, this holds all topics from
-   * a single wildcard subscription burst without overflow. */
-#define HA_DISCOVERY_CLEANUP_QUEUE_SIZE 128
-  char cleanup_topic_queue[HA_DISCOVERY_CLEANUP_QUEUE_SIZE][192];
-  uint16_t cleanup_queue_write_idx;  // Producer (callback) write position
-  uint16_t cleanup_queue_read_idx;   // Consumer (flush) read position
+  /* Cleanup topic queue: compacting buffer of packed topic entries.
+   * Each entry: [domain_index:1][suffix:variable][null:1]
+   * At ~22 bytes avg, 12KB holds ~550 topics (vs 128 with fixed slots). */
+#ifdef HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
+  #define HA_DISCOVERY_CLEANUP_BUF_SIZE HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
+#else
+  #define HA_DISCOVERY_CLEANUP_BUF_SIZE 12288
+#endif
+  char cleanup_topic_buf[HA_DISCOVERY_CLEANUP_BUF_SIZE];
+  uint16_t cleanup_queue_write_pos;  // Next write byte offset (= total bytes used)
+  uint16_t cleanup_queue_count;      // Number of entries in buffer
+  uint16_t cleanup_dropped_count;    // Topics dropped due to buffer full
 
   /* Domain topic prefix: pre-computed "homeassistant/{domain}/{device_id}/"
    * to avoid repeated snprintf during discovery publish. */
@@ -244,6 +268,13 @@ ha_discovery_state_t ha_discovery_manager_get_state(ha_discovery_manager_t* self
 void ha_discovery_manager_set_time_fn(
   ha_discovery_manager_t* self,
   uint32_t (*get_time_ms)(void));
+
+/* Test-only exports: exposed when HA_DISCOVERY_TEST_EXPORT is defined. */
+#ifdef HA_DISCOVERY_TEST_EXPORT
+void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg);
+void cleanup_start(ha_discovery_manager_t* self);
+uint16_t cleanup_flush_queue(ha_discovery_manager_t* self);
+#endif
 
 #ifdef __cplusplus
 }
