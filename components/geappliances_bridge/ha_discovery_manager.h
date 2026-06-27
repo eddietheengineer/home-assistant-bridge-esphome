@@ -157,18 +157,16 @@ typedef struct {
   uint32_t current_offset;         // Byte offset within decompressed chunk
   uint32_t current_decomp_size;    // Size of current decompressed chunk
 
-  /* Cleanup state: discover and remove old discovery topics. */
+  /* Cleanup state: discover and remove old discovery topics.
+   * Uses a single wildcard subscription (homeassistant/+/{device_id}/#)
+   * instead of per-component subscriptions to avoid 13+ passes. */
   uint32_t cleanup_last_activity_ms;  // Last time a topic was received
   bool cleanup_subscribed;            // Whether we've subscribed
-  uint16_t cleanup_current_component; // Index into ha_discovery_component_types[]
-  bool cleanup_received_topics;       // Whether we received any topics for current component
   bool cleanup_flushed_once;          // Whether we flushed at least once after subscribing
   uint8_t cleanup_clean_passes;       // Consecutive passes with no topics found
-  uint32_t cleanup_component_skip;        // Per-component skip bitmap (1 bit per component type)
-  bool cleanup_pass_found_topics;      // Whether any topics were found during current pass
-  uint16_t cleanup_component_removed_count; // Topics removed for current component
-  uint8_t cleanup_pass_number;              // Current pass number (starts at 1)
+  bool cleanup_pass_found_topics;     // Whether any topics were found during current pass
   uint16_t cleanup_pass_removed_count; // Topics removed during current pass
+  uint8_t cleanup_pass_number;        // Current pass number (starts at 1)
   uint32_t cleanup_wait_start_ms;     // Start time of final wait before discovery
 
   /* Cleanup topic queue: buffer topic names for batched publishing. */
@@ -176,6 +174,14 @@ typedef struct {
   char cleanup_topic_queue[HA_DISCOVERY_CLEANUP_QUEUE_SIZE][192];
   uint16_t cleanup_queue_write_idx;  // Producer (callback) write position
   uint16_t cleanup_queue_read_idx;   // Consumer (flush) read position
+
+  /* Domain topic prefix: pre-computed "homeassistant/{domain}/{device_id}/"
+   * to avoid repeated snprintf during discovery publish. */
+  char domain_topic_prefix[128];
+  char current_domain_prefix_buf[32]; // Tracks current domain for prefix caching
+
+  /* Yield counter: yields every N published entities during discovery. */
+  uint8_t publish_yield_counter;
 #endif
 } ha_discovery_manager_t;
 
