@@ -373,15 +373,6 @@ async def to_code(config: dict[str, Any]) -> None:
             text=True,
         )
         _LOGGER.info("ERD lists generated successfully")
-        # Log script output for debugging HA discovery generation
-        if result.stdout.strip():
-            for line in result.stdout.strip().split('\n'):
-                if line.startswith('DEBUG') or 'Total entities' in line or 'HA discovery' in line:
-                    _LOGGER.info(line)
-        if result.stderr.strip():
-            for line in result.stderr.strip().split('\n'):
-                if line.startswith('DEBUG') or 'Warning' in line or 'Error' in line or 'Total entities' in line or 'HA discovery' in line:
-                    _LOGGER.info(line)
     except subprocess.CalledProcessError as e:
         _LOGGER.error(
             "ERD lists generation failed: %s. "

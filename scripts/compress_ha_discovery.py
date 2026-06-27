@@ -192,20 +192,11 @@ def generate_header_to_file(input_dir: Path, output_dir: Path) -> None:
     output_dir is the repo root (parent of ha_discovery/).
     """
     output_file = output_dir / 'components' / 'geappliances_bridge' / 'ha_discovery_data.h'
-    print(f"DEBUG compress: input_dir={input_dir}, output_dir={output_dir}, output_file={output_file}")
-    
-    # Verify JSONL files exist before generating header
-    jsonl_files = list(input_dir.glob('*.jsonl'))
-    print(f"DEBUG compress: found {len(jsonl_files)} JSONL files in {input_dir}")
-    for f in jsonl_files:
-        print(f"DEBUG compress:   {f.name} ({f.stat().st_size} bytes)")
-    
     header = generate_header(input_dir)
     print(f"Writing compressed header to {output_file}")
     output_file.parent.mkdir(parents=True, exist_ok=True)
     with open(output_file, 'w') as f:
         f.write(header)
-    print(f"DEBUG compress: wrote {len(header)} bytes to {output_file}", file=sys.stderr)
 
 
 def main():
@@ -215,7 +206,6 @@ def main():
     input_dir = repo_root / 'ha_discovery'
     output_file = repo_root / 'components' / 'geappliances_bridge' / 'ha_discovery_data.h'
 
-    print(f"DEBUG: repo_root={repo_root}, input_dir={input_dir}", file=sys.stderr)
     if not input_dir.exists():
         print(f"Error: {input_dir} does not exist. Run generate_ha_discovery.py first.", file=sys.stderr)
         sys.exit(1)
