@@ -82,8 +82,6 @@ static const char* const HA_DISCOVERY_COMPONENT_TYPES[] = {
 
 /* Idle timeout after last topic for current component type. */
 #define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 2000
-/* Short timeout for component types with no topics — skip quickly. */
-#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS 500
 /* Wait after a clean pass before starting discovery publishing. */
 #define HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS 5000
 
@@ -232,16 +230,13 @@ static void cleanup_run(ha_discovery_manager_t* self)
             return;
         }
 
-        /* Check if we've been idle long enough. On the first pass through
-         * component types use the long timeout — the MQTT inbound queue
-         * (32 events) often overflows on large components like
-         * binary_sensor, so the callback may not fire for a while even
-         * though retained messages exist. On subsequent validation passes
-         * a short timeout is fine since we already know what's there. */
-        uint32_t timeout = (self->cleanup_pass_number > 1)
-            ? HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_EMPTY_MS
-            : HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS;
-        if (now - self->cleanup_last_activity_ms >= timeout) {
+        /* Check if we've been idle long enough. Use the long timeout for
+         * all passes — the 32-event ESP-IDF MQTT inbound queue overflows
+         * on large components (binary_sensor: 288 dropped, switch: 104
+         * dropped), so the callback may not fire for a while even though
+         * retained messages exist. Components that survive the timeout
+         * with no topics are permanently skipped via the skip bitmap. */
+        if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
             /* Flush any remaining queued topics before unsubscribing. */
             cleanup_flush_queue(self);
 
