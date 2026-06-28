@@ -15,6 +15,7 @@ namespace button {
 class Button {
  public:
   virtual ~Button() {}
+  virtual void press_action() = 0;
 
   void add_on_press_callback(std::function<void()> callback) {
     callbacks_.push_back(std::move(callback));

@@ -45,6 +45,7 @@ extern "C" {
 #include "tiny_hsm.h"
 #include "erd_cache_mqtt_publisher.h"
 #include "ha_discovery_manager.h"
+#include "ha_discovery_cleanup.h"
 }
 
 #include "erd_bridge_subscribe.h"

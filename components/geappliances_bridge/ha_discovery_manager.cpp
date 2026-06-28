@@ -42,291 +42,7 @@
 
 GEA_TAG(TAG) = "ha_discovery";
 
-/* ------------------------------------------------------------------ */
-/* Cleanup: discover and remove old HA discovery topics               */
-/* ------------------------------------------------------------------ */
-
-/* Uses a single wildcard subscription (homeassistant/+/{device_id}/#)
- * to catch all retained discovery topics across all domains at once. */
-
-/* Idle timeout after last topic callback during cleanup.
- * The ESP-IDF MQTT inbound queue holds ~32 messages before dropping.
- * This must be long enough for the broker to finish delivering a batch
- * and for the MQTT task to process its queue before we flush. */
-#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 1000
-/* Minimum time we stay subscribed before considering a pass complete.
- * Ensures we wait for the initial retained message burst even if
- * cleanup_run() isn't called frequently. */
-#define HA_DISCOVERY_CLEANUP_MIN_SUBSCRIBE_MS 1000
-/* Wait after unsubscribe for the inbound MQTT event queue to drain
- * before re-subscribing. If no new topic callbacks fire during this
- * window, the queue is empty and it's safe to re-subscribe. */
-#define HA_DISCOVERY_CLEANUP_DRAIN_WAIT_MS 1000
-/* Yield every N published entities during discovery to keep WDT happy. */
 #define HA_DISCOVERY_YIELD_INTERVAL 5
-/* Flush one topic per batch call. Each publish allocates a std::string
- * on the heap; processing one at a time minimizes peak heap pressure. */
-#define HA_DISCOVERY_CLEANUP_FLUSH_BATCH 1
-
-/* Expose cleanup functions for unit testing when HA_DISCOVERY_TEST_EXPORT is defined. */
-#ifdef HA_DISCOVERY_TEST_EXPORT
-#  define CLEANUP_FN
-#else
-#  define CLEANUP_FN static
-#endif
-
-/* Flush queued cleanup topics: publish empty retained payloads to remove them.
- * Called from cleanup_run() during idle periods, not from the MQTT callback,
- * to avoid blocking the ESP-IDF MQTT task. Returns the number of topics
- * remaining in the queue (0 means all flushed). */
-CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
-{
-    const char* topic;
-    uint16_t consumed;
-
-    vPortEnterCritical();
-    if (self->cleanup_queue_count == 0) {
-        vPortExitCritical();
-        return 0;
-    }
-
-    /* Topic is at the front of the buffer. Copy pointer — it stays valid
-     * through the compact below since memmove shifts data forward. */
-    topic = self->cleanup_topic_buf;
-    consumed = (uint16_t)(strlen(topic) + 1);
-
-    /* Safety clamp: prevent underflow if buffer is corrupted. */
-    if (consumed > self->cleanup_queue_write_pos) {
-        consumed = self->cleanup_queue_write_pos;
-    }
-
-    /* Compact: shift remaining data to front. */
-    memmove(self->cleanup_topic_buf, self->cleanup_topic_buf + consumed,
-            self->cleanup_queue_write_pos - consumed);
-    self->cleanup_queue_write_pos -= consumed;
-    self->cleanup_queue_count--;
-    vPortExitCritical();
-
-    /* Republish with empty payload to clear the retained message. */
-    mqtt_client_publish_raw(self->mqtt_client, topic, "", 0, true);
-    ESP_LOGD(TAG, "Removed old topic: %s", topic);
-    self->cleanup_pass_removed_count++;
-
-    vTaskDelay(pdMS_TO_TICKS(1));
-
-    return self->cleanup_queue_count;
-}
-
-/* Callback for homeassistant/+/{device_id}/# wildcard subscription during cleanup.
- * Stores the full topic string in the buffer for republishing from the main loop.
- * Keeps the callback short — no outbound publish call — so the MQTT task's
- * inbound queue drains fast and retained message bursts don't overflow. */
-CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
-{
-    (void)payload;
-    ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
-
-    /* Diagnostic: count all callbacks received. */
-    self->cleanup_pass_received_count++;
-    /* Only remove config topics. */
-    size_t topic_len = strlen(topic);
-    if (topic_len < 7) return;
-    if (strcmp(topic + topic_len - 7, "/config") != 0) return;
-
-    /* If the payload is empty, it's our own echo from a previous clear — skip. */
-    if (payload_len == 0) return;
-
-    /* Store the full topic string: [topic:variable][null:1] */
-    uint16_t needed = (uint16_t)(topic_len + 1);
-
-    vPortEnterCritical();
-
-    /* Check if buffer has room. Simple linear append — no ring buffer. */
-    if (self->cleanup_queue_write_pos + needed <= HA_DISCOVERY_CLEANUP_BUF_SIZE) {
-        memcpy(self->cleanup_topic_buf + self->cleanup_queue_write_pos, topic, topic_len);
-        self->cleanup_topic_buf[self->cleanup_queue_write_pos + topic_len] = '\0';
-        self->cleanup_queue_write_pos += needed;
-        self->cleanup_queue_count++;
-    } else {
-        /* Buffer full — drop this topic */
-        self->cleanup_dropped_count++;
-    }
-
-    self->cleanup_pass_found_topics = true;
-    self->cleanup_last_activity_ms = self->get_time_ms();
-    vPortExitCritical();
-}
-CLEANUP_FN void cleanup_start(ha_discovery_manager_t* self)
-{
-    self->cleanup_queue_write_pos = 0;
-    self->cleanup_queue_count = 0;
-    self->cleanup_dropped_count = 0;
-    self->cleanup_flushed_once = false;
-    self->cleanup_clean_passes = 0;
-    self->cleanup_pass_found_topics = false;
-    self->cleanup_pass_received_count = 0;
-    self->cleanup_pass_removed_count = 0;
-    self->cleanup_subscribe_start_ms = 0;
-    self->cleanup_pass_number = 1;
-    self->cleanup_drain_start_ms = 0;
-
-    /* Heap fragmentation baseline before cleanup. */
-    {
-        size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-        size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-        ESP_LOGI(TAG, "Heap before cleanup: free=%u, largest_block=%u, fragmentation=%.1f%%",
-            (unsigned)free_heap, (unsigned)largest_free,
-            (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
-    }
-
-    ESP_LOGI(TAG, "Starting HA discovery cleanup...");
-}
-
-static void cleanup_run(ha_discovery_manager_t* self)
-{
-    if (self->mqtt_client == NULL) {
-        /* No MQTT client — skip cleanup, proceed to discovery. */
-        self->state = ha_discovery_state_discovering;
-        self->current_category = 0;
-        self->current_chunk = 0;
-        self->current_offset = 0;
-        self->current_decomp_size = 0;
-        self->last_publish_ms = self->get_time_ms();
-        self->publish_yield_counter = 0;
-        self->current_domain_prefix_buf[0] = '\0';
-        ESP_LOGI(TAG, "Skipping cleanup (no MQTT client), proceeding to discovery");
-        ESP_LOGI(TAG, "Starting HA discovery fetch...");
-        return;
-    }
-
-    /* Not yet subscribed — subscribe to all domains at once. */
-    if (!self->cleanup_subscribed) {
-        /* If we just unsubscribed, wait for the inbound MQTT event queue
-         * to drain before re-subscribing. We know it's drained when no new
-         * topic callbacks fire for DRAIN_WAIT_MS after the last one. */
-        if (self->cleanup_drain_start_ms != 0) {
-            uint32_t now = self->get_time_ms();
-            /* If a callback still fired after we started draining, the queue
-             * isn't empty yet — reset the drain timer from the latest activity. */
-            if (self->cleanup_last_activity_ms > self->cleanup_drain_start_ms) {
-                self->cleanup_drain_start_ms = self->cleanup_last_activity_ms;
-                return;
-            }
-            /* No new activity since drain started. Wait until enough time
-             * has passed to be confident the queue is empty. */
-            if (now - self->cleanup_last_activity_ms < HA_DISCOVERY_CLEANUP_DRAIN_WAIT_MS) {
-                return;
-            }
-            /* Queue has drained — clear drain state and proceed to subscribe. */
-            self->cleanup_drain_start_ms = 0;
-        }
-
-        char sub_topic[128];
-        snprintf(sub_topic, sizeof(sub_topic),
-            "homeassistant/+/%s/#", self->device_id);
-        mqtt_client_subscribe(self->mqtt_client, sub_topic,
-            cleanup_topic_callback, self);
-        self->cleanup_subscribed = true;
-        self->cleanup_subscribe_start_ms = self->get_time_ms();
-        self->cleanup_last_activity_ms = self->cleanup_subscribe_start_ms;
-        self->cleanup_pass_found_topics = false;
-        self->cleanup_pass_removed_count = 0;
-        self->cleanup_pass_received_count = 0;
-        self->cleanup_flushed_once = false;
-        ESP_LOGI(TAG, "  Pass %u: subscribing to %s", self->cleanup_pass_number, sub_topic);
-        return;
-    }
-
-    uint32_t now = self->get_time_ms();
-
-    /* Enforce minimum subscription time: don't consider the pass complete
-     * until we've been subscribed long enough for the MQTT task to deliver
-     * at least one batch of retained messages (~32 per queue cycle). */
-    if (now - self->cleanup_subscribe_start_ms < HA_DISCOVERY_CLEANUP_MIN_SUBSCRIBE_MS) {
-        /* Still within minimum subscription window — flush what we have. */
-        while (self->cleanup_queue_count > 0) {
-            cleanup_flush_queue(self);
-        }
-        return;
-    }
-
-    /* Must flush at least once after subscribing before declaring empty. */
-    if (!self->cleanup_flushed_once) {
-        cleanup_flush_queue(self);
-        self->cleanup_flushed_once = true;
-        return;
-    }
-
-    /* Check if we've been idle long enough (no new callbacks). */
-    if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
-        /* Flush entire queue. */
-        while (self->cleanup_queue_count > 0) {
-            cleanup_flush_queue(self);
-        }
-
-        char sub_topic[128];
-        snprintf(sub_topic, sizeof(sub_topic),
-            "homeassistant/+/%s/#", self->device_id);
-        mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
-        self->cleanup_subscribed = false;
-        /* Start drain wait: track when we unsubscribed so we can wait
-         * for the inbound queue to empty before re-subscribing. */
-        self->cleanup_drain_start_ms = self->cleanup_last_activity_ms;
-
-        if (self->cleanup_pass_found_topics) {
-            /* Found topics this pass — log and retry from scratch. */
-            ESP_LOGI(TAG, "  Pass %u: %u received, %u removed, %u dropped — retrying",
-                self->cleanup_pass_number,
-                self->cleanup_pass_received_count,
-                self->cleanup_pass_removed_count,
-                self->cleanup_dropped_count);
-            self->cleanup_pass_number++;
-            return;
-        }
-
-        /* Clean pass — no topics found. */
-        ESP_LOGI(TAG, "  Pass %u: clean (%u received, %u removed)",
-            self->cleanup_pass_number,
-            self->cleanup_pass_received_count,
-            self->cleanup_pass_removed_count);
-        self->cleanup_clean_passes++;
-        self->cleanup_pass_number++;
-
-        if (self->cleanup_clean_passes < 2) {
-            /* Need one more verification pass. */
-            return;
-        }
-
-        /* Two clean verification passes — done. */
-        if (self->cleanup_dropped_count > 0) {
-            ESP_LOGW(TAG, "  Dropped %u topics due to buffer full during cleanup",
-                (unsigned)self->cleanup_dropped_count);
-        }
-        {
-            size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-            size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-            ESP_LOGI(TAG, "Heap after cleanup: free=%u, largest_block=%u, fragmentation=%.1f%%",
-                (unsigned)free_heap, (unsigned)largest_free,
-                (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
-        }
-        self->state = ha_discovery_state_discovering;
-        self->current_category = 0;
-        self->current_chunk = 0;
-        self->current_offset = 0;
-        self->current_decomp_size = 0;
-        self->last_publish_ms = self->get_time_ms();
-        self->publish_yield_counter = 0;
-        self->current_domain_prefix_buf[0] = '\0';
-        ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
-        ESP_LOGI(TAG, "Starting HA discovery fetch...");
-        return;
-    }
-
-    /* Still receiving messages. Flush queued topics while waiting. */
-    while (self->cleanup_queue_count > 0) {
-        cleanup_flush_queue(self);
-    }
-}
 
 /* ------------------------------------------------------------------ */
 /* Zero-allocation JSON parser helpers                                */
@@ -1039,7 +755,6 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 {
 #ifdef USE_ESP_IDF
     if (self->state != ha_discovery_state_building &&
-        self->state != ha_discovery_state_cleaning &&
         self->state != ha_discovery_state_discovering) {
         return;
     }
@@ -1059,9 +774,9 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 
             /* Free task resources after the idle task has unlinked the TCB.
              * This returns ~3 KB (stack + TCB) to the heap during the
-             * cleanup + discovery phases — the period of highest memory
-             * pressure. cleanup_resources() at the end will be a no-op
-             * since these are set to NULL. */
+             * discovery phase — the period of highest memory pressure.
+             * cleanup_resources() at the end will be a no-op since these
+             * are set to NULL. */
             free(self->task_stack);
             free(self->task_tcb);
             self->task_stack = NULL;
@@ -1081,29 +796,32 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                 (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
         }
 
-        /* Transition to cleaning or directly to discovering. */
-        if (self->skip_cleanup) {
-            self->state = ha_discovery_state_discovering;
-            self->current_category = 0;
-            self->current_chunk = 0;
-            self->current_offset = 0;
-            self->current_decomp_size = 0;
-            self->last_publish_ms = self->get_time_ms();
-            self->publish_yield_counter = 0;
-            self->current_domain_prefix_buf[0] = '\0';
+        /* If cleanup is needed, run the embedded cleanup module until done
+         * before transitioning to discovery. */
+        if (!self->skip_cleanup) {
+            ha_discovery_cleanup_configure(&self->cleanup, self->device_id, self->mqtt_client);
+            ha_discovery_cleanup_start(&self->cleanup);
+            while (!ha_discovery_cleanup_is_done(&self->cleanup)) {
+                ha_discovery_cleanup_run(&self->cleanup);
+                esp_task_wdt_reset();
+                vTaskDelay(pdMS_TO_TICKS(10));
+            }
+            ha_discovery_cleanup_destroy(&self->cleanup);
+            ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
+        } else {
             ESP_LOGI(TAG, "Skipping cleanup, proceeding to discovery");
-            return;
         }
 
-        /* Transition to cleaning. */
-        self->state = ha_discovery_state_cleaning;
-        cleanup_start(self);
-        return;
-    }
-
-    /* Cleaning state: collect and remove old discovery topics. */
-    if (self->state == ha_discovery_state_cleaning) {
-        cleanup_run(self);
+        /* Transition to discovering. */
+        self->state = ha_discovery_state_discovering;
+        self->current_category = 0;
+        self->current_chunk = 0;
+        self->current_offset = 0;
+        self->current_decomp_size = 0;
+        self->last_publish_ms = self->get_time_ms();
+        self->publish_yield_counter = 0;
+        self->current_domain_prefix_buf[0] = '\0';
+        ESP_LOGI(TAG, "Starting HA discovery fetch...");
         return;
     }
 
@@ -1260,18 +978,25 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 /* Public API                                                         */
 /* ------------------------------------------------------------------ */
 
-void ha_discovery_manager_init(ha_discovery_manager_t* self)
+void ha_discovery_manager_init(ha_discovery_manager_t* self, bool skip_cleanup)
 {
     memset(self, 0, sizeof(*self));
     self->state = ha_discovery_state_idle;
     self->get_time_ms = esphome::millis;
+    self->skip_cleanup = skip_cleanup;
 
 #ifdef USE_ESP_IDF
+    /* Delete existing semaphore if re-initing to prevent leak. */
+    if (self->done_sem) {
+        vSemaphoreDelete(self->done_sem);
+        self->done_sem = NULL;
+    }
     self->done_sem = xSemaphoreCreateBinary();
     if (!self->done_sem) {
         ESP_LOGE(TAG, "Failed to create done semaphore");
     }
     self->task_running = false;
+    ha_discovery_cleanup_init(&self->cleanup);
 #endif
 }
 
@@ -1362,32 +1087,16 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
     }
 
     cleanup_resources(self);
+    ha_discovery_cleanup_destroy(&self->cleanup);
 #endif
 
     memset(self, 0, sizeof(*self));
 }
 
-void ha_discovery_manager_cleanup_only(ha_discovery_manager_t* self)
-{
-    if (self->state != ha_discovery_state_idle) {
-        ESP_LOGW(TAG, "Cannot start cleanup_only: manager is not idle (state=%d)",
-                 self->state);
-        return;
-    }
-    if (self->mqtt_client == NULL) {
-        ESP_LOGW(TAG, "Cannot start cleanup_only: no MQTT client");
-        return;
-    }
-
-    self->state = ha_discovery_state_cleaning;
-    cleanup_start(self);
-    ESP_LOGI(TAG, "HA discovery cleanup-only started");
-}
 
 bool ha_discovery_manager_is_processing(ha_discovery_manager_t* self)
 {
     return self->state == ha_discovery_state_building ||
-           self->state == ha_discovery_state_cleaning ||
            self->state == ha_discovery_state_discovering;
 }
 

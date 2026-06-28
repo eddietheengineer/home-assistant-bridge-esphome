@@ -31,8 +31,9 @@ SRC_FILES := \
   components/geappliances_bridge/feature_bit_manager.cpp \
   components/geappliances_bridge/autodiscovery_manager.cpp \
   components/geappliances_bridge/esphome_mqtt_client_adapter.cpp \
-  components/geappliances_bridge/erd_cache_mqtt_publisher.cpp \
+  components/geappliances_bridge/ha_discovery_cleanup.cpp \
   components/geappliances_bridge/ha_discovery_manager.cpp \
+  components/geappliances_bridge/erd_cache_mqtt_publisher.cpp \
   components/geappliances_bridge/erd_registry.cpp \
   components/geappliances_bridge/esphome_time_source.cpp \
   components/geappliances_bridge/esphome_uart_adapter.cpp \
@@ -72,7 +73,7 @@ CPPUTEST_INC := -I$(CPPUTEST_PREFIX)/include
 CPPUTEST_LIB := -L$(CPPUTEST_PREFIX)/lib
 
 CFLAGS += -std=c11 -pedantic
-CPPFLAGS += $(SANITIZE_FLAGS) -fno-omit-frame-pointer -DUSE_ESP_IDF -DUSE_ESP_IDF_STUBS -DHA_DISCOVERY_TEST_EXPORT -DHA_DISCOVERY_CLEANUP_TEST_BUF_SIZE=512
+CPPFLAGS += $(SANITIZE_FLAGS) -fno-omit-frame-pointer -DUSE_ESP_IDF -DUSE_ESP_IDF_STUBS -DHA_DISCOVERY_TEST_EXPORT -DHA_DISCOVERY_CLEANUP_TEST_BUF_SIZE=512 -DHA_CLEANUP_TEST_BUF_SIZE=512 -DHA_DISCOVERY_CLEANUP_TEST_EXPORT
 CPPFLAGS += $(INC_FLAGS) $(CPPUTEST_INC) -MMD -MP -g -Wall -Wextra -Wcast-qual -Werror
 CXXFLAGS += -std=c++17
 LDFLAGS := $(SANITIZE_FLAGS) $(CPPUTEST_LIB)
