@@ -197,7 +197,6 @@ CLEANUP_FN void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_pass_received_count = 0;
     self->cleanup_pass_removed_count = 0;
     self->cleanup_current_domain = 0;
-    self->cleanup_current_window = 0;
     self->cleanup_pass_number = 1;
     self->cleanup_wait_start_ms = 0;
 
@@ -230,20 +229,20 @@ static void cleanup_run(ha_discovery_manager_t* self)
         return;
     }
 
-    /* Suffix windows for splitting large domains. Each window covers a range
-     * of first suffix characters to keep retained message count per subscription
-     * under the ESP-IDF MQTT event queue limit (32). */
-    static const char* const suffix_windows[] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f" };
-    static const uint8_t suffix_window_count = 16;
-
-    /* Not yet subscribed — subscribe to the current domain/window. */
+    /* Not yet subscribed — subscribe to the current domain. */
     if (!self->cleanup_subscribed) {
         char sub_topic[128];
-        snprintf(sub_topic, sizeof(sub_topic),
-            "homeassistant/%s/%s/%s*/#",
-            HA_DOMAIN_STRINGS[self->cleanup_current_domain],
-            self->device_id,
-            suffix_windows[self->cleanup_current_window]);
+        if (self->cleanup_current_domain < HA_DOMAIN_COUNT) {
+            /* Per-domain subscription. */
+            snprintf(sub_topic, sizeof(sub_topic),
+                "homeassistant/%s/%s/#",
+                HA_DOMAIN_STRINGS[self->cleanup_current_domain],
+                self->device_id);
+        } else {
+            /* Verification pass: wildcard. */
+            snprintf(sub_topic, sizeof(sub_topic),
+                "homeassistant/+/%s/#", self->device_id);
+        }
         mqtt_client_subscribe(self->mqtt_client, sub_topic,
             cleanup_topic_callback, self);
         self->cleanup_subscribed = true;
@@ -252,9 +251,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
         self->cleanup_pass_removed_count = 0;
         self->cleanup_pass_received_count = 0;
         self->cleanup_flushed_once = false;
-        ESP_LOGI(TAG, "  Subscribing to %s (domain=%s, window=%s)",
-            sub_topic, HA_DOMAIN_STRINGS[self->cleanup_current_domain],
-            suffix_windows[self->cleanup_current_window]);
+        ESP_LOGI(TAG, "  Subscribing to %s", sub_topic);
         return;
     }
 
@@ -275,107 +272,78 @@ static void cleanup_run(ha_discovery_manager_t* self)
             cleanup_flush_queue(self);
         }
 
-        ESP_LOGI(TAG, "  Domain %s/%s: %u received, %u removed, %u dropped",
-            HA_DOMAIN_STRINGS[self->cleanup_current_domain],
-            suffix_windows[self->cleanup_current_window],
+        char sub_topic[128];
+
+        if (self->cleanup_current_domain < HA_DOMAIN_COUNT) {
+            /* Per-domain pass complete. */
+            ESP_LOGI(TAG, "  Domain %s: %u received, %u removed, %u dropped",
+                HA_DOMAIN_STRINGS[self->cleanup_current_domain],
+                self->cleanup_pass_received_count,
+                self->cleanup_pass_removed_count,
+                self->cleanup_dropped_count);
+
+            snprintf(sub_topic, sizeof(sub_topic),
+                "homeassistant/%s/%s/#",
+                HA_DOMAIN_STRINGS[self->cleanup_current_domain],
+                self->device_id);
+            mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
+            self->cleanup_subscribed = false;
+            self->cleanup_current_domain++;
+            self->cleanup_last_activity_ms = self->get_time_ms();
+            return;
+        }
+
+        /* Verification pass complete. */
+        ESP_LOGI(TAG, "  Verification pass %u: %u received, %u removed, %u dropped",
+            self->cleanup_clean_passes + 1,
             self->cleanup_pass_received_count,
             self->cleanup_pass_removed_count,
             self->cleanup_dropped_count);
 
-        /* Unsubscribe from current window. */
-        char sub_topic[128];
         snprintf(sub_topic, sizeof(sub_topic),
-            "homeassistant/%s/%s/%s*/#",
-            HA_DOMAIN_STRINGS[self->cleanup_current_domain],
-            self->device_id,
-            suffix_windows[self->cleanup_current_window]);
+            "homeassistant/+/%s/#", self->device_id);
         mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
         self->cleanup_subscribed = false;
 
-        /* Move to next window or next domain. */
-        self->cleanup_current_window++;
-        if (self->cleanup_current_window >= suffix_window_count) {
-            self->cleanup_current_window = 0;
-            self->cleanup_current_domain++;
-        }
-
-        if (self->cleanup_current_domain >= HA_DOMAIN_COUNT) {
-            /* All domains done. Run 2 clean verification passes with wildcard. */
-            if (self->cleanup_clean_passes < 2) {
-                snprintf(sub_topic, sizeof(sub_topic), "homeassistant/+/%s/#", self->device_id);
-                mqtt_client_subscribe(self->mqtt_client, sub_topic,
-                    cleanup_topic_callback, self);
-                self->cleanup_subscribed = true;
-                self->cleanup_last_activity_ms = self->get_time_ms();
-                self->cleanup_pass_found_topics = false;
-                self->cleanup_pass_removed_count = 0;
-                self->cleanup_pass_received_count = 0;
-                self->cleanup_flushed_once = false;
-                ESP_LOGI(TAG, "  Verification pass %u: subscribing to homeassistant/+/%s/#",
-                    self->cleanup_clean_passes + 1, self->device_id);
-                return;
-            }
-
-            /* Verification found topics — re-scan all domains. */
-            if (self->cleanup_pass_found_topics) {
-                self->cleanup_current_domain = 0;
-                self->cleanup_current_window = 0;
-                self->cleanup_clean_passes = 0;
-                snprintf(sub_topic, sizeof(sub_topic),
-                    "homeassistant/%s/%s/%s*/#",
-                    HA_DOMAIN_STRINGS[0], self->device_id, suffix_windows[0]);
-                mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
-                self->cleanup_subscribed = false;
-                self->cleanup_last_activity_ms = self->get_time_ms();
-                return;
-            }
-
-            /* Two clean verification passes — done. */
-            self->cleanup_clean_passes++;
-            if (self->cleanup_clean_passes >= 2) {
-                snprintf(sub_topic, sizeof(sub_topic), "homeassistant/+/%s/#", self->device_id);
-                mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
-                self->cleanup_subscribed = false;
-
-                if (self->cleanup_dropped_count > 0) {
-                    ESP_LOGW(TAG, "  Dropped %u topics due to buffer full during cleanup",
-                        (unsigned)self->cleanup_dropped_count);
-                }
-                {
-                    size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-                    size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-                    ESP_LOGI(TAG, "Heap after cleanup: free=%u, largest_block=%u, fragmentation=%.1f%%",
-                        (unsigned)free_heap, (unsigned)largest_free,
-                        (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
-                }
-                self->state = ha_discovery_state_discovering;
-                self->current_category = 0;
-                self->current_chunk = 0;
-                self->current_offset = 0;
-                self->current_decomp_size = 0;
-                self->last_publish_ms = self->get_time_ms();
-                self->publish_yield_counter = 0;
-                self->current_domain_prefix_buf[0] = '\0';
-                ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
-                ESP_LOGI(TAG, "Starting HA discovery fetch...");
-                return;
-            }
-
-            /* Need another verification pass. */
-            snprintf(sub_topic, sizeof(sub_topic), "homeassistant/+/%s/#", self->device_id);
-            mqtt_client_subscribe(self->mqtt_client, sub_topic,
-                cleanup_topic_callback, self);
-            self->cleanup_subscribed = true;
+        /* If verification found topics, re-scan all domains. */
+        if (self->cleanup_pass_found_topics) {
+            self->cleanup_current_domain = 0;
+            self->cleanup_clean_passes = 0;
             self->cleanup_last_activity_ms = self->get_time_ms();
-            self->cleanup_pass_found_topics = false;
-            self->cleanup_pass_removed_count = 0;
-            self->cleanup_pass_received_count = 0;
-            self->cleanup_flushed_once = false;
             return;
         }
 
-        /* Move to next domain/window. */
-        self->cleanup_last_activity_ms = self->get_time_ms();
+        /* Clean verification pass. */
+        self->cleanup_clean_passes++;
+
+        if (self->cleanup_clean_passes < 2) {
+            /* Need another verification pass. */
+            self->cleanup_last_activity_ms = self->get_time_ms();
+            return;
+        }
+
+        /* Two clean verification passes — done. */
+        if (self->cleanup_dropped_count > 0) {
+            ESP_LOGW(TAG, "  Dropped %u topics due to buffer full during cleanup",
+                (unsigned)self->cleanup_dropped_count);
+        }
+        {
+            size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+            size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+            ESP_LOGI(TAG, "Heap after cleanup: free=%u, largest_block=%u, fragmentation=%.1f%%",
+                (unsigned)free_heap, (unsigned)largest_free,
+                (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
+        }
+        self->state = ha_discovery_state_discovering;
+        self->current_category = 0;
+        self->current_chunk = 0;
+        self->current_offset = 0;
+        self->current_decomp_size = 0;
+        self->last_publish_ms = self->get_time_ms();
+        self->publish_yield_counter = 0;
+        self->current_domain_prefix_buf[0] = '\0';
+        ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
+        ESP_LOGI(TAG, "Starting HA discovery fetch...");
         return;
     }
 
