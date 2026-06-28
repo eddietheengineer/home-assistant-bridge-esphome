@@ -204,11 +204,10 @@ typedef struct {
   uint8_t cleanup_pass_number;        // Current pass number (starts at 1)
   uint32_t cleanup_wait_start_ms;     // Start time of final wait before discovery
 
-  /* Retry state: delay between unsubscribe and re-subscribe to allow
-   * async unsubscribe to complete before re-subscribing. */
-  bool cleanup_pending_resubscribe;   // Waiting to re-subscribe after unsubscribe
-  uint32_t cleanup_unsubscribe_ms;    // When unsubscribe was called
-  uint16_t cleanup_retry_count;       // Current retry number for this domain
+  /* Post-unsubscribe drain tracking: records when we unsubscribed so we can
+   * wait for the inbound MQTT event queue to fully drain before re-subscribing.
+   * Non-zero means we're in a drain-wait phase. */
+  uint32_t cleanup_drain_start_ms;     // Time of last unsubscribe (0 = not draining)
 
   /* Cleanup topic queue: compacting buffer with domain-enum packing.
    * Each entry: [domain_index:1][suffix:variable][null:1]

@@ -379,10 +379,10 @@ TEST(ha_discovery_cleanup, domain_strings_non_null)
 }
 
 /* ------------------------------------------------------------------ */
-/* Delayed re-subscribe state initialization                            */
+/* Drain wait state initialization                                      */
 /* ------------------------------------------------------------------ */
 
-TEST(ha_discovery_cleanup, retry_state_initialized_to_zero)
+TEST(ha_discovery_cleanup, drain_state_initialized_to_zero)
 {
     ha_discovery_manager_t mgr;
     memset(&mgr, 0, sizeof(mgr));
@@ -391,15 +391,5 @@ TEST(ha_discovery_cleanup, retry_state_initialized_to_zero)
 
     cleanup_start(&mgr);
 
-    CHECK_EQUAL(false, mgr.cleanup_pending_resubscribe);
-    CHECK_EQUAL(0, mgr.cleanup_unsubscribe_ms);
-    CHECK_EQUAL(0, mgr.cleanup_retry_count);
-}
-
-TEST(ha_discovery_cleanup, retry_count_starts_at_zero)
-{
-    ha_discovery_manager_t mgr = make_manager("TestDevice");
-    cleanup_start(&mgr);
-
-    CHECK_EQUAL(0, mgr.cleanup_retry_count);
+    CHECK_EQUAL(0, mgr.cleanup_drain_start_ms);
 }
