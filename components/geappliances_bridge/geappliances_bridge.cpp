@@ -856,7 +856,7 @@ void GeappliancesBridge::trigger_discovery_refresh()
 #ifdef USE_ESP_IDF
   ha_discovery_cleanup_configure(&this->ha_discovery_manager_.cleanup,
       this->device_identity_manager_.get_device_id(),
-      &this->mqtt_client_adapter_.interface);
+      &this->mqtt_client_adapter_.interface, esphome::millis);
   ha_discovery_cleanup_start(&this->ha_discovery_manager_.cleanup);
 #else
   (void)this->device_identity_manager_.get_device_id();

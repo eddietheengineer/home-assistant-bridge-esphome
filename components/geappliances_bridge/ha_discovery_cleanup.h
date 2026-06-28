@@ -77,7 +77,7 @@ typedef struct {
 void ha_discovery_cleanup_init(ha_discovery_cleanup_t* self);
 
 void ha_discovery_cleanup_configure(ha_discovery_cleanup_t* self,
-    const char* device_id, i_mqtt_client_t* mqtt_client);
+    const char* device_id, i_mqtt_client_t* mqtt_client, uint32_t (*get_time_ms)(void));
 
 void ha_discovery_cleanup_start(ha_discovery_cleanup_t* self);
 

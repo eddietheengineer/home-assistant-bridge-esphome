@@ -799,7 +799,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         /* If cleanup is needed, run the embedded cleanup module until done
          * before transitioning to discovery. */
         if (!self->skip_cleanup) {
-            ha_discovery_cleanup_configure(&self->cleanup, self->device_id, self->mqtt_client);
+            ha_discovery_cleanup_configure(&self->cleanup, self->device_id, self->mqtt_client, self->get_time_ms);
             ha_discovery_cleanup_start(&self->cleanup);
             while (!ha_discovery_cleanup_is_done(&self->cleanup)) {
                 ha_discovery_cleanup_run(&self->cleanup);
