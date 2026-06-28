@@ -103,6 +103,7 @@ typedef struct {
   uint8_t appliance_type;          // Appliance type for category filtering
 
   ha_discovery_state_t state;
+  bool skip_cleanup;            /* If true, skip CLEANING phase after BUILDING */
 
   /* Stats */
   uint32_t total_discovered;       // Total entities discovered
@@ -267,6 +268,14 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self);
  * Stops tasks and frees resources. Call from teardown.
  */
 void ha_discovery_manager_cleanup(ha_discovery_manager_t* self);
+
+/*!
+ * Run cleanup-only: discover and remove all existing HA discovery topics
+ * for this device. Does not publish new discovery payloads.
+ * Call from the main loop; transitions to COMPLETE when done.
+ * Only valid when the manager has been configured (device_id, mqtt_client set).
+ */
+void ha_discovery_manager_cleanup_only(ha_discovery_manager_t* self);
 
 /*!
  * Returns true if the manager is currently processing (building or discovering).

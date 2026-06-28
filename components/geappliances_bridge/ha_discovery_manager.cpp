@@ -1081,6 +1081,20 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                 (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
         }
 
+        /* Transition to cleaning or directly to discovering. */
+        if (self->skip_cleanup) {
+            self->state = ha_discovery_state_discovering;
+            self->current_category = 0;
+            self->current_chunk = 0;
+            self->current_offset = 0;
+            self->current_decomp_size = 0;
+            self->last_publish_ms = self->get_time_ms();
+            self->publish_yield_counter = 0;
+            self->current_domain_prefix_buf[0] = '\0';
+            ESP_LOGI(TAG, "Skipping cleanup, proceeding to discovery");
+            return;
+        }
+
         /* Transition to cleaning. */
         self->state = ha_discovery_state_cleaning;
         cleanup_start(self);
@@ -1351,6 +1365,23 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
 #endif
 
     memset(self, 0, sizeof(*self));
+}
+
+void ha_discovery_manager_cleanup_only(ha_discovery_manager_t* self)
+{
+    if (self->state != ha_discovery_state_idle) {
+        ESP_LOGW(TAG, "Cannot start cleanup_only: manager is not idle (state=%d)",
+                 self->state);
+        return;
+    }
+    if (self->mqtt_client == NULL) {
+        ESP_LOGW(TAG, "Cannot start cleanup_only: no MQTT client");
+        return;
+    }
+
+    self->state = ha_discovery_state_cleaning;
+    cleanup_start(self);
+    ESP_LOGI(TAG, "HA discovery cleanup-only started");
 }
 
 bool ha_discovery_manager_is_processing(ha_discovery_manager_t* self)

@@ -10,7 +10,11 @@ namespace esphome {
 
 class Application {
  public:
-  static Application& get_app();
+  static Application& get_app() {
+    static Application instance;
+    return instance;
+  }
+  void restart() {}
 };
 
 inline Application& app() { return Application::get_app(); }

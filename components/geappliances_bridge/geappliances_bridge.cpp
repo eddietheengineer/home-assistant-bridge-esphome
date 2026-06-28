@@ -181,6 +181,13 @@ void GeappliancesBridge::setup() {
   ESP_LOGI(TAG, "Waiting %u seconds before starting autodiscovery...",
            AUTODISCOVERY_STARTUP_DELAY_MS / 1000);
 
+
+  // Wire the discovery refresh button if configured.
+  if (this->discovery_refresh_button_ != nullptr) {
+    this->discovery_refresh_button_->add_on_press_callback([this]() {
+      this->trigger_discovery_refresh();
+    });
+  }
   ESP_LOGCONFIG(TAG, "GE Appliances Bridge setup complete");
 }
 
@@ -273,6 +280,16 @@ void GeappliancesBridge::loop() {
   /* Drive the HA discovery consumer (publishes at rate-limited intervals). */
   if (ha_discovery_manager_is_processing(&this->ha_discovery_manager_)) {
     ha_discovery_manager_run(&this->ha_discovery_manager_);
+  }
+
+  /* If cleanup-only finished, restart the device so normal boot republishes. */
+  if (this->discovery_refresh_in_progress_) {
+    ha_discovery_state_t state = ha_discovery_manager_get_state(&this->ha_discovery_manager_);
+    if (state == ha_discovery_state_complete || state == ha_discovery_state_failed) {
+      this->discovery_refresh_in_progress_ = false;
+      ESP_LOGI(TAG, "HA discovery cleanup complete, restarting device...");
+      esphome::app().restart();
+    }
   }
 
 
@@ -815,8 +832,51 @@ void GeappliancesBridge::init_erd_cache_publisher_()
 
   // Initialize the HA discovery manager (lazy-started on steady state).
   ha_discovery_manager_init(&this->ha_discovery_manager_);
+  this->ha_discovery_manager_.skip_cleanup = true;
 
   ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
+}
+
+void GeappliancesBridge::trigger_discovery_refresh()
+{
+  if (this->discovery_refresh_in_progress_) {
+    ESP_LOGW(TAG, "Discovery refresh already in progress, ignoring");
+    return;
+  }
+
+  if (!this->steady_state_reached_) {
+    ESP_LOGW(TAG, "Cannot refresh discovery: appliance bridge not in steady state");
+    return;
+  }
+
+  if (!this->generate_device_config_) {
+    ESP_LOGW(TAG, "Cannot refresh discovery: generate_device_config is disabled");
+    return;
+  }
+
+  // If the discovery manager is still processing from a previous run,
+  // wait for it to finish before starting cleanup.
+  if (ha_discovery_manager_is_processing(&this->ha_discovery_manager_)) {
+    ESP_LOGW(TAG, "Cannot refresh discovery: manager still processing");
+    return;
+  }
+
+  ESP_LOGI(TAG, "Starting HA discovery cleanup...");
+
+  // Reset the manager for cleanup-only mode.
+  ha_discovery_manager_cleanup(&this->ha_discovery_manager_);
+  ha_discovery_manager_init(&this->ha_discovery_manager_);
+  ha_discovery_manager_configure(
+    &this->ha_discovery_manager_,
+    this->device_identity_manager_.get_device_id(),
+    this->device_identity_manager_.get_model_number(),
+    this->device_identity_manager_.get_serial_number(),
+    this->device_identity_manager_.get_appliance_type(),
+    &this->erd_cache_,
+    &this->mqtt_client_adapter_.interface);
+
+  ha_discovery_manager_cleanup_only(&this->ha_discovery_manager_);
+  this->discovery_refresh_in_progress_ = true;
 }
 
 }  // namespace geappliances_bridge
