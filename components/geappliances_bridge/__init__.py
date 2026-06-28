@@ -13,7 +13,7 @@ from typing import Any
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import button, sensor
+from esphome.components import button, sensor, uart
 from esphome.const import CONF_ID
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,6 +58,11 @@ MODE_AUTO_VALUE = 2
 geappliances_bridge_ns = cg.esphome_ns.namespace("geappliances_bridge")
 GeappliancesBridge = geappliances_bridge_ns.class_(
     "GeappliancesBridge", cg.Component
+)
+
+# Concrete button subclass for discovery refresh (Button is abstract)
+DiscoveryRefreshButton = geappliances_bridge_ns.class_(
+    "DiscoveryRefreshButton", button.Button
 )
 
 
@@ -315,7 +320,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_FILTER_CONFIG_TOPICS, default=True): cv.boolean,
         cv.Optional(CONF_DISCOVERY_REFRESH_BUTTON): cv.Schema({
             cv.Optional("name", default="Discovery Refresh"): cv.string,
-        }).extend(button.button_schema()),
+        }).extend(button.button_schema(DiscoveryRefreshButton)),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
@@ -443,8 +448,8 @@ async def to_code(config: dict[str, Any]) -> None:
 
     # Optionally create the discovery refresh button
     if CONF_DISCOVERY_REFRESH_BUTTON in config:
-        btn = await button.new_button(config[CONF_DISCOVERY_REFRESH_BUTTON])
-        cg.add(var.set_discovery_refresh_button(btn))
+        btn = cg.new_Pvariable(config[CONF_DISCOVERY_REFRESH_BUTTON][CONF_ID], var)
+        await button.register_button(btn, config[CONF_DISCOVERY_REFRESH_BUTTON])
 
     # Register any user-configured custom ERDs
     for erd in config[CONF_CUSTOM_ERDS]:

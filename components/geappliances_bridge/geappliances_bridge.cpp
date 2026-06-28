@@ -181,13 +181,6 @@ void GeappliancesBridge::setup() {
   ESP_LOGI(TAG, "Waiting %u seconds before starting autodiscovery...",
            AUTODISCOVERY_STARTUP_DELAY_MS / 1000);
 
-
-  // Wire the discovery refresh button if configured.
-  if (this->discovery_refresh_button_ != nullptr) {
-    this->discovery_refresh_button_->add_on_press_callback([this]() {
-      this->trigger_discovery_refresh();
-    });
-  }
   ESP_LOGCONFIG(TAG, "GE Appliances Bridge setup complete");
 }
 
@@ -288,7 +281,7 @@ void GeappliancesBridge::loop() {
     if (state == ha_discovery_state_complete || state == ha_discovery_state_failed) {
       this->discovery_refresh_in_progress_ = false;
       ESP_LOGI(TAG, "HA discovery cleanup complete, restarting device...");
-      esphome::app().restart();
+      esphome::App.reboot();
     }
   }
 

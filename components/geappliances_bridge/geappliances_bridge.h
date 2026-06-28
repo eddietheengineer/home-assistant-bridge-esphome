@@ -72,8 +72,10 @@ namespace geappliances_bridge {
 // BridgeMode is now defined in bridge_mode.h (included via i_bridge_services.h).
 
 
+
 class GeappliancesBridge : public Component, public IBridgeServices {
   friend ErdPollListResult build_poll_list_(GeappliancesBridge* bridge);
+  friend class DiscoveryRefreshButton;
   friend tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t*);
 
  public:
@@ -98,7 +100,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; }
   void set_mqtt_publish_rate_sensor(sensor::Sensor* sensor) { this->mqtt_publish_rate_sensor_ = sensor; }
   void set_throttle_rate_seconds(uint8_t rate) { this->throttle_rate_seconds_ = rate; }
-  void set_discovery_refresh_button(button::Button* button) { this->discovery_refresh_button_ = button; }
   void add_custom_erd(tiny_erd_t erd);
 
  protected:
@@ -238,7 +239,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // HA discovery manager: publishes one-shot HA MQTT discovery payloads
   // after steady state is reached.
   ha_discovery_manager_t ha_discovery_manager_;
-  button::Button* discovery_refresh_button_{nullptr};
   bool discovery_refresh_in_progress_{false};
   bool ha_discovery_started_{false};
 
@@ -305,6 +305,20 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   tiny_event_subscription_t erd_client_activity_subscription_;
   tiny_event_subscription_t gea2_activity_subscription_;
+};
+
+// DiscoveryRefreshButton: concrete button that triggers HA discovery cleanup
+// and device restart when pressed.
+class DiscoveryRefreshButton : public button::Button {
+ public:
+  DiscoveryRefreshButton(GeappliancesBridge* bridge) : bridge_(bridge) {}
+
+  void press_action() override {
+    bridge_->trigger_discovery_refresh();
+  }
+
+ private:
+  GeappliancesBridge* bridge_;
 };
 
 }  // namespace geappliances_bridge
