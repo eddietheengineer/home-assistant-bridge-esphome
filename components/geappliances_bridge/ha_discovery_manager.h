@@ -191,11 +191,10 @@ typedef struct {
   uint32_t current_decomp_size;    // Size of current decompressed chunk
 
   /* Cleanup state: discover and remove old discovery topics.
-   * Subscribes to each domain separately (homeassistant/{domain}/{device_id}/#)
-   * to limit retained message bursts per subscription. */
+   * Subscribes to homeassistant/+/{device_id}/# to catch all domains
+   * at once, then does a verification pass to confirm clean. */
   uint32_t cleanup_last_activity_ms;  // Last time a topic was received
-  bool cleanup_subscribed;            // Whether we've subscribed to current domain
-  uint8_t cleanup_current_domain;     // Current domain index being cleaned (0-20)
+  bool cleanup_subscribed;            // Whether we're currently subscribed
   bool cleanup_flushed_once;          // Whether we flushed at least once after subscribing
   uint8_t cleanup_clean_passes;       // Consecutive passes with no topics found
   bool cleanup_pass_found_topics;     // Whether any topics were found during current pass

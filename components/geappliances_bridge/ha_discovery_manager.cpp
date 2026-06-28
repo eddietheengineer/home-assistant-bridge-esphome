@@ -47,8 +47,7 @@ GEA_TAG(TAG) = "ha_discovery";
 /* ------------------------------------------------------------------ */
 
 /* Uses a single wildcard subscription (homeassistant/+/{device_id}/#)
- * to catch all retained discovery topics in one pass, avoiding the
- * 13+ pass overhead of per-component subscriptions. */
+ * to catch all retained discovery topics across all domains at once. */
 
 /* Idle timeout after last topic received during cleanup. */
 #define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 1000
@@ -200,7 +199,6 @@ CLEANUP_FN void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_pass_found_topics = false;
     self->cleanup_pass_received_count = 0;
     self->cleanup_pass_removed_count = 0;
-    self->cleanup_current_domain = 0;
     self->cleanup_pass_number = 1;
     self->cleanup_wait_start_ms = 0;
     self->cleanup_drain_start_ms = 0;
@@ -234,7 +232,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
         return;
     }
 
-    /* Not yet subscribed — subscribe to the current domain. */
+    /* Not yet subscribed — subscribe to all domains at once. */
     if (!self->cleanup_subscribed) {
         /* If we just unsubscribed, wait for the inbound MQTT event queue
          * to drain before re-subscribing. We know it's drained when no new
@@ -257,17 +255,8 @@ static void cleanup_run(ha_discovery_manager_t* self)
         }
 
         char sub_topic[128];
-        if (self->cleanup_current_domain < HA_DOMAIN_COUNT) {
-            /* Per-domain subscription. */
-            snprintf(sub_topic, sizeof(sub_topic),
-                "homeassistant/%s/%s/#",
-                HA_DOMAIN_STRINGS[self->cleanup_current_domain],
-                self->device_id);
-        } else {
-            /* Verification pass: wildcard. */
-            snprintf(sub_topic, sizeof(sub_topic),
-                "homeassistant/+/%s/#", self->device_id);
-        }
+        snprintf(sub_topic, sizeof(sub_topic),
+            "homeassistant/+/%s/#", self->device_id);
         mqtt_client_subscribe(self->mqtt_client, sub_topic,
             cleanup_topic_callback, self);
         self->cleanup_subscribed = true;
@@ -298,61 +287,35 @@ static void cleanup_run(ha_discovery_manager_t* self)
         }
 
         char sub_topic[128];
-
-        if (self->cleanup_current_domain < HA_DOMAIN_COUNT) {
-            /* Per-domain pass complete. */
-            ESP_LOGI(TAG, "  Domain %s: %u received, %u removed, %u dropped",
-                HA_DOMAIN_STRINGS[self->cleanup_current_domain],
-                self->cleanup_pass_received_count,
-                self->cleanup_pass_removed_count,
-                self->cleanup_dropped_count);
-
-            snprintf(sub_topic, sizeof(sub_topic),
-                "homeassistant/%s/%s/#",
-                HA_DOMAIN_STRINGS[self->cleanup_current_domain],
-                self->device_id);
-            mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
-            self->cleanup_subscribed = false;
-            /* Start drain wait: track when we unsubscribed so we can wait
-             * for the inbound queue to empty before re-subscribing. */
-            self->cleanup_drain_start_ms = self->cleanup_last_activity_ms;
-
-            /* If we found topics, retry the same domain to catch
-             * any dropped by the 32-slot queue. Otherwise move on. */
-            if (self->cleanup_pass_found_topics) {
-                return;
-            }
-
-            self->cleanup_current_domain++;
-            return;
-        }
-
-        /* Verification pass complete. */
-        ESP_LOGI(TAG, "  Verification pass %u: %u received, %u removed, %u dropped",
-            self->cleanup_clean_passes + 1,
-            self->cleanup_pass_received_count,
-            self->cleanup_pass_removed_count,
-            self->cleanup_dropped_count);
-
         snprintf(sub_topic, sizeof(sub_topic),
             "homeassistant/+/%s/#", self->device_id);
         mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
         self->cleanup_subscribed = false;
-        /* Start drain wait for the wildcard verification subscription. */
+        /* Start drain wait: track when we unsubscribed so we can wait
+         * for the inbound queue to empty before re-subscribing. */
         self->cleanup_drain_start_ms = self->cleanup_last_activity_ms;
 
-        /* If verification found topics, re-scan all domains. */
         if (self->cleanup_pass_found_topics) {
-            self->cleanup_current_domain = 0;
-            self->cleanup_clean_passes = 0;
+            /* Found topics this pass — log and retry from scratch. */
+            ESP_LOGI(TAG, "  Pass %u: %u received, %u removed, %u dropped — retrying",
+                self->cleanup_pass_number,
+                self->cleanup_pass_received_count,
+                self->cleanup_pass_removed_count,
+                self->cleanup_dropped_count);
+            self->cleanup_pass_number++;
             return;
         }
 
-        /* Clean verification pass. */
+        /* Clean pass — no topics found. */
+        ESP_LOGI(TAG, "  Pass %u: clean (%u received, %u removed)",
+            self->cleanup_pass_number,
+            self->cleanup_pass_received_count,
+            self->cleanup_pass_removed_count);
         self->cleanup_clean_passes++;
+        self->cleanup_pass_number++;
 
         if (self->cleanup_clean_passes < 2) {
-            /* Need another verification pass. */
+            /* Need one more verification pass. */
             return;
         }
 
