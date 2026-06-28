@@ -16,6 +16,7 @@ Run with:
 
 import json
 import os
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -779,5 +780,195 @@ class TestEntityFiltering(unittest.TestCase):
             "Filtered entities should be a subset of unfiltered")
 
 
+class TestDeduplicateFieldIds(unittest.TestCase):
+    """Test that _deduplicate_field_ids resolves collisions correctly."""
+
+    def test_no_collision_passes_through(self):
+        """Entries with unique field_ids are unchanged."""
+        entries = [
+            {'erd_id': 0x301b, 'field_id': 'temp_high', 'value_template': '{{ value[0:2] }}'},
+            {'erd_id': 0x301b, 'field_id': 'temp_low', 'value_template': '{{ value[2:4] }}'},
+        ]
+        gen._deduplicate_field_ids(entries)
+        self.assertEqual(entries[0]['field_id'], 'temp_high')
+        self.assertEqual(entries[1]['field_id'], 'temp_low')
+
+    def test_collision_with_value_template(self):
+        """Colliding field_ids are disambiguated using byte offset from value_template."""
+        entries = [
+            {'erd_id': 0x301b, 'field_id': 'index', 'value_template': '{{ value[0:2] }}'},
+            {'erd_id': 0x301b, 'field_id': 'index', 'value_template': '{{ value[4:6] }}'},
+            {'erd_id': 0x301b, 'field_id': 'index', 'value_template': '{{ value[8:10] }}'},
+        ]
+        gen._deduplicate_field_ids(entries)
+        self.assertEqual(entries[0]['field_id'], 'index')  # first occurrence kept
+        self.assertEqual(entries[1]['field_id'], 'index_4')
+        self.assertEqual(entries[2]['field_id'], 'index_8')
+
+    def test_collision_without_value_template(self):
+        """Colliding entries without value_template use a counter fallback."""
+        entries = [
+            {'erd_id': 0x1041, 'field_id': 'press', 'value_template': ''},
+            {'erd_id': 0x1041, 'field_id': 'press', 'value_template': ''},
+            {'erd_id': 0x1041, 'field_id': 'press', 'value_template': ''},
+        ]
+        gen._deduplicate_field_ids(entries)
+        self.assertEqual(entries[0]['field_id'], 'press')
+        self.assertEqual(entries[1]['field_id'], 'press_1')
+        self.assertEqual(entries[2]['field_id'], 'press_2')
+
+    def test_collision_across_different_erds_is_independent(self):
+        """Same field_id in different ERDs is NOT a collision."""
+        entries = [
+            {'erd_id': 0x301b, 'field_id': 'temp', 'value_template': '{{ value[0:2] }}'},
+            {'erd_id': 0x301c, 'field_id': 'temp', 'value_template': '{{ value[0:2] }}'},
+        ]
+        gen._deduplicate_field_ids(entries)
+        self.assertEqual(entries[0]['field_id'], 'temp')
+        self.assertEqual(entries[1]['field_id'], 'temp')
+
+    def test_empty_field_id_skipped(self):
+        """Entries with empty field_id are not modified."""
+        entries = [
+            {'erd_id': 0x301b, 'field_id': '', 'value_template': '{{ value[0:2] }}'},
+            {'erd_id': 0x301b, 'field_id': '', 'value_template': '{{ value[2:4] }}'},
+        ]
+        gen._deduplicate_field_ids(entries)
+        self.assertEqual(entries[0]['field_id'], '')
+        self.assertEqual(entries[1]['field_id'], '')
+
+    def test_new_id_collides_with_existing(self):
+        """If the disambiguated id already exists, a suffix is appended."""
+        entries = [
+            {'erd_id': 0x301b, 'field_id': 'index', 'value_template': '{{ value[0:2] }}'},
+            {'erd_id': 0x301b, 'field_id': 'index_4', 'value_template': '{{ value[2:4] }}'},
+            {'erd_id': 0x301b, 'field_id': 'index', 'value_template': '{{ value[4:6] }}'},
+        ]
+        gen._deduplicate_field_ids(entries)
+        self.assertEqual(entries[0]['field_id'], 'index')
+        self.assertEqual(entries[1]['field_id'], 'index_4')
+        # Third entry would get index_4, but that's taken, so it gets index_4_1
+        self.assertEqual(entries[2]['field_id'], 'index_4_1')
+
+
+
+class TestBufferSizeSufficiency(unittest.TestCase):
+    """Verify that generated topics fit within C buffer sizes.
+
+    If this test fails, the C buffer sizes in ha_discovery_manager.h
+    need to be increased. The buffer constants below MUST match the
+    actual C definitions — keep them in sync.
+
+    Key buffers:
+      - topic_buf[HA_DISCOVERY_TOPIC_BUF_SIZE]: holds the HA discovery topic
+      - cleanup_topic_buf: stores full topic strings for republishing
+      - field_id_buf[HA_DISCOVERY_FIELD_ID_BUF_SIZE]: holds the field_id slug
+      - unique_id_buf[HA_DISCOVERY_UNIQUE_ID_BUF_SIZE]: holds the unique_id
+      - device_id max 63 chars (configured_device_id_[64])
+    """
+
+    # These constants MUST match ha_discovery_manager.h — parsed from header.
+    _HEADER = Path(__file__).resolve().parent.parent / 'components' / 'geappliances_bridge' / 'ha_discovery_manager.h'
+    _HEADER_TEXT = _HEADER.read_text()
+    TOPIC_BUF_SIZE = int(re.search(r'#define\s+HA_DISCOVERY_TOPIC_BUF_SIZE\s+(\d+)', _HEADER_TEXT).group(1))
+    CLEANUP_TOPIC_BUF_SIZE = TOPIC_BUF_SIZE  # cleanup stores full topics, same bound
+    FIELD_ID_BUF_SIZE = int(re.search(r'#define\s+HA_DISCOVERY_FIELD_ID_BUF_SIZE\s+(\d+)', _HEADER_TEXT).group(1))
+    UNIQUE_ID_BUF_SIZE = int(re.search(r'#define\s+HA_DISCOVERY_UNIQUE_ID_BUF_SIZE\s+(\d+)', _HEADER_TEXT).group(1))
+    DEVICE_ID_MAX = 63  # configured_device_id_[64] minus null terminator
+
+    def setUp(self):
+        self.entities = load_all_entities()
+
+    def test_all_field_ids_fit_in_buffer(self):
+        """Every field_id must fit in field_id_buf[72]."""
+        for obj in self.entities:
+            field_id = obj.get('fi', '')
+            with self.subTest(entity=obj.get('n', '?'), erd=obj.get('i', '?')):
+                self.assertLessEqual(
+                    len(field_id), self.FIELD_ID_BUF_SIZE - 1,
+                    f'field_id too long ({len(field_id)} chars, max {self.FIELD_ID_BUF_SIZE - 1}): '
+                    f'{obj["n"]} erd={obj["i"]} field_id={field_id}')
+
+    def test_all_topics_fit_in_publish_buffer(self):
+        """Every generated topic must fit in topic_buf[192] with worst-case device_id.
+
+        Uses the max device_id length (63 chars) to ensure the buffer is
+        sufficient regardless of the actual device_id at runtime.
+        """
+        worst_device_id = 'A' * self.DEVICE_ID_MAX
+        longest_topic = ''
+        longest_len = 0
+
+        for obj in self.entities:
+            domain = obj.get('d', '')
+            erd_id = obj.get('i', '')
+            field_id = obj.get('fi', '')
+
+            if field_id:
+                topic = f'homeassistant/{domain}/{worst_device_id}/{erd_id}_{field_id}/config'
+            else:
+                topic = f'homeassistant/{domain}/{worst_device_id}/{erd_id}/config'
+
+            if len(topic) > longest_len:
+                longest_len = len(topic)
+                longest_topic = topic
+
+            with self.subTest(entity=obj.get('n', '?'), erd=obj.get('i', '?')):
+                self.assertLessEqual(
+                    len(topic), self.TOPIC_BUF_SIZE - 1,
+                    f'topic too long ({len(topic)} chars, max {self.TOPIC_BUF_SIZE - 1}): '
+                    f'{topic}')
+
+        # Report the longest topic for reference
+        print(f'Longest topic ({longest_len} chars): {longest_topic[:80]}...')
+
+    def test_all_topics_fit_in_cleanup_buffer(self):
+        """Every generated topic must fit in cleanup_topic_queue entries [192].
+
+        This MUST match the publish buffer size — if cleanup can hold a topic
+        but publish cannot (or vice versa), cleanup will silently fail to
+        remove retained messages, creating an infinite re-discovery loop.
+        """
+        self.assertEqual(
+            self.CLEANUP_TOPIC_BUF_SIZE, self.TOPIC_BUF_SIZE,
+            f'cleanup_topic_queue buffer ({self.CLEANUP_TOPIC_BUF_SIZE}) must match '
+            f'topic_buf ({self.TOPIC_BUF_SIZE})')
+
+        worst_device_id = 'A' * self.DEVICE_ID_MAX
+
+        for obj in self.entities:
+            domain = obj.get('d', '')
+            erd_id = obj.get('i', '')
+            field_id = obj.get('fi', '')
+
+            if field_id:
+                topic = f'homeassistant/{domain}/{worst_device_id}/{erd_id}_{field_id}/config'
+            else:
+                topic = f'homeassistant/{domain}/{worst_device_id}/{erd_id}/config'
+
+            with self.subTest(entity=obj.get('n', '?'), erd=obj.get('i', '?')):
+                self.assertLessEqual(
+                    len(topic), self.CLEANUP_TOPIC_BUF_SIZE - 1,
+                    f'cleanup topic too long ({len(topic)} chars, max {self.CLEANUP_TOPIC_BUF_SIZE - 1}): '
+                    f'{topic}')
+
+    def test_all_unique_ids_fit_in_buffer(self):
+        """Every unique_id must fit in unique_id_buf[160] with worst-case device_id."""
+        worst_device_id = 'A' * self.DEVICE_ID_MAX
+
+        for obj in self.entities:
+            erd_id = obj.get('i', '')
+            field_id = obj.get('fi', '')
+
+            if field_id:
+                unique_id = f'{worst_device_id}_erd_{erd_id}_{field_id}'
+            else:
+                unique_id = f'{worst_device_id}_erd_{erd_id}'
+
+            with self.subTest(entity=obj.get('n', '?'), erd=obj.get('i', '?')):
+                self.assertLessEqual(
+                    len(unique_id), self.UNIQUE_ID_BUF_SIZE - 1,
+                    f'unique_id too long ({len(unique_id)} chars, max {self.UNIQUE_ID_BUF_SIZE - 1}): '
+                    f'{unique_id}')
 if __name__ == '__main__':
     unittest.main()

@@ -60,8 +60,32 @@ typedef enum {
 /* Line buffer size for JSONL parsing (max line is ~14KB). */
 #define HA_DISCOVERY_LINE_BUF_SIZE 14336
 
+/* Topic buffer size for HA discovery topics (must fit worst-case topic + null). */
+#define HA_DISCOVERY_TOPIC_BUF_SIZE 192
+/* Field ID slug buffer size. */
+#define HA_DISCOVERY_FIELD_ID_BUF_SIZE 72
+/* Unique ID buffer size. */
+#define HA_DISCOVERY_UNIQUE_ID_BUF_SIZE 160
 /* Payload buffer for building discovery payloads. */
 #define HA_DISCOVERY_PAYLOAD_BUF_SIZE 8192
+
+/* Home Assistant domain strings for discovery topic generation. */
+#define HA_DOMAIN_COUNT 21
+static const char* const HA_DOMAIN_STRINGS[HA_DOMAIN_COUNT] = {
+    "alarm_control_panel", "binary_sensor", "button", "camera", "climate",
+    "cover", "date", "datetime", "event", "fan", "light", "lock", "number",
+    "select", "sensor", "switch", "text", "time", "update", "vacuum", "valve"
+};
+
+static inline int ha_domain_to_index(const char* str, size_t len) {
+    for (int i = 0; i < HA_DOMAIN_COUNT; i++) {
+        if (strlen(HA_DOMAIN_STRINGS[i]) == len &&
+            strncmp(HA_DOMAIN_STRINGS[i], str, len) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
 
 /*!
  * @brief Home Assistant MQTT Discovery manager.
@@ -107,13 +131,26 @@ typedef struct {
 
   /* Decompression state. */
   tinfl_decompressor decomp_state;
-  uint8_t decomp_buf[HA_DISCOVERY_DECOMP_BUF_SIZE];
+
+  /* Decompression buffer and cleanup topic queue share memory via union
+   * since they're never used simultaneously.
+   * During cleanup: cleanup_topic_buf (6KB) holds full topic strings.
+   * During discovery: decomp_buf (14KB) holds decompressed JSONL chunks. */
+#ifdef HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
+  #define HA_DISCOVERY_CLEANUP_BUF_SIZE HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
+#else
+  #define HA_DISCOVERY_CLEANUP_BUF_SIZE 6144
+#endif
+  union {
+    uint8_t decomp_buf[HA_DISCOVERY_DECOMP_BUF_SIZE];
+    char cleanup_topic_buf[HA_DISCOVERY_CLEANUP_BUF_SIZE];
+  };
 
   /* Line parsing buffer. */
   char line_buf[HA_DISCOVERY_LINE_BUF_SIZE];
 
   /* Payload buffer for building discovery payloads. */
-  char topic_buf[128];
+  char topic_buf[HA_DISCOVERY_TOPIC_BUF_SIZE];
   char payload_buf[HA_DISCOVERY_PAYLOAD_BUF_SIZE];
 
   /* Rate limiting. */
@@ -125,10 +162,10 @@ typedef struct {
   /* Entity field buffers (used by process_jsonl_line to avoid stack overflow).
    * Templates are NOT stored here — they are embedded directly from the raw
    * JSONL line into the payload buffer with proper re-escaping. */
-  char entity_name_buf[128];
+  char entity_name_buf[160];
   char erd_id_hex_buf[8];
   char domain_buf[32];
-  char field_id_buf[16];
+  char field_id_buf[HA_DISCOVERY_FIELD_ID_BUF_SIZE];
   char paired_erd_buf[8];
   char role_buf[16];
   char unit_buf[32];
@@ -145,7 +182,7 @@ typedef struct {
   char payload_off_buf[16];
   char state_on_buf[16];
   char state_off_buf[16];
-  char unique_id_buf[128];
+  char unique_id_buf[HA_DISCOVERY_UNIQUE_ID_BUF_SIZE];
   char state_topic_buf[128];
   char command_topic_buf[128];
   char actual_state_topic_buf[128];
@@ -157,25 +194,38 @@ typedef struct {
   uint32_t current_offset;         // Byte offset within decompressed chunk
   uint32_t current_decomp_size;    // Size of current decompressed chunk
 
-  /* Cleanup state: discover and remove old discovery topics. */
-  uint32_t cleanup_last_activity_ms;  // Last time a topic was received
-  bool cleanup_subscribed;            // Whether we've subscribed
-  uint16_t cleanup_current_component; // Index into ha_discovery_component_types[]
-  bool cleanup_received_topics;       // Whether we received any topics for current component
-  bool cleanup_flushed_once;          // Whether we flushed at least once after subscribing
-  uint8_t cleanup_clean_passes;       // Consecutive passes with no topics found
-  uint32_t cleanup_component_skip;        // Per-component skip bitmap (1 bit per component type)
+  /* Cleanup state: discover and remove old discovery topics.
+   * Subscribes to homeassistant/+/{device_id}/# to catch all domains
+   * at once, then does a verification pass to confirm clean. */
+  uint32_t cleanup_last_activity_ms;   // Last time a topic callback fired
+  uint32_t cleanup_subscribe_start_ms; // Time we subscribed (for min-subscribe check)
+  bool cleanup_subscribed;             // Whether we're currently subscribed
+  bool cleanup_flushed_once;           // Whether we flushed at least once after subscribing
+  uint8_t cleanup_clean_passes;        // Consecutive clean verification passes
   bool cleanup_pass_found_topics;      // Whether any topics were found during current pass
-  uint16_t cleanup_component_removed_count; // Topics removed for current component
-  uint8_t cleanup_pass_number;              // Current pass number (starts at 1)
-  uint16_t cleanup_pass_removed_count; // Topics removed during current pass
-  uint32_t cleanup_wait_start_ms;     // Start time of final wait before discovery
+  uint16_t cleanup_pass_received_count;  // Topics received by callback during current pass
+  uint16_t cleanup_pass_removed_count;   // Topics removed during current pass
+  uint8_t cleanup_pass_number;         // Current pass number (starts at 1)
 
-  /* Cleanup topic queue: buffer topic names for batched publishing. */
-#define HA_DISCOVERY_CLEANUP_QUEUE_SIZE 64
-  char cleanup_topic_queue[HA_DISCOVERY_CLEANUP_QUEUE_SIZE][128];
-  uint16_t cleanup_queue_write_idx;  // Producer (callback) write position
-  uint16_t cleanup_queue_read_idx;   // Consumer (flush) read position
+  /* Post-unsubscribe drain tracking: records when we unsubscribed so we can
+   * wait for the inbound MQTT event queue to fully drain before re-subscribing.
+   * Non-zero means we're in a drain-wait phase. */
+  uint32_t cleanup_drain_start_ms;     // Time of last unsubscribe (0 = not draining)
+
+  /* Cleanup topic queue: stores full topic strings for republishing.
+   * Each entry is a null-terminated topic (max 191 chars + null).
+   * Memory is shared with decomp_buf via union (see above). */
+  uint16_t cleanup_queue_write_pos;   // Byte offset where next topic is written
+  uint16_t cleanup_queue_count;       // Number of entries in buffer
+  uint16_t cleanup_dropped_count;     // Topics dropped due to buffer full
+
+  /* Domain topic prefix: pre-computed "homeassistant/{domain}/{device_id}/"
+   * to avoid repeated snprintf during discovery publish. */
+  char domain_topic_prefix[128];
+  char current_domain_prefix_buf[32]; // Tracks current domain for prefix caching
+
+  /* Yield counter: yields every N published entities during discovery. */
+  uint8_t publish_yield_counter;
 #endif
 } ha_discovery_manager_t;
 
@@ -235,6 +285,13 @@ ha_discovery_state_t ha_discovery_manager_get_state(ha_discovery_manager_t* self
 void ha_discovery_manager_set_time_fn(
   ha_discovery_manager_t* self,
   uint32_t (*get_time_ms)(void));
+
+/* Test-only exports: exposed when HA_DISCOVERY_TEST_EXPORT is defined. */
+#ifdef HA_DISCOVERY_TEST_EXPORT
+void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg);
+void cleanup_start(ha_discovery_manager_t* self);
+uint16_t cleanup_flush_queue(ha_discovery_manager_t* self);
+#endif
 
 #ifdef __cplusplus
 }
