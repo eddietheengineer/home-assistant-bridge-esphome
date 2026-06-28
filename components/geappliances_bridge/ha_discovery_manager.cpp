@@ -53,19 +53,20 @@ GEA_TAG(TAG) = "ha_discovery";
  * The ESP-IDF MQTT inbound queue holds ~32 messages before dropping.
  * This must be long enough for the broker to finish delivering a batch
  * and for the MQTT task to process its queue before we flush. */
-#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 3000
+#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 1000
 /* Minimum time we stay subscribed before considering a pass complete.
  * Ensures we wait for the initial retained message burst even if
  * cleanup_run() isn't called frequently. */
-#define HA_DISCOVERY_CLEANUP_MIN_SUBSCRIBE_MS 3000
+#define HA_DISCOVERY_CLEANUP_MIN_SUBSCRIBE_MS 1000
 /* Wait after unsubscribe for the inbound MQTT event queue to drain
  * before re-subscribing. If no new topic callbacks fire during this
  * window, the queue is empty and it's safe to re-subscribe. */
 #define HA_DISCOVERY_CLEANUP_DRAIN_WAIT_MS 1000
 /* Yield every N published entities during discovery to keep WDT happy. */
 #define HA_DISCOVERY_YIELD_INTERVAL 5
-/* Max topics to flush per batch call. */
-#define HA_DISCOVERY_CLEANUP_FLUSH_BATCH 16
+/* Max topics to flush per batch call. Match the MQTT inbound queue
+ * size (~32) so we drain the compacting buffer in fewer calls. */
+#define HA_DISCOVERY_CLEANUP_FLUSH_BATCH 32
 
 /* Expose cleanup functions for unit testing when HA_DISCOVERY_TEST_EXPORT is defined. */
 #ifdef HA_DISCOVERY_TEST_EXPORT
@@ -81,7 +82,7 @@ GEA_TAG(TAG) = "ha_discovery";
 CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
 {
     uint16_t batch = 0;
-    const uint16_t max_batch = 16;
+    const uint16_t max_batch = HA_DISCOVERY_CLEANUP_FLUSH_BATCH;
 
     while (batch < max_batch) {
         char topic_buf[256];
