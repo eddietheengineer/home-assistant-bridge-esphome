@@ -190,6 +190,11 @@ typedef struct {
   uint8_t cleanup_pass_number;        // Current pass number (starts at 1)
   uint32_t cleanup_wait_start_ms;     // Start time of final wait before discovery
 
+  /* Post-unsubscribe drain tracking: records when we unsubscribed so we can
+   * wait for the inbound MQTT event queue to fully drain before re-subscribing.
+   * Non-zero means we're in a drain-wait phase. */
+  uint32_t cleanup_drain_start_ms;     // Time of last unsubscribe (0 = not draining)
+
   /* Cleanup yield counter: yields every N publishes during cleanup
    * to let the MQTT inbound queue drain. */
   uint8_t cleanup_yield_counter;
