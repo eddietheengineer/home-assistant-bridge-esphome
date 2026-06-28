@@ -60,13 +60,17 @@ typedef enum {
 /* Line buffer size for JSONL parsing (max line is ~14KB). */
 #define HA_DISCOVERY_LINE_BUF_SIZE 14336
 
+/* Topic buffer size for HA discovery topics (must fit worst-case topic + null). */
+#define HA_DISCOVERY_TOPIC_BUF_SIZE 192
+/* Field ID slug buffer size. */
+#define HA_DISCOVERY_FIELD_ID_BUF_SIZE 72
+/* Unique ID buffer size. */
+#define HA_DISCOVERY_UNIQUE_ID_BUF_SIZE 160
 /* Payload buffer for building discovery payloads. */
 #define HA_DISCOVERY_PAYLOAD_BUF_SIZE 8192
 
-/* Home Assistant domain strings for topic reconstruction during cleanup.
- * Used to pack/unpack topics in the compacting cleanup buffer. */
+/* Home Assistant domain strings for discovery topic generation. */
 #define HA_DOMAIN_COUNT 21
-
 static const char* const HA_DOMAIN_STRINGS[HA_DOMAIN_COUNT] = {
     "alarm_control_panel", "binary_sensor", "button", "camera", "climate",
     "cover", "date", "datetime", "event", "fan", "light", "lock", "number",
@@ -129,13 +133,13 @@ typedef struct {
   tinfl_decompressor decomp_state;
 
   /* Decompression buffer and cleanup topic queue share memory via union
-   * since they're never used simultaneously — saves 12KB of heap.
-   * During cleanup: cleanup_topic_buf (12KB) holds discovered topics.
+   * since they're never used simultaneously.
+   * During cleanup: cleanup_topic_buf (6KB) holds full topic strings.
    * During discovery: decomp_buf (14KB) holds decompressed JSONL chunks. */
 #ifdef HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
   #define HA_DISCOVERY_CLEANUP_BUF_SIZE HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
 #else
-  #define HA_DISCOVERY_CLEANUP_BUF_SIZE 12288
+  #define HA_DISCOVERY_CLEANUP_BUF_SIZE 6144
 #endif
   union {
     uint8_t decomp_buf[HA_DISCOVERY_DECOMP_BUF_SIZE];
@@ -146,7 +150,7 @@ typedef struct {
   char line_buf[HA_DISCOVERY_LINE_BUF_SIZE];
 
   /* Payload buffer for building discovery payloads. */
-  char topic_buf[192];
+  char topic_buf[HA_DISCOVERY_TOPIC_BUF_SIZE];
   char payload_buf[HA_DISCOVERY_PAYLOAD_BUF_SIZE];
 
   /* Rate limiting. */
@@ -161,7 +165,7 @@ typedef struct {
   char entity_name_buf[160];
   char erd_id_hex_buf[8];
   char domain_buf[32];
-  char field_id_buf[72];
+  char field_id_buf[HA_DISCOVERY_FIELD_ID_BUF_SIZE];
   char paired_erd_buf[8];
   char role_buf[16];
   char unit_buf[32];
@@ -178,7 +182,7 @@ typedef struct {
   char payload_off_buf[16];
   char state_on_buf[16];
   char state_off_buf[16];
-  char unique_id_buf[160];
+  char unique_id_buf[HA_DISCOVERY_UNIQUE_ID_BUF_SIZE];
   char state_topic_buf[128];
   char command_topic_buf[128];
   char actual_state_topic_buf[128];
@@ -208,9 +212,8 @@ typedef struct {
    * Non-zero means we're in a drain-wait phase. */
   uint32_t cleanup_drain_start_ms;     // Time of last unsubscribe (0 = not draining)
 
-  /* Cleanup topic queue: compacting buffer with domain-enum packing.
-   * Each entry: [domain_index:1][suffix:variable][null:1]
-   * At ~22 bytes avg, 12KB holds ~550 topics.
+  /* Cleanup topic queue: stores full topic strings for republishing.
+   * Each entry is a null-terminated topic (max 191 chars + null).
    * Memory is shared with decomp_buf via union (see above). */
   uint16_t cleanup_queue_write_pos;   // Byte offset where next topic is written
   uint16_t cleanup_queue_count;       // Number of entries in buffer

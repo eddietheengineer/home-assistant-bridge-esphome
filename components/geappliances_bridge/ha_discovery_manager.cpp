@@ -81,9 +81,7 @@ GEA_TAG(TAG) = "ha_discovery";
  * remaining in the queue (0 means all flushed). */
 CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
 {
-    char topic_buf[256];
-    char suffix_buf[128];
-    int domain_index;
+    const char* topic;
     uint16_t consumed;
 
     vPortEnterCritical();
@@ -92,13 +90,10 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
         return 0;
     }
 
-    /* Read domain index and suffix from the front of the buffer (position 0). */
-    domain_index = (int)(uint8_t)self->cleanup_topic_buf[0];
-    strncpy(suffix_buf, self->cleanup_topic_buf + 1, sizeof(suffix_buf) - 1);
-    suffix_buf[sizeof(suffix_buf) - 1] = '\0';
-
-    /* Compute bytes consumed: [domain_index:1][suffix][null:1]. */
-    consumed = (uint16_t)(1 + strlen(suffix_buf) + 1);
+    /* Topic is at the front of the buffer. Copy pointer — it stays valid
+     * through the compact below since memmove shifts data forward. */
+    topic = self->cleanup_topic_buf;
+    consumed = (uint16_t)(strlen(topic) + 1);
 
     /* Safety clamp: prevent underflow if buffer is corrupted. */
     if (consumed > self->cleanup_queue_write_pos) {
@@ -112,15 +107,9 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
     self->cleanup_queue_count--;
     vPortExitCritical();
 
-    /* Reconstruct full topic outside critical section. */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-truncation"
-    snprintf(topic_buf, sizeof(topic_buf), "homeassistant/%s/%s/%s/config",
-             HA_DOMAIN_STRINGS[domain_index], self->device_id, suffix_buf);
-#pragma GCC diagnostic pop
-
-    mqtt_client_publish_raw(self->mqtt_client, topic_buf, "", 0, true);
-    ESP_LOGD(TAG, "Removed old topic: %s [domain=%d(%s), suffix=%s]", topic_buf, domain_index, HA_DOMAIN_STRINGS[domain_index], suffix_buf);
+    /* Republish with empty payload to clear the retained message. */
+    mqtt_client_publish_raw(self->mqtt_client, topic, "", 0, true);
+    ESP_LOGD(TAG, "Removed old topic: %s", topic);
     self->cleanup_pass_removed_count++;
 
     vTaskDelay(pdMS_TO_TICKS(1));
@@ -129,10 +118,9 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
 }
 
 /* Callback for homeassistant/+/{device_id}/# wildcard subscription during cleanup.
- * Parses the topic, packs domain enum + suffix into the ring buffer,
- * and queues for batched publishing from the main loop. This keeps the callback
- * short — no outbound publish call — so the MQTT task's inbound queue drains fast
- * and retained message bursts don't overflow. */
+ * Stores the full topic string in the buffer for republishing from the main loop.
+ * Keeps the callback short — no outbound publish call — so the MQTT task's
+ * inbound queue drains fast and retained message bursts don't overflow. */
 CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     (void)payload;
@@ -148,36 +136,15 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     /* If the payload is empty, it's our own echo from a previous clear — skip. */
     if (payload_len == 0) return;
 
-    /* Parse topic: "homeassistant/{domain}/{device_id}/{suffix}/config"
-     * Skip "homeassistant/" (14 chars), extract domain up to next /. */
-    const char* p = topic + 14;  // skip "homeassistant/"
-    const char* domain_end = strchr(p, '/');
-    if (!domain_end) return;
-
-    size_t domain_len = (size_t)(domain_end - p);
-    int domain_index = ha_domain_to_index(p, domain_len);
-    if (domain_index < 0) return;  // unknown domain, skip
-
-    /* Skip past /{device_id}/ to find suffix start. */
-    const char* device_id_start = domain_end + 1;
-    const char* device_id_end = strchr(device_id_start, '/');
-    if (!device_id_end) return;
-
-    /* Suffix is between device_id_end+1 and topic_len-7 (strip /config). */
-    const char* suffix_start = device_id_end + 1;
-    const char* suffix_end = topic + topic_len - 7;  // before "/config"
-    size_t suffix_len = (size_t)(suffix_end - suffix_start);
-
-    /* Pack: [domain_index:1][suffix:variable][null:1] */
-    uint16_t needed = (uint16_t)(1 + suffix_len + 1);
+    /* Store the full topic string: [topic:variable][null:1] */
+    uint16_t needed = (uint16_t)(topic_len + 1);
 
     vPortEnterCritical();
 
     /* Check if buffer has room. Simple linear append — no ring buffer. */
     if (self->cleanup_queue_write_pos + needed <= HA_DISCOVERY_CLEANUP_BUF_SIZE) {
-        self->cleanup_topic_buf[self->cleanup_queue_write_pos] = (char)(uint8_t)domain_index;
-        memcpy(self->cleanup_topic_buf + self->cleanup_queue_write_pos + 1, suffix_start, suffix_len);
-        self->cleanup_topic_buf[self->cleanup_queue_write_pos + 1 + suffix_len] = '\0';
+        memcpy(self->cleanup_topic_buf + self->cleanup_queue_write_pos, topic, topic_len);
+        self->cleanup_topic_buf[self->cleanup_queue_write_pos + topic_len] = '\0';
         self->cleanup_queue_write_pos += needed;
         self->cleanup_queue_count++;
     } else {
