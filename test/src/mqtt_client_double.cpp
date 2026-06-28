@@ -112,7 +112,7 @@ void mqtt_client_double_publish_raw(
   mock()
     .actualCall("publish_raw")
     .withParameter("topic", topic)
-    .withParameterOfType("const char*", "payload", payload)
+    .withStringParameter("payload", payload)
     .withParameter("payload_len", payload_len)
     .withParameter("retain", retain);
 }

@@ -183,7 +183,6 @@ typedef struct {
   uint32_t cleanup_last_activity_ms;  // Last time a topic was received
   bool cleanup_subscribed;            // Whether we've subscribed to current domain
   uint8_t cleanup_current_domain;     // Current domain index being cleaned (0-20)
-  bool cleanup_flushed_once;          // Whether we flushed at least once after subscribing
   uint8_t cleanup_clean_passes;       // Consecutive passes with no topics found
   bool cleanup_pass_found_topics;     // Whether any topics were found during current pass
   uint16_t cleanup_pass_received_count;  // Topics received by callback during current pass
@@ -191,19 +190,9 @@ typedef struct {
   uint8_t cleanup_pass_number;        // Current pass number (starts at 1)
   uint32_t cleanup_wait_start_ms;     // Start time of final wait before discovery
 
-  /* Cleanup topic queue: ring buffer with domain-enum packing.
-   * Each entry: [domain_index:1][suffix:variable][null:1]
-   * Uses read_pos/write_pos indices — no memmove needed.
-   * At ~22 bytes avg, 12KB holds ~550 topics. */
-#ifdef HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
-  #define HA_DISCOVERY_CLEANUP_BUF_SIZE HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
-#else
-  #define HA_DISCOVERY_CLEANUP_BUF_SIZE 12288
-#endif
-  char cleanup_topic_buf[HA_DISCOVERY_CLEANUP_BUF_SIZE];
-  uint16_t cleanup_queue_write_pos;   // Byte offset where next topic is written
-  uint16_t cleanup_queue_count;       // Number of entries in buffer
-  uint16_t cleanup_dropped_count;     // Topics dropped due to buffer full
+  /* Cleanup yield counter: yields every N publishes during cleanup
+   * to let the MQTT inbound queue drain. */
+  uint8_t cleanup_yield_counter;
 
   /* Domain topic prefix: pre-computed "homeassistant/{domain}/{device_id}/"
    * to avoid repeated snprintf during discovery publish. */
