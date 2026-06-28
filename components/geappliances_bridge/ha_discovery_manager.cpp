@@ -64,9 +64,9 @@ GEA_TAG(TAG) = "ha_discovery";
 #define HA_DISCOVERY_CLEANUP_DRAIN_WAIT_MS 1000
 /* Yield every N published entities during discovery to keep WDT happy. */
 #define HA_DISCOVERY_YIELD_INTERVAL 5
-/* Max topics to flush per batch call. Match the MQTT inbound queue
- * size (~32) so we drain the compacting buffer in fewer calls. */
-#define HA_DISCOVERY_CLEANUP_FLUSH_BATCH 32
+/* Max topics to flush per batch call. Keep low to limit peak heap
+ * pressure — each publish allocates a std::string on the heap. */
+#define HA_DISCOVERY_CLEANUP_FLUSH_BATCH 16
 
 /* Expose cleanup functions for unit testing when HA_DISCOVERY_TEST_EXPORT is defined. */
 #ifdef HA_DISCOVERY_TEST_EXPORT
