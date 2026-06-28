@@ -311,13 +311,11 @@ TEST(ha_discovery_cleanup, compacting_buffer_drain_and_refill)
     ha_discovery_manager_t mgr = make_manager("Dishwasher_PDT715");
 
     /* Pack many topics to fill a significant portion of the buffer. */
-    uint16_t num_packed = 0;
     for (uint32_t i = 0; i < 50; i++) {
         char topic[128];
         snprintf(topic, sizeof(topic),
             "homeassistant/sensor/Dishwasher_PDT715/field_%u/config", i);
         cleanup_topic_callback(topic, "{\"data\":1}", 10, &mgr);
-        num_packed++;
     }
 
     uint16_t write_pos_before = mgr.cleanup_queue_write_pos;
@@ -378,4 +376,20 @@ TEST(ha_discovery_cleanup, domain_strings_non_null)
         CHECK(HA_DOMAIN_STRINGS[i] != NULL);
         CHECK(strlen(HA_DOMAIN_STRINGS[i]) > 0);
     }
+}
+
+/* ------------------------------------------------------------------ */
+/* Drain wait state initialization                                      */
+/* ------------------------------------------------------------------ */
+
+TEST(ha_discovery_cleanup, drain_state_initialized_to_zero)
+{
+    ha_discovery_manager_t mgr;
+    memset(&mgr, 0, sizeof(mgr));
+    mgr.device_id = "TestDevice";
+    mgr.get_time_ms = test_get_time_ms;
+
+    cleanup_start(&mgr);
+
+    CHECK_EQUAL(0, mgr.cleanup_drain_start_ms);
 }
