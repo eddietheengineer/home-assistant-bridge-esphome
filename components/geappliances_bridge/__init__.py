@@ -400,6 +400,9 @@ async def to_code(config: dict[str, Any]) -> None:
     # HA discovery compression is now handled by generate_erd_lists.py
     # (in-process, after JSONL generation). No separate step needed.
     await cg.register_component(var, config)
+    # Ensure USE_ESP_IDF is defined for ESP-IDF builds so that
+    # platform-specific code in our component compiles correctly.
+    cg.add_build_flag("-DUSE_ESP_IDF")
 
     # Get optional GEA3 UART component reference
     if CONF_GEA3_UART_ID in config:
