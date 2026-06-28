@@ -193,15 +193,15 @@ typedef struct {
   /* Cleanup state: discover and remove old discovery topics.
    * Subscribes to homeassistant/+/{device_id}/# to catch all domains
    * at once, then does a verification pass to confirm clean. */
-  uint32_t cleanup_last_activity_ms;  // Last time a topic was received
-  bool cleanup_subscribed;            // Whether we're currently subscribed
-  bool cleanup_flushed_once;          // Whether we flushed at least once after subscribing
-  uint8_t cleanup_clean_passes;       // Consecutive passes with no topics found
-  bool cleanup_pass_found_topics;     // Whether any topics were found during current pass
+  uint32_t cleanup_last_activity_ms;   // Last time a topic callback fired
+  uint32_t cleanup_subscribe_start_ms; // Time we subscribed (for min-subscribe check)
+  bool cleanup_subscribed;             // Whether we're currently subscribed
+  bool cleanup_flushed_once;           // Whether we flushed at least once after subscribing
+  uint8_t cleanup_clean_passes;        // Consecutive clean verification passes
+  bool cleanup_pass_found_topics;      // Whether any topics were found during current pass
   uint16_t cleanup_pass_received_count;  // Topics received by callback during current pass
   uint16_t cleanup_pass_removed_count;   // Topics removed during current pass
-  uint8_t cleanup_pass_number;        // Current pass number (starts at 1)
-  uint32_t cleanup_wait_start_ms;     // Start time of final wait before discovery
+  uint8_t cleanup_pass_number;         // Current pass number (starts at 1)
 
   /* Post-unsubscribe drain tracking: records when we unsubscribed so we can
    * wait for the inbound MQTT event queue to fully drain before re-subscribing.

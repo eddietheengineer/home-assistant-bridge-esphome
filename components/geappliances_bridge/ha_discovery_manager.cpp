@@ -49,14 +49,19 @@ GEA_TAG(TAG) = "ha_discovery";
 /* Uses a single wildcard subscription (homeassistant/+/{device_id}/#)
  * to catch all retained discovery topics across all domains at once. */
 
-/* Idle timeout after last topic received during cleanup. */
-#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 1000
-/* Wait after a clean pass before starting discovery publishing. */
-#define HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS 5000
+/* Idle timeout after last topic callback during cleanup.
+ * The ESP-IDF MQTT inbound queue holds ~32 messages before dropping.
+ * This must be long enough for the broker to finish delivering a batch
+ * and for the MQTT task to process its queue before we flush. */
+#define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 3000
+/* Minimum time we stay subscribed before considering a pass complete.
+ * Ensures we wait for the initial retained message burst even if
+ * cleanup_run() isn't called frequently. */
+#define HA_DISCOVERY_CLEANUP_MIN_SUBSCRIBE_MS 3000
 /* Wait after unsubscribe for the inbound MQTT event queue to drain
  * before re-subscribing. If no new topic callbacks fire during this
  * window, the queue is empty and it's safe to re-subscribe. */
-#define HA_DISCOVERY_CLEANUP_DRAIN_WAIT_MS 500
+#define HA_DISCOVERY_CLEANUP_DRAIN_WAIT_MS 1000
 /* Yield every N published entities during discovery to keep WDT happy. */
 #define HA_DISCOVERY_YIELD_INTERVAL 5
 /* Max topics to flush per batch call. */
@@ -199,8 +204,8 @@ CLEANUP_FN void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_pass_found_topics = false;
     self->cleanup_pass_received_count = 0;
     self->cleanup_pass_removed_count = 0;
+    self->cleanup_subscribe_start_ms = 0;
     self->cleanup_pass_number = 1;
-    self->cleanup_wait_start_ms = 0;
     self->cleanup_drain_start_ms = 0;
 
     /* Heap fragmentation baseline before cleanup. */
@@ -260,26 +265,37 @@ static void cleanup_run(ha_discovery_manager_t* self)
         mqtt_client_subscribe(self->mqtt_client, sub_topic,
             cleanup_topic_callback, self);
         self->cleanup_subscribed = true;
-        self->cleanup_last_activity_ms = self->get_time_ms();
+        self->cleanup_subscribe_start_ms = self->get_time_ms();
+        self->cleanup_last_activity_ms = self->cleanup_subscribe_start_ms;
         self->cleanup_pass_found_topics = false;
         self->cleanup_pass_removed_count = 0;
         self->cleanup_pass_received_count = 0;
         self->cleanup_flushed_once = false;
-        ESP_LOGI(TAG, "  Subscribing to %s", sub_topic);
+        ESP_LOGI(TAG, "  Pass %u: subscribing to %s", self->cleanup_pass_number, sub_topic);
         return;
     }
 
     uint32_t now = self->get_time_ms();
 
+    /* Enforce minimum subscription time: don't consider the pass complete
+     * until we've been subscribed long enough for the MQTT task to deliver
+     * at least one batch of retained messages (~32 per queue cycle). */
+    if (now - self->cleanup_subscribe_start_ms < HA_DISCOVERY_CLEANUP_MIN_SUBSCRIBE_MS) {
+        /* Still within minimum subscription window — flush what we have. */
+        while (self->cleanup_queue_count > 0) {
+            cleanup_flush_queue(self);
+        }
+        return;
+    }
+
     /* Must flush at least once after subscribing before declaring empty. */
     if (!self->cleanup_flushed_once) {
         cleanup_flush_queue(self);
         self->cleanup_flushed_once = true;
-        self->cleanup_last_activity_ms = self->get_time_ms();
         return;
     }
 
-    /* Check if we've been idle long enough. */
+    /* Check if we've been idle long enough (no new callbacks). */
     if (now - self->cleanup_last_activity_ms >= HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS) {
         /* Flush entire queue. */
         while (self->cleanup_queue_count > 0) {
