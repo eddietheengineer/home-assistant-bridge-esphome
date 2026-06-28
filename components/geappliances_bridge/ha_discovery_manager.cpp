@@ -288,6 +288,14 @@ static void cleanup_run(ha_discovery_manager_t* self)
                 self->device_id);
             mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
             self->cleanup_subscribed = false;
+
+            /* If we found topics, retry the same domain to catch
+             * any dropped by the 32-slot queue. Otherwise move on. */
+            if (self->cleanup_pass_found_topics) {
+                self->cleanup_last_activity_ms = self->get_time_ms();
+                return;
+            }
+
             self->cleanup_current_domain++;
             self->cleanup_last_activity_ms = self->get_time_ms();
             return;
