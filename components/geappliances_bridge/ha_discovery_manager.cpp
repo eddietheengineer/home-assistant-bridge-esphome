@@ -64,9 +64,9 @@ GEA_TAG(TAG) = "ha_discovery";
 #define HA_DISCOVERY_CLEANUP_DRAIN_WAIT_MS 1000
 /* Yield every N published entities during discovery to keep WDT happy. */
 #define HA_DISCOVERY_YIELD_INTERVAL 5
-/* Max topics to flush per batch call. Keep low to limit peak heap
- * pressure — each publish allocates a std::string on the heap. */
-#define HA_DISCOVERY_CLEANUP_FLUSH_BATCH 16
+/* Flush one topic per batch call. Each publish allocates a std::string
+ * on the heap; processing one at a time minimizes peak heap pressure. */
+#define HA_DISCOVERY_CLEANUP_FLUSH_BATCH 1
 
 /* Expose cleanup functions for unit testing when HA_DISCOVERY_TEST_EXPORT is defined. */
 #ifdef HA_DISCOVERY_TEST_EXPORT
@@ -81,55 +81,49 @@ GEA_TAG(TAG) = "ha_discovery";
  * remaining in the queue (0 means all flushed). */
 CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_manager_t* self)
 {
-    uint16_t batch = 0;
-    const uint16_t max_batch = HA_DISCOVERY_CLEANUP_FLUSH_BATCH;
+    char topic_buf[256];
+    char suffix_buf[128];
+    int domain_index;
+    uint16_t consumed;
 
-    while (batch < max_batch) {
-        char topic_buf[256];
-        char suffix_buf[128];
-        int domain_index;
-        uint16_t consumed;
-
-        vPortEnterCritical();
-        if (self->cleanup_queue_count == 0) {
-            vPortExitCritical();
-            break;  // empty
-        }
-
-        /* Read domain index and suffix from the front of the buffer (position 0). */
-        domain_index = (int)(uint8_t)self->cleanup_topic_buf[0];
-        strncpy(suffix_buf, self->cleanup_topic_buf + 1, sizeof(suffix_buf) - 1);
-        suffix_buf[sizeof(suffix_buf) - 1] = '\0';
-
-        /* Compute bytes consumed: [domain_index:1][suffix][null:1]. */
-        consumed = (uint16_t)(1 + strlen(suffix_buf) + 1);
-
-        /* Safety clamp: prevent underflow if buffer is corrupted. */
-        if (consumed > self->cleanup_queue_write_pos) {
-            consumed = self->cleanup_queue_write_pos;
-        }
-
-        /* Compact: shift remaining data to front. */
-        memmove(self->cleanup_topic_buf, self->cleanup_topic_buf + consumed,
-                self->cleanup_queue_write_pos - consumed);
-        self->cleanup_queue_write_pos -= consumed;
-        self->cleanup_queue_count--;
+    vPortEnterCritical();
+    if (self->cleanup_queue_count == 0) {
         vPortExitCritical();
+        return 0;
+    }
 
-        /* Reconstruct full topic outside critical section. */
+    /* Read domain index and suffix from the front of the buffer (position 0). */
+    domain_index = (int)(uint8_t)self->cleanup_topic_buf[0];
+    strncpy(suffix_buf, self->cleanup_topic_buf + 1, sizeof(suffix_buf) - 1);
+    suffix_buf[sizeof(suffix_buf) - 1] = '\0';
+
+    /* Compute bytes consumed: [domain_index:1][suffix][null:1]. */
+    consumed = (uint16_t)(1 + strlen(suffix_buf) + 1);
+
+    /* Safety clamp: prevent underflow if buffer is corrupted. */
+    if (consumed > self->cleanup_queue_write_pos) {
+        consumed = self->cleanup_queue_write_pos;
+    }
+
+    /* Compact: shift remaining data to front. */
+    memmove(self->cleanup_topic_buf, self->cleanup_topic_buf + consumed,
+            self->cleanup_queue_write_pos - consumed);
+    self->cleanup_queue_write_pos -= consumed;
+    self->cleanup_queue_count--;
+    vPortExitCritical();
+
+    /* Reconstruct full topic outside critical section. */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-        snprintf(topic_buf, sizeof(topic_buf), "homeassistant/%s/%s/%s/config",
-                 HA_DOMAIN_STRINGS[domain_index], self->device_id, suffix_buf);
+    snprintf(topic_buf, sizeof(topic_buf), "homeassistant/%s/%s/%s/config",
+             HA_DOMAIN_STRINGS[domain_index], self->device_id, suffix_buf);
 #pragma GCC diagnostic pop
 
-        mqtt_client_publish_raw(self->mqtt_client, topic_buf, "", 0, true);
-        ESP_LOGD(TAG, "Removed old topic: %s [domain=%d(%s), suffix=%s]", topic_buf, domain_index, HA_DOMAIN_STRINGS[domain_index], suffix_buf);
-        self->cleanup_pass_removed_count++;
-        batch++;
+    mqtt_client_publish_raw(self->mqtt_client, topic_buf, "", 0, true);
+    ESP_LOGD(TAG, "Removed old topic: %s [domain=%d(%s), suffix=%s]", topic_buf, domain_index, HA_DOMAIN_STRINGS[domain_index], suffix_buf);
+    self->cleanup_pass_removed_count++;
 
-        vTaskDelay(pdMS_TO_TICKS(1));
-    }
+    vTaskDelay(pdMS_TO_TICKS(1));
 
     return self->cleanup_queue_count;
 }
