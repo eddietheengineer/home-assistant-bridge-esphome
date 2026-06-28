@@ -16,6 +16,7 @@ Run with:
 
 import json
 import os
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -859,18 +860,20 @@ class TestBufferSizeSufficiency(unittest.TestCase):
     actual C definitions — keep them in sync.
 
     Key buffers:
-      - topic_buf[192]: holds the HA discovery topic for publish
-      - cleanup_topic_queue[N][192]: holds topics during cleanup
-      - field_id_buf[72]: holds the field_id slug
-      - unique_id_buf[160]: holds the unique_id
+      - topic_buf[HA_DISCOVERY_TOPIC_BUF_SIZE]: holds the HA discovery topic
+      - cleanup_topic_buf: stores full topic strings for republishing
+      - field_id_buf[HA_DISCOVERY_FIELD_ID_BUF_SIZE]: holds the field_id slug
+      - unique_id_buf[HA_DISCOVERY_UNIQUE_ID_BUF_SIZE]: holds the unique_id
       - device_id max 63 chars (configured_device_id_[64])
     """
 
-    # These constants MUST match ha_discovery_manager.h
-    TOPIC_BUF_SIZE = 192
-    CLEANUP_TOPIC_BUF_SIZE = 192
-    FIELD_ID_BUF_SIZE = 72
-    UNIQUE_ID_BUF_SIZE = 160
+    # These constants MUST match ha_discovery_manager.h — parsed from header.
+    _HEADER = Path(__file__).resolve().parent.parent / 'components' / 'geappliances_bridge' / 'ha_discovery_manager.h'
+    _HEADER_TEXT = _HEADER.read_text()
+    TOPIC_BUF_SIZE = int(re.search(r'#define\s+HA_DISCOVERY_TOPIC_BUF_SIZE\s+(\d+)', _HEADER_TEXT).group(1))
+    CLEANUP_TOPIC_BUF_SIZE = TOPIC_BUF_SIZE  # cleanup stores full topics, same bound
+    FIELD_ID_BUF_SIZE = int(re.search(r'#define\s+HA_DISCOVERY_FIELD_ID_BUF_SIZE\s+(\d+)', _HEADER_TEXT).group(1))
+    UNIQUE_ID_BUF_SIZE = int(re.search(r'#define\s+HA_DISCOVERY_UNIQUE_ID_BUF_SIZE\s+(\d+)', _HEADER_TEXT).group(1))
     DEVICE_ID_MAX = 63  # configured_device_id_[64] minus null terminator
 
     def setUp(self):
