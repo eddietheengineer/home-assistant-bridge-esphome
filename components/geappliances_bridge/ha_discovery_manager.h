@@ -127,7 +127,20 @@ typedef struct {
 
   /* Decompression state. */
   tinfl_decompressor decomp_state;
-  uint8_t decomp_buf[HA_DISCOVERY_DECOMP_BUF_SIZE];
+
+  /* Decompression buffer and cleanup topic queue share memory via union
+   * since they're never used simultaneously — saves 12KB of heap.
+   * During cleanup: cleanup_topic_buf (12KB) holds discovered topics.
+   * During discovery: decomp_buf (14KB) holds decompressed JSONL chunks. */
+#ifdef HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
+  #define HA_DISCOVERY_CLEANUP_BUF_SIZE HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
+#else
+  #define HA_DISCOVERY_CLEANUP_BUF_SIZE 12288
+#endif
+  union {
+    uint8_t decomp_buf[HA_DISCOVERY_DECOMP_BUF_SIZE];
+    char cleanup_topic_buf[HA_DISCOVERY_CLEANUP_BUF_SIZE];
+  };
 
   /* Line parsing buffer. */
   char line_buf[HA_DISCOVERY_LINE_BUF_SIZE];
@@ -191,16 +204,16 @@ typedef struct {
   uint8_t cleanup_pass_number;        // Current pass number (starts at 1)
   uint32_t cleanup_wait_start_ms;     // Start time of final wait before discovery
 
-  /* Cleanup topic queue: ring buffer with domain-enum packing.
+  /* Retry state: delay between unsubscribe and re-subscribe to allow
+   * async unsubscribe to complete before re-subscribing. */
+  bool cleanup_pending_resubscribe;   // Waiting to re-subscribe after unsubscribe
+  uint32_t cleanup_unsubscribe_ms;    // When unsubscribe was called
+  uint16_t cleanup_retry_count;       // Current retry number for this domain
+
+  /* Cleanup topic queue: compacting buffer with domain-enum packing.
    * Each entry: [domain_index:1][suffix:variable][null:1]
-   * Uses read_pos/write_pos indices — no memmove needed.
-   * At ~22 bytes avg, 12KB holds ~550 topics. */
-#ifdef HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
-  #define HA_DISCOVERY_CLEANUP_BUF_SIZE HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
-#else
-  #define HA_DISCOVERY_CLEANUP_BUF_SIZE 12288
-#endif
-  char cleanup_topic_buf[HA_DISCOVERY_CLEANUP_BUF_SIZE];
+   * At ~22 bytes avg, 12KB holds ~550 topics.
+   * Memory is shared with decomp_buf via union (see above). */
   uint16_t cleanup_queue_write_pos;   // Byte offset where next topic is written
   uint16_t cleanup_queue_count;       // Number of entries in buffer
   uint16_t cleanup_dropped_count;     // Topics dropped due to buffer full

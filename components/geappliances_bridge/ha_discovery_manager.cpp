@@ -54,6 +54,9 @@ GEA_TAG(TAG) = "ha_discovery";
 #define HA_DISCOVERY_CLEANUP_IDLE_TIMEOUT_MS 1000
 /* Wait after a clean pass before starting discovery publishing. */
 #define HA_DISCOVERY_CLEANUP_FINAL_WAIT_MS 5000
+/* Delay between unsubscribe and re-subscribe to allow async unsubscribe
+ * to complete before the broker re-delivers retained messages. */
+#define HA_DISCOVERY_CLEANUP_RESUBSCRIBE_DELAY_MS 200
 /* Yield every N published entities during discovery to keep WDT happy. */
 #define HA_DISCOVERY_YIELD_INTERVAL 5
 /* Max topics to flush per batch call. */
@@ -199,6 +202,9 @@ CLEANUP_FN void cleanup_start(ha_discovery_manager_t* self)
     self->cleanup_current_domain = 0;
     self->cleanup_pass_number = 1;
     self->cleanup_wait_start_ms = 0;
+    self->cleanup_pending_resubscribe = false;
+    self->cleanup_unsubscribe_ms = 0;
+    self->cleanup_retry_count = 0;
 
     /* Heap fragmentation baseline before cleanup. */
     {
@@ -231,6 +237,15 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
     /* Not yet subscribed — subscribe to the current domain. */
     if (!self->cleanup_subscribed) {
+        /* If we're waiting for async unsubscribe to complete, delay re-subscribe. */
+        if (self->cleanup_pending_resubscribe) {
+            uint32_t now = self->get_time_ms();
+            if (now - self->cleanup_unsubscribe_ms < HA_DISCOVERY_CLEANUP_RESUBSCRIBE_DELAY_MS) {
+                return;  // Still waiting for unsubscribe to complete
+            }
+            self->cleanup_pending_resubscribe = false;
+        }
+
         char sub_topic[128];
         if (self->cleanup_current_domain < HA_DOMAIN_COUNT) {
             /* Per-domain subscription. */
@@ -251,7 +266,7 @@ static void cleanup_run(ha_discovery_manager_t* self)
         self->cleanup_pass_removed_count = 0;
         self->cleanup_pass_received_count = 0;
         self->cleanup_flushed_once = false;
-        ESP_LOGI(TAG, "  Subscribing to %s", sub_topic);
+        ESP_LOGI(TAG, "  Subscribing to %s (pass %u)", sub_topic, self->cleanup_retry_count + 1);
         return;
     }
 
@@ -276,8 +291,9 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
         if (self->cleanup_current_domain < HA_DOMAIN_COUNT) {
             /* Per-domain pass complete. */
-            ESP_LOGI(TAG, "  Domain %s: %u received, %u removed, %u dropped",
+            ESP_LOGI(TAG, "  Domain %s (pass %u): %u received, %u removed, %u dropped",
                 HA_DOMAIN_STRINGS[self->cleanup_current_domain],
+                self->cleanup_retry_count + 1,
                 self->cleanup_pass_received_count,
                 self->cleanup_pass_removed_count,
                 self->cleanup_dropped_count);
@@ -292,12 +308,16 @@ static void cleanup_run(ha_discovery_manager_t* self)
             /* If we found topics, retry the same domain to catch
              * any dropped by the 32-slot queue. Otherwise move on. */
             if (self->cleanup_pass_found_topics) {
-                self->cleanup_last_activity_ms = self->get_time_ms();
+                self->cleanup_retry_count++;
+                self->cleanup_pending_resubscribe = true;
+                self->cleanup_unsubscribe_ms = now;
+                self->cleanup_last_activity_ms = now;
                 return;
             }
 
             self->cleanup_current_domain++;
-            self->cleanup_last_activity_ms = self->get_time_ms();
+            self->cleanup_retry_count = 0;
+            self->cleanup_last_activity_ms = now;
             return;
         }
 
@@ -317,7 +337,10 @@ static void cleanup_run(ha_discovery_manager_t* self)
         if (self->cleanup_pass_found_topics) {
             self->cleanup_current_domain = 0;
             self->cleanup_clean_passes = 0;
-            self->cleanup_last_activity_ms = self->get_time_ms();
+            self->cleanup_retry_count = 0;
+            self->cleanup_pending_resubscribe = true;
+            self->cleanup_unsubscribe_ms = now;
+            self->cleanup_last_activity_ms = now;
             return;
         }
 
@@ -326,7 +349,10 @@ static void cleanup_run(ha_discovery_manager_t* self)
 
         if (self->cleanup_clean_passes < 2) {
             /* Need another verification pass. */
-            self->cleanup_last_activity_ms = self->get_time_ms();
+            self->cleanup_retry_count = 0;
+            self->cleanup_pending_resubscribe = true;
+            self->cleanup_unsubscribe_ms = now;
+            self->cleanup_last_activity_ms = now;
             return;
         }
 
