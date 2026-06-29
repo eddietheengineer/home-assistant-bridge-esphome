@@ -179,14 +179,12 @@ void erd_cache_mqtt_publisher_init(
     mqtt_client_on_mqtt_connect(self->mqtt_client),
     &self->mqtt_connect_subscription);
 
-  /* If MQTT is already connected when we register, fire the event immediately
-   * so mqtt_connected is set correctly.  This mirrors the adapter's pattern:
-   * the adapter fires on_mqtt_connect_event during its init, but the publisher
-   * subscribes after the adapter is already initialized, so it can miss that
-   * initial event. */
+  /* If MQTT is already connected when we register, set the flag so the
+   * publisher knows it can publish.  Don't call on_connected() — that
+   * logs "MQTT reconnected" which is misleading at init time. */
   auto global = esphome::mqtt::global_mqtt_client;
   if (global != nullptr && global->is_connected()) {
-    erd_cache_mqtt_publisher_on_connected(self);
+    self->mqtt_connected = true;
   }
 
   ESP_LOGI(PUBLISHER_TAG, "ERD cache MQTT publisher initialized");
