@@ -697,24 +697,8 @@ static void build_task(void* arg)
 {
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
 
-    /* Fragmentation baseline: log heap state before build work. */
-    {
-        size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-        size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-        ESP_LOGI(TAG, "Heap before build: free=%u, largest_block=%u, fragmentation=%.1f%%",
-            (unsigned)free_heap, (unsigned)largest_free,
-            (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
-    }
-
     build_sorted_erd_list(self);
     build_device_json(self);
-
-    /* Stack watermark: verify 2KB stack is sufficient. */
-    {
-        UBaseType_t hw __attribute__((unused)) = uxTaskGetStackHighWaterMark(NULL);
-        ESP_LOGI(TAG, "build_task stack high_watermark: %lu words (%lu bytes)",
-            (unsigned long)hw, (unsigned long)(hw * sizeof(StackType_t)));
-    }
 
     if (self->done_sem) {
         xSemaphoreGive(self->done_sem);
