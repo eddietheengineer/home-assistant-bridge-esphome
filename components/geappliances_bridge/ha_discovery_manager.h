@@ -50,11 +50,11 @@ typedef enum {
 #define HA_DISCOVERY_MAX_ERDS 645
 
 
-/* Decompression buffer size per chunk (max chunk is ~14KB). */
-#define HA_DISCOVERY_DECOMP_BUF_SIZE 14336
+/* Decompression buffer size per chunk (max single line is ~7.4KB). */
+#define HA_DISCOVERY_DECOMP_BUF_SIZE 8192
 
-/* Line buffer size for JSONL parsing (max line is ~14KB). */
-#define HA_DISCOVERY_LINE_BUF_SIZE 14336
+/* Line buffer size for JSONL parsing (matches decomp buffer). */
+#define HA_DISCOVERY_LINE_BUF_SIZE 8192
 
 /* Topic buffer size for HA discovery topics (must fit worst-case topic + null). */
 #define HA_DISCOVERY_TOPIC_BUF_SIZE 192
