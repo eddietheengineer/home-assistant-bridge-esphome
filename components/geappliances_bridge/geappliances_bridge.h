@@ -319,7 +319,9 @@ class DiscoveryRefreshButton : public button::Button {
   DiscoveryRefreshButton(GeappliancesBridge* bridge) : bridge_(bridge) {}
 
   void press_action() override {
-    bridge_->trigger_discovery_refresh();
+    if (bridge_ != nullptr) {
+      bridge_->trigger_discovery_refresh();
+    }
   }
 
  private:

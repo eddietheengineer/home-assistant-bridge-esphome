@@ -48,6 +48,10 @@ typedef struct i_mqtt_client_api_t {
   i_tiny_event_t* (*on_mqtt_connect)(i_mqtt_client_t* self);
 
   void (*publish_raw)(i_mqtt_client_t* self, const char* topic, const char* payload, size_t payload_len, bool retain);
+
+  void (*subscribe)(i_mqtt_client_t* self, const char* topic, void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg), void* arg);
+
+  void (*unsubscribe)(i_mqtt_client_t* self, const char* topic);
 } i_mqtt_client_api_t;
 ```
 
@@ -112,6 +116,26 @@ void mqtt_client_publish_raw(
 
 Publish a raw MQTT message with a C-string topic and payload. Used by the bridges to publish ERD values and state updates to arbitrary MQTT topics.
 
+### 3.7 `mqtt_client_subscribe`
+
+```c
+void mqtt_client_subscribe(
+    i_mqtt_client_t* self,
+    const char* topic,
+    void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg),
+    void* arg);
+```
+
+Subscribe to a topic with a raw C callback. The callback is invoked with the topic, payload, payload length, and the user-supplied argument. Used by `ha_discovery_cleanup` to receive MQTT messages on cleanup topics.
+
+### 3.8 `mqtt_client_unsubscribe`
+
+```c
+void mqtt_client_unsubscribe(i_mqtt_client_t* self, const char* topic);
+```
+
+Unsubscribe from a previously subscribed topic. Removes the callback registered via `mqtt_client_subscribe`.
+
 ---
 
 ## 4. Inline Wrappers
@@ -126,8 +150,11 @@ Each vtable method has a corresponding `static inline` wrapper in the header:
 | `mqtt_client_on_mqtt_disconnect(self)` | `self->api->on_mqtt_disconnect(self)` |
 | `mqtt_client_on_mqtt_connect(self)` | `self->api->on_mqtt_connect(self)` |
 | `mqtt_client_publish_raw(self, topic, payload, payload_len, retain)` | `self->api->publish_raw(self, topic, payload, payload_len, retain)` |
+| `mqtt_client_subscribe(self, topic, callback, arg)` | `self->api->subscribe(self, topic, callback, arg)` |
+| `mqtt_client_unsubscribe(self, topic)` | `self->api->unsubscribe(self, topic)` |
 
 This allows callers to use the interface with normal function-call syntax without knowing the vtable structure.
+
 
 ---
 

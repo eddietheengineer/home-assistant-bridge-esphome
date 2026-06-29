@@ -2,15 +2,15 @@
  * @file
  * @brief Home Assistant MQTT Discovery manager implementation.
  *
- * Serialized producer-consumer design:
- *   Producer (background task): decompresses embedded JSONL entity definitions,
- *   builds one discovery topic/payload at a time in a shared buffer, then
- *   signals the consumer via a binary semaphore.
+ * Two-phase design:
+ *   Phase 1 (background build task): builds sorted ERD list and device JSON,
+ *   then signals completion via a one-shot binary semaphore.
  *
- *   Consumer (main loop run()): receives the semaphore, publishes the payload
- *   to MQTT, releases the semaphore, and the producer continues.
+ *   Phase 2 (main loop run()): takes the semaphore once to detect build
+ *   completion, then performs all chunk decompression, JSONL parsing,
+ *   payload building, and MQTT publishing incrementally.
  *
- *   Only one payload is in flight at any time — no item pool needed.
+ *   Only one entity is built and published at a time — no item pool needed.
  */
 
 #include "ha_discovery_manager.h"

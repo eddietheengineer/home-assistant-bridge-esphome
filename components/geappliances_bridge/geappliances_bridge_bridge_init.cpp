@@ -188,6 +188,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
   }
 
   ESP_LOGI(TAG, "Bridge mode: %s", mode_name);
+  (void)mode_name; /* suppress -Wunused-but-set-variable when ESP_LOGI is stubbed */
 
   // Wire the discovery-complete callback BEFORE initializing the bridge,
   // so the HSM cannot fire the callback before it's set (race condition

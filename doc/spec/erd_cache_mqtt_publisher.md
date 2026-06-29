@@ -287,3 +287,73 @@ Override the time source (defaults to `esphome::millis`). Used for testing to co
 4. **Hex encoding is CPU-intensive:** Converting binary data to hex via `snprintf` per byte is simple but not optimal for large payloads. A lookup table or bit-manipulation approach would be faster.
 5. **Background task has no publish budget:** The ESP-IDF background task drains all available updates in one pass. If the cache has many updates, this could block the task for an extended period. The 1000 ms slow-publish warning provides visibility but no enforcement.
 6. **Semaphore failure is degraded, not fatal:** If any semaphore creation fails in `init()`, the publisher continues with reduced safety (no mutex protection, no clean shutdown handshake). This is acceptable for the single-core ESP32-C3 target where context switches provide natural serialization, but could lead to data races on dual-core ESP32 variants.
+
+---
+
+## 11. Pause / Resume / First Round Done
+
+The publisher supports temporarily pausing and resuming publishing, with a mechanism to detect when a full cache round has completed after resuming. These functions are primarily used to reduce MQTT queue contention during Home Assistant discovery cleanup.
+
+### 11.1 Pause
+
+```c
+void erd_cache_mqtt_publisher_pause(erd_cache_mqtt_publisher_t* self);
+```
+
+- Sets `paused = true` and resets `first_round_done = false`
+- **Thread-safe on ESP-IDF**: acquires `state_mutex` (100 ms timeout) before modifying state; falls back to unprotected write if mutex creation failed
+- **Non-ESP-IDF**: sets `paused = true` and `first_round_done = false` directly (no mutex)
+- The `paused` flag is checked by the ESP-IDF background task in `mqtt_publisher_task()`: when `paused` is `true`, the task skips the drain loop and returns to waiting on `work_semaphore`
+- The non-ESP-IDF `erd_cache_mqtt_publisher_loop()` does **not** check `paused` — pause/resume has no effect in main-loop mode. This is intentional: the main loop controls its own pacing via `max_publishes` and `max_ms` budgets.
+
+### 11.2 Resume
+
+```c
+void erd_cache_mqtt_publisher_resume(erd_cache_mqtt_publisher_t* self);
+```
+
+- Sets `paused = false`
+- **Thread-safe on ESP-IDF**: acquires `state_mutex` (100 ms timeout) before modifying state; falls back to unprotected write if mutex creation failed
+- **On ESP-IDF**: after clearing `paused`, calls `erd_cache_mqtt_publisher_signal_work()` to wake the background task so it can immediately resume draining
+- **Non-ESP-IDF**: sets `paused = false` directly (no-op in practice since the main loop doesn't check the flag)
+- Does **not** reset `first_round_done` — the flag is set by the publish loop itself when a full round completes
+
+### 11.3 First Round Done
+
+```c
+bool erd_cache_mqtt_publisher_first_round_done(erd_cache_mqtt_publisher_t* self);
+```
+
+- Returns `true` if the publisher has completed a full cache round since the last `pause()` or `on_connected()` call
+- **Thread-safe on ESP-IDF**: acquires `state_mutex` (100 ms timeout) to read `first_round_done`; falls back to unprotected read if mutex creation failed
+- **Non-ESP-IDF**: reads `first_round_done` directly
+
+**How `first_round_done` is set:**
+- The background task (ESP-IDF) sets `first_round_done = true` after a drain pass where `publish_index` wraps back to 0 (lines 120–122 in implementation)
+- The main-loop function (non-ESP-IDF) sets `first_round_done = true` after publishing entries and `publish_index` wraps to 0 (lines 379–381 in implementation)
+- `first_round_done` is reset to `false` by `pause()` and by `on_connected()` (MQTT reconnect), ensuring the flag reflects completion relative to the most recent pause or reconnect event
+
+### 11.4 Interaction with the Publish Loop
+
+**ESP-IDF background task (`mqtt_publisher_task`):**
+- On each wake (from `work_semaphore` signal or 100 ms timeout), the task acquires `state_mutex` and reads `mqtt_connected`, `paused`, and dependency pointers
+- If `paused` is `true`, the task skips the drain loop entirely and returns to waiting on `work_semaphore` — no cache entries are published
+- When `resume()` is called, it clears `paused` and signals `work_semaphore`, waking the task to resume immediately
+- After resuming, the task drains all available cache entries; when `publish_index` wraps to 0, `first_round_done` is set to `true`
+
+**Non-ESP-IDF main loop (`erd_cache_mqtt_publisher_loop`):**
+- The loop checks `mqtt_connected` but does **not** check `paused`
+- `pause()` and `resume()` are no-ops in terms of publish gating on non-ESP-IDF platforms
+- `first_round_done` is still set by the loop when `publish_index` wraps to 0, so `first_round_done()` remains useful as a completion indicator even in main-loop mode
+
+### 11.5 Use Case: Pausing During HA Discovery
+
+The primary use case for pause/resume is to avoid MQTT config storms during Home Assistant discovery cleanup:
+
+1. Before starting HA discovery cleanup, call `erd_cache_mqtt_publisher_pause()` to stop the background task from publishing cache updates
+2. Perform discovery cleanup (which may generate a burst of MQTT config messages)
+3. Call `erd_cache_mqtt_publisher_resume()` to restart the background task
+4. Optionally poll `erd_cache_mqtt_publisher_first_round_done()` to confirm the publisher has drained all accumulated cache updates before proceeding
+
+This prevents the background task from competing for MQTT queue space with discovery messages, reducing the risk of queue overflow or dropped messages during the transition.
+
