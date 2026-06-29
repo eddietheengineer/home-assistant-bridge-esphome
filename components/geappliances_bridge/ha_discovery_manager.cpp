@@ -726,22 +726,25 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
             const ha_discovery_category_t* cat = &ha_discovery_categories[self->current_category];
 
             if (!should_process_category(cat->name, self->appliance_type)) {
+                /* Skip unneeded category. Return to main loop; next run()
+                 * will try the next category. */
                 self->current_category++;
                 self->current_chunk = 0;
                 self->current_offset = 0;
                 self->current_decomp_size = 0;
-                continue;
+                return;
             }
 
             /* Decompress the current chunk if needed. */
             if (self->current_decomp_size == 0) {
                 if (self->current_chunk >= cat->num_chunks) {
-                    /* Done with this category. */
+                    /* Done with this category. Return to main loop; next
+                     * run() will try the next category. */
                     self->current_category++;
                     self->current_chunk = 0;
                     self->current_offset = 0;
                     self->current_decomp_size = 0;
-                    continue;
+                    return;
                 }
 
                 const ha_discovery_chunk_t* chunk = &cat->chunks[self->current_chunk];
@@ -809,29 +812,35 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                     self->current_offset = (uint32_t)(line_end - decomp) + 1;
                 }
             }
-
-            /* Done with this chunk, move to the next. */
+            /* Done with this chunk. Return to main loop; next run() will
+             * advance to the next chunk or category. This avoids blocking
+             * the main loop while skipping empty chunks. */
             self->current_chunk++;
             self->current_offset = 0;
             self->current_decomp_size = 0;
-
-            break;  /* Break inner while to re-evaluate category/chunk state. */
+            return;
         }
 
         /* Check if all categories are done. */
         if (self->current_category >= ha_discovery_category_count) {
-            cleanup_resources(self);
             self->state = ha_discovery_state_complete;
-
-            size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-            size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-            ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
-                self->total_published, self->total_filtered);
-            ESP_LOGV(TAG, "Heap after discovery: free=%u, largest_block=%u, fragmentation=%.1f%%",
-                (unsigned)free_heap, (unsigned)largest_free,
-                (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
             break;
         }
+    }
+
+    /* If just completed, do cleanup and logging on this call.
+     * This is separate from the publish-return path so the last
+     * entity publish doesn't block on cleanup. */
+    if (self->state == ha_discovery_state_complete) {
+        cleanup_resources(self);
+
+        size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+        ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
+            self->total_published, self->total_filtered);
+        ESP_LOGV(TAG, "Heap after discovery: free=%u, largest_block=%u, fragmentation=%.1f%%",
+            (unsigned)free_heap, (unsigned)largest_free,
+            (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
     }
 #else
     (void)self;
