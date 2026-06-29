@@ -697,8 +697,23 @@ static void build_task(void* arg)
 {
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
 
+    /* Fragmentation baseline before build work. */
+    {
+        size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+        ESP_LOGV(TAG, "Heap before build: free=%u, largest_block=%u, fragmentation=%.1f%%",
+            (unsigned)free_heap, (unsigned)largest_free,
+            (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
+    }
     build_sorted_erd_list(self);
     build_device_json(self);
+
+    /* Stack watermark: verify 2KB stack is sufficient. */
+    {
+        UBaseType_t hw __attribute__((unused)) = uxTaskGetStackHighWaterMark(NULL);
+        ESP_LOGV(TAG, "build_task stack high_watermark: %lu words (%lu bytes)",
+            (unsigned long)hw, (unsigned long)(hw * sizeof(StackType_t)));
+    }
 
     if (self->done_sem) {
         xSemaphoreGive(self->done_sem);
@@ -771,6 +786,14 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         }
         if (!self->build_done) return;
 
+        /* Heap after build task freed its stack/TCB. */
+        {
+            size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+            size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
+            ESP_LOGV(TAG, "Heap after build: free=%u, largest_block=%u, fragmentation=%.1f%%",
+                (unsigned)free_heap, (unsigned)largest_free,
+                (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
+        }
         /* Transition to discovering. */
         self->state = ha_discovery_state_discovering;
         self->current_category = 0;
@@ -922,7 +945,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
             size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
             ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
                 self->total_published, self->total_filtered);
-            ESP_LOGI(TAG, "Heap after discovery: free=%u, largest_block=%u, fragmentation=%.1f%%",
+            ESP_LOGV(TAG, "Heap after discovery: free=%u, largest_block=%u, fragmentation=%.1f%%",
                 (unsigned)free_heap, (unsigned)largest_free,
                 (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
             break;
