@@ -187,7 +187,7 @@ void erd_cache_mqtt_publisher_init(
     self->mqtt_connected = true;
   }
 
-  ESP_LOGI(PUBLISHER_TAG, "ERD cache MQTT publisher initialized");
+  ESP_LOGI(PUBLISHER_TAG, "ERD cache MQTT publisher initialized with device ID: %s", self->device_id);
 }
 
 void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self)
