@@ -280,7 +280,6 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
 
   switch (signal) {
     case tiny_hsm_signal_entry:
-      ESP_LOGI(TAG, "Startup: Feature bits phase");
       break;
 
     case signal_run_loop:

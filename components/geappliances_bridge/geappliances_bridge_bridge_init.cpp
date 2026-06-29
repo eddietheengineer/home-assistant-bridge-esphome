@@ -107,7 +107,6 @@ void GeappliancesBridge::start_feature_bit_reading_()
   // transient null-client on an earlier call does not permanently block retry.
   this->feature_bit_reading_started_ = true;
 
-  ESP_LOGI(TAG, "Reading appliance API feature bits...");
   this->feature_bit_manager_.init(
       erd_client,
       this->autodiscovery_manager_.get_host_address(),

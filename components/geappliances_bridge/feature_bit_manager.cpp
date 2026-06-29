@@ -104,6 +104,7 @@ void FeatureBitManager::start()
   if (this->state_ != FEATURE_BIT_STATE_READING_0092 || this->read_queued_) {
     return;
   }
+  ESP_LOGI(TAG, "Reading appliance API feature bits...");
   this->queue_erd_read_();
 }
 
