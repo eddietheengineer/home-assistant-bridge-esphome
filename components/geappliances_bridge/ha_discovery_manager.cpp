@@ -2,15 +2,9 @@
  * @file
  * @brief Home Assistant MQTT Discovery manager implementation.
  *
- * Two-phase design:
- *   Phase 1 (background build task): builds sorted ERD list and device JSON,
- *   then signals completion via a one-shot binary semaphore.
- *
- *   Phase 2 (main loop run()): takes the semaphore once to detect build
- *   completion, then performs all chunk decompression, JSONL parsing,
- *   payload building, and MQTT publishing incrementally.
- *
- *   Only one entity is built and published at a time — no item pool needed.
+ * Main-loop design: start() builds the sorted ERD list and device JSON
+ * inline. run() is called from the main loop; it decompresses chunks,
+ * parses JSONL, and publishes one entity per call, keeping loop times low.
  */
 
 #include "ha_discovery_manager.h"
@@ -30,9 +24,6 @@
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 #ifndef USE_ESP_IDF_STUBS
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/semphr.h"
 #define MINIZ_NO_ARCHIVE_APIS
 #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
 #define MINIZ_NO_STDIO
@@ -41,8 +32,6 @@
 #endif /* USE_ESP_IDF */
 
 GEA_TAG(TAG) = "ha_discovery";
-
-#define HA_DISCOVERY_YIELD_INTERVAL 5
 
 /* ------------------------------------------------------------------ */
 /* Zero-allocation JSON parser helpers                                */
@@ -692,39 +681,6 @@ static bool should_process_category(const char* category, uint8_t appliance_type
 }
 
 /* ------------------------------------------------------------------ */
-/* Build task: builds sorted ERD list and device JSON                 */
-/* ------------------------------------------------------------------ */
-
-#ifdef USE_ESP_IDF
-static void build_task(void* arg)
-{
-    ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
-
-    /* Fragmentation baseline before build work. */
-    {
-        size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-        size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-        ESP_LOGV(TAG, "Heap before build: free=%u, largest_block=%u, fragmentation=%.1f%%",
-            (unsigned)free_heap, (unsigned)largest_free,
-            (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
-    }
-    build_sorted_erd_list(self);
-    build_device_json(self);
-
-    /* Stack watermark: verify 2KB stack is sufficient. */
-    {
-        UBaseType_t hw __attribute__((unused)) = uxTaskGetStackHighWaterMark(NULL);
-        ESP_LOGV(TAG, "build_task stack high_watermark: %lu words (%lu bytes)",
-            (unsigned long)hw, (unsigned long)(hw * sizeof(StackType_t)));
-    }
-
-    if (self->done_sem) {
-        xSemaphoreGive(self->done_sem);
-    }
-
-    vTaskDelete(NULL);
-}
-#endif
 
 /* ------------------------------------------------------------------ */
 /* Cleanup helper                                                     */
@@ -733,24 +689,12 @@ static void build_task(void* arg)
 #ifdef USE_ESP_IDF
 static void cleanup_resources(ha_discovery_manager_t* self)
 {
-    if (self->done_sem) {
-        vSemaphoreDelete(self->done_sem);
-        self->done_sem = NULL;
-    }
-    if (self->task_stack) {
-        free(self->task_stack);
-        self->task_stack = NULL;
-    }
-    if (self->task_tcb) {
-        free(self->task_tcb);
-        self->task_tcb = NULL;
-    }
-    self->task_handle = NULL;
+    ha_discovery_cleanup_destroy(&self->cleanup);
 }
 #endif
 
 /* ------------------------------------------------------------------ */
-/* run(): sequential chunk decompression + publish                    */
+/* run(): publish one entity per call                                 */
 /* ------------------------------------------------------------------ */
 
 void ha_discovery_manager_run(ha_discovery_manager_t* self)
@@ -761,57 +705,21 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         return;
     }
 
-    /* Wait for build task to finish (first call). */
+    /* If still in BUILDING state, the build happened inline in start().
+     * Transition to DISCOVERING on the first run() call. */
     if (self->state == ha_discovery_state_building) {
-        if (xSemaphoreTake(self->done_sem, 0) == pdTRUE) {
-            self->build_done = true;
-
-            /* After vTaskDelete() the TCB is on xTasksWaitingTermination.
-             * The idle task runs prvCheckTasksWaitingTermination to unlink
-             * the TCB's list items via uxListRemove(). We MUST yield here
-             * so the idle task can finish before freeing the TCB — freeing
-             * it mid-uxListRemove causes a load access fault. */
-            esp_task_wdt_reset();
-            vTaskDelay(pdMS_TO_TICKS(100));
-
-            /* Free task resources after the idle task has unlinked the TCB.
-             * This returns ~3 KB (stack + TCB) to the heap during the
-             * discovery phase — the period of highest memory pressure.
-             * cleanup_resources() at the end will be a no-op since these
-             * are set to NULL. */
-            free(self->task_stack);
-            free(self->task_tcb);
-            self->task_stack = NULL;
-            self->task_tcb = NULL;
-            self->task_handle = NULL;
-        } else {
-            return;  /* Build not done yet. */
-        }
-        if (!self->build_done) return;
-
-        /* Heap after build task freed its stack/TCB. */
-        {
-            size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-            size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-            ESP_LOGV(TAG, "Heap after build: free=%u, largest_block=%u, fragmentation=%.1f%%",
-                (unsigned)free_heap, (unsigned)largest_free,
-                (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
-        }
-        /* Transition to discovering. */
         self->state = ha_discovery_state_discovering;
         self->current_category = 0;
         self->current_chunk = 0;
         self->current_offset = 0;
         self->current_decomp_size = 0;
-        self->last_publish_ms = self->get_time_ms();
-        self->publish_yield_counter = 0;
         self->current_domain_prefix_buf[0] = '\0';
         ESP_LOGI(TAG, "Generating MQTT discovery payloads (filtering: %s)",
             self->filter_config_topics ? "enabled" : "disabled");
         return;
     }
 
-    /* Discovering state: decompress chunks and publish entities. */
+    /* Discovering state: decompress chunks and publish one entity per call. */
     while (self->state == ha_discovery_state_discovering) {
         /* Find the next category to process. */
         while (self->current_category < ha_discovery_category_count) {
@@ -841,10 +749,6 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 
                 size_t dst_size = sizeof(self->decomp_buf);
                 if (chunk_decompress(self, src, chunk->size, self->decomp_buf, &dst_size) != 0) {
-                    /* Decompression failed — log and transition to error state.
-                     * Corrupt data would produce garbage JSONL that the consumer
-                     * cannot parse, so abort discovery rather than risk publishing
-                     * malformed discovery payloads. */
                     ESP_LOGE(TAG, "Decompression failed for category '%s' chunk %u (offset %u, size %u)",
                         cat->name, self->current_chunk, chunk->offset, chunk->size);
                     self->state = ha_discovery_state_failed;
@@ -879,14 +783,6 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 
                 /* Process the line. */
                 if (process_jsonl_line(self, self->line_buf)) {
-                    /* Rate-limit before publishing. */
-                    uint32_t now = self->get_time_ms();
-                    if (now - self->last_publish_ms < HA_DISCOVERY_PUBLISH_INTERVAL_MS) {
-                        /* Don't advance offset; next run() will retry this line. */
-                        return;
-                    }
-                    self->last_publish_ms = now;
-
                     /* Publish. */
                     if (self->mqtt_client) {
                         mqtt_client_publish_raw(self->mqtt_client, self->topic_buf,
@@ -905,22 +801,12 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                         ESP_LOGI(TAG, "Category %s: %u discovered, %u published",
                             cat->name, self->total_discovered, self->total_published);
                     }
+
+                    /* One entity per call — return to main loop. */
+                    return;
                 } else {
                     /* Line was filtered; advance offset past it. */
                     self->current_offset = (uint32_t)(line_end - decomp) + 1;
-                }
-
-                /* Yield to other tasks after each entity. */
-                esp_task_wdt_reset();
-                vTaskDelay(pdMS_TO_TICKS(1));
-
-                /* Additional yield every N entities to keep WDT happy
-                 * and let MQTT callbacks drain during long publish runs. */
-                self->publish_yield_counter++;
-                if (self->publish_yield_counter >= HA_DISCOVERY_YIELD_INTERVAL) {
-                    self->publish_yield_counter = 0;
-                    esp_task_wdt_reset();
-                    vTaskDelay(pdMS_TO_TICKS(2));
                 }
             }
 
@@ -928,13 +814,6 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
             self->current_chunk++;
             self->current_offset = 0;
             self->current_decomp_size = 0;
-
-            /* Log category completion. */
-            /* We don't track per-category discovered easily, so skip the log. */
-
-            /* Yield after finishing a chunk. */
-            esp_task_wdt_reset();
-            vTaskDelay(pdMS_TO_TICKS(10));
 
             break;  /* Break inner while to re-evaluate category/chunk state. */
         }
@@ -944,7 +823,6 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
             cleanup_resources(self);
             self->state = ha_discovery_state_complete;
 
-            /* Fragmentation after discovery: log heap state post-completion. */
             size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
             size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
             ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
@@ -971,16 +849,6 @@ void ha_discovery_manager_init(ha_discovery_manager_t* self)
     self->get_time_ms = esphome::millis;
 
 #ifdef USE_ESP_IDF
-    /* Delete existing semaphore if re-initing to prevent leak. */
-    if (self->done_sem) {
-        vSemaphoreDelete(self->done_sem);
-        self->done_sem = NULL;
-    }
-    self->done_sem = xSemaphoreCreateBinary();
-    if (!self->done_sem) {
-        ESP_LOGE(TAG, "Failed to create done semaphore");
-    }
-    self->task_running = false;
     ha_discovery_cleanup_init(&self->cleanup);
 #endif
 }
@@ -1009,41 +877,9 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
     if (self->state != ha_discovery_state_idle) return;
 
 #ifdef USE_ESP_IDF
-    static constexpr int STACK_SIZE = 4 * 1024;
-
-    self->task_stack = (StackType_t*)heap_caps_malloc(STACK_SIZE, MALLOC_CAP_8BIT);
-    self->task_tcb = (StaticTask_t*)heap_caps_malloc(sizeof(StaticTask_t), MALLOC_CAP_8BIT);
-
-    if (!self->task_stack || !self->task_tcb) {
-        ESP_LOGW(TAG, "Skipping HA discovery: unable to allocate task stack/TCB");
-        free(self->task_stack);
-        free(self->task_tcb);
-        self->task_stack = NULL;
-        self->task_tcb = NULL;
-        self->state = ha_discovery_state_failed;
-        return;
-    }
-
-    self->task_running = true;
-    self->task_handle = xTaskCreateStatic(
-        build_task,
-        "ha_discovery_build",
-        STACK_SIZE,
-        self,
-        1,
-        self->task_stack,
-        self->task_tcb);
-
-    if (!self->task_handle) {
-        ESP_LOGE(TAG, "Failed to create build task");
-        free(self->task_stack);
-        free(self->task_tcb);
-        self->task_stack = NULL;
-        self->task_tcb = NULL;
-        self->state = ha_discovery_state_failed;
-        self->task_running = false;
-        return;
-    }
+    /* Build sorted ERD list and device JSON inline. */
+    build_sorted_erd_list(self);
+    build_device_json(self);
 
     self->state = ha_discovery_state_building;
 #else
@@ -1054,27 +890,7 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
 void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
 {
 #ifdef USE_ESP_IDF
-    if (self->task_handle) {
-        self->task_running = false;
-        if (self->done_sem) {
-            xSemaphoreTake(self->done_sem, pdMS_TO_TICKS(1000));
-        }
-        esp_task_wdt_reset();
-        vTaskDelay(pdMS_TO_TICKS(100));
-
-        /* After the semaphore take + delay, the build task has called
-         * vTaskDelete() and the idle task has had time to unlink the TCB.
-         * Free stack/TCB unconditionally — same as the normal path in
-         * ha_discovery_manager_run(). free(NULL) is a no-op. */
-        free(self->task_stack);
-        free(self->task_tcb);
-        self->task_stack = NULL;
-        self->task_tcb = NULL;
-        self->task_handle = NULL;
-    }
-
     cleanup_resources(self);
-    ha_discovery_cleanup_destroy(&self->cleanup);
 #endif
 
     memset(self, 0, sizeof(*self));

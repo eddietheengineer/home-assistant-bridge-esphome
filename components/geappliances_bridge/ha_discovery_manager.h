@@ -2,17 +2,17 @@
  * @file
  * @brief Home Assistant MQTT Discovery manager.
  *
- * Sequential design: decompresses one chunk at a time into the shared buffer,
- * parses each line, and publishes valid entities with rate limiting. Once all
- * valid entities from a chunk are published, it decompresses the next chunk
- * into the same memory space.
+ * Main-loop design: start() builds the sorted ERD list and device JSON
+ * inline. run() is called from the main loop; it decompresses chunks,
+ * parses JSONL, and publishes one entity per call, keeping loop times low.
  *
  * States: IDLE -> BUILDING -> DISCOVERING -> COMPLETE / FAILED
  *
  * Cleanup is handled by the embedded ha_discovery_cleanup_t module.
  *
- * All FreeRTOS task code is guarded with #ifdef USE_ESP_IDF for
- * simulator/test build compatibility.
+ * All buffers are pre-allocated — no heap allocation during processing.
+ * Peak memory: payload buffer (~8 KB) + decompress buffer (~14 KB) +
+ * line buffer (~14 KB) + sorted ERD array (~1.3 KB).
  */
 
 #ifndef ha_discovery_manager_h
@@ -27,12 +27,8 @@
 
 #ifdef USE_ESP_IDF
 #  ifdef USE_ESP_IDF_STUBS
-#    include "esp-idf/freertos_stub.h"
 #    include "miniz_tinfl.h"
 #  else
-#    include "freertos/FreeRTOS.h"
-#    include "freertos/task.h"
-#    include "freertos/semphr.h"
 #    include "miniz.h"
 #  endif
 #endif
@@ -53,8 +49,6 @@ typedef enum {
 /* Maximum number of registered/seen ERDs for HA discovery binary search. */
 #define HA_DISCOVERY_MAX_ERDS 645
 
-/* Publish rate limit interval in milliseconds. */
-#define HA_DISCOVERY_PUBLISH_INTERVAL_MS 50
 
 /* Decompression buffer size per chunk (max chunk is ~14KB). */
 #define HA_DISCOVERY_DECOMP_BUF_SIZE 14336
@@ -116,17 +110,6 @@ typedef struct {
   uint32_t (*get_time_ms)(void);
 
 #ifdef USE_ESP_IDF
-  /* Task resources for initial ERD list build (heap-allocated). */
-  TaskHandle_t    task_handle;
-  StackType_t*    task_stack;
-  StaticTask_t*   task_tcb;
-  bool task_running;
-
-  /* Done semaphore: given by build task when sorted ERD list is ready. */
-  SemaphoreHandle_t done_sem;
-
-  /* Build state. */
-  bool build_done;
 
   /* Sorted ERD array for binary search during discovery. */
   uint16_t sorted_erds[HA_DISCOVERY_MAX_ERDS];
@@ -144,8 +127,6 @@ typedef struct {
   char topic_buf[HA_DISCOVERY_TOPIC_BUF_SIZE];
   char payload_buf[HA_DISCOVERY_PAYLOAD_BUF_SIZE];
 
-  /* Rate limiting. */
-  uint32_t last_publish_ms;
 
   /* Device JSON built once at start. */
   char device_json_buf[512];
@@ -192,8 +173,6 @@ typedef struct {
   char domain_topic_prefix[128];
   char current_domain_prefix_buf[32]; // Tracks current domain for prefix caching
 
-  /* Yield counter: yields every N published entities during discovery. */
-  uint8_t publish_yield_counter;
 #endif
 } ha_discovery_manager_t;
 
@@ -218,14 +197,15 @@ void ha_discovery_manager_configure(
 
 /*!
  * Start the discovery process.
- * On ESP-IDF, spawns a background build task for the sorted ERD list.
- * On non-ESP-IDF, marks complete immediately.
+ * On ESP-IDF, builds the sorted ERD list and device JSON inline, then
+ * transitions to DISCOVERING state. On non-ESP-IDF, marks complete immediately.
  */
 void ha_discovery_manager_start(ha_discovery_manager_t* self);
 
 /*!
  * Drive the discovery: decompress chunks and publish entities.
  * Call from the main loop while the manager is in BUILDING or DISCOVERING state.
+ * Publishes one entity per call, keeping loop times low.
  * Transitions to COMPLETE when all entities are published.
  */
 void ha_discovery_manager_run(ha_discovery_manager_t* self);
