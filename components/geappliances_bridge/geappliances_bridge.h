@@ -29,6 +29,8 @@
 #include "esphome/core/component.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/uart/uart.h"
+#include "esphome/components/button/button.h"
+#include "esphome/core/application.h"
 #include <string>
 #include <cstring>
 
@@ -43,6 +45,7 @@ extern "C" {
 #include "tiny_hsm.h"
 #include "erd_cache_mqtt_publisher.h"
 #include "ha_discovery_manager.h"
+#include "ha_discovery_cleanup.h"
 }
 
 #include "erd_bridge_subscribe.h"
@@ -70,8 +73,10 @@ namespace geappliances_bridge {
 // BridgeMode is now defined in bridge_mode.h (included via i_bridge_services.h).
 
 
+
 class GeappliancesBridge : public Component, public IBridgeServices {
   friend ErdPollListResult build_poll_list_(GeappliancesBridge* bridge);
+  friend class DiscoveryRefreshButton;
   friend tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t*);
 
  public:
@@ -142,6 +147,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void start_feature_bit_reading_();
   void init_erd_cache_publisher_();
   void on_poll_discovery_complete_();
+  void trigger_discovery_refresh();
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 
   // Startup HSM — replaces the manual switch-based phase progression.
@@ -234,6 +240,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // HA discovery manager: publishes one-shot HA MQTT discovery payloads
   // after steady state is reached.
   ha_discovery_manager_t ha_discovery_manager_;
+  bool discovery_refresh_in_progress_{false};
   bool ha_discovery_started_{false};
 
   // Autodiscovery manager (extracted from god class)
@@ -299,6 +306,20 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   tiny_event_subscription_t erd_client_activity_subscription_;
   tiny_event_subscription_t gea2_activity_subscription_;
+};
+
+// DiscoveryRefreshButton: concrete button that triggers HA discovery cleanup
+// and device restart when pressed.
+class DiscoveryRefreshButton : public button::Button {
+ public:
+  DiscoveryRefreshButton(GeappliancesBridge* bridge) : bridge_(bridge) {}
+
+  void press_action() override {
+    bridge_->trigger_discovery_refresh();
+  }
+
+ private:
+  GeappliancesBridge* bridge_;
 };
 
 }  // namespace geappliances_bridge

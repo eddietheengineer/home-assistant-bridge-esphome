@@ -275,6 +275,19 @@ void GeappliancesBridge::loop() {
     ha_discovery_manager_run(&this->ha_discovery_manager_);
   }
 
+  /* If cleanup-only finished, restart the device so normal boot republishes. */
+  if (this->discovery_refresh_in_progress_) {
+#ifdef USE_ESP_IDF
+    ha_discovery_cleanup_run(&this->ha_discovery_manager_.cleanup);
+    if (ha_discovery_cleanup_is_done(&this->ha_discovery_manager_.cleanup)) {
+      this->discovery_refresh_in_progress_ = false;
+      ESP_LOGI(TAG, "HA discovery cleanup complete, restarting device...");
+      // Allow final retained-clear publishes to transmit before reboot (fixes C5).
+      vTaskDelay(pdMS_TO_TICKS(500));
+      esphome::App.reboot();
+    }
+#endif
+  }
 
   // Publish ERD/MQTT publish rate + cache stats sensors every ~60 seconds.
   if (this->erd_publish_rate_sensor_ != nullptr || this->mqtt_publish_rate_sensor_ != nullptr) {
@@ -814,9 +827,44 @@ void GeappliancesBridge::init_erd_cache_publisher_()
 #endif
 
   // Initialize the HA discovery manager (lazy-started on steady state).
-  ha_discovery_manager_init(&this->ha_discovery_manager_);
+  // Normal boot skips cleanup to avoid entity flicker on restart.
+  ha_discovery_manager_init(&this->ha_discovery_manager_, true);
 
   ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
+}
+
+void GeappliancesBridge::trigger_discovery_refresh()
+{
+  if (this->discovery_refresh_in_progress_) {
+    ESP_LOGW(TAG, "Discovery refresh already in progress, ignoring");
+    return;
+  }
+
+  if (!this->steady_state_reached_) {
+    ESP_LOGW(TAG, "Cannot refresh discovery: appliance bridge not in steady state");
+    return;
+  }
+
+  // If the discovery manager is still processing from a previous run,
+  // wait for it to finish before starting cleanup.
+  if (ha_discovery_manager_is_processing(&this->ha_discovery_manager_)) {
+    ESP_LOGW(TAG, "Cannot refresh discovery: manager still processing");
+    return;
+  }
+
+  ESP_LOGI(TAG, "Starting HA discovery cleanup...");
+
+  // Use the embedded cleanup module directly for cleanup-only mode.
+#ifdef USE_ESP_IDF
+  ha_discovery_cleanup_configure(&this->ha_discovery_manager_.cleanup,
+      this->device_identity_manager_.get_device_id(),
+      &this->mqtt_client_adapter_.interface, esphome::millis);
+  ha_discovery_cleanup_start(&this->ha_discovery_manager_.cleanup);
+#else
+  (void)this->device_identity_manager_.get_device_id();
+  (void)this->mqtt_client_adapter_.interface;
+#endif
+  this->discovery_refresh_in_progress_ = true;
 }
 
 }  // namespace geappliances_bridge

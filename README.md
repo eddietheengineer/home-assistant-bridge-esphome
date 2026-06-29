@@ -74,6 +74,9 @@ geappliances_bridge:
   # mqtt_publish_rate_sensor:
   #   name: "MQTT Publish Rate"           # Number of MQTT messages published per minute
 
+  # Optional discovery refresh button:
+  # discovery_refresh_button:
+  #   name: "Discovery Refresh"           # Triggers HA discovery cleanup and republish when pressed
 ```
 
 ## Configurable Parameters
@@ -124,6 +127,7 @@ The `appliance_api_parsing` parameter is **optional** (default: `true`). When en
 - **`throttle_rate_seconds`** (default: `0`) — Minimum interval in seconds between MQTT publishes for any individual ERD. Set to 0 to disable (publish on every update). Range: 0–255. Useful for reducing MQTT traffic when the appliance generates frequent updates.
 - **`generate_device_config`** (default: `false`) — Currently disabled
 - **`filter_config_topics`** (default: `true`) — Filters out internal/diagnostic entities (firmware metadata, commissioning state, usage profiles, cycle definitions, fault data, etc.) from Home Assistant MQTT discovery. Reduces entity count by ~19% (from ~9,310 to ~7,520) and firmware data by ~8.8%. Set to `false` to include all entities.
+- **`discovery_refresh_button`** (optional) — Exposes an ESPHome button entity that triggers a Home Assistant MQTT discovery cleanup when pressed. Useful for clearing stale discovery topics after firmware updates or configuration changes. Works as a cleanup-only button when `generate_device_config` is disabled (clears stale discovery topics without republishing). Accepts standard [ESPHome button](https://esphome.io/components/button/) options (e.g. `name`). Default name is "Discovery Refresh".
 
 ## Development
 

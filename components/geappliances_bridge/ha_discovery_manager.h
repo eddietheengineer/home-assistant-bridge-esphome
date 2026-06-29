@@ -9,6 +9,8 @@
  *
  * States: IDLE -> BUILDING -> DISCOVERING -> COMPLETE / FAILED
  *
+ * Cleanup is handled by the embedded ha_discovery_cleanup_t module.
+ *
  * All FreeRTOS task code is guarded with #ifdef USE_ESP_IDF for
  * simulator/test build compatibility.
  */
@@ -21,6 +23,7 @@
 
 #include "erd_cache.h"
 #include "i_mqtt_client.h"
+#include "ha_discovery_cleanup.h"
 
 #ifdef USE_ESP_IDF
 #  ifdef USE_ESP_IDF_STUBS
@@ -42,7 +45,6 @@ extern "C" {
 typedef enum {
   ha_discovery_state_idle,
   ha_discovery_state_building,     // building sorted ERD list
-  ha_discovery_state_cleaning,    // removing old discovery topics
   ha_discovery_state_discovering,  // main loop decompressing/publishing
   ha_discovery_state_complete,
   ha_discovery_state_failed
@@ -103,6 +105,7 @@ typedef struct {
   uint8_t appliance_type;          // Appliance type for category filtering
 
   ha_discovery_state_t state;
+  bool skip_cleanup;            /* If true, skip CLEANING phase after BUILDING */
 
   /* Stats */
   uint32_t total_discovered;       // Total entities discovered
@@ -131,20 +134,8 @@ typedef struct {
 
   /* Decompression state. */
   tinfl_decompressor decomp_state;
-
-  /* Decompression buffer and cleanup topic queue share memory via union
-   * since they're never used simultaneously.
-   * During cleanup: cleanup_topic_buf (6KB) holds full topic strings.
-   * During discovery: decomp_buf (14KB) holds decompressed JSONL chunks. */
-#ifdef HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
-  #define HA_DISCOVERY_CLEANUP_BUF_SIZE HA_DISCOVERY_CLEANUP_TEST_BUF_SIZE
-#else
-  #define HA_DISCOVERY_CLEANUP_BUF_SIZE 6144
-#endif
-  union {
-    uint8_t decomp_buf[HA_DISCOVERY_DECOMP_BUF_SIZE];
-    char cleanup_topic_buf[HA_DISCOVERY_CLEANUP_BUF_SIZE];
-  };
+  /* Decompression buffer for JSONL chunks (14KB). */
+  uint8_t decomp_buf[HA_DISCOVERY_DECOMP_BUF_SIZE];
 
   /* Line parsing buffer. */
   char line_buf[HA_DISCOVERY_LINE_BUF_SIZE];
@@ -193,31 +184,8 @@ typedef struct {
   uint16_t current_chunk;          // Index into current category's chunks
   uint32_t current_offset;         // Byte offset within decompressed chunk
   uint32_t current_decomp_size;    // Size of current decompressed chunk
-
-  /* Cleanup state: discover and remove old discovery topics.
-   * Subscribes to homeassistant/+/{device_id}/# to catch all domains
-   * at once, then does a verification pass to confirm clean. */
-  uint32_t cleanup_last_activity_ms;   // Last time a topic callback fired
-  uint32_t cleanup_subscribe_start_ms; // Time we subscribed (for min-subscribe check)
-  bool cleanup_subscribed;             // Whether we're currently subscribed
-  bool cleanup_flushed_once;           // Whether we flushed at least once after subscribing
-  uint8_t cleanup_clean_passes;        // Consecutive clean verification passes
-  bool cleanup_pass_found_topics;      // Whether any topics were found during current pass
-  uint16_t cleanup_pass_received_count;  // Topics received by callback during current pass
-  uint16_t cleanup_pass_removed_count;   // Topics removed during current pass
-  uint8_t cleanup_pass_number;         // Current pass number (starts at 1)
-
-  /* Post-unsubscribe drain tracking: records when we unsubscribed so we can
-   * wait for the inbound MQTT event queue to fully drain before re-subscribing.
-   * Non-zero means we're in a drain-wait phase. */
-  uint32_t cleanup_drain_start_ms;     // Time of last unsubscribe (0 = not draining)
-
-  /* Cleanup topic queue: stores full topic strings for republishing.
-   * Each entry is a null-terminated topic (max 191 chars + null).
-   * Memory is shared with decomp_buf via union (see above). */
-  uint16_t cleanup_queue_write_pos;   // Byte offset where next topic is written
-  uint16_t cleanup_queue_count;       // Number of entries in buffer
-  uint16_t cleanup_dropped_count;     // Topics dropped due to buffer full
+  /* Embedded cleanup module for removing old discovery topics. */
+  ha_discovery_cleanup_t cleanup;
 
   /* Domain topic prefix: pre-computed "homeassistant/{domain}/{device_id}/"
    * to avoid repeated snprintf during discovery publish. */
@@ -231,9 +199,9 @@ typedef struct {
 
 /*!
  * Initialize the discovery manager.
- * Call once before configure().
+ * Call once before configure(). skip_cleanup=true skips the cleanup phase on start.
  */
-void ha_discovery_manager_init(ha_discovery_manager_t* self);
+void ha_discovery_manager_init(ha_discovery_manager_t* self, bool skip_cleanup);
 
 /*!
  * Configure the discovery manager with device info and dependencies.
@@ -268,6 +236,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self);
  */
 void ha_discovery_manager_cleanup(ha_discovery_manager_t* self);
 
+
 /*!
  * Returns true if the manager is currently processing (building or discovering).
  */
@@ -289,8 +258,8 @@ void ha_discovery_manager_set_time_fn(
 /* Test-only exports: exposed when HA_DISCOVERY_TEST_EXPORT is defined. */
 #ifdef HA_DISCOVERY_TEST_EXPORT
 void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg);
-void cleanup_start(ha_discovery_manager_t* self);
-uint16_t cleanup_flush_queue(ha_discovery_manager_t* self);
+void cleanup_start(ha_discovery_cleanup_t* self);
+uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self);
 #endif
 
 #ifdef __cplusplus

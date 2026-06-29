@@ -13,14 +13,14 @@ from typing import Any
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import sensor, uart
+from esphome.components import button, sensor, uart
 from esphome.const import CONF_ID
 
 _LOGGER = logging.getLogger(__name__)
 
 CODEOWNERS = ["@joshualongenecker"]
 DEPENDENCIES = ["uart"]
-AUTO_LOAD = ["sensor"]
+AUTO_LOAD = ["sensor", "button"]
 
 # UART configuration keys
 CONF_GEA3_UART_ID = "gea3_uart_id"
@@ -41,6 +41,7 @@ CONF_ERD_CACHE_UPDATES_SENSOR = "erd_cache_updates_sensor"
 CONF_MQTT_PUBLISH_RATE_SENSOR = "mqtt_publish_rate_sensor"
 CONF_THROTTLE_RATE_SECONDS = "throttle_rate_seconds"
 CONF_FILTER_CONFIG_TOPICS = "filter_config_topics"
+CONF_DISCOVERY_REFRESH_BUTTON = "discovery_refresh_button"
 
 
 
@@ -57,6 +58,11 @@ MODE_AUTO_VALUE = 2
 geappliances_bridge_ns = cg.esphome_ns.namespace("geappliances_bridge")
 GeappliancesBridge = geappliances_bridge_ns.class_(
     "GeappliancesBridge", cg.Component
+)
+
+# Concrete button subclass for discovery refresh (Button is abstract)
+DiscoveryRefreshButton = geappliances_bridge_ns.class_(
+    "DiscoveryRefreshButton", button.Button
 )
 
 
@@ -312,6 +318,9 @@ CONFIG_SCHEMA = cv.Schema(
             cv.Optional("name", default="MQTT Publish Rate"): cv.string,
         }).extend(sensor.sensor_schema(state_class="measurement")),
         cv.Optional(CONF_FILTER_CONFIG_TOPICS, default=True): cv.boolean,
+        cv.Optional(CONF_DISCOVERY_REFRESH_BUTTON): cv.Schema({
+            cv.Optional("name", default="Discovery Refresh"): cv.string,
+        }).extend(button.button_schema(DiscoveryRefreshButton)),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
@@ -391,6 +400,9 @@ async def to_code(config: dict[str, Any]) -> None:
     # HA discovery compression is now handled by generate_erd_lists.py
     # (in-process, after JSONL generation). No separate step needed.
     await cg.register_component(var, config)
+    # Ensure USE_ESP_IDF is defined for ESP-IDF builds so that
+    # platform-specific code in our component compiles correctly.
+    cg.add_build_flag("-DUSE_ESP_IDF")
 
     # Get optional GEA3 UART component reference
     if CONF_GEA3_UART_ID in config:
@@ -436,6 +448,11 @@ async def to_code(config: dict[str, Any]) -> None:
     if CONF_MQTT_PUBLISH_RATE_SENSOR in config:
         sens = await sensor.new_sensor(config[CONF_MQTT_PUBLISH_RATE_SENSOR])
         cg.add(var.set_mqtt_publish_rate_sensor(sens))
+
+    # Optionally create the discovery refresh button
+    if CONF_DISCOVERY_REFRESH_BUTTON in config:
+        btn = cg.new_Pvariable(config[CONF_DISCOVERY_REFRESH_BUTTON][CONF_ID], var)
+        await button.register_button(btn, config[CONF_DISCOVERY_REFRESH_BUTTON])
 
     # Register any user-configured custom ERDs
     for erd in config[CONF_CUSTOM_ERDS]:

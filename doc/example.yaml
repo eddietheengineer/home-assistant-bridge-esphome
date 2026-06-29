@@ -76,7 +76,9 @@ geappliances_bridge:
   #   name: "ERD Cache Entries"           # Number of Erds registered by the appliance
   # erd_publish_rate_sensor:
   #   name: "ERD Publish Rate"            # Number of read or subscribe responses from the appliance per minute
-  # erd_cache_updates_sensor:
-  #   name: "ERD Cache Update Rate"       # Number of appliance messages that have changed payloads per minute
   # mqtt_publish_rate_sensor:
   #   name: "MQTT Publish Rate"           # Number of MQTT messages published per minute
+
+  # Optional discovery refresh button:
+  # discovery_refresh_button:
+  #   name: "Discovery Refresh"           # Triggers HA discovery cleanup and republish when pressed
