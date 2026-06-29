@@ -463,8 +463,6 @@ void GeappliancesBridge::log_poll_state_transitions_()
     polling_state_t poll_state = this->get_polling_state();
     const char* new_state = polling_state_name(poll_state);
     if (new_state != nullptr && poll_state != this->last_logged_poll_state_) {
-      ESP_LOGI(TAG, "Polling bridge state: %s (ERDs cached: %u)",
-               new_state, erd_cache_get_count(&this->erd_cache_));
       this->last_logged_poll_state_ = poll_state;
     }
   }
@@ -770,7 +768,8 @@ bool GeappliancesBridge::check_steady_state()
 
   if (steady) {
     this->steady_state_reached_ = true;
-    ESP_LOGI(TAG, "Appliance Bridge is in steady state");
+    ESP_LOGI(TAG, "Appliance Bridge is in steady state (ERDs cached: %u)",
+             erd_cache_get_count(&this->erd_cache_));
   }
 
   return steady;
