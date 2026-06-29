@@ -59,6 +59,9 @@ static const char* json_get_str(const char* json, const char* key,
     const char* p = json;
 
     while ((p = strstr(p, "\"")) != NULL) {
+        /* Verify this " is the start of a key (preceded by { or ,),
+         * not a value that happens to match the key name. */
+        if (p > json && *(p - 1) != '{' && *(p - 1) != ',') { p++; continue; }
         if (strncmp(p + 1, key, key_len) == 0 && p[key_len + 1] == '\"') {
             p = p + key_len + 3;
             while (*p == ' ' || *p == '\t') p++;
@@ -118,7 +121,7 @@ static void json_unescape(const char* src, size_t src_len, char* out, int out_si
                 case 'n':  out[i++] = '\n'; break;
                 case 'r':  out[i++] = '\r'; break;
                 case 't':  out[i++] = '\t'; break;
-                case 'u':  /* skip \uXXXX */ p += 4; break;
+                case 'u':  /* skip \uXXXX */ if (p + 4 < end) p += 4; break;
                 default:   out[i++] = *p; break;
             }
         } else {
@@ -369,8 +372,8 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             snprintf(self->actual_command_topic_buf, sizeof(self->actual_command_topic_buf), "geappliances/%s/erd/0x%s/write", self->device_id, self->paired_erd_buf);
         }
     } else {
-        strncpy(self->actual_state_topic_buf, self->state_topic_buf, sizeof(self->actual_state_topic_buf));
-        strncpy(self->actual_command_topic_buf, self->command_topic_buf, sizeof(self->actual_command_topic_buf));
+        snprintf(self->actual_state_topic_buf, sizeof(self->actual_state_topic_buf), "%s", self->state_topic_buf);
+        snprintf(self->actual_command_topic_buf, sizeof(self->actual_command_topic_buf), "%s", self->command_topic_buf);
     }
 
     /* Build topic using pre-computed domain prefix if available.

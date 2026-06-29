@@ -560,12 +560,7 @@ def _compute_sensor_value_template(scaling_factor: int, data_size: int, signed: 
                 f' if (value | int(base=16)) >= {half_val}'
                 f' else (value | int(base=16)) }}}}')
     if scaling_factor > 1:
-        if scaling_factor == 10:
-            dp = 1
-        elif scaling_factor == 100:
-            dp = 2
-        else:
-            dp = 3
+        dp = _decimal_places(scaling_factor)
         return f'{{{{ (value | int(base=16)) / {scaling_factor} | round({dp}) }}}}'
     return '{{ value | int(base=16) }}'
 
