@@ -748,6 +748,8 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                 }
 
                 const ha_discovery_chunk_t* chunk = &cat->chunks[self->current_chunk];
+                ESP_LOGD(TAG, "Decompressing chunk %u/%u for category '%s' (compressed %u bytes)",
+                    self->current_chunk, cat->num_chunks, cat->name, chunk->size);
                 const uint8_t* src = cat->data + chunk->offset;
 
                 size_t dst_size = sizeof(self->decomp_buf);
