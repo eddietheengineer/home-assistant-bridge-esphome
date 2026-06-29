@@ -28,8 +28,8 @@ CATEGORIES = [
     "energy",
 ]
 
-# Target decompressed chunk size (must fit in decompress_buf: 8KB).
-CHUNK_TARGET_DECOMPRESSED = 4000
+# Target decompressed chunk size (must fit in decompress_buf: 16KB).
+CHUNK_TARGET_DECOMPRESSED = 14000
 
 
 def category_to_cpp_name(category: str) -> str:
