@@ -68,9 +68,11 @@ static void mqtt_publisher_task(void* arg)
 
     // Drain all available updates — no per-loop budget in background task.
     // The mutex is held throughout to protect publish_index and cache access.
+    bool drained_any = false;
     while (1) {
       erd_cache_entry_t* entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
       if (!entry) break;
+      drained_any = true;
 
       /* Determine data pointer. */
       const uint8_t* data;
@@ -113,9 +115,9 @@ static void mqtt_publisher_task(void* arg)
       self->publish_count_window++;
     }
 
-    /* Detect full cache round: publish_index wrapped back to 0.
-     * Mark first_round_done so the bridge knows all stale updates are flushed. */
-    if (self->publish_index == 0 && !self->first_round_done) {
+    /* Detect full cache round: we drained entries and the index wrapped
+     * back to 0, meaning we've scanned the entire cache. */
+    if (drained_any && self->publish_index == 0) {
       self->first_round_done = true;
     }
 
@@ -373,9 +375,8 @@ uint16_t erd_cache_mqtt_publisher_loop(
     self->publish_count_window++;
     published++;
   }
-
-  /* Detect full cache round: publish_index wrapped back to 0. */
-  if (self->publish_index == 0 && !self->first_round_done) {
+  /* Detect full cache round: drained entries and index wrapped to 0. */
+  if (published > 0 && self->publish_index == 0) {
     self->first_round_done = true;
   }
 

@@ -252,6 +252,7 @@ void GeappliancesBridge::loop() {
       if (this->erd_cache_publisher_paused_) {
         ESP_LOGD(TAG, "ERD cache publisher resumed after MQTT discovery payload generation");
         this->erd_cache_publisher_paused_ = false;
+        this->discovery_just_resumed_ = true;
       }
     }
   }
@@ -264,10 +265,11 @@ void GeappliancesBridge::loop() {
 #endif
   }
 
-  /* Log steady state once the publisher has completed a full cache round
-   * after resuming from discovery. */
-  if (!this->erd_cache_publisher_paused_ && this->erd_cache_publisher_.first_round_done) {
+  /* Log steady state once after the publisher resumes from discovery
+   * and has completed a full cache round. */
+  if (this->discovery_just_resumed_ && this->erd_cache_publisher_.first_round_done) {
     ESP_LOGI(TAG, "Device is in steady state");
+    this->discovery_just_resumed_ = false;
   }
 
   // Start HA discovery once steady state is reached and generate_device_config is enabled.
