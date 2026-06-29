@@ -304,7 +304,7 @@ static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
     if (self->polling_list_count > 0) {
       clear_discovery_state(self);
     }
-    ESP_LOGI(TAG, "Probe phase started: %u ERDs to verify", self->probe_list_count);
+    ESP_LOGD(TAG, "Probe phase started: %u ERDs to verify", self->probe_list_count);
     if (self->probe_list_count > 0) {
       send_next_read_request(self);
     } else {

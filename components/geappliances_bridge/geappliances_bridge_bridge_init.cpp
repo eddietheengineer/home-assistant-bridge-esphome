@@ -207,7 +207,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
     auto result = build_poll_list_(this);
     this->poll_probe_list_count_ = result.erds_count;
     std::memcpy(this->poll_probe_list_, result.erds, result.erds_count * sizeof(uint16_t));
-    ESP_LOGI(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
+    ESP_LOGD(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
     erd_bridge_poll_init(
       &this->erd_bridge_poll_,
       &this->timer_group_,
