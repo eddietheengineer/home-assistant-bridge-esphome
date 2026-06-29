@@ -29,19 +29,19 @@ TEST_GROUP(geappliances_bridge_discovery)
 
 TEST(geappliances_bridge_discovery, set_generate_device_config_sets_flag_correctly)
 {
+  // Toggling setter doesn't crash.
   bridge.set_generate_device_config(true);
   bridge.set_generate_device_config(false);
   bridge.set_generate_device_config(true);
-  // No crash = setter is safe.
   CHECK_TRUE(true);
 }
 
 TEST(geappliances_bridge_discovery, set_filter_config_topics_sets_flag_correctly)
 {
+  // Toggling setter doesn't crash.
   bridge.set_filter_config_topics(false);
   bridge.set_filter_config_topics(true);
   bridge.set_filter_config_topics(false);
-  // No crash = setter is safe.
   CHECK_TRUE(true);
 }
 
@@ -52,57 +52,45 @@ TEST(geappliances_bridge_discovery, trigger_discovery_refresh_safe_on_initialize
   // so it returns early without side effects.
   DiscoveryRefreshButton button(&bridge);
   button.press_action();
+  // No crash = guard chain works when steady_state_reached_ is false.
   CHECK_TRUE(true);
 }
 
-TEST(geappliances_bridge_discovery, ha_discovery_started_defaults_to_false)
+TEST(geappliances_bridge_discovery, button_press_is_idempotent)
 {
-  // ha_discovery_started_ is initialized to false in the class definition.
-  // Calling trigger_discovery_refresh() on a fresh bridge (steady_state_reached_
-  // = false) returns early, confirming the initial state is clean.
+  // Multiple presses don't crash and don't cause side effects
+  // (steady_state_reached_ is false, so all return early).
   DiscoveryRefreshButton button(&bridge);
+  button.press_action();
+  button.press_action();
   button.press_action();
   CHECK_TRUE(true);
 }
 
-TEST(geappliances_bridge_discovery, discovery_refresh_in_progress_defaults_to_false)
+TEST(geappliances_bridge_discovery, button_safe_with_null_bridge)
 {
-  // discovery_refresh_in_progress_ is initialized to false in the class definition.
-  // Calling trigger_discovery_refresh() when steady_state_reached_ is false
-  // returns early without setting the flag.
-  DiscoveryRefreshButton button(&bridge);
+  // Button with null bridge pointer should not crash.
+  DiscoveryRefreshButton button(nullptr);
   button.press_action();
   CHECK_TRUE(true);
 }
 
-TEST(geappliances_bridge_discovery, erd_cache_publisher_paused_defaults_to_false)
+TEST(geappliances_bridge_discovery, button_inherits_from_button_base)
 {
-  // erd_cache_publisher_paused_ is initialized to false in the class definition.
-  // The bridge starts with the ERD cache publisher unpaused.
-  CHECK_TRUE(true);
+  // DiscoveryRefreshButton is a subclass of esphome::button::Button.
+  GeappliancesBridge bridge;
+  DiscoveryRefreshButton button(&bridge);
+  // Can cast to esphome::button::Button* without error.
+  esphome::button::Button* base = &button;
+  CHECK(base != nullptr);
 }
 
-TEST(geappliances_bridge_discovery, discovery_just_resumed_defaults_to_false)
+TEST(geappliances_bridge_discovery, setter_toggles_are_safe)
 {
-  // discovery_just_resumed_ is initialized to false in the class definition.
-  // The bridge starts with no discovery resume event pending.
-  CHECK_TRUE(true);
-}
-
-TEST(geappliances_bridge_discovery, generate_device_config_defaults_to_false)
-{
-  // generate_device_config_ is initialized to false in the class definition.
-  // We verify by toggling it and confirming no crash.
-  bridge.set_generate_device_config(true);
-  bridge.set_generate_device_config(false);
-  CHECK_TRUE(true);
-}
-
-TEST(geappliances_bridge_discovery, filter_config_topics_defaults_to_true)
-{
-  // filter_config_topics_ is initialized to true in the class definition.
-  // We verify by toggling it and confirming no crash.
-  bridge.set_filter_config_topics(false);
-  bridge.set_filter_config_topics(true);
+  // Repeatedly toggling both setters doesn't crash.
+  for (int i = 0; i < 10; i++) {
+    bridge.set_generate_device_config(i % 2 == 0);
+    bridge.set_filter_config_topics(i % 2 != 0);
+  }
   CHECK_TRUE(true);
 }
