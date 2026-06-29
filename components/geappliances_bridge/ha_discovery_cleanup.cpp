@@ -64,8 +64,9 @@ GEA_TAG(TAG) = "ha_cleanup";
  * remaining in the queue (0 means all flushed). */
 CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
 {
-    const char* topic;
+    char topic[128];
     uint16_t consumed;
+    uint16_t remaining;
 
     vPortEnterCritical();
     if (self->queue_count == 0) {
@@ -73,10 +74,12 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
         return 0;
     }
 
-    /* Topic is at the front of the buffer. Copy pointer — it stays valid
-     * through the compact below since memmove shifts data forward. */
-    topic = self->topic_buf;
-    consumed = (uint16_t)(strlen(topic) + 1);
+    /* Copy the topic string to a stack buffer BEFORE compacting.
+     * memmove shifts data forward into topic_buf, invalidating any
+     * pointer into the buffer. */
+    strncpy(topic, self->topic_buf, sizeof(topic) - 1);
+    topic[sizeof(topic) - 1] = '\0';
+    consumed = (uint16_t)(strlen(self->topic_buf) + 1);
 
     /* Safety clamp: prevent underflow if buffer is corrupted. */
     if (consumed > self->queue_write_pos) {
@@ -88,6 +91,9 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
             self->queue_write_pos - consumed);
     self->queue_write_pos -= consumed;
     self->queue_count--;
+
+    /* Read remaining count while still in critical section (fixes C3). */
+    remaining = self->queue_count;
     vPortExitCritical();
 
     /* Republish with empty payload to clear the retained message. */
@@ -95,9 +101,9 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
     ESP_LOGD(TAG, "Removed old topic: %s", topic);
     self->pass_removed_count++;
 
-    vTaskDelay(pdMS_TO_TICKS(1));
+    /* No vTaskDelay — flush one topic per call to keep main loop responsive (fixes C4). */
 
-    return self->queue_count;
+    return remaining;
 }
 
 /* Callback for homeassistant/+/{device_id}/# wildcard subscription during cleanup.
@@ -198,6 +204,12 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
         ESP_LOGI(TAG, "Skipping cleanup (no MQTT client)");
         return;
     }
+    if (self->device_id == NULL) {
+        /* No device_id — can't build subscription topic, mark done. */
+        self->state = ha_cleanup_state_done;
+        ESP_LOGW(TAG, "Skipping cleanup (no device_id)");
+        return;
+    }
 
     /* Not yet subscribed — subscribe to all domains at once. */
     if (!self->subscribed) {
@@ -243,10 +255,8 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
      * until we've been subscribed long enough for the MQTT task to deliver
      * at least one batch of retained messages (~32 per queue cycle). */
     if (now - self->subscribe_start_ms < HA_CLEANUP_MIN_SUBSCRIBE_MS) {
-        /* Still within minimum subscription window — flush what we have. */
-        while (self->queue_count > 0) {
-            cleanup_flush_queue(self);
-        }
+        /* Still within minimum subscription window — flush one topic (fixes C4). */
+        cleanup_flush_queue(self);
         return;
     }
 
@@ -259,10 +269,8 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
 
     /* Check if we've been idle long enough (no new callbacks). */
     if (now - self->last_activity_ms >= HA_CLEANUP_IDLE_TIMEOUT_MS) {
-        /* Flush entire queue. */
-        while (self->queue_count > 0) {
-            cleanup_flush_queue(self);
-        }
+        /* Flush one topic (fixes C4). */
+        cleanup_flush_queue(self);
 
         char sub_topic[128];
         snprintf(sub_topic, sizeof(sub_topic),
@@ -314,14 +322,16 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
         return;
     }
 
-    /* Still receiving messages. Flush queued topics while waiting. */
-    while (self->queue_count > 0) {
-        cleanup_flush_queue(self);
-    }
+    /* Still receiving messages. Flush one topic while waiting (fixes C4). */
+    cleanup_flush_queue(self);
 }
 
 void ha_discovery_cleanup_destroy(ha_discovery_cleanup_t* self)
 {
+    if (self->device_id == NULL) {
+        memset(self, 0, sizeof(*self));
+        return;
+    }
     if (self->subscribed && self->mqtt_client != NULL) {
         char sub_topic[128];
         snprintf(sub_topic, sizeof(sub_topic),
@@ -331,7 +341,6 @@ void ha_discovery_cleanup_destroy(ha_discovery_cleanup_t* self)
     }
     memset(self, 0, sizeof(*self));
 }
-
 ha_cleanup_state_t ha_discovery_cleanup_get_state(ha_discovery_cleanup_t* self)
 {
     return self->state;

@@ -282,6 +282,8 @@ void GeappliancesBridge::loop() {
     if (ha_discovery_cleanup_is_done(&this->ha_discovery_manager_.cleanup)) {
       this->discovery_refresh_in_progress_ = false;
       ESP_LOGI(TAG, "HA discovery cleanup complete, restarting device...");
+      // Allow final retained-clear publishes to transmit before reboot (fixes C5).
+      vTaskDelay(pdMS_TO_TICKS(500));
       esphome::App.reboot();
     }
 #endif
