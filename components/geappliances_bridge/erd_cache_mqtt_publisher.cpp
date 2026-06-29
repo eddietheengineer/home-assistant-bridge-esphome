@@ -113,6 +113,12 @@ static void mqtt_publisher_task(void* arg)
       self->publish_count_window++;
     }
 
+    /* Detect full cache round: publish_index wrapped back to 0.
+     * Mark first_round_done so the bridge knows all stale updates are flushed. */
+    if (self->publish_index == 0 && !self->first_round_done) {
+      self->first_round_done = true;
+    }
+
     if (mutex_held) {
       xSemaphoreGive(self->state_mutex);
     }
@@ -368,6 +374,11 @@ uint16_t erd_cache_mqtt_publisher_loop(
     published++;
   }
 
+  /* Detect full cache round: publish_index wrapped back to 0. */
+  if (self->publish_index == 0 && !self->first_round_done) {
+    self->first_round_done = true;
+  }
+
   return published;
 }
 
@@ -412,13 +423,16 @@ void erd_cache_mqtt_publisher_pause(erd_cache_mqtt_publisher_t* self)
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->paused = true;
+      self->first_round_done = false;
       xSemaphoreGive(self->state_mutex);
     }
   } else {
     self->paused = true;
+    self->first_round_done = false;
   }
 #else
   self->paused = true;
+  self->first_round_done = false;
 #endif
 }
 

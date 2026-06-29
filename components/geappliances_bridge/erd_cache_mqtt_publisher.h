@@ -47,6 +47,7 @@ typedef struct {
   uint16_t publish_index;          // Round-robin index into cache entries
   bool mqtt_connected;             // True when MQTT broker is connected
   bool paused;                     // True when publishing should be temporarily paused
+  bool first_round_done;          // True after one full cache pass following resume
   tiny_event_subscription_t mqtt_disconnect_subscription;
   tiny_event_subscription_t mqtt_connect_subscription;
   // Stats
