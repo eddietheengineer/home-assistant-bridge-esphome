@@ -251,6 +251,7 @@ void GeappliancesBridge::loop() {
       erd_cache_mqtt_publisher_resume(&this->erd_cache_publisher_);
       if (this->erd_cache_publisher_paused_) {
         ESP_LOGD(TAG, "ERD cache publisher resumed after MQTT discovery payload generation");
+        ESP_LOGI(TAG, "Device is in steady state");
         this->erd_cache_publisher_paused_ = false;
       }
     }
