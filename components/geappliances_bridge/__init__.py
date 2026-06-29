@@ -451,6 +451,7 @@ async def to_code(config: dict[str, Any]) -> None:
     cg.add(var.set_appliance_api_parsing(config[CONF_APPLIANCE_API_PARSING]))
     cg.add(var.set_generate_device_config(config[CONF_GENERATE_DEVICE_CONFIG]))
     cg.add(var.set_throttle_rate_seconds(config[CONF_THROTTLE_RATE_SECONDS]))
+    cg.add(var.set_filter_config_topics(config[CONF_FILTER_CONFIG_TOPICS]))
 
 
     # Create diagnostic sensors (auto-created by default, set to false to disable)

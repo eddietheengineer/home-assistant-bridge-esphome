@@ -104,6 +104,7 @@ typedef struct {
   const char* serial_number;       // Serial number for device info
   uint8_t appliance_type;          // Appliance type for category filtering
 
+  bool filter_config_topics;       /* Whether config topic filtering was enabled */
   ha_discovery_state_t state;
 
   /* Stats */
@@ -211,6 +212,7 @@ void ha_discovery_manager_configure(
   const char* model_number,
   const char* serial_number,
   uint8_t appliance_type,
+  bool filter_config_topics,
   erd_cache_t* cache,
   i_mqtt_client_t* mqtt_client);
 

@@ -281,6 +281,7 @@ void GeappliancesBridge::loop() {
       this->device_identity_manager_.get_model_number(),
       this->device_identity_manager_.get_serial_number(),
       this->device_identity_manager_.get_appliance_type(),
+      this->filter_config_topics_,
       &this->erd_cache_,
       &this->mqtt_client_adapter_.interface);
     ha_discovery_manager_start(&this->ha_discovery_manager_);

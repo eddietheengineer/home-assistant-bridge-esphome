@@ -803,7 +803,8 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         self->last_publish_ms = self->get_time_ms();
         self->publish_yield_counter = 0;
         self->current_domain_prefix_buf[0] = '\0';
-        ESP_LOGI(TAG, "Generating MQTT discovery payloads...");
+        ESP_LOGI(TAG, "Generating MQTT discovery payloads (filtering: %s)",
+            self->filter_config_topics ? "enabled" : "disabled");
         return;
     }
 
@@ -987,6 +988,7 @@ void ha_discovery_manager_configure(
     const char* model_number,
     const char* serial_number,
     uint8_t appliance_type,
+    bool filter_config_topics,
     erd_cache_t* cache,
     i_mqtt_client_t* mqtt_client)
 {
@@ -994,6 +996,7 @@ void ha_discovery_manager_configure(
     self->model_number = model_number;
     self->serial_number = serial_number;
     self->appliance_type = appliance_type;
+    self->filter_config_topics = filter_config_topics;
     self->cache = cache;
     self->mqtt_client = mqtt_client;
 }

@@ -96,6 +96,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_polling_interval(uint32_t polling_interval) { this->polling_interval_ms_ = polling_interval; }
   void set_appliance_api_parsing(bool appliance_api_parsing) { this->appliance_api_parsing_ = appliance_api_parsing; }
   void set_generate_device_config(bool generate_device_config) { this->generate_device_config_ = generate_device_config; }
+  void set_filter_config_topics(bool filter_config_topics) { this->filter_config_topics_ = filter_config_topics; }
   void set_erd_publish_rate_sensor(sensor::Sensor* sensor) { this->erd_publish_rate_sensor_ = sensor; }
   void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; }
   void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; }
@@ -167,6 +168,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   uint32_t polling_interval_ms_{10000};
   bool appliance_api_parsing_{true};
   bool generate_device_config_{false};
+  bool filter_config_topics_{true};
   uint8_t throttle_rate_seconds_{0};
   uint32_t last_cooldown_tick_{0};  /* last time erd_cache_tick_cooldowns ran (ms) */
   // User-configured custom ERDs to poll in addition to the standard list.
