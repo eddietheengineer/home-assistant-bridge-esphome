@@ -828,8 +828,6 @@ void GeappliancesBridge::init_erd_cache_publisher_()
 
   // Initialize the HA discovery manager (lazy-started on steady state).
   ha_discovery_manager_init(&this->ha_discovery_manager_);
-
-  ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
 }
 
 void GeappliancesBridge::trigger_discovery_refresh()
