@@ -478,8 +478,7 @@ void GeappliancesBridge::log_poll_state_transitions_()
   // poll mode, or as the custom-ERD polling bridge alongside subscription).
   if (this->polling_bridge_initialized_) {
     polling_state_t poll_state = this->get_polling_state();
-    const char* new_state = polling_state_name(poll_state);
-    if (new_state != nullptr && poll_state != this->last_logged_poll_state_) {
+    if (poll_state != polling_state_none && poll_state != this->last_logged_poll_state_) {
       this->last_logged_poll_state_ = poll_state;
     }
   }

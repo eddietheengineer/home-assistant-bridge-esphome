@@ -48,6 +48,7 @@ typedef struct {
   bool mqtt_connected;             // True when MQTT broker is connected
   bool paused;                     // True when publishing should be temporarily paused
   bool first_round_done;          // True after one full cache pass following resume
+  bool round_started;             // True once publish_index has advanced past 0 in the current round
   tiny_event_subscription_t mqtt_disconnect_subscription;
   tiny_event_subscription_t mqtt_connect_subscription;
   // Stats

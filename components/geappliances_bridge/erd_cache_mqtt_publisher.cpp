@@ -115,10 +115,18 @@ static void mqtt_publisher_task(void* arg)
       self->publish_count_window++;
     }
 
-    /* Detect full cache round: we drained entries and the index wrapped
-     * back to 0, meaning we've scanned the entire cache. */
-    if (drained_any && self->publish_index == 0) {
-      self->first_round_done = true;
+    /* Track round progress: mark started once we've scanned past index 0,
+     * then set first_round_done when we wrap back to 0.  This avoids a
+     * false positive when the last updated entry happens to be at the end
+     * of the cache, causing publish_index to wrap to 0 on the very first
+     * drain cycle. */
+    if (drained_any) {
+      if (!self->round_started && self->publish_index > 0) {
+        self->round_started = true;
+      }
+      if (self->round_started && self->publish_index == 0) {
+        self->first_round_done = true;
+      }
     }
 
     if (mutex_held) {
@@ -375,9 +383,15 @@ uint16_t erd_cache_mqtt_publisher_loop(
     self->publish_count_window++;
     published++;
   }
-  /* Detect full cache round: drained entries and index wrapped to 0. */
-  if (published > 0 && self->publish_index == 0) {
-    self->first_round_done = true;
+  /* Track round progress: mark started once past index 0, then set
+   * first_round_done on wrap.  See mqtt_publisher_task for rationale. */
+  if (published > 0) {
+    if (!self->round_started && self->publish_index > 0) {
+      self->round_started = true;
+    }
+    if (self->round_started && self->publish_index == 0) {
+      self->first_round_done = true;
+    }
   }
 
   return published;
@@ -389,13 +403,19 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->mqtt_connected = true;
+      self->first_round_done = false;
+      self->round_started = false;
       xSemaphoreGive(self->state_mutex);
     }
   } else {
     self->mqtt_connected = true;
+    self->first_round_done = false;
+    self->round_started = false;
   }
 #else
   self->mqtt_connected = true;
+  self->first_round_done = false;
+  self->round_started = false;
 #endif
   ESP_LOGI(PUBLISHER_TAG, "MQTT reconnected — resuming ERD cache publishing");
   /* Wake the background task so it can start publishing again. */
@@ -425,15 +445,18 @@ void erd_cache_mqtt_publisher_pause(erd_cache_mqtt_publisher_t* self)
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->paused = true;
       self->first_round_done = false;
+      self->round_started = false;
       xSemaphoreGive(self->state_mutex);
     }
   } else {
     self->paused = true;
     self->first_round_done = false;
+    self->round_started = false;
   }
 #else
   self->paused = true;
   self->first_round_done = false;
+  self->round_started = false;
 #endif
 }
 
