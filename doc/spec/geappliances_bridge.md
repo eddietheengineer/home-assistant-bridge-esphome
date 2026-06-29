@@ -103,11 +103,11 @@ During `startup_state_bridge_init`, `initialize_erd_bridge_()` runs:
 
 ## 6. GEA2 Tight Loop
 
-When GEA2 is active, `run_protocol_stack_()` executes a 200 ms wall-clock busy loop to ensure the full TX→RX cycle at 19200 baud completes within a single `loop()` call. A manual millisecond counter (`gea2_msec_interrupt_`) drives the GEA2 interface's internal timers without starving the shared `timer_group_`.
+When GEA2 is active, `run_protocol_stack_()` executes a 100 ms wall-clock busy loop to ensure the full TX→RX cycle at 19200 baud completes within a single `loop()` call. A manual millisecond counter (`gea2_msec_interrupt_`) drives the GEA2 interface's internal timers without starving the shared `timer_group_`.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `GEA2_LOOP_DURATION_MS` | 200 ms | Wall-clock duration for GEA2 tight loop |
+| `GEA2_LOOP_DURATION_MS` | 100 ms | Wall-clock duration for GEA2 tight loop |
 | `GEA3_LOOP_DURATION_MS` | 10 ms | Wall-clock duration for GEA3 protocol tick |
 
 ---
@@ -179,7 +179,7 @@ Key member variables:
 1. **Single appliance:** The bridge operates with a single discovered appliance address. Multi-appliance support would require significant architectural changes.
 2. **Fixed capacity arrays:** All data structures use fixed-capacity arrays. If the appliance supports more ERDs than the cache can hold (200), updates are silently dropped.
 3. **No rollback:** The startup sequence is linear — once a phase completes, it does not re-run. If a phase fails, the bridge continues with fallback values.
-4. **GEA2 tight loop blocks the main loop:** During the 200 ms GEA2 tight loop, the ESPHome main loop is blocked. This is necessary for correct GEA2 half-duplex operation but limits the responsiveness of other ESPHome components during that window.
+4. **GEA2 tight loop blocks the main loop:** During the 100 ms GEA2 tight loop, the ESPHome main loop is blocked. This is necessary for correct GEA2 half-duplex operation but limits the responsiveness of other ESPHome components during that window.
 5. **Static global back-pointer:** The startup HSM uses a static global pointer (`g_bridge_instance`) to access `IBridgeServices` methods. This is safe in the single-threaded ESPHome context but would not be thread-safe in a multi-threaded environment.
 ---
 
@@ -292,7 +292,7 @@ On non-ESP-IDF platforms, the cleanup configure/start calls are omitted (depende
 The bridge owns a `ha_discovery_manager_t` instance (`ha_discovery_manager_`) and drives it from `loop()`:
 
 - **Configuration:** `ha_discovery_manager_configure()` is called once when discovery starts, passing the device identity (ID, model, serial, appliance type), the `filter_config_topics_` flag, the ERD cache, and the MQTT client interface.
-- **Start:** `ha_discovery_manager_start()` transitions the manager from `IDLE` to `BUILDING` (on ESP-IDF) or directly to `DISCOVERING` (on non-ESP-IDF).
+- **Start:** `ha_discovery_manager_start()` transitions the manager from `IDLE` to `BUILDING` (on ESP-IDF) or directly to `COMPLETE` (on non-ESP-IDF).
 - **Drive:** `ha_discovery_manager_run()` is called each `loop()` iteration while `ha_discovery_manager_is_processing()` returns `true`. This advances the manager through its state machine, decompressing JSONL chunks and publishing discovery payloads at a rate-limited interval (50 ms).
 - **Completion:** When the manager reaches `COMPLETE` or `FAILED` state, `ha_discovery_manager_is_processing()` returns `false`, causing `loop()` to stop calling `run()` and resume normal ERD cache publishing.
 
