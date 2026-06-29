@@ -14,7 +14,8 @@ from typing import Any
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import button, sensor, uart
-from esphome.const import CONF_ID
+from esphome.const import CONF_ID, CONF_STATE_CLASS
+from esphome.core import EnumValue, ID
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,6 +65,14 @@ GeappliancesBridge = geappliances_bridge_ns.class_(
 DiscoveryRefreshButton = geappliances_bridge_ns.class_(
     "DiscoveryRefreshButton", button.Button
 )
+
+
+def _make_state_class(value: str):
+    """Wrap a state_class string as an EnumValue for codegen."""
+    v = cv.add_class_to_obj(value, EnumValue)
+    v.enum_value = sensor.STATE_CLASSES[value]
+    return v
+
 
 
 def sanitize_appliance_name(name: str) -> str:
@@ -305,22 +314,37 @@ CONFIG_SCHEMA = cv.Schema(
             cv.int_range(min=0, max=0xFFFF)
         ),
         cv.Optional(CONF_THROTTLE_RATE_SECONDS, default=0): cv.int_range(min=0, max=255),
-        cv.Optional(CONF_ERD_PUBLISH_RATE_SENSOR): cv.Schema({
-            cv.Optional("name", default="ERD Publish Rate"): cv.string,
-        }).extend(sensor.sensor_schema(state_class="measurement")),
-        cv.Optional(CONF_ERD_CACHE_ENTRIES_SENSOR): cv.Schema({
-            cv.Optional("name", default="ERD Cache Entries"): cv.string,
-        }).extend(sensor.sensor_schema()),
-        cv.Optional(CONF_ERD_CACHE_UPDATES_SENSOR): cv.Schema({
-            cv.Optional("name", default="ERD Cache Updates/60s"): cv.string,
-        }).extend(sensor.sensor_schema(state_class="measurement")),
-        cv.Optional(CONF_MQTT_PUBLISH_RATE_SENSOR): cv.Schema({
-            cv.Optional("name", default="MQTT Publish Rate"): cv.string,
-        }).extend(sensor.sensor_schema(state_class="measurement")),
+        cv.Optional(CONF_ERD_PUBLISH_RATE_SENSOR, default=True): cv.Any(
+            cv.boolean,
+            sensor.sensor_schema(state_class="measurement").extend(cv.Schema({
+                cv.Optional("name", default="ERD Publish Rate"): cv.string,
+            })),
+        ),
+        cv.Optional(CONF_ERD_CACHE_ENTRIES_SENSOR, default=True): cv.Any(
+            cv.boolean,
+            sensor.sensor_schema().extend(cv.Schema({
+                cv.Optional("name", default="ERD Cache Entries"): cv.string,
+            })),
+        ),
+        cv.Optional(CONF_ERD_CACHE_UPDATES_SENSOR, default=True): cv.Any(
+            cv.boolean,
+            sensor.sensor_schema(state_class="measurement").extend(cv.Schema({
+                cv.Optional("name", default="ERD Cache Update Rate"): cv.string,
+            })),
+        ),
+        cv.Optional(CONF_MQTT_PUBLISH_RATE_SENSOR, default=True): cv.Any(
+            cv.boolean,
+            sensor.sensor_schema(state_class="measurement").extend(cv.Schema({
+                cv.Optional("name", default="MQTT Publish Rate"): cv.string,
+            })),
+        ),
         cv.Optional(CONF_FILTER_CONFIG_TOPICS, default=True): cv.boolean,
-        cv.Optional(CONF_DISCOVERY_REFRESH_BUTTON): cv.Schema({
-            cv.Optional("name", default="Discovery Refresh"): cv.string,
-        }).extend(button.button_schema(DiscoveryRefreshButton)),
+        cv.Optional(CONF_DISCOVERY_REFRESH_BUTTON, default=True): cv.Any(
+            cv.boolean,
+            button.button_schema(DiscoveryRefreshButton).extend(cv.Schema({
+                cv.Optional("name", default="Discovery Refresh"): cv.string,
+            })),
+        ),
     }
 ).extend(cv.COMPONENT_SCHEMA)
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
@@ -429,30 +453,69 @@ async def to_code(config: dict[str, Any]) -> None:
     cg.add(var.set_throttle_rate_seconds(config[CONF_THROTTLE_RATE_SECONDS]))
 
 
-    # Optionally create the ERD publish rate sensor
-    if CONF_ERD_PUBLISH_RATE_SENSOR in config:
-        sens = await sensor.new_sensor(config[CONF_ERD_PUBLISH_RATE_SENSOR])
+    # Create diagnostic sensors (auto-created by default, set to false to disable)
+    val = config.get(CONF_ERD_PUBLISH_RATE_SENSOR, True)
+    if val is not False:
+        if val is True:
+            val = {
+                "name": "ERD Publish Rate",
+                CONF_ID: ID("erd_publish_rate", is_declaration=True, type=sensor.Sensor),
+                CONF_STATE_CLASS: _make_state_class("measurement"),
+                "disabled_by_default": False,
+                "force_update": False,
+            }
+        sens = await sensor.new_sensor(val)
         cg.add(var.set_erd_publish_rate_sensor(sens))
 
-    # Optionally create the ERD cache entries sensor
-    if CONF_ERD_CACHE_ENTRIES_SENSOR in config:
-        sens = await sensor.new_sensor(config[CONF_ERD_CACHE_ENTRIES_SENSOR])
+    val = config.get(CONF_ERD_CACHE_ENTRIES_SENSOR, True)
+    if val is not False:
+        if val is True:
+            val = {
+                "name": "ERD Cache Entries",
+                CONF_ID: ID("erd_cache_entries", is_declaration=True, type=sensor.Sensor),
+                "disabled_by_default": False,
+                "force_update": False,
+            }
+        sens = await sensor.new_sensor(val)
         cg.add(var.set_erd_cache_entries_sensor(sens))
 
-    # Optionally create the ERD cache updates sensor
-    if CONF_ERD_CACHE_UPDATES_SENSOR in config:
-        sens = await sensor.new_sensor(config[CONF_ERD_CACHE_UPDATES_SENSOR])
+    val = config.get(CONF_ERD_CACHE_UPDATES_SENSOR, True)
+    if val is not False:
+        if val is True:
+            val = {
+                "name": "ERD Cache Update Rate",
+                CONF_ID: ID("erd_cache_updates", is_declaration=True, type=sensor.Sensor),
+                CONF_STATE_CLASS: _make_state_class("measurement"),
+                "disabled_by_default": False,
+                "force_update": False,
+            }
+        sens = await sensor.new_sensor(val)
         cg.add(var.set_erd_cache_updates_sensor(sens))
 
-    # Optionally create the MQTT publish rate sensor
-    if CONF_MQTT_PUBLISH_RATE_SENSOR in config:
-        sens = await sensor.new_sensor(config[CONF_MQTT_PUBLISH_RATE_SENSOR])
+    val = config.get(CONF_MQTT_PUBLISH_RATE_SENSOR, True)
+    if val is not False:
+        if val is True:
+            val = {
+                "name": "MQTT Publish Rate",
+                CONF_ID: ID("mqtt_publish_rate", is_declaration=True, type=sensor.Sensor),
+                CONF_STATE_CLASS: _make_state_class("measurement"),
+                "disabled_by_default": False,
+                "force_update": False,
+            }
+        sens = await sensor.new_sensor(val)
         cg.add(var.set_mqtt_publish_rate_sensor(sens))
 
-    # Optionally create the discovery refresh button
-    if CONF_DISCOVERY_REFRESH_BUTTON in config:
-        btn = cg.new_Pvariable(config[CONF_DISCOVERY_REFRESH_BUTTON][CONF_ID], var)
-        await button.register_button(btn, config[CONF_DISCOVERY_REFRESH_BUTTON])
+    # Create discovery refresh button (auto-created by default, set to false to disable)
+    val = config.get(CONF_DISCOVERY_REFRESH_BUTTON, True)
+    if val is not False:
+        if val is True:
+            val = {
+                "name": "Discovery Refresh",
+                CONF_ID: ID("discovery_refresh", is_declaration=True, type=DiscoveryRefreshButton),
+                "disabled_by_default": False,
+            }
+        btn = cg.new_Pvariable(val[CONF_ID], var)
+        await button.register_button(btn, val)
 
     # Register any user-configured custom ERDs
     for erd in config[CONF_CUSTOM_ERDS]:

@@ -63,20 +63,9 @@ geappliances_bridge:
   # appliance_api_parsing: true           # Default: true, restricts polling to appliance-supported ERDs
   # throttle_rate_seconds: 0              # Default: 0 (disabled), min seconds between publishes per ERD (0-255)
   # filter_config_topics: true            # Default: true, filters internal/diagnostic entities from HA discovery
-  
-  # Optional diagnostic sensors:
-  # erd_cache_entries_sensor:
-  #   name: "ERD Cache Entries"           # Number of Erds registered by the appliance
-  # erd_publish_rate_sensor:
-  #   name: "ERD Publish Rate"            # Number of read or subscribe responses from the appliance per minute
-  # erd_cache_updates_sensor:
-  #   name: "ERD Cache Update Rate"       # Number of appliance messages that have changed payloads per minute
-  # mqtt_publish_rate_sensor:
-  #   name: "MQTT Publish Rate"           # Number of MQTT messages published per minute
 
-  # Optional discovery refresh button:
-  # discovery_refresh_button:
-  #   name: "Discovery Refresh"           # Triggers HA discovery cleanup and republish when pressed
+  # Diagnostic sensors and discovery refresh button are auto-created by default.
+  # To disable: erd_publish_rate_sensor: false, discovery_refresh_button: false, etc.
 ```
 
 ## Configurable Parameters
@@ -127,7 +116,9 @@ The `appliance_api_parsing` parameter is **optional** (default: `true`). When en
 - **`throttle_rate_seconds`** (default: `0`) — Minimum interval in seconds between MQTT publishes for any individual ERD. Set to 0 to disable (publish on every update). Range: 0–255. Useful for reducing MQTT traffic when the appliance generates frequent updates.
 - **`generate_device_config`** (default: `false`) — Currently disabled
 - **`filter_config_topics`** (default: `true`) — Filters out internal/diagnostic entities (firmware metadata, commissioning state, usage profiles, cycle definitions, fault data, etc.) from Home Assistant MQTT discovery. Reduces entity count by ~19% (from ~9,310 to ~7,520) and firmware data by ~8.8%. Set to `false` to include all entities.
-- **`discovery_refresh_button`** (optional) — Exposes an ESPHome button entity that triggers a Home Assistant MQTT discovery cleanup when pressed. Useful for clearing stale discovery topics after firmware updates or configuration changes. Works as a cleanup-only button when `generate_device_config` is disabled (clears stale discovery topics without republishing). Accepts standard [ESPHome button](https://esphome.io/components/button/) options (e.g. `name`). Default name is "Discovery Refresh".
+- **Diagnostic sensors** (`erd_publish_rate_sensor`, `erd_cache_entries_sensor`, `erd_cache_updates_sensor`, `mqtt_publish_rate_sensor`) — Auto-created by default with `discovery: false` (only visible via ESPHome API, not MQTT discovery). Set to `false` to disable, or provide a dict to customize (e.g. `name`).
+- **`discovery_refresh_button`** — Auto-created by default with `discovery: false`. Exposes an ESPHome button entity that triggers a Home Assistant MQTT discovery cleanup when pressed. Useful for clearing stale discovery topics after firmware updates or configuration changes. Set to `false` to disable, or provide a dict to customize (e.g. `name`).
+
 
 ## Development
 
@@ -136,10 +127,6 @@ The `appliance_api_parsing` parameter is **optional** (default: `true`). When en
 When polling, the device uses an auto-generated ERD list (`erd_lists.h`) based on the [GE Appliances Public API Documentation](https://github.com/geappliances/public-appliance-api-documentation). The ERD list is automatically generated during the build process from `appliance_api_erd_definitions.json`.
 
 **To manually regenerate the ERD list:**
-```bash
-python3 scripts/generate_erd_lists.py
-```
-
 The generation script categorizes ERDs by appliance type based on their hex address ranges (common, refrigeration, laundry, dishwasher, water heater, range, air conditioning, water filter, small appliance, and energy ERDs). See [scripts/README.md](scripts/README.md) for more details.
 
 ### Running Tests
