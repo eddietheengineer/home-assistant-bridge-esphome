@@ -241,12 +241,18 @@ void GeappliancesBridge::loop() {
   if (ha_discovery_active) {
     if (this->erd_cache_publisher_.cache != nullptr) {
       erd_cache_mqtt_publisher_pause(&this->erd_cache_publisher_);
-      ESP_LOGD(TAG, "ERD cache publisher paused during MQTT discovery payload generation");
+      if (!this->erd_cache_publisher_paused_) {
+        ESP_LOGD(TAG, "ERD cache publisher paused during MQTT discovery payload generation");
+        this->erd_cache_publisher_paused_ = true;
+      }
     }
   } else {
     if (this->erd_cache_publisher_.cache != nullptr) {
       erd_cache_mqtt_publisher_resume(&this->erd_cache_publisher_);
-      ESP_LOGD(TAG, "ERD cache publisher resumed after MQTT discovery payload generation");
+      if (this->erd_cache_publisher_paused_) {
+        ESP_LOGD(TAG, "ERD cache publisher resumed after MQTT discovery payload generation");
+        this->erd_cache_publisher_paused_ = false;
+      }
     }
   }
 

@@ -242,6 +242,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   ha_discovery_manager_t ha_discovery_manager_;
   bool discovery_refresh_in_progress_{false};
   bool ha_discovery_started_{false};
+  bool erd_cache_publisher_paused_{false};
 
   // Autodiscovery manager (extracted from god class)
   AutodiscoveryManager autodiscovery_manager_;
