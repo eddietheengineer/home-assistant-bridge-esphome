@@ -64,7 +64,7 @@ GEA_TAG(TAG) = "ha_cleanup";
  * remaining in the queue (0 means all flushed). */
 CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
 {
-    char topic[128];
+    char topic[256];
     uint16_t consumed;
     uint16_t remaining;
 
@@ -91,6 +91,7 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
             self->queue_write_pos - consumed);
     self->queue_write_pos -= consumed;
     self->queue_count--;
+    self->pass_removed_count++;
 
     /* Read remaining count while still in critical section (fixes C3). */
     remaining = self->queue_count;
@@ -99,7 +100,6 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
     /* Republish with empty payload to clear the retained message. */
     mqtt_client_publish_raw(self->mqtt_client, topic, "", 0, true);
     ESP_LOGD(TAG, "Removed old topic: %s", topic);
-    self->pass_removed_count++;
 
     /* No vTaskDelay — flush one topic per call to keep main loop responsive (fixes C4). */
 
@@ -115,8 +115,6 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     (void)payload;
     ha_discovery_cleanup_t* self = (ha_discovery_cleanup_t*)arg;
 
-    /* Diagnostic: count all callbacks received. */
-    self->pass_received_count++;
     /* Only remove config topics. */
     size_t topic_len = strlen(topic);
     if (topic_len < 7) return;
@@ -129,6 +127,8 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     uint16_t needed = (uint16_t)(topic_len + 1);
 
     vPortEnterCritical();
+    /* Diagnostic: count all callbacks received (inside critical section to avoid race). */
+    self->pass_received_count++;
 
     /* Check if buffer has room. Simple linear append — no ring buffer. */
     if (self->queue_write_pos + needed <= HA_CLEANUP_TOPIC_BUF_SIZE) {
