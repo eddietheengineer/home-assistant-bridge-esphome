@@ -167,8 +167,6 @@ void GeappliancesBridge::initialize_erd_bridge_()
       this->feature_bit_manager_.get_valid_erd_count() > 0) {
     this->erd_registry_.set_valid_erds(this->feature_bit_manager_.valid_erds_,
                                        this->feature_bit_manager_.get_valid_erd_count());
-    ESP_LOGI(TAG, "Appliance API parsing enabled: publishing filtered to %u valid ERDs",
-             this->feature_bit_manager_.get_valid_erd_count());
   }
 
   // Select operating mode.
