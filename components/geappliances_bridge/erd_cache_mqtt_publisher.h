@@ -143,6 +143,11 @@ void erd_cache_mqtt_publisher_set_time_fn(
  * Returns the number of ERD publishes in the last 60 seconds, then resets the window.
  */
 uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* self);
+/*!
+ * Returns true if the publisher has completed a full cache round since the
+ * last resume.  Thread-safe — acquires the state mutex on ESP-IDF.
+ */
+bool erd_cache_mqtt_publisher_first_round_done(erd_cache_mqtt_publisher_t* self);
 
 #ifdef __cplusplus
 }

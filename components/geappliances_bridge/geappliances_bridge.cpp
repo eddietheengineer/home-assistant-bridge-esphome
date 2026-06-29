@@ -257,19 +257,21 @@ void GeappliancesBridge::loop() {
     }
   }
 
+  /* Check steady state BEFORE signaling work — the background task sets
+   * first_round_done during its drain, and we want to read it before
+   * the next signal_work() wakes it again. */
+  if (this->discovery_just_resumed_ &&
+      erd_cache_mqtt_publisher_first_round_done(&this->erd_cache_publisher_)) {
+    ESP_LOGI(TAG, "Device is in steady state");
+    this->discovery_just_resumed_ = false;
+  }
+
   if (this->erd_cache_publisher_.cache != nullptr && !ha_discovery_active) {
 #ifdef USE_ESP_IDF
     erd_cache_mqtt_publisher_signal_work(&this->erd_cache_publisher_);
 #else
     erd_cache_mqtt_publisher_loop(&this->erd_cache_publisher_, 5, 20);
 #endif
-  }
-
-  /* Log steady state once after the publisher resumes from discovery
-   * and has completed a full cache round. */
-  if (this->discovery_just_resumed_ && this->erd_cache_publisher_.first_round_done) {
-    ESP_LOGI(TAG, "Device is in steady state");
-    this->discovery_just_resumed_ = false;
   }
 
   // Start HA discovery once steady state is reached and generate_device_config is enabled.

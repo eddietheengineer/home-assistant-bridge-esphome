@@ -116,17 +116,16 @@ static void mqtt_publisher_task(void* arg)
     }
 
     /* Track round progress: mark started once we've scanned past index 0,
-     * then set first_round_done when we wrap back to 0.  This avoids a
-     * false positive when the last updated entry happens to be at the end
-     * of the cache, causing publish_index to wrap to 0 on the very first
-     * drain cycle. */
-    if (drained_any) {
-      if (!self->round_started && self->publish_index > 0) {
-        self->round_started = true;
-      }
-      if (self->round_started && self->publish_index == 0) {
-        self->first_round_done = true;
-      }
+     * then set first_round_done when we wrap back to 0.  The round_started
+     * guard prevents false positives on the very first drain cycle.
+     * The check runs regardless of drained_any — even if nothing was
+     * published this cycle, a previous cycle may have advanced the index
+     * and the cache may have exhausted, meaning the round is complete. */
+    if (!self->round_started && self->publish_index > 0) {
+      self->round_started = true;
+    }
+    if (self->round_started && self->publish_index == 0) {
+      self->first_round_done = true;
     }
 
     if (mutex_held) {
@@ -384,14 +383,14 @@ uint16_t erd_cache_mqtt_publisher_loop(
     published++;
   }
   /* Track round progress: mark started once past index 0, then set
-   * first_round_done on wrap.  See mqtt_publisher_task for rationale. */
-  if (published > 0) {
-    if (!self->round_started && self->publish_index > 0) {
-      self->round_started = true;
-    }
-    if (self->round_started && self->publish_index == 0) {
-      self->first_round_done = true;
-    }
+   * first_round_done on wrap.  See mqtt_publisher_task for rationale.
+   * Check runs regardless of published count — a previous call may have
+   * advanced the index and the cache may have exhausted. */
+  if (!self->round_started && self->publish_index > 0) {
+    self->round_started = true;
+  }
+  if (self->round_started && self->publish_index == 0) {
+    self->first_round_done = true;
   }
 
   return published;
@@ -504,4 +503,18 @@ uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* s
   self->publish_count_window = 0;
 #endif
   return count;
+}
+
+bool erd_cache_mqtt_publisher_first_round_done(erd_cache_mqtt_publisher_t* self)
+{
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      bool done = self->first_round_done;
+      xSemaphoreGive(self->state_mutex);
+      return done;
+    }
+  }
+#endif
+  return self->first_round_done;
 }
