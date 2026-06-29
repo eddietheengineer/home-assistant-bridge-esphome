@@ -259,6 +259,19 @@ class TestCompressEdgeCases(unittest.TestCase):
             result += zlib.decompress(chunk_data)
         self.assertEqual(jsonl, result)
 
+    def test_all_real_chunks_fit_in_decomp_buffer(self):
+        """Verify all actual JSONL chunks decompress to <= HA_DISCOVERY_DECOMP_BUF_SIZE (8192)."""
+        import glob as glob_mod
+        DECOMP_BUF_SIZE = 8192
+        jsonl_dir = Path(__file__).parent.parent / "ha_discovery"
+        for jsonl_path in sorted(jsonl_dir.glob("*.jsonl")):
+            raw = jsonl_path.read_bytes()
+            chunks = compress.split_into_chunks(raw)
+            for i, (chunk_data, reported_size) in enumerate(chunks):
+                self.assertLessEqual(
+                    reported_size, DECOMP_BUF_SIZE,
+                    f"{jsonl_path.name} chunk {i}: decompressed size {reported_size} exceeds buffer {DECOMP_BUF_SIZE}"
+                )
 
 if __name__ == '__main__':
     unittest.main()
