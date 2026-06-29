@@ -174,6 +174,24 @@ void GeappliancesBridge::initialize_erd_bridge_()
 
   // Select operating mode.
   bool        use_polling = false;
+  const char* mode_name = "unknown";
+
+  if (this->autodiscovery_manager_.is_gea2_protocol()) {
+    use_polling = true;
+    mode_name   = "polling (GEA2 - subscriptions not supported)";
+  } else if (this->mode_ == BRIDGE_MODE_POLL) {
+    use_polling = true;
+    mode_name   = "polling";
+  } else if (this->mode_ == BRIDGE_MODE_SUBSCRIBE) {
+    use_polling = false;
+    mode_name   = "subscription";
+  } else if (this->mode_ == BRIDGE_MODE_AUTO) {
+    use_polling = false;
+    mode_name   = "auto (subscription + custom ERD polling)";
+  }
+
+  ESP_LOGI(TAG, "Bridge mode: %s", mode_name);
+  (void)mode_name;  // Suppress unused warning when ESP_LOGI is stubbed out
 
   // Wire the discovery-complete callback BEFORE initializing the bridge,
   // so the HSM cannot fire the callback before it's set (race condition
