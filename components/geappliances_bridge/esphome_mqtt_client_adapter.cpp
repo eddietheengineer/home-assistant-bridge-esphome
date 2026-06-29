@@ -242,7 +242,7 @@ extern "C" void esphome_mqtt_client_adapter_subscribe(
 {
   (void)_self;
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
-  if (mqtt_client == nullptr || !mqtt_client->is_connected()) return;
+  if (mqtt_client == nullptr) return;
 
   mqtt_client->subscribe(topic, [callback, arg](const std::string& t, const std::string& p) {
     callback(t.c_str(), p.c_str(), p.size(), arg);
@@ -255,7 +255,7 @@ extern "C" void esphome_mqtt_client_adapter_unsubscribe(
 {
   (void)_self;
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
-  if (mqtt_client != nullptr && mqtt_client->is_connected()) {
+  if (mqtt_client != nullptr) {
     mqtt_client->unsubscribe(topic);
   }
 }
