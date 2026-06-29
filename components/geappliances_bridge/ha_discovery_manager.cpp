@@ -796,21 +796,9 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                 (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
         }
 
-        /* If cleanup is needed, run the embedded cleanup module until done
-         * before transitioning to discovery. */
-        if (!self->skip_cleanup) {
-            ha_discovery_cleanup_configure(&self->cleanup, self->device_id, self->mqtt_client, self->get_time_ms);
-            ha_discovery_cleanup_start(&self->cleanup);
-            while (!ha_discovery_cleanup_is_done(&self->cleanup)) {
-                ha_discovery_cleanup_run(&self->cleanup);
-                esp_task_wdt_reset();
-                vTaskDelay(pdMS_TO_TICKS(10));
-            }
-            ha_discovery_cleanup_destroy(&self->cleanup);
-            ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
-        } else {
-            ESP_LOGI(TAG, "Skipping cleanup, proceeding to discovery");
-        }
+        /* Transition to discovery. Cleanup on boot is not needed;
+         * the discovery refresh button handles cleanup when requested. */
+        ESP_LOGI(TAG, "Proceeding to discovery");
 
         /* Transition to discovering. */
         self->state = ha_discovery_state_discovering;
@@ -978,12 +966,11 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 /* Public API                                                         */
 /* ------------------------------------------------------------------ */
 
-void ha_discovery_manager_init(ha_discovery_manager_t* self, bool skip_cleanup)
+void ha_discovery_manager_init(ha_discovery_manager_t* self)
 {
     memset(self, 0, sizeof(*self));
     self->state = ha_discovery_state_idle;
     self->get_time_ms = esphome::millis;
-    self->skip_cleanup = skip_cleanup;
 
 #ifdef USE_ESP_IDF
     /* Delete existing semaphore if re-initing to prevent leak. */

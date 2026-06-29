@@ -827,8 +827,7 @@ void GeappliancesBridge::init_erd_cache_publisher_()
 #endif
 
   // Initialize the HA discovery manager (lazy-started on steady state).
-  // Normal boot skips cleanup to avoid entity flicker on restart.
-  ha_discovery_manager_init(&this->ha_discovery_manager_, true);
+  ha_discovery_manager_init(&this->ha_discovery_manager_);
 
   ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
 }
