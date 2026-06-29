@@ -125,7 +125,7 @@ void GeappliancesBridge::initialize_mqtt_client_()
     return;
   }
 
-  ESP_LOGI(TAG, "Initializing MQTT client adapter with device ID: %s",
+  ESP_LOGD(TAG, "Initializing MQTT client adapter with device ID: %s",
            this->device_identity_manager_.get_device_id());
 
   // For manual device_id configs where autodiscovery is skipped (gea2_uart only,
@@ -149,7 +149,6 @@ void GeappliancesBridge::initialize_mqtt_client_()
     &this->mqtt_client_adapter_, &this->erd_registry_);
 
   this->mqtt_client_adapter_initialized_ = true;
-  ESP_LOGI(TAG, "MQTT client adapter initialized; feature bit ERDs will be published as they are read");
 }
 
 // ---------------------------------------------------------------------------
