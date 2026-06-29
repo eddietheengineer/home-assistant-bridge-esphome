@@ -5,6 +5,7 @@
 
 #include "erd_cache_mqtt_publisher.h"
 #include "erd_cache.h"
+#include "geappliances_bridge_log.h"
 #include "i_mqtt_client.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
@@ -13,7 +14,7 @@
 #include <cstdio>
 #include <string.h>
 
-static const char* const TAG = "erd_cache_mqtt_publisher";
+GEA_TAG(PUBLISHER_TAG) = "erd_cache_mqtt_publisher";
 #ifdef USE_ESP_IDF
 #include "esp_task_wdt.h"
 #endif
@@ -40,22 +41,25 @@ static void mqtt_publisher_task(void* arg)
     // modified by the main loop during context switches.
     bool connected = false;
     bool has_deps = false;
+    bool paused = false;
     bool mutex_held = false;
     if (self->state_mutex) {
       if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         mutex_held = true;
         connected = self->mqtt_connected;
+        paused = self->paused;
         has_deps = self->cache != NULL && self->mqtt_client != NULL &&
                    self->device_id != NULL && self->get_time_ms != NULL;
       }
     } else {
       // Fallback when mutex creation failed — read without protection.
       connected = self->mqtt_connected;
+      paused = self->paused;
       has_deps = self->cache != NULL && self->mqtt_client != NULL &&
                  self->device_id != NULL && self->get_time_ms != NULL;
     }
 
-    if (!connected || !has_deps) {
+    if (!connected || paused || !has_deps) {
       if (mutex_held) {
         xSemaphoreGive(self->state_mutex);
       }
@@ -64,9 +68,11 @@ static void mqtt_publisher_task(void* arg)
 
     // Drain all available updates — no per-loop budget in background task.
     // The mutex is held throughout to protect publish_index and cache access.
+    bool drained_any = false;
     while (1) {
       erd_cache_entry_t* entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
       if (!entry) break;
+      drained_any = true;
 
       /* Determine data pointer. */
       const uint8_t* data;
@@ -80,7 +86,7 @@ static void mqtt_publisher_task(void* arg)
       int topic_len = snprintf(self->task_topic, sizeof(self->task_topic),
           "geappliances/%s/erd/0x%04x/value", self->device_id, entry->erd);
       if (topic_len < 0 || (unsigned)topic_len >= sizeof(self->task_topic)) {
-        ESP_LOGW(TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
+        ESP_LOGW(PUBLISHER_TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
         break;
       }
 
@@ -98,7 +104,7 @@ static void mqtt_publisher_task(void* arg)
       uint32_t elapsed = self->get_time_ms() - t_publish;
 
       if (elapsed >= 1000) {
-        ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
+        ESP_LOGW(PUBLISHER_TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
       }
 
       /* Reload the publish cooldown after successful MQTT publish. */
@@ -107,6 +113,12 @@ static void mqtt_publisher_task(void* arg)
       // Update stats — already protected by the outer mutex hold.
       self->total_published++;
       self->publish_count_window++;
+    }
+
+    /* Detect full cache round: we drained entries and the index wrapped
+     * back to 0, meaning we've scanned the entire cache. */
+    if (drained_any && self->publish_index == 0) {
+      self->first_round_done = true;
     }
 
     if (mutex_held) {
@@ -139,15 +151,15 @@ void erd_cache_mqtt_publisher_init(
 #ifdef USE_ESP_IDF
   self->work_semaphore = xSemaphoreCreateBinary();
   if (!self->work_semaphore) {
-    ESP_LOGE(TAG, "Failed to create work semaphore");
+    ESP_LOGE(PUBLISHER_TAG, "Failed to create work semaphore");
   }
   self->state_mutex = xSemaphoreCreateMutex();
   if (!self->state_mutex) {
-    ESP_LOGE(TAG, "Failed to create state mutex");
+    ESP_LOGE(PUBLISHER_TAG, "Failed to create state mutex");
   }
   self->done_semaphore = xSemaphoreCreateBinary();
   if (!self->done_semaphore) {
-    ESP_LOGE(TAG, "Failed to create done semaphore");
+    ESP_LOGE(PUBLISHER_TAG, "Failed to create done semaphore");
   }
   self->task_running = false;
 #endif
@@ -175,17 +187,15 @@ void erd_cache_mqtt_publisher_init(
     mqtt_client_on_mqtt_connect(self->mqtt_client),
     &self->mqtt_connect_subscription);
 
-  /* If MQTT is already connected when we register, fire the event immediately
-   * so mqtt_connected is set correctly.  This mirrors the adapter's pattern:
-   * the adapter fires on_mqtt_connect_event during its init, but the publisher
-   * subscribes after the adapter is already initialized, so it can miss that
-   * initial event. */
+  /* If MQTT is already connected when we register, set the flag so the
+   * publisher knows it can publish.  Don't call on_connected() — that
+   * logs "MQTT reconnected" which is misleading at init time. */
   auto global = esphome::mqtt::global_mqtt_client;
   if (global != nullptr && global->is_connected()) {
-    erd_cache_mqtt_publisher_on_connected(self);
+    self->mqtt_connected = true;
   }
 
-  ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
+  ESP_LOGI(PUBLISHER_TAG, "ERD cache MQTT publisher initialized with device ID: %s", self->device_id);
 }
 
 void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self)
@@ -237,7 +247,7 @@ void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
       self->task_stack,
       &self->task_tcb);
   if (self->task_handle == NULL) {
-    ESP_LOGE(TAG, "Failed to create MQTT publisher task");
+    ESP_LOGE(PUBLISHER_TAG, "Failed to create MQTT publisher task");
     self->task_running = false;
   }
 #else
@@ -259,7 +269,7 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
   // know it has entered the termination path.
   if (self->done_semaphore != NULL) {
     if (xSemaphoreTake(self->done_semaphore, pdMS_TO_TICKS(1000)) != pdTRUE) {
-      ESP_LOGW(TAG, "MQTT publisher task did not signal done within 1 s");
+      ESP_LOGW(PUBLISHER_TAG, "MQTT publisher task did not signal done within 1 s");
     }
   } else {
     // Fallback: poll with delay when done_semaphore creation failed.
@@ -269,7 +279,7 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
       vTaskDelay(pdMS_TO_TICKS(10));
     }
     if (self->task_handle != NULL) {
-      ESP_LOGW(TAG, "MQTT publisher task did not terminate within 1 s");
+      ESP_LOGW(PUBLISHER_TAG, "MQTT publisher task did not terminate within 1 s");
     }
   }
 
@@ -339,7 +349,7 @@ uint16_t erd_cache_mqtt_publisher_loop(
     char topic[128];
     int topic_len = snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/value", self->device_id, entry->erd);
     if (topic_len < 0 || (unsigned)topic_len >= sizeof(topic)) {
-      ESP_LOGW(TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
+      ESP_LOGW(PUBLISHER_TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
       return published;
     }
     /* Build hex payload: max data_size is 255 (uint8_t), so hex is 510 chars + null */
@@ -350,13 +360,12 @@ uint16_t erd_cache_mqtt_publisher_loop(
     }
     hex[data_len * 2] = '\0';
 
-    /* Publish through the interface — measure per-publish time. */
     uint32_t t_publish = self->get_time_ms();
     mqtt_client_publish_raw(self->mqtt_client, topic, hex, data_len * 2, true);
     uint32_t elapsed = self->get_time_ms() - t_publish;
 
     if (elapsed >= 1000) {
-      ESP_LOGW(TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
+      ESP_LOGW(PUBLISHER_TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
     }
 
     /* Reload the publish cooldown after successful MQTT publish. */
@@ -365,6 +374,10 @@ uint16_t erd_cache_mqtt_publisher_loop(
     self->total_published++;
     self->publish_count_window++;
     published++;
+  }
+  /* Detect full cache round: drained entries and index wrapped to 0. */
+  if (published > 0 && self->publish_index == 0) {
+    self->first_round_done = true;
   }
 
   return published;
@@ -376,15 +389,18 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->mqtt_connected = true;
+      self->first_round_done = false;
       xSemaphoreGive(self->state_mutex);
     }
   } else {
     self->mqtt_connected = true;
+    self->first_round_done = false;
   }
 #else
   self->mqtt_connected = true;
+  self->first_round_done = false;
 #endif
-  ESP_LOGI(TAG, "MQTT reconnected — resuming ERD cache publishing");
+  ESP_LOGI(PUBLISHER_TAG, "MQTT reconnected — resuming ERD cache publishing");
   /* Wake the background task so it can start publishing again. */
   erd_cache_mqtt_publisher_signal_work(self);
 }
@@ -402,7 +418,44 @@ void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self)
 #else
   self->mqtt_connected = false;
 #endif
-  ESP_LOGW(TAG, "MQTT disconnected — pausing ERD cache publishing");
+  ESP_LOGW(PUBLISHER_TAG, "MQTT disconnected — pausing ERD cache publishing");
+}
+
+void erd_cache_mqtt_publisher_pause(erd_cache_mqtt_publisher_t* self)
+{
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      self->paused = true;
+      self->first_round_done = false;
+      xSemaphoreGive(self->state_mutex);
+    }
+  } else {
+    self->paused = true;
+    self->first_round_done = false;
+  }
+#else
+  self->paused = true;
+  self->first_round_done = false;
+#endif
+}
+
+void erd_cache_mqtt_publisher_resume(erd_cache_mqtt_publisher_t* self)
+{
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      self->paused = false;
+      xSemaphoreGive(self->state_mutex);
+      // Wake the task so it can resume publishing.
+      erd_cache_mqtt_publisher_signal_work(self);
+    }
+  } else {
+    self->paused = false;
+  }
+#else
+  self->paused = false;
+#endif
 }
 
 void erd_cache_mqtt_publisher_set_time_fn(
@@ -431,4 +484,18 @@ uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* s
   self->publish_count_window = 0;
 #endif
   return count;
+}
+
+bool erd_cache_mqtt_publisher_first_round_done(erd_cache_mqtt_publisher_t* self)
+{
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      bool done = self->first_round_done;
+      xSemaphoreGive(self->state_mutex);
+      return done;
+    }
+  }
+#endif
+  return self->first_round_done;
 }

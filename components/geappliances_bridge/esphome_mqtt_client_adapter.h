@@ -22,7 +22,6 @@
 #pragma once
 #include "esphome/components/mqtt/mqtt_client.h"
 
-#include <string>
 
 #include "erd_registry.h"
 
@@ -34,7 +33,7 @@ extern "C" {
 
 typedef struct {
   i_mqtt_client_t interface;
-  std::string* device_id;
+  const char* device_id;
   tiny_event_t on_write_request_event;
   tiny_event_t on_mqtt_disconnect_event;
   tiny_event_t on_mqtt_connect_event;
@@ -103,6 +102,24 @@ void esphome_mqtt_client_adapter_publish_raw(
   const char* payload,
   size_t payload_len,
   bool retain);
+
+/*!
+ * Subscribe to a topic with a raw C callback.
+ * Implements the i_mqtt_client_t subscribe vtable slot.
+ */
+void esphome_mqtt_client_adapter_subscribe(
+  i_mqtt_client_t* self,
+  const char* topic,
+  void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg),
+  void* arg);
+
+/*!
+ * Unsubscribe from a topic.
+ * Implements the i_mqtt_client_t unsubscribe vtable slot.
+ */
+void esphome_mqtt_client_adapter_unsubscribe(
+  i_mqtt_client_t* self,
+  const char* topic);
 
 #ifdef __cplusplus
 }

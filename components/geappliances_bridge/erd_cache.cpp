@@ -4,11 +4,12 @@
  */
 
 #include "erd_cache.h"
+#include "geappliances_bridge_log.h"
 #include "esphome/core/log.h"
 #include <cstring>
 #include <new>
 
-static const char* const TAG = "erd_cache";
+GEA_TAG(TAG) = "erd_cache";
 
 static bool s_overflow_warned = false;
 

@@ -15,7 +15,7 @@
 namespace esphome {
 namespace geappliances_bridge {
 
-static const char* const TAG __attribute__((unused)) = "feature_bit";
+GEA_TAG(TAG) = "feature_bit";
 
 // =============================================================================
 // Public API
@@ -104,6 +104,7 @@ void FeatureBitManager::start()
   if (this->state_ != FEATURE_BIT_STATE_READING_0092 || this->read_queued_) {
     return;
   }
+  ESP_LOGI(TAG, "Reading appliance API feature bits...");
   this->queue_erd_read_();
 }
 
@@ -292,7 +293,7 @@ void FeatureBitManager::queue_erd_read_()
    * and schedule a retry timer. */
   tiny_gea3_erd_client_request_id_t req_id;
   if (tiny_gea3_erd_client_read(this->erd_client_, &req_id, this->host_address_, feature_erd)) {
-    ESP_LOGD(TAG, "Queued read for %s", feature_name);
+    ESP_LOGV(TAG, "Queued read for %s", feature_name);
     this->read_queued_ = true;
   } else {
     /* Queue is full — arm a one-shot retry timer so we don't stall

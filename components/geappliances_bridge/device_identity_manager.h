@@ -69,7 +69,7 @@ class DeviceIdentityManager {
    * Initialize with configured device ID (if any), ERD client, and host address.
    * Always starts reading ERDs regardless of whether a configured ID exists.
    */
-  void init(const std::string& configured_id,
+  void init(const char* configured_id,
             i_tiny_gea3_erd_client_t* erd_client,
             uint8_t host_address);
 
@@ -94,12 +94,12 @@ class DeviceIdentityManager {
    * Get the final device ID string. Returns the preconfigured ID if one was
    * provided, otherwise the auto-generated ID.
    */
-  const std::string& get_device_id() const;
+  const char* get_device_id() const;
 
   /*
    * Get the model number string.
    */
-  const std::string& get_model_number() const { return model_number_; }
+  const char* get_model_number() const { return model_number_; }
   /*
    * Get the appliance type byte (from ERD 0x0008).
    */
@@ -108,19 +108,20 @@ class DeviceIdentityManager {
   /*
    * Get the serial number string.
    */
-  const std::string& get_serial_number() const { return serial_number_; }
+  const char* get_serial_number() const { return serial_number_; }
 
  private:
   bool try_queue_read_(tiny_erd_t erd);
-  std::string bytes_to_string_(const uint8_t* data, size_t size);
-  std::string sanitize_for_mqtt_topic_(const std::string& input);
+  void bytes_to_string_(const uint8_t* data, size_t size, char* out, size_t out_size);
+  std::string sanitize_for_mqtt_topic_(const char* input);
 
   DeviceIdState state_{DEVICE_ID_STATE_READING_APPLIANCE_TYPE};
-  std::string configured_device_id_;
-  std::string generated_device_id_;
+  bool has_configured_device_id_{false};
+  char configured_device_id_[64];
+  char generated_device_id_[64];
   uint8_t appliance_type_{0};
-  std::string model_number_;
-  std::string serial_number_;
+  char model_number_[64];
+  char serial_number_[64];
   tiny_gea3_erd_client_request_id_t pending_request_id_{0};
 
   i_tiny_gea3_erd_client_t* erd_client_{nullptr};

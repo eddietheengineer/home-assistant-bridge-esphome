@@ -10,9 +10,10 @@
 
 #include "erd_bridge_subscribe.h"
 #include "erd_cache.h"
+#include "geappliances_bridge_log.h"
 #include "esphome/core/log.h"
 
-static const char* const TAG __attribute__((unused)) = "erd_bridge_subscribe";
+GEA_TAG(TAG) = "erd_bridge_subscribe";
 
 // ============================================================================
 // Subscription bridge

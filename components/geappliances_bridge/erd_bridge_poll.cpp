@@ -16,12 +16,13 @@
 
 #include "erd_bridge_common.h"
 #include "erd_lists.h"
+#include "geappliances_bridge_log.h"
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/application.h"
 #include "erd_cache.h"
 
-static const char* const TAG __attribute__((unused)) = "erd_bridge_poll";
+GEA_TAG(TAG) = "erd_bridge_poll";
 
 // ============================================================================
 // Polling bridge — forward declarations
@@ -303,7 +304,8 @@ static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
     if (self->polling_list_count > 0) {
       clear_discovery_state(self);
     }
-    ESP_LOGI(TAG, "Probe phase started: %u ERDs to verify", self->probe_list_count);
+    ESP_LOGI(TAG, "Polling bridge: %u ERDs to verify, interval %u ms",
+        self->probe_list_count, (unsigned)self->polling_interval_ms);
     if (self->probe_list_count > 0) {
       send_next_read_request(self);
     } else {

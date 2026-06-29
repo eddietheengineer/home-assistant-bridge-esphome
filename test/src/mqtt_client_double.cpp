@@ -42,13 +42,33 @@ static i_tiny_event_t* on_mqtt_connect(i_mqtt_client_t* _self)
   return &self->on_mqtt_connect.interface;
 }
 
+static void subscribe(i_mqtt_client_t* self, const char* topic,
+  void (*callback)(const char*, const char*, size_t, void*), void* arg)
+{
+  (void)self; (void)callback; (void)arg;
+  mock()
+    .actualCall("subscribe")
+    .onObject(self)
+    .withParameter("topic", topic);
+}
+
+static void unsubscribe(i_mqtt_client_t* self, const char* topic)
+{
+  mock()
+    .actualCall("unsubscribe")
+    .onObject(self)
+    .withParameter("topic", topic);
+}
+
 static const i_mqtt_client_api_t api = {
   register_erd,
   update_erd_write_result,
   on_write_request,
   on_mqtt_disconnect,
   on_mqtt_connect,
-  mqtt_client_double_publish_raw
+  mqtt_client_double_publish_raw,
+  subscribe,
+  unsubscribe
 };
 
 void mqtt_client_double_init(mqtt_client_double_t* self)

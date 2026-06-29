@@ -46,6 +46,8 @@ typedef struct {
   const char* device_id;           // Device ID string for topic construction
   uint16_t publish_index;          // Round-robin index into cache entries
   bool mqtt_connected;             // True when MQTT broker is connected
+  bool paused;                     // True when publishing should be temporarily paused
+  bool first_round_done;          // True after one full cache pass following resume
   tiny_event_subscription_t mqtt_disconnect_subscription;
   tiny_event_subscription_t mqtt_connect_subscription;
   // Stats
@@ -118,6 +120,17 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self);
 void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self);
 
 /*!
+ * Temporarily pause publishing (ESP-IDF only; no-op otherwise).
+ * Use during HA discovery cleanup to reduce MQTT queue contention.
+ */
+void erd_cache_mqtt_publisher_pause(erd_cache_mqtt_publisher_t* self);
+
+/*!
+ * Resume publishing after a pause (ESP-IDF only; no-op otherwise).
+ */
+void erd_cache_mqtt_publisher_resume(erd_cache_mqtt_publisher_t* self);
+
+/*!
  * Override the time source (defaults to esphome::millis).
  * Useful for testing.
  */
@@ -129,6 +142,11 @@ void erd_cache_mqtt_publisher_set_time_fn(
  * Returns the number of ERD publishes in the last 60 seconds, then resets the window.
  */
 uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* self);
+/*!
+ * Returns true if the publisher has completed a full cache round since the
+ * last resume.  Thread-safe — acquires the state mutex on ESP-IDF.
+ */
+bool erd_cache_mqtt_publisher_first_round_done(erd_cache_mqtt_publisher_t* self);
 
 #ifdef __cplusplus
 }

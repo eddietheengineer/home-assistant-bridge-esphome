@@ -82,6 +82,21 @@ static inline BaseType_t xSemaphoreGive(SemaphoreHandle_t sem) {
 }
 static inline void vSemaphoreDelete(SemaphoreHandle_t) { }
 
+/* ---------- Critical section ---------- */
+static inline void vPortEnterCritical(void) { }
+static inline void vPortExitCritical(void) { }
+
+/* ---------- Task state ---------- */
+typedef enum {
+    eReady,
+    eRunning,
+    eBlocked,
+    eSuspended,
+    eDeleted
+} eTaskState;
+
+static inline eTaskState eTaskGetState(TaskHandle_t) { return eDeleted; }
+
 #ifdef __cplusplus
 }
 #endif

@@ -29,7 +29,10 @@
 #include "esphome/core/component.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/uart/uart.h"
+#include "esphome/components/button/button.h"
+#include "esphome/core/application.h"
 #include <string>
+#include <cstring>
 
 extern "C" {
 #include "erd_cache.h"
@@ -41,6 +44,8 @@ extern "C" {
 #include "tiny_timer.h"
 #include "tiny_hsm.h"
 #include "erd_cache_mqtt_publisher.h"
+#include "ha_discovery_manager.h"
+#include "ha_discovery_cleanup.h"
 }
 
 #include "erd_bridge_subscribe.h"
@@ -68,8 +73,10 @@ namespace geappliances_bridge {
 // BridgeMode is now defined in bridge_mode.h (included via i_bridge_services.h).
 
 
+
 class GeappliancesBridge : public Component, public IBridgeServices {
   friend ErdPollListResult build_poll_list_(GeappliancesBridge* bridge);
+  friend class DiscoveryRefreshButton;
   friend tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t*);
 
  public:
@@ -84,11 +91,12 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_gea3_uart(uart::UARTComponent *uart) { this->uart_ = uart; }
   void set_gea2_uart(uart::UARTComponent *uart) { this->gea2_uart_ = uart; }
   void set_client_address(uint8_t address) { this->client_address_ = address; }
-  void set_device_id(const std::string &device_id) { this->configured_device_id_ = device_id; }
+  void set_device_id(const std::string &device_id) { strncpy(this->configured_device_id_, device_id.c_str(), sizeof(this->configured_device_id_) - 1); this->configured_device_id_[sizeof(this->configured_device_id_) - 1] = '\0'; }
   void set_mode(uint8_t mode) { this->mode_ = static_cast<BridgeMode>(mode); }
   void set_polling_interval(uint32_t polling_interval) { this->polling_interval_ms_ = polling_interval; }
   void set_appliance_api_parsing(bool appliance_api_parsing) { this->appliance_api_parsing_ = appliance_api_parsing; }
   void set_generate_device_config(bool generate_device_config) { this->generate_device_config_ = generate_device_config; }
+  void set_filter_config_topics(bool filter_config_topics) { this->filter_config_topics_ = filter_config_topics; }
   void set_erd_publish_rate_sensor(sensor::Sensor* sensor) { this->erd_publish_rate_sensor_ = sensor; }
   void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; }
   void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; }
@@ -140,6 +148,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void start_feature_bit_reading_();
   void init_erd_cache_publisher_();
   void on_poll_discovery_complete_();
+  void trigger_discovery_refresh();
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 
   // Startup HSM — replaces the manual switch-based phase progression.
@@ -150,7 +159,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   uart::UARTComponent *uart_{nullptr};
   uart::UARTComponent *gea2_uart_{nullptr};
-  std::string configured_device_id_;
+  char configured_device_id_[64]{0};
   uint8_t client_address_{0xE4};
 
   bool mqtt_client_adapter_initialized_{false};
@@ -159,6 +168,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   uint32_t polling_interval_ms_{10000};
   bool appliance_api_parsing_{true};
   bool generate_device_config_{false};
+  bool filter_config_topics_{true};
   uint8_t throttle_rate_seconds_{0};
   uint32_t last_cooldown_tick_{0};  /* last time erd_cache_tick_cooldowns ran (ms) */
   // User-configured custom ERDs to poll in addition to the standard list.
@@ -229,6 +239,14 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   erd_cache_mqtt_publisher_t erd_cache_publisher_;
   erd_cache_t erd_cache_;
 
+  // HA discovery manager: publishes one-shot HA MQTT discovery payloads
+  // after steady state is reached.
+  ha_discovery_manager_t ha_discovery_manager_;
+  bool discovery_refresh_in_progress_{false};
+  bool ha_discovery_started_{false};
+  bool erd_cache_publisher_paused_{false};
+  bool discovery_just_resumed_{false};
+
   // Autodiscovery manager (extracted from god class)
   AutodiscoveryManager autodiscovery_manager_;
 
@@ -251,17 +269,17 @@ class GeappliancesBridge : public Component, public IBridgeServices {
    * polling bridge and subscription bridge share the same ERD client;
    * overflow corrupts adjacent heap metadata causing
    * prvCheckTasksWaitingTermination crashes (see erd_bridge_poll.cpp). */
-  uint8_t client_queue_buffer_[8192];
+  uint8_t client_queue_buffer_[4096];
 
   // GEA2 components (only used when gea2_uart_ is set)
   esphome_uart_adapter_t gea2_uart_adapter_;
 
   tiny_gea2_interface_t gea2_interface_;
   uint8_t gea2_receive_buffer_[255];
-  uint8_t gea2_send_queue_buffer_[10000];
+  uint8_t gea2_send_queue_buffer_[4096];
 
   tiny_gea2_erd_client_t gea2_erd_client_;
-  uint8_t gea2_client_queue_buffer_[8096];
+  uint8_t gea2_client_queue_buffer_[4096];
 
   // Event fired once per millisecond to drive GEA2 interface's internal timers.
   // Published manually inside the GEA2 tight loop (not via a timer_group_ periodic
@@ -292,6 +310,22 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   tiny_event_subscription_t erd_client_activity_subscription_;
   tiny_event_subscription_t gea2_activity_subscription_;
+};
+
+// DiscoveryRefreshButton: concrete button that triggers HA discovery cleanup
+// and device restart when pressed.
+class DiscoveryRefreshButton : public button::Button {
+ public:
+  DiscoveryRefreshButton(GeappliancesBridge* bridge) : bridge_(bridge) {}
+
+  void press_action() override {
+    if (bridge_ != nullptr) {
+      bridge_->trigger_discovery_refresh();
+    }
+  }
+
+ private:
+  GeappliancesBridge* bridge_;
 };
 
 }  // namespace geappliances_bridge

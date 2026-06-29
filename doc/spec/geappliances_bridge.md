@@ -45,7 +45,8 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `set_mode(mode)` | Set bridge mode: POLL (0), SUBSCRIBE (1), or AUTO (2) |
 | `set_polling_interval(ms)` | Set polling interval (default 10000 ms) |
 | `set_appliance_api_parsing(bool)` | Enable feature bit-based ERD filtering (default true) |
-| `set_generate_device_config(bool)` | Deprecated, no-op |
+| `set_generate_device_config(bool)` | Enable HA discovery payload generation (default false) |
+| `set_filter_config_topics(bool)` | Filter non-config topics during discovery cleanup (default true) |
 | `add_custom_erd(erd)` | Add a custom ERD to poll |
 | `set_erd_publish_rate_sensor(sensor)` | Sensor for ERD publish rate |
 | `set_erd_cache_entries_sensor(sensor)` | Sensor for ERD cache entry count |
@@ -102,11 +103,11 @@ During `startup_state_bridge_init`, `initialize_erd_bridge_()` runs:
 
 ## 6. GEA2 Tight Loop
 
-When GEA2 is active, `run_protocol_stack_()` executes a 200 ms wall-clock busy loop to ensure the full TX→RX cycle at 19200 baud completes within a single `loop()` call. A manual millisecond counter (`gea2_msec_interrupt_`) drives the GEA2 interface's internal timers without starving the shared `timer_group_`.
+When GEA2 is active, `run_protocol_stack_()` executes a 100 ms wall-clock busy loop to ensure the full TX→RX cycle at 19200 baud completes within a single `loop()` call. A manual millisecond counter (`gea2_msec_interrupt_`) drives the GEA2 interface's internal timers without starving the shared `timer_group_`.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `GEA2_LOOP_DURATION_MS` | 200 ms | Wall-clock duration for GEA2 tight loop |
+| `GEA2_LOOP_DURATION_MS` | 100 ms | Wall-clock duration for GEA2 tight loop |
 | `GEA3_LOOP_DURATION_MS` | 10 ms | Wall-clock duration for GEA3 protocol tick |
 
 ---
@@ -178,5 +179,140 @@ Key member variables:
 1. **Single appliance:** The bridge operates with a single discovered appliance address. Multi-appliance support would require significant architectural changes.
 2. **Fixed capacity arrays:** All data structures use fixed-capacity arrays. If the appliance supports more ERDs than the cache can hold (200), updates are silently dropped.
 3. **No rollback:** The startup sequence is linear — once a phase completes, it does not re-run. If a phase fails, the bridge continues with fallback values.
-4. **GEA2 tight loop blocks the main loop:** During the 200 ms GEA2 tight loop, the ESPHome main loop is blocked. This is necessary for correct GEA2 half-duplex operation but limits the responsiveness of other ESPHome components during that window.
+4. **GEA2 tight loop blocks the main loop:** During the 100 ms GEA2 tight loop, the ESPHome main loop is blocked. This is necessary for correct GEA2 half-duplex operation but limits the responsiveness of other ESPHome components during that window.
 5. **Static global back-pointer:** The startup HSM uses a static global pointer (`g_bridge_instance`) to access `IBridgeServices` methods. This is safe in the single-threaded ESPHome context but would not be thread-safe in a multi-threaded environment.
+---
+
+## 11. HA Discovery Integration
+
+The bridge integrates Home Assistant MQTT discovery via the `ha_discovery_manager_` and coordinates with the `erd_cache_publisher_` to avoid MQTT queue contention during discovery payload generation and cleanup.
+
+### 11.1 Configuration Flags
+
+Two boolean configuration flags control discovery behavior. Both are set via the ESPHome code generator during `setup()` and read by `loop()` to gate discovery actions.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `generate_device_config_` | `false` | When `true`, the bridge starts HA discovery once steady state is reached. Discovery runs once per boot cycle. |
+| `filter_config_topics_` | `true` | When `true`, the discovery manager filters out non-config topics during cleanup (only `/config` discovery payloads are removed). Passed to `ha_discovery_manager_configure()`. |
+
+**Configuration setters:**
+
+```cpp
+void set_generate_device_config(bool generate_device_config);
+void set_filter_config_topics(bool filter_config_topics);
+```
+
+Both setters store their value directly into the corresponding member variable. They are called from `__init__.py` during ESPHome code generation based on the user's YAML configuration.
+
+### 11.2 Discovery State Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ha_discovery_started_` | `bool` | Set to `true` once discovery has been initiated. Acts as a one-shot guard — discovery is started at most once per boot. Initialized to `false`. |
+| `discovery_refresh_in_progress_` | `bool` | Set to `true` while a discovery cleanup refresh is running (triggered by `DiscoveryRefreshButton`). Cleared to `false` when cleanup completes and before reboot. Initialized to `false`. |
+| `erd_cache_publisher_paused_` | `bool` | Tracks whether the ERD cache publisher was paused during discovery activity. Set to `true` when `pause()` is called, and `false` when `resume()` is called. Used to avoid redundant pause/resume calls across `loop()` iterations. Initialized to `false`. |
+| `discovery_just_resumed_` | `bool` | Set to `true` when the publisher is resumed after discovery activity ends. Cleared to `false` once `erd_cache_mqtt_publisher_first_round_done()` returns `true`, indicating the publisher has completed a full cache round after resuming. Initialized to `false`. |
+
+### 11.3 Discovery Lifecycle in loop()
+
+Each `loop()` iteration performs the following discovery-related work in order:
+
+1. **Check discovery activity:** Call `ha_discovery_manager_is_processing(&ha_discovery_manager_)` to determine if the discovery manager is in an active state (`building` or `discovering`).
+
+2. **Pause/resume ERD cache publisher:**
+   - **If discovery is active** and `erd_cache_publisher_.cache` is non-null: call `erd_cache_mqtt_publisher_pause()`. If `erd_cache_publisher_paused_` is `false`, log a debug message and set it to `true`.
+   - **If discovery is not active** and `erd_cache_publisher_.cache` is non-null: call `erd_cache_mqtt_publisher_resume()`. If `erd_cache_publisher_paused_` is `true`, log a debug message, set it to `false`, and set `discovery_just_resumed_` to `true`.
+
+3. **Check steady state after resume:** If `discovery_just_resumed_` is `true` and `erd_cache_mqtt_publisher_first_round_done()` returns `true`, log "Device is in steady state" and clear `discovery_just_resumed_`.
+
+4. **Signal or run publisher:** If `erd_cache_publisher_.cache` is non-null and discovery is not active:
+   - **On ESP-IDF:** call `erd_cache_mqtt_publisher_signal_work()` to wake the background task.
+   - **On non-ESP-IDF:** call `erd_cache_mqtt_publisher_loop()` with `max_publishes=5` and `max_ms=20`.
+
+5. **Start HA discovery (one-shot):** If `steady_state_reached_` is `true`, `ha_discovery_started_` is `false`, and `generate_device_config_` is `true`:
+   - Set `ha_discovery_started_` to `true`.
+   - Call `ha_discovery_manager_configure()` with device ID, model number, serial number, appliance type, `filter_config_topics_`, ERD cache pointer, and MQTT client interface.
+   - Call `ha_discovery_manager_start()`.
+
+6. **Drive discovery manager:** If `ha_discovery_manager_is_processing()` returns `true`, call `ha_discovery_manager_run()` to advance the discovery state machine.
+
+7. **Handle cleanup completion:** If `discovery_refresh_in_progress_` is `true` (ESP-IDF only):
+   - Call `ha_discovery_cleanup_run()` to advance the cleanup module.
+   - When `ha_discovery_cleanup_is_done()` returns `true`: clear `discovery_refresh_in_progress_`, log "HA discovery cleanup complete, restarting device...", delay 500 ms via `vTaskDelay`, and call `esphome::App.reboot()`.
+
+```mermaid
+flowchart TD
+    A[loop() entry] --> B{discovery active?}
+    B -->|yes| C[pause publisher]
+    B -->|no| D{publisher was paused?}
+    C --> E[skip publisher work]
+    D -->|yes| F[resume publisher]
+    D -->|no| G[signal/run publisher]
+    F --> H{first round done?}
+    H -->|yes| I[log steady state]
+    H -->|no| G
+    I --> J{steady & !started & generate?}
+    G --> J
+    E --> K{manager processing?}
+    J -->|yes| L[start discovery]
+    J -->|no| K
+    L --> K
+    K -->|yes| M[run manager]
+    K -->|no| N{cleanup in progress?}
+    M --> N
+    N -->|yes| O[run cleanup]
+    N -->|no| P[continue loop]
+    O --> Q{cleanup done?}
+    Q -->|yes| R[reboot]
+    Q -->|no| P
+```
+
+### 11.4 trigger_discovery_refresh() Flow
+
+`trigger_discovery_refresh()` is called by `DiscoveryRefreshButton::press_action()` to initiate a discovery cleanup and device restart.
+
+**Guard checks (in order):**
+
+1. **Idempotency guard:** If `discovery_refresh_in_progress_` is `true`, log a warning ("Discovery refresh already in progress, ignoring") and return.
+2. **Steady-state guard:** If `steady_state_reached_` is `false`, log a warning ("Cannot refresh discovery: appliance bridge not in steady state") and return.
+3. **Processing guard:** If `ha_discovery_manager_is_processing()` returns `true`, log a warning ("Cannot refresh discovery: manager still processing") and return.
+
+**On ESP-IDF, after guards pass:**
+
+1. Log info: "Starting HA discovery cleanup..."
+2. Call `ha_discovery_cleanup_configure()` with the device ID, MQTT client interface, and `esphome::millis` as the time source.
+3. Call `ha_discovery_cleanup_start()`.
+4. Set `discovery_refresh_in_progress_` to `true`.
+
+On non-ESP-IDF platforms, the cleanup configure/start calls are omitted (dependency pointers are suppressed with `(void)` casts), but the guard checks still execute and `discovery_refresh_in_progress_` is set to `true`.
+
+### 11.5 Integration with ha_discovery_manager
+
+The bridge owns a `ha_discovery_manager_t` instance (`ha_discovery_manager_`) and drives it from `loop()`:
+
+- **Configuration:** `ha_discovery_manager_configure()` is called once when discovery starts, passing the device identity (ID, model, serial, appliance type), the `filter_config_topics_` flag, the ERD cache, and the MQTT client interface.
+- **Start:** `ha_discovery_manager_start()` transitions the manager from `IDLE` to `BUILDING` (on ESP-IDF) or directly to `COMPLETE` (on non-ESP-IDF).
+- **Drive:** `ha_discovery_manager_run()` is called each `loop()` iteration while `ha_discovery_manager_is_processing()` returns `true`. This advances the manager through its state machine, decompressing JSONL chunks and publishing discovery payloads at a rate-limited interval (50 ms).
+- **Completion:** When the manager reaches `COMPLETE` or `FAILED` state, `ha_discovery_manager_is_processing()` returns `false`, causing `loop()` to stop calling `run()` and resume normal ERD cache publishing.
+
+### 11.6 Integration with ha_discovery_cleanup
+
+The bridge accesses the embedded cleanup module via `ha_discovery_manager_.cleanup`:
+
+- **Configuration:** `ha_discovery_cleanup_configure()` is called with the device ID, MQTT client interface, and time source. This sets up the wildcard subscription and internal buffers.
+- **Start:** `ha_discovery_cleanup_start()` begins the cleanup process.
+- **Drive:** `ha_discovery_cleanup_run()` is called each `loop()` iteration while `discovery_refresh_in_progress_` is `true`. This advances the cleanup through its phases (subscribe, discover, drain).
+- **Completion:** `ha_discovery_cleanup_is_done()` returns `true` when all phases are complete. The bridge then clears `discovery_refresh_in_progress_`, delays 500 ms for final messages to transmit, and calls `esphome::App.reboot()`.
+
+The cleanup module is embedded within the `ha_discovery_manager_t` struct, so the bridge does not maintain a separate cleanup instance.
+
+### 11.7 Publisher Pause/Resume Rationale
+
+The ERD cache publisher is paused during discovery activity to avoid competing for the ESP-IDF MQTT task's inbound/outbound queues. Without pausing, the background publisher task would continue draining cache updates while the discovery manager publishes config payloads, potentially causing:
+
+- MQTT queue overflow, leading to dropped messages
+- Retained-clear messages from cleanup being overwritten by late cache publishes
+- Unpredictable ordering of discovery config vs. value messages on the broker
+
+The pause/resume cycle ensures a clean separation: discovery messages are published without interference, then the cache publisher resumes and drains accumulated updates. The `first_round_done` mechanism confirms the publisher has completed a full cache round after resuming, providing a steady-state signal.

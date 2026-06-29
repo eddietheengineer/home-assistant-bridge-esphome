@@ -18,21 +18,28 @@ std::string appliance_type_to_string(uint8_t appliance_type);
 namespace esphome {
 namespace geappliances_bridge {
 
-static const char* const TAG __attribute__((unused)) = "device_identity";
+GEA_TAG(TAG) = "device_identity";
 
-void DeviceIdentityManager::init(const std::string& configured_id,
+void DeviceIdentityManager::init(const char* configured_id,
                                   i_tiny_gea3_erd_client_t* erd_client,
                                   uint8_t host_address)
 {
-  this->configured_device_id_ = configured_id;
   this->erd_client_ = erd_client;
   this->host_address_ = host_address;
   this->state_ = DEVICE_ID_STATE_READING_APPLIANCE_TYPE;
+  this->generated_device_id_[0] = '\0';
+  this->model_number_[0] = '\0';
+  this->serial_number_[0] = '\0';
 
-  if (!this->configured_device_id_.empty()) {
+  if (configured_id != nullptr && configured_id[0] != '\0') {
+    strncpy(this->configured_device_id_, configured_id, sizeof(this->configured_device_id_) - 1);
+    this->configured_device_id_[sizeof(this->configured_device_id_) - 1] = '\0';
+    this->has_configured_device_id_ = true;
     ESP_LOGI(TAG, "Device ID configured: %s (will still read identity ERDs)",
-             this->configured_device_id_.c_str());
+             this->configured_device_id_);
   } else {
+    this->has_configured_device_id_ = false;
+    this->configured_device_id_[0] = '\0';
     ESP_LOGI(TAG, "No device_id configured, will auto-generate from identity ERDs");
   }
 
@@ -50,18 +57,22 @@ void DeviceIdentityManager::on_erd_read_completed(tiny_erd_t erd, const uint8_t*
     this->try_queue_read_(ERD_MODEL_NUMBER);
 
   } else if (erd == ERD_MODEL_NUMBER) {
-    this->model_number_ = this->bytes_to_string_(data, size);
-    ESP_LOGI(TAG, "Read model number: %s", this->model_number_.c_str());
+    this->bytes_to_string_(data, size, this->model_number_, sizeof(this->model_number_));
+    ESP_LOGI(TAG, "Read model number: %s", this->model_number_);
     this->state_ = DEVICE_ID_STATE_READING_SERIAL_NUMBER;
     this->try_queue_read_(ERD_SERIAL_NUMBER);
 
   } else if (erd == ERD_SERIAL_NUMBER) {
-    this->serial_number_ = this->bytes_to_string_(data, size);
-    ESP_LOGI(TAG, "Read serial number: %s", this->serial_number_.c_str());
-    this->generated_device_id_ = appliance_type_to_string(this->appliance_type_) + "_" +
-                                  this->sanitize_for_mqtt_topic_(this->model_number_) + "_" +
-                                  this->sanitize_for_mqtt_topic_(this->serial_number_);
-    ESP_LOGI(TAG, "Generated device ID: %s", this->generated_device_id_.c_str());
+    this->bytes_to_string_(data, size, this->serial_number_, sizeof(this->serial_number_));
+    ESP_LOGI(TAG, "Read serial number: %s", this->serial_number_);
+
+    /* Build generated_device_id: applianceType_model_serial */
+    const std::string type_str = appliance_type_to_string(this->appliance_type_);
+    const std::string sanitized_model = this->sanitize_for_mqtt_topic_(this->model_number_);
+    const std::string sanitized_serial = this->sanitize_for_mqtt_topic_(this->serial_number_);
+    snprintf(this->generated_device_id_, sizeof(this->generated_device_id_),
+             "%s_%s_%s", type_str.c_str(), sanitized_model.c_str(), sanitized_serial.c_str());
+    ESP_LOGI(TAG, "Generated device ID: %s", this->generated_device_id_);
     this->state_ = DEVICE_ID_STATE_COMPLETE;
   }
 }
@@ -74,9 +85,9 @@ void DeviceIdentityManager::on_erd_read_failed(tiny_erd_t erd)
   this->try_queue_read_(erd);
 }
 
-const std::string& DeviceIdentityManager::get_device_id() const
+const char* DeviceIdentityManager::get_device_id() const
 {
-  if (!this->configured_device_id_.empty()) {
+  if (this->has_configured_device_id_) {
     return this->configured_device_id_;
   }
   return this->generated_device_id_;
@@ -92,27 +103,39 @@ bool DeviceIdentityManager::try_queue_read_(tiny_erd_t erd)
                                     this->host_address_, erd);
 }
 
-std::string DeviceIdentityManager::bytes_to_string_(const uint8_t* data, size_t size)
+void DeviceIdentityManager::bytes_to_string_(const uint8_t* data, size_t size,
+                                              char* out, size_t out_size)
 {
-  if (size == 0) return "";
-  std::string result(reinterpret_cast<const char*>(data), size);
-  // Trim trailing null bytes
-  while (!result.empty() && result.back() == '\0') {
-    result.pop_back();
+  if (size == 0) {
+    out[0] = '\0';
+    return;
   }
-  return result;
+  // GE API model/serial are plain ASCII, null-terminated or padded with 0x00.
+  // Some appliances use 0x7F ('_') as trailing padding; strip it.
+  size_t i = 0;
+  for (; i < size && i < out_size - 1; i++) {
+    uint8_t raw = data[i];
+    if (raw == 0x00) break;
+    out[i] = static_cast<char>(raw);
+  }
+  out[i] = '\0';
+  // Strip trailing '_' padding
+  while (i > 0 && out[i - 1] == '_') {
+    out[i - 1] = '\0';
+    i--;
+  }
 }
 
-std::string DeviceIdentityManager::sanitize_for_mqtt_topic_(const std::string& input)
+std::string DeviceIdentityManager::sanitize_for_mqtt_topic_(const char* input)
 {
   std::string result;
-  result.reserve(input.size());
-  for (char c : input) {
-    if (c == '+' || c == '#' || c == '/' || c == '$' || c == ' ' ||
-        static_cast<unsigned char>(c) < 0x20 || static_cast<unsigned char>(c) > 0x7E) {
+  result.reserve(strlen(input));
+  for (const char* c = input; *c; c++) {
+    if (*c == '+' || *c == '#' || *c == '/' || *c == '$' || *c == ' ' ||
+        static_cast<unsigned char>(*c) < 0x20 || static_cast<unsigned char>(*c) > 0x7E) {
       result += '_';
     } else {
-      result += c;
+      result += *c;
     }
   }
   return result.empty() ? "Unknown" : result;

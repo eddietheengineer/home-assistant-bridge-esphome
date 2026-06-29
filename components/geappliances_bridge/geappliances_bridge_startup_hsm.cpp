@@ -22,6 +22,8 @@ extern "C" {
 #include "tiny_utils.h"  // element_count macro
 }
 
+GEA_TAG(TAG) = "geappliances_bridge_startup_hsm";
+
 namespace esphome {
 namespace geappliances_bridge {
 
@@ -278,7 +280,6 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
 
   switch (signal) {
     case tiny_hsm_signal_entry:
-      ESP_LOGI(TAG, "Startup: Feature bits phase");
       break;
 
     case signal_run_loop:
@@ -326,13 +327,12 @@ tiny_hsm_result_t startup_state_bridge_init(tiny_hsm_t* hsm, tiny_hsm_signal_t s
 
   switch (signal) {
     case tiny_hsm_signal_entry:
-      ESP_LOGI(TAG, "Startup: Bridge init phase");
+      ESP_LOGD(TAG, "Startup: Bridge init phase");
       break;
 
     case signal_run_loop:
       if (!svc->is_bridge_initialized() &&
           svc->is_autodiscovery_complete()) {
-        ESP_LOGI(TAG, "Device ID ready, initializing ERD bridge");
         svc->initialize_erd_bridge();
         // Do NOT transition here — wait for signal_bridge_ready from the
         // polling bridge when ERD discovery is complete.

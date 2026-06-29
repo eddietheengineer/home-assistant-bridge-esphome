@@ -25,7 +25,7 @@
 #ifndef i_mqtt_client_h
 #define i_mqtt_client_h
 
-#include <cstddef>
+#include <stddef.h>
 
 #include "i_tiny_event.h"
 #include "i_tiny_gea3_erd_client.h"
@@ -55,6 +55,10 @@ typedef struct i_mqtt_client_api_t {
   i_tiny_event_t* (*on_mqtt_connect)(i_mqtt_client_t* self);
 
   void (*publish_raw)(i_mqtt_client_t* self, const char* topic, const char* payload, size_t payload_len, bool retain);
+
+  void (*subscribe)(i_mqtt_client_t* self, const char* topic, void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg), void* arg);
+
+  void (*unsubscribe)(i_mqtt_client_t* self, const char* topic);
 } i_mqtt_client_api_t;
 
 /*!
@@ -104,6 +108,22 @@ static inline i_tiny_event_t* mqtt_client_on_mqtt_connect(i_mqtt_client_t* self)
 static inline void mqtt_client_publish_raw(i_mqtt_client_t* self, const char* topic, const char* payload, size_t payload_len, bool retain)
 {
   self->api->publish_raw(self, topic, payload, payload_len, retain);
+}
+
+/*!
+ * Subscribe to a topic with a raw C callback.
+ */
+static inline void mqtt_client_subscribe(i_mqtt_client_t* self, const char* topic, void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg), void* arg)
+{
+  self->api->subscribe(self, topic, callback, arg);
+}
+
+/*!
+ * Unsubscribe from a topic.
+ */
+static inline void mqtt_client_unsubscribe(i_mqtt_client_t* self, const char* topic)
+{
+  self->api->unsubscribe(self, topic);
 }
 
 #endif

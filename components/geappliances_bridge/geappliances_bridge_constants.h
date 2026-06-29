@@ -12,15 +12,11 @@
 
 #include <cstdint>
 
+#include "geappliances_bridge_log.h"
+
 extern "C" {
 #include "tiny_gea3_erd_client.h"
 }
-
-// ---------------------------------------------------------------------------
-// Logging tag — shared across all bridge translation units
-// ---------------------------------------------------------------------------
-
-[[maybe_unused]] static constexpr const char* TAG = "geappliances_bridge";
 
 // ---------------------------------------------------------------------------
 // Well-known GEA ERD identifiers
@@ -50,7 +46,7 @@ static constexpr tiny_erd_t ERD_APPLIANCE_FEATURE_API_9 = 0x010D;
 static constexpr uint8_t GEA_BROADCAST_ADDRESS = 0xFF;
 
 // Autodiscovery startup delay (bridge waits before starting broadcast discovery).
-static constexpr uint32_t AUTODISCOVERY_STARTUP_DELAY_MS = 5000;
+static constexpr uint32_t AUTODISCOVERY_STARTUP_DELAY_MS = 10000;
 
 // Each appliance feature API ERD has the layout [2B type][2B version][4B bitmap]
 static constexpr uint8_t APPLIANCE_FEATURE_ERD_SIZE = 8;

@@ -14,7 +14,7 @@
 namespace esphome {
 namespace geappliances_bridge {
 
-static const char* const TAG __attribute__((unused)) = "autodiscovery";
+GEA_TAG(TAG) = "autodiscovery";
 
 // =============================================================================
 // Public API
