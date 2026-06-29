@@ -78,6 +78,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   friend ErdPollListResult build_poll_list_(GeappliancesBridge* bridge);
   friend class DiscoveryRefreshButton;
   friend tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t*);
+  friend class GeappliancesBridgeDiscoveryTest;
 
  public:
   static constexpr unsigned long baud = 230400;
@@ -319,7 +320,9 @@ class DiscoveryRefreshButton : public button::Button {
   DiscoveryRefreshButton(GeappliancesBridge* bridge) : bridge_(bridge) {}
 
   void press_action() override {
-    bridge_->trigger_discovery_refresh();
+    if (bridge_ != nullptr) {
+      bridge_->trigger_discovery_refresh();
+    }
   }
 
  private:

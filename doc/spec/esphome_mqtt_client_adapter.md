@@ -16,6 +16,7 @@ Implement the `i_mqtt_client_t` interface for the ESPHome bridge, providing the 
 - Queue ERD updates during MQTT disconnect and flush on reconnect with a settle delay
 - Delegate ERD registration tracking and valid-ERD filtering to `ErdRegistry`
 - Provide a `publish()` helper for arbitrary MQTT message publishing
+- Support topic subscription and unsubscription via `subscribe()`/`unsubscribe()` vtable slots
 
 ### 1.3 Not Responsible For
 
@@ -169,7 +170,7 @@ Publish a raw MQTT message with C-string topic and payload. Implements the `publ
 
 ## 4. i_mqtt_client API Implementation
 
-The adapter implements all six vtable slots of `i_mqtt_client_api_t`:
+The adapter implements all eight vtable slots of `i_mqtt_client_api_t`:
 
 ### 4.1 `register_erd`
 
@@ -228,11 +229,58 @@ void publish_raw(
 
 Forward to `esphome_mqtt_client_adapter_publish_raw()`. Creates a temporary `std::string` from the raw payload for the ESPHome MQTT client API. Guards against null or disconnected MQTT client.
 
+### 4.7 `subscribe`
+
+```c
+void subscribe(
+  i_mqtt_client_t* self,
+  const char* topic,
+  void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg),
+  void* arg);
+```
+
+Register a callback for an MQTT topic. The adapter wraps the C function pointer in a C++ lambda and forwards it to `esphome::mqtt::global_mqtt_client->subscribe()`, passing QoS 0. When a message arrives on the topic, ESPHome invokes the lambda, which converts the `std::string` parameters to C strings and calls the original callback with the `arg` pointer. The callback and `arg` are captured by value in the lambda closure, which is heap-allocated by the ESPHome MQTT client and retained for the lifetime of the subscription.
+
+Guards against null MQTT client: if `global_mqtt_client` is `nullptr` at the time of the call, the function returns immediately without registering the callback.
+
+### 4.8 `unsubscribe`
+
+```c
+void unsubscribe(i_mqtt_client_t* self, const char* topic);
+```
+
+Remove a previously registered subscription for a topic. Forwards to `esphome::mqtt::global_mqtt_client->unsubscribe()`, which releases the lambda closure and tells the broker to stop delivering messages for that topic. Guards against null MQTT client: if `global_mqtt_client` is `nullptr`, the function returns immediately.
+
 ---
 
-## 5. Wildcard Subscription
+## 5. Subscribe/Unsubscribe Callback Lifecycle
 
-### 5.1 Design
+### 5.1 Callback Storage
+
+The adapter does not maintain its own collection of callbacks. When `subscribe()` is called, the C function pointer and `arg` are captured by value in a C++ lambda closure, which is passed to the ESPHome MQTT client. The ESPHome client stores the closure internally and is responsible for its lifetime. The adapter has no way to enumerate, modify, or prematurely destroy stored callbacks.
+
+### 5.2 When Callbacks Fire
+
+Callbacks fire when the MQTT broker delivers a message matching the subscribed topic. The ESPHome MQTT client receives the message on its internal task, invokes the stored lambda, which in turn calls the original C callback synchronously. The callback runs in the ESPHome MQTT task context, not the main loop.
+
+### 5.3 Null Safety
+
+Both `subscribe()` and `unsubscribe()` guard against a null `global_mqtt_client`:
+
+- `subscribe()`: if `global_mqtt_client` is `nullptr`, returns immediately. The callback is not registered and will not fire. The caller is responsible for retrying subscription after the MQTT client becomes available (e.g., after `on_mqtt_connect` event).
+- `unsubscribe()`: if `global_mqtt_client` is `nullptr`, returns immediately. No error is raised.
+
+### 5.4 Multiple Subscriptions
+
+The adapter supports multiple independent subscriptions to different topics. Each call to `subscribe()` registers a separate callback with the ESPHome MQTT client. Topics may use MQTT wildcards (`+` for single-level, `#` for multi-level). Calling `subscribe()` again for the same topic replaces the previous callback (ESPHome behavior). Calling `unsubscribe()` for a topic removes only that topic's subscription; other subscriptions remain active.
+
+The `_self` parameter is unused in both `subscribe()` and `unsubscribe()` — the functions operate on the global MQTT client singleton rather than per-instance state. This means all adapter instances share the same subscription namespace on the MQTT client.
+
+---
+
+## 6. Wildcard Subscription
+
+### 6.1 Design
 
 Instead of subscribing to individual write topics for each ERD (e.g., `geappliances/{device_id}/erd/0x0001/write`, `geappliances/{device_id}/erd/0x0002/write`, ...), the adapter subscribes to a single wildcard topic:
 
@@ -242,14 +290,14 @@ geappliances/{device_id}/erd/+/write
 
 The `+` wildcard matches any single topic level, covering all possible ERD identifiers.
 
-### 5.2 Benefits
+### 6.2 Benefits
 
 - Eliminates 100+ individual MQTT subscriptions (one per ERD)
 - Eliminates 100+ heap-allocated lambda closures (one per subscription callback)
 - Eliminates 100+ IDF MQTT outbox entries (SUBSCRIBE packets)
 - Eliminates a ~3-second stall on MQTT reconnect caused by synchronous re-subscriptions
 
-### 5.3 Write Command Routing
+### 6.3 Write Command Routing
 When a message arrives on the wildcard topic, the adapter:
 
 1. Parses the ERD ID from the topic path (e.g., `0x7701` from `.../erd/0x7701/write`)
@@ -261,29 +309,29 @@ The `erd_write_bridge` receives the event and dispatches the write to the ERD cl
 
 ---
 
-## 6. Pending Update Queue
+## 7. Pending Update Queue
 
-### 6.1 Queue on Disconnect
+### 7.1 Queue on Disconnect
 
 When the MQTT client disconnects, ERD value updates are queued rather than dropped. The queue is keyed by ERD, so repeated updates to the same ERD overwrite the previous pending entry rather than appending. This ensures only the latest value is published after reconnection.
 
-### 6.2 Flush on Reconnect
+### 7.2 Flush on Reconnect
 
 When `notify_connected()` is called, pending updates are flushed to MQTT. To avoid stalling the main loop, updates are drained in small batches (e.g., 5 per `drain_pending_updates()` call). The caller is responsible for calling `drain_pending_updates()` repeatedly until it returns 0.
 
-### 6.3 Settle Delay
+### 7.3 Settle Delay
 
 After reconnect, pending updates are not flushed immediately. A settle delay (tracked via `mqtt_connected_at_ms`) gives the IDF MQTT task time to process the broker's reconnect backlog before the adapter begins publishing. This prevents message ordering issues and reduces the chance of the MQTT outbox filling up.
 
-### 6.4 Queue Capacity
+### 7.4 Queue Capacity
 
 The pending update queue has a maximum capacity of 200 entries. If the queue is full, new updates overwrite the oldest entry.
 
 ---
 
-## 7. ERD Filtering
+## 8. ERD Filtering
 
-### 7.1 ErdRegistry Integration
+### 8.1 ErdRegistry Integration
 
 The adapter holds an optional pointer to `ErdRegistry`. When set via `esphome_mqtt_client_adapter_set_erd_registry()`, the registry provides:
 
@@ -291,14 +339,14 @@ The adapter holds an optional pointer to `ErdRegistry`. When set via `esphome_mq
 - **Registered-ERD tracking:** `ErdRegistry::register_erd()` records which ERDs have been registered at runtime, used by diagnostics.
 - **String-ERD type detection:** The registry can identify ERDs whose values are strings rather than binary, allowing appropriate payload encoding.
 
-### 7.2 Filtering Behavior
+### 8.2 Filtering Behavior
 
 - When `erd_registry` is `nullptr`, all ERDs pass through unfiltered.
 - When `erd_registry` is non-null and `has_valid_erds_filter()` returns `true`, only ERDs in the valid set are processed.
 - The filter is checked at publish time, not at registration time.
 
 ---
-## 8. Invariants
+## 9. Invariants
 
 1. **Single vtable instance:** The `i_mqtt_client_api_t` vtable is a file-scope `static const` variable. It is assigned once during `init()` and never modified.
 2. **Wildcard subscription eliminates per-ERD overhead:** A single wildcard topic replaces per-ERD subscriptions, eliminating heap-allocated closures and MQTT outbox entries.
@@ -311,7 +359,7 @@ The adapter holds an optional pointer to `ErdRegistry`. When set via `esphome_mq
 
 ---
 
-## 9. Dependencies
+## 10. Dependencies
 
 | Dependency | Purpose |
 |------------|---------|
@@ -325,7 +373,7 @@ The adapter holds an optional pointer to `ErdRegistry`. When set via `esphome_mq
 
 ---
 
-## 10. Known Limitations
+## 11. Known Limitations
 
 1. **No individual ERD write topics:** The wildcard subscription approach means write commands are received on a single topic and routed by parsing the ERD from the topic path. Individual ERD write topics are not subscribed to.
 2. **No publish acknowledgment:** All publish operations are fire-and-forget. There is no QoS or acknowledgment mechanism exposed to the caller.
