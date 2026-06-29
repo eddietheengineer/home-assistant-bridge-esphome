@@ -780,7 +780,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         self->last_publish_ms = self->get_time_ms();
         self->publish_yield_counter = 0;
         self->current_domain_prefix_buf[0] = '\0';
-        ESP_LOGI(TAG, "Starting HA discovery fetch...");
+        ESP_LOGI(TAG, "Generating MQTT discovery payloads...");
         return;
     }
 
