@@ -107,7 +107,6 @@ void GeappliancesBridge::start_feature_bit_reading_()
   // transient null-client on an earlier call does not permanently block retry.
   this->feature_bit_reading_started_ = true;
 
-  ESP_LOGI(TAG, "Reading appliance API feature bits...");
   this->feature_bit_manager_.init(
       erd_client,
       this->autodiscovery_manager_.get_host_address(),
@@ -124,9 +123,6 @@ void GeappliancesBridge::initialize_mqtt_client_()
   if (this->mqtt_client_adapter_initialized_) {
     return;
   }
-
-  ESP_LOGI(TAG, "Initializing MQTT client adapter with device ID: %s",
-           this->device_identity_manager_.get_device_id());
 
   // For manual device_id configs where autodiscovery is skipped (gea2_uart only,
   // no GEA3 uart), mark the protocol as GEA2 so run_protocol_stack_() enables
@@ -149,7 +145,6 @@ void GeappliancesBridge::initialize_mqtt_client_()
     &this->mqtt_client_adapter_, &this->erd_registry_);
 
   this->mqtt_client_adapter_initialized_ = true;
-  ESP_LOGI(TAG, "MQTT client adapter initialized; feature bit ERDs will be published as they are read");
 }
 
 // ---------------------------------------------------------------------------
@@ -172,14 +167,12 @@ void GeappliancesBridge::initialize_erd_bridge_()
       this->feature_bit_manager_.get_valid_erd_count() > 0) {
     this->erd_registry_.set_valid_erds(this->feature_bit_manager_.valid_erds_,
                                        this->feature_bit_manager_.get_valid_erd_count());
-    ESP_LOGI(TAG, "Appliance API parsing enabled: publishing filtered to %u valid ERDs",
-             this->feature_bit_manager_.get_valid_erd_count());
   }
 
   // Select operating mode.
   bool        use_polling = false;
-
   const char* mode_name = "unknown";
+
   if (this->autodiscovery_manager_.is_gea2_protocol()) {
     use_polling = true;
     mode_name   = "polling (GEA2 - subscriptions not supported)";
@@ -190,13 +183,11 @@ void GeappliancesBridge::initialize_erd_bridge_()
     use_polling = false;
     mode_name   = "subscription";
   } else if (this->mode_ == BRIDGE_MODE_AUTO) {
-    use_polling                          = false;
-    mode_name                            = "auto (starting with subscription)";
+    use_polling = false;
+    mode_name   = "auto (subscription + custom ERD polling)";
   }
 
-  (void)mode_name;
-
-  ESP_LOGI(TAG, "Using %s mode with polling interval: %u ms", mode_name, this->polling_interval_ms_);
+  ESP_LOGI(TAG, "Bridge mode: %s", mode_name);
 
   // Wire the discovery-complete callback BEFORE initializing the bridge,
   // so the HSM cannot fire the callback before it's set (race condition
@@ -211,7 +202,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
     auto result = build_poll_list_(this);
     this->poll_probe_list_count_ = result.erds_count;
     std::memcpy(this->poll_probe_list_, result.erds, result.erds_count * sizeof(uint16_t));
-    ESP_LOGI(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
+    ESP_LOGD(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
     erd_bridge_poll_init(
       &this->erd_bridge_poll_,
       &this->timer_group_,

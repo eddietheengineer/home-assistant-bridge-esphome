@@ -1182,6 +1182,16 @@ _FILTER_PATTERNS = [
     ("unused_reserved", re.compile(
         r"(?i)(unused|reserved)(\s*\[.*\])?"
     )),
+    # Service mode. Internal technician state, not useful to end users.
+    ("service_mode", re.compile(
+        r"(?i)service mode"
+    )),
+    # Issue/fault/diagnostic/failure indicators. Operational error state,
+    # not actionable in HA (appliance handles these internally).
+    ("operational_errors", re.compile(
+        r"(?i)(issue|\bfault\b|\bfaulted\b|diagnostic|failure)"
+    )),
+
 ]
 
 

@@ -49,7 +49,7 @@ extern "C" {
 namespace esphome {
 namespace geappliances_bridge {
 
-static constexpr uint32_t AUTODISCOVERY_BROADCAST_WINDOW_MS = 5000;
+static constexpr uint32_t AUTODISCOVERY_BROADCAST_WINDOW_MS = 1000;
 
 enum AutodiscoveryState {
   AUTODISCOVERY_IDLE,

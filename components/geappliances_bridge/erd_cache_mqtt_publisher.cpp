@@ -68,9 +68,11 @@ static void mqtt_publisher_task(void* arg)
 
     // Drain all available updates — no per-loop budget in background task.
     // The mutex is held throughout to protect publish_index and cache access.
+    bool drained_any = false;
     while (1) {
       erd_cache_entry_t* entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
       if (!entry) break;
+      drained_any = true;
 
       /* Determine data pointer. */
       const uint8_t* data;
@@ -111,6 +113,12 @@ static void mqtt_publisher_task(void* arg)
       // Update stats — already protected by the outer mutex hold.
       self->total_published++;
       self->publish_count_window++;
+    }
+
+    /* Detect full cache round: we drained entries and the index wrapped
+     * back to 0, meaning we've scanned the entire cache. */
+    if (drained_any && self->publish_index == 0) {
+      self->first_round_done = true;
     }
 
     if (mutex_held) {
@@ -179,17 +187,15 @@ void erd_cache_mqtt_publisher_init(
     mqtt_client_on_mqtt_connect(self->mqtt_client),
     &self->mqtt_connect_subscription);
 
-  /* If MQTT is already connected when we register, fire the event immediately
-   * so mqtt_connected is set correctly.  This mirrors the adapter's pattern:
-   * the adapter fires on_mqtt_connect_event during its init, but the publisher
-   * subscribes after the adapter is already initialized, so it can miss that
-   * initial event. */
+  /* If MQTT is already connected when we register, set the flag so the
+   * publisher knows it can publish.  Don't call on_connected() — that
+   * logs "MQTT reconnected" which is misleading at init time. */
   auto global = esphome::mqtt::global_mqtt_client;
   if (global != nullptr && global->is_connected()) {
-    erd_cache_mqtt_publisher_on_connected(self);
+    self->mqtt_connected = true;
   }
 
-  ESP_LOGI(PUBLISHER_TAG, "ERD cache MQTT publisher initialized");
+  ESP_LOGI(PUBLISHER_TAG, "ERD cache MQTT publisher initialized with device ID: %s", self->device_id);
 }
 
 void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self)
@@ -369,6 +375,10 @@ uint16_t erd_cache_mqtt_publisher_loop(
     self->publish_count_window++;
     published++;
   }
+  /* Detect full cache round: drained entries and index wrapped to 0. */
+  if (published > 0 && self->publish_index == 0) {
+    self->first_round_done = true;
+  }
 
   return published;
 }
@@ -379,13 +389,16 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->mqtt_connected = true;
+      self->first_round_done = false;
       xSemaphoreGive(self->state_mutex);
     }
   } else {
     self->mqtt_connected = true;
+    self->first_round_done = false;
   }
 #else
   self->mqtt_connected = true;
+  self->first_round_done = false;
 #endif
   ESP_LOGI(PUBLISHER_TAG, "MQTT reconnected — resuming ERD cache publishing");
   /* Wake the background task so it can start publishing again. */
@@ -414,13 +427,16 @@ void erd_cache_mqtt_publisher_pause(erd_cache_mqtt_publisher_t* self)
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->paused = true;
+      self->first_round_done = false;
       xSemaphoreGive(self->state_mutex);
     }
   } else {
     self->paused = true;
+    self->first_round_done = false;
   }
 #else
   self->paused = true;
+  self->first_round_done = false;
 #endif
 }
 
@@ -468,4 +484,18 @@ uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* s
   self->publish_count_window = 0;
 #endif
   return count;
+}
+
+bool erd_cache_mqtt_publisher_first_round_done(erd_cache_mqtt_publisher_t* self)
+{
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      bool done = self->first_round_done;
+      xSemaphoreGive(self->state_mutex);
+      return done;
+    }
+  }
+#endif
+  return self->first_round_done;
 }

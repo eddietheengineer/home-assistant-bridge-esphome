@@ -47,6 +47,7 @@ typedef struct {
   uint16_t publish_index;          // Round-robin index into cache entries
   bool mqtt_connected;             // True when MQTT broker is connected
   bool paused;                     // True when publishing should be temporarily paused
+  bool first_round_done;          // True after one full cache pass following resume
   tiny_event_subscription_t mqtt_disconnect_subscription;
   tiny_event_subscription_t mqtt_connect_subscription;
   // Stats
@@ -141,6 +142,11 @@ void erd_cache_mqtt_publisher_set_time_fn(
  * Returns the number of ERD publishes in the last 60 seconds, then resets the window.
  */
 uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* self);
+/*!
+ * Returns true if the publisher has completed a full cache round since the
+ * last resume.  Thread-safe — acquires the state mutex on ESP-IDF.
+ */
+bool erd_cache_mqtt_publisher_first_round_done(erd_cache_mqtt_publisher_t* self);
 
 #ifdef __cplusplus
 }

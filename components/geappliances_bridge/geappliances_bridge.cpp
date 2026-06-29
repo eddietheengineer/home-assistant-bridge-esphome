@@ -241,11 +241,29 @@ void GeappliancesBridge::loop() {
   if (ha_discovery_active) {
     if (this->erd_cache_publisher_.cache != nullptr) {
       erd_cache_mqtt_publisher_pause(&this->erd_cache_publisher_);
+      if (!this->erd_cache_publisher_paused_) {
+        ESP_LOGD(TAG, "ERD cache publisher paused during MQTT discovery payload generation");
+        this->erd_cache_publisher_paused_ = true;
+      }
     }
   } else {
     if (this->erd_cache_publisher_.cache != nullptr) {
       erd_cache_mqtt_publisher_resume(&this->erd_cache_publisher_);
+      if (this->erd_cache_publisher_paused_) {
+        ESP_LOGD(TAG, "ERD cache publisher resumed after MQTT discovery payload generation");
+        this->erd_cache_publisher_paused_ = false;
+        this->discovery_just_resumed_ = true;
+      }
     }
+  }
+
+  /* Check steady state BEFORE signaling work — the background task sets
+   * first_round_done during its drain, and we want to read it before
+   * the next signal_work() wakes it again. */
+  if (this->discovery_just_resumed_ &&
+      erd_cache_mqtt_publisher_first_round_done(&this->erd_cache_publisher_)) {
+    ESP_LOGI(TAG, "Device is in steady state");
+    this->discovery_just_resumed_ = false;
   }
 
   if (this->erd_cache_publisher_.cache != nullptr && !ha_discovery_active) {
@@ -265,6 +283,7 @@ void GeappliancesBridge::loop() {
       this->device_identity_manager_.get_model_number(),
       this->device_identity_manager_.get_serial_number(),
       this->device_identity_manager_.get_appliance_type(),
+      this->filter_config_topics_,
       &this->erd_cache_,
       &this->mqtt_client_adapter_.interface);
     ha_discovery_manager_start(&this->ha_discovery_manager_);
@@ -461,10 +480,7 @@ void GeappliancesBridge::log_poll_state_transitions_()
   // poll mode, or as the custom-ERD polling bridge alongside subscription).
   if (this->polling_bridge_initialized_) {
     polling_state_t poll_state = this->get_polling_state();
-    const char* new_state = polling_state_name(poll_state);
-    if (new_state != nullptr && poll_state != this->last_logged_poll_state_) {
-      ESP_LOGI(TAG, "Polling bridge state: %s (ERDs cached: %u)",
-               new_state, erd_cache_get_count(&this->erd_cache_));
+    if (poll_state != polling_state_none && poll_state != this->last_logged_poll_state_) {
       this->last_logged_poll_state_ = poll_state;
     }
   }
@@ -770,7 +786,8 @@ bool GeappliancesBridge::check_steady_state()
 
   if (steady) {
     this->steady_state_reached_ = true;
-    ESP_LOGI(TAG, "Appliance Bridge is in steady state");
+    ESP_LOGI(TAG, "Appliance Bridge is in steady state (ERDs cached: %u)",
+             erd_cache_get_count(&this->erd_cache_));
   }
 
   return steady;
@@ -827,10 +844,7 @@ void GeappliancesBridge::init_erd_cache_publisher_()
 #endif
 
   // Initialize the HA discovery manager (lazy-started on steady state).
-  // Normal boot skips cleanup to avoid entity flicker on restart.
-  ha_discovery_manager_init(&this->ha_discovery_manager_, true);
-
-  ESP_LOGI(TAG, "ERD cache MQTT publisher initialized");
+  ha_discovery_manager_init(&this->ha_discovery_manager_);
 }
 
 void GeappliancesBridge::trigger_discovery_refresh()

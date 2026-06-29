@@ -697,22 +697,21 @@ static void build_task(void* arg)
 {
     ha_discovery_manager_t* self = (ha_discovery_manager_t*)arg;
 
-    /* Fragmentation baseline: log heap state before build work. */
+    /* Fragmentation baseline before build work. */
     {
         size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
         size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-        ESP_LOGI(TAG, "Heap before build: free=%u, largest_block=%u, fragmentation=%.1f%%",
+        ESP_LOGV(TAG, "Heap before build: free=%u, largest_block=%u, fragmentation=%.1f%%",
             (unsigned)free_heap, (unsigned)largest_free,
             (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
     }
-
     build_sorted_erd_list(self);
     build_device_json(self);
 
     /* Stack watermark: verify 2KB stack is sufficient. */
     {
         UBaseType_t hw __attribute__((unused)) = uxTaskGetStackHighWaterMark(NULL);
-        ESP_LOGI(TAG, "build_task stack high_watermark: %lu words (%lu bytes)",
+        ESP_LOGV(TAG, "build_task stack high_watermark: %lu words (%lu bytes)",
             (unsigned long)hw, (unsigned long)(hw * sizeof(StackType_t)));
     }
 
@@ -791,27 +790,10 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         {
             size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
             size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-            ESP_LOGI(TAG, "Heap after build: free=%u, largest_block=%u, fragmentation=%.1f%%",
+            ESP_LOGV(TAG, "Heap after build: free=%u, largest_block=%u, fragmentation=%.1f%%",
                 (unsigned)free_heap, (unsigned)largest_free,
                 (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
         }
-
-        /* If cleanup is needed, run the embedded cleanup module until done
-         * before transitioning to discovery. */
-        if (!self->skip_cleanup) {
-            ha_discovery_cleanup_configure(&self->cleanup, self->device_id, self->mqtt_client, self->get_time_ms);
-            ha_discovery_cleanup_start(&self->cleanup);
-            while (!ha_discovery_cleanup_is_done(&self->cleanup)) {
-                ha_discovery_cleanup_run(&self->cleanup);
-                esp_task_wdt_reset();
-                vTaskDelay(pdMS_TO_TICKS(10));
-            }
-            ha_discovery_cleanup_destroy(&self->cleanup);
-            ESP_LOGI(TAG, "Cleanup complete, proceeding to discovery");
-        } else {
-            ESP_LOGI(TAG, "Skipping cleanup, proceeding to discovery");
-        }
-
         /* Transition to discovering. */
         self->state = ha_discovery_state_discovering;
         self->current_category = 0;
@@ -821,7 +803,8 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         self->last_publish_ms = self->get_time_ms();
         self->publish_yield_counter = 0;
         self->current_domain_prefix_buf[0] = '\0';
-        ESP_LOGI(TAG, "Starting HA discovery fetch...");
+        ESP_LOGI(TAG, "Generating MQTT discovery payloads (filtering: %s)",
+            self->filter_config_topics ? "enabled" : "disabled");
         return;
     }
 
@@ -963,7 +946,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
             size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
             ESP_LOGI(TAG, "HA discovery complete: %u published, %u filtered",
                 self->total_published, self->total_filtered);
-            ESP_LOGI(TAG, "Heap after discovery: free=%u, largest_block=%u, fragmentation=%.1f%%",
+            ESP_LOGV(TAG, "Heap after discovery: free=%u, largest_block=%u, fragmentation=%.1f%%",
                 (unsigned)free_heap, (unsigned)largest_free,
                 (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
             break;
@@ -978,12 +961,11 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 /* Public API                                                         */
 /* ------------------------------------------------------------------ */
 
-void ha_discovery_manager_init(ha_discovery_manager_t* self, bool skip_cleanup)
+void ha_discovery_manager_init(ha_discovery_manager_t* self)
 {
     memset(self, 0, sizeof(*self));
     self->state = ha_discovery_state_idle;
     self->get_time_ms = esphome::millis;
-    self->skip_cleanup = skip_cleanup;
 
 #ifdef USE_ESP_IDF
     /* Delete existing semaphore if re-initing to prevent leak. */
@@ -1006,6 +988,7 @@ void ha_discovery_manager_configure(
     const char* model_number,
     const char* serial_number,
     uint8_t appliance_type,
+    bool filter_config_topics,
     erd_cache_t* cache,
     i_mqtt_client_t* mqtt_client)
 {
@@ -1013,6 +996,7 @@ void ha_discovery_manager_configure(
     self->model_number = model_number;
     self->serial_number = serial_number;
     self->appliance_type = appliance_type;
+    self->filter_config_topics = filter_config_topics;
     self->cache = cache;
     self->mqtt_client = mqtt_client;
 }
