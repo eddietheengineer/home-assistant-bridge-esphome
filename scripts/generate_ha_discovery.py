@@ -799,6 +799,25 @@ def _deduplicate_field_ids(entries: List[Dict]) -> None:
                 claimed[fid] = entry
 
 
+def _resolve_field_metadata(field: Dict, parent_domain: str, parent_dc: str,
+                            parent_unit: str, parent_sc: str, parent_sf: int,
+                            idx: int) -> Dict[str, Any]:
+    """Resolve per-field HA metadata, falling back to parent ERD values.
+
+    Returns a dict with keys: domain, device_class, unit, state_class, scaling_factor.
+    """
+    f_domain = field.get('ha_domain') or parent_domain
+    f_dev_cls = field.get('device_class') or parent_dc
+    f_unit = field.get('unit_of_measurement') or parent_unit
+    f_state_cls = field.get('state_class') or parent_sc
+    f_scaling = int(field.get('scaling_factor') or parent_sf)
+    return {
+        'domain': f_domain,
+        'device_class': f_dev_cls,
+        'unit': f_unit,
+        'state_class': f_state_cls,
+        'scaling_factor': f_scaling,
+    }
 def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
     """Process all ERDs with ha_domain metadata and return a list of entry dicts.
 
@@ -980,16 +999,22 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                                else f'{display_name} - {leaf}')
                 fid = '' if idx == 0 else _field_slug(leaf)
                 f_type = field.get('type', '')
-                f_dev_cls = 'enum' if f_type == 'enum' else (device_class if idx == 0 else '')
-                f_state_cls = state_class if idx == 0 else ''
-                f_unit = _infer_unit_from_field_name(leaf, unit)
+                parent_dc = 'enum' if f_type == 'enum' else (device_class if idx == 0 else '')
+                parent_sc = state_class if idx == 0 else ''
+                parent_unit = _infer_unit_from_field_name(leaf, unit)
+                meta = _resolve_field_metadata(field, ha_domain, parent_dc,
+                                               parent_unit, parent_sc, scaling_factor, idx)
+                f_dev_cls = meta['device_class']
+                f_state_cls = meta['state_class']
+                f_unit = meta['unit']
+                f_scaling = meta['scaling_factor']
                 if ha_domain == 'binary_sensor' and f_type == 'enum':
                     f_dev_cls = ''
                     vt = _compute_binary_sensor_value_template(data_size)
                 else:
-                    vt = _byte_subfield_value_template(field, scaling_factor)
-                collect(erd_id_int, entity_name, ha_domain, f_unit, f_dev_cls,
-                        f_state_cls, scaling_factor, data_size, paired_erd_id,
+                    vt = _byte_subfield_value_template(field, f_scaling)
+                collect(erd_id_int, entity_name, meta['domain'], f_unit, f_dev_cls,
+                        f_state_cls, f_scaling, data_size, paired_erd_id,
                         pair_role, vt, '', '', fid, '', '', '', '', '')
 
         elif classification == 'bitfield':
@@ -998,13 +1023,15 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 fid = _field_slug(leaf)
                 bits_size = field.get('bits', {}).get('size', 1)
                 sub_domain = 'binary_sensor' if bits_size == 1 else 'sensor'
+                meta = _resolve_field_metadata(field, sub_domain, '', '',
+                                               '', scaling_factor, 0)
                 vt = _bitfield_sub_value_template(field)
                 b_p_on = '01' if sub_domain == 'binary_sensor' else ''
                 b_p_off = '00' if sub_domain == 'binary_sensor' else ''
                 b_s_on = '01' if sub_domain == 'binary_sensor' else ''
                 b_s_off = '00' if sub_domain == 'binary_sensor' else ''
-                collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
-                        '', scaling_factor, data_size, paired_erd_id, pair_role,
+                collect(erd_id_int, f'{display_name} - {leaf}', meta['domain'], '', '',
+                        '', meta['scaling_factor'], data_size, paired_erd_id, pair_role,
                         vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
 
         elif classification == 'mixed':
@@ -1015,15 +1042,18 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             )
             if primary:
                 p_type = primary.get('type', '')
-                p_dev_cls = 'enum' if p_type == 'enum' else device_class
+                parent_dc = 'enum' if p_type == 'enum' else device_class
+                meta = _resolve_field_metadata(primary, ha_domain, parent_dc,
+                                               unit, state_class, scaling_factor, 0)
+                p_dev_cls = meta['device_class']
                 if ha_domain == 'binary_sensor' and p_type == 'enum':
                     # binary_sensor can't display enum labels; use ON/OFF
                     p_dev_cls = ''
                     p_vt = _compute_binary_sensor_value_template(data_size)
                 else:
-                    p_vt = _byte_subfield_value_template(primary, scaling_factor)
-                collect(erd_id_int, display_name, ha_domain, unit, p_dev_cls,
-                        state_class, scaling_factor, data_size, paired_erd_id,
+                    p_vt = _byte_subfield_value_template(primary, meta['scaling_factor'])
+                collect(erd_id_int, display_name, meta['domain'], meta['unit'], p_dev_cls,
+                        meta['state_class'], meta['scaling_factor'], data_size, paired_erd_id,
                         pair_role, p_vt, '', '', '', '', '', '', '', '')
 
             for field in [d for d in erd_data
@@ -1032,13 +1062,15 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 fid = _field_slug(leaf)
                 bits_size = field.get('bits', {}).get('size', 1)
                 sub_domain = 'binary_sensor' if bits_size == 1 else 'sensor'
+                meta = _resolve_field_metadata(field, sub_domain, '', '',
+                                               '', scaling_factor, 0)
                 vt = _bitfield_sub_value_template(field)
                 b_p_on = '01' if sub_domain == 'binary_sensor' else ''
                 b_p_off = '00' if sub_domain == 'binary_sensor' else ''
                 b_s_on = '01' if sub_domain == 'binary_sensor' else ''
                 b_s_off = '00' if sub_domain == 'binary_sensor' else ''
-                collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
-                        '', scaling_factor, data_size, paired_erd_id, pair_role,
+                collect(erd_id_int, f'{display_name} - {leaf}', meta['domain'], '', '',
+                        '', meta['scaling_factor'], data_size, paired_erd_id, pair_role,
                         vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
 
         elif classification == 'version':
