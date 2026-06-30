@@ -42,7 +42,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 # Valid HA device_class values per domain. Invalid combos are silently dropped.
 VALID_DEVICE_CLASSES = {
-    'button': {'restart'},
+    'button': {'identify', 'restart', 'update'},
     'switch': {'outlet', 'switch'},
     'binary_sensor': {
         'battery', 'battery_charging', 'carbon_monoxide', 'cold',
