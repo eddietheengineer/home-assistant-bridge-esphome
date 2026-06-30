@@ -186,42 +186,42 @@ def load_appliance_types() -> dict[int, str]:
         except Exception as e:
             _LOGGER.warning("Failed to load from %s (%s): %s", location_name, json_path, str(e))
 
-    # If local paths failed, try fetching from GitHub as fallback
-    if data is None:
-        url = "https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
-        _LOGGER.info("Fetching ERD definitions from GitHub: %s", url)
-
-        try:
-            with urllib.request.urlopen(url, timeout=5) as response:
-                data = json.loads(response.read().decode('utf-8'))
-            _LOGGER.info("Successfully fetched appliance types from GitHub (fallback)")
-        except urllib.error.HTTPError as e:
-            _LOGGER.error(
-                "HTTP error fetching appliance API documentation (status %d): %s. Using fallback mapping.",
-                e.code, str(e)
-            )
-            return {
-                0: "Unknown",
-                255: "Unknown"
-            }
-        except urllib.error.URLError as e:
-            _LOGGER.error(
-                "Network error fetching appliance API documentation: %s. Using fallback mapping.",
-                str(e.reason)
-            )
-            return {
-                0: "Unknown",
-                255: "Unknown"
-            }
-        except Exception as e:
-            _LOGGER.error(
-                "Unexpected error fetching appliance API documentation: %s. Using fallback mapping.",
-                str(e)
-            )
-            return {
-                0: "Unknown",
-                255: "Unknown"
-            }
+    # If local paths failed, try fetching from GitHub as fallback.
+    # This SHA mirrors scripts/submodule_config.py SUBMODULE_SHA — update both.
+    _SUBMODULE_SHA = "a802cc181c829770e04df7b600ff327e0f9f7812"
+    url = f"https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/{_SUBMODULE_SHA}/appliance_api_erd_definitions.json"
+    _LOGGER.info("Fetching ERD definitions from GitHub: %s", url)
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:
+            data = json.loads(response.read().decode('utf-8'))
+        _LOGGER.info("Successfully fetched appliance types from GitHub (fallback)")
+    except urllib.error.HTTPError as e:
+        _LOGGER.error(
+            "HTTP error fetching appliance API documentation (status %d): %s. Using fallback mapping.",
+            e.code, str(e)
+        )
+        return {
+            0: "Unknown",
+            255: "Unknown"
+        }
+    except urllib.error.URLError as e:
+        _LOGGER.error(
+            "Network error fetching appliance API documentation: %s. Using fallback mapping.",
+            str(e.reason)
+        )
+        return {
+            0: "Unknown",
+            255: "Unknown"
+        }
+    except Exception as e:
+        _LOGGER.error(
+            "Unexpected error fetching appliance API documentation: %s. Using fallback mapping.",
+            str(e)
+        )
+        return {
+            0: "Unknown",
+            255: "Unknown"
+        }
 
     # Parse the data
     try:

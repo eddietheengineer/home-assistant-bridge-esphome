@@ -24,6 +24,8 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
+from submodule_config import SUBMODULE_SHA
+
 
 def parse_erd_id(erd_id_str: str) -> int:
     """Convert ERD ID string (e.g., '0x0001') to integer."""
@@ -539,11 +541,9 @@ def main():
         if found:
             return Path(found)
         local = repo_root / "lib" / "public-appliance-api-documentation" / filename
-        if local.exists():
-            return local
         # Fetch from GitHub as last resort (ESPHome Docker, clean cache, etc.)
-        # Use eddietheengineer fork which has ha_domain metadata for HA discovery.
-        url = f"https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/main/{filename}"
+        # Uses the exact submodule commit SHA from submodule_config.py.
+        url = f"https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/{SUBMODULE_SHA}/{filename}"
         print(f"Local {filename} not found, fetching from GitHub: {url}", file=sys.stderr)
         try:
             tmp = Path("/tmp") / filename

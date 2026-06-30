@@ -39,6 +39,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from submodule_config import SUBMODULE_SHA
 
 # Valid HA device_class values per domain. Invalid combos are silently dropped.
 VALID_DEVICE_CLASSES = {
@@ -1391,9 +1392,8 @@ def fetch_erd_definitions_from_github() -> Optional[dict]:
     if commit_sha:
         url = f"https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/{commit_sha}/appliance_api_erd_definitions.json"
     else:
-        # Hardcoded submodule commit SHA for Docker/ESPHome Dashboard builds
-        # where the submodule isn't checked out. Update this when the submodule moves.
-        url = f"https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/a802cc181c829770e04df7b600ff327e0f9f7812/appliance_api_erd_definitions.json"
+        # Fallback to submodule SHA from submodule_config.py for Docker builds.
+        url = f"https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/{SUBMODULE_SHA}/appliance_api_erd_definitions.json"
 
     print(f"Fetching ERD definitions from GitHub: {url}", file=sys.stderr)
     try:
