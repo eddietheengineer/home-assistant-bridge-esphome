@@ -474,8 +474,10 @@ async def to_code(config: dict[str, Any]) -> None:
             val = {
                 "name": "ERD Cache Entries",
                 CONF_ID: ID("erd_cache_entries", is_declaration=True, type=sensor.Sensor),
+                CONF_STATE_CLASS: _make_state_class("measurement"),
                 "disabled_by_default": False,
                 "force_update": False,
+                "accuracy_decimals": 0,
             }
         sens = await sensor.new_sensor(val)
         cg.add(var.set_erd_cache_entries_sensor(sens))
