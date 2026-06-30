@@ -241,7 +241,7 @@ void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
   self->task_handle = xTaskCreateStatic(
       mqtt_publisher_task,
       "erd_mqtt_pub",
-      2048,
+      2048 / sizeof(StackType_t),  /* words, matching task_stack[] size */
       self,
       2,
       self->task_stack,
