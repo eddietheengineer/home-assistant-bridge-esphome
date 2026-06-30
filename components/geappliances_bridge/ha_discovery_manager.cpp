@@ -857,7 +857,6 @@ void ha_discovery_manager_init(ha_discovery_manager_t* self)
 {
     memset(self, 0, sizeof(*self));
     self->state = ha_discovery_state_idle;
-    self->get_time_ms = esphome::millis;
 
 #ifdef USE_ESP_IDF
     ha_discovery_cleanup_init(&self->cleanup);
@@ -919,9 +918,3 @@ ha_discovery_state_t ha_discovery_manager_get_state(ha_discovery_manager_t* self
     return self->state;
 }
 
-void ha_discovery_manager_set_time_fn(
-    ha_discovery_manager_t* self,
-    uint32_t (*get_time_ms)(void))
-{
-    self->get_time_ms = get_time_ms;
-}

@@ -106,9 +106,6 @@ typedef struct {
   uint32_t total_published;        // Total discovery publishes
   uint32_t total_filtered;         // Entities filtered out (ERD not registered)
 
-  /* Time source */
-  uint32_t (*get_time_ms)(void);
-
 #ifdef USE_ESP_IDF
 
   /* Sorted ERD array for binary search during discovery. */
@@ -226,14 +223,6 @@ bool ha_discovery_manager_is_processing(ha_discovery_manager_t* self);
  * Returns the current state.
  */
 ha_discovery_state_t ha_discovery_manager_get_state(ha_discovery_manager_t* self);
-
-/*!
- * Override the time source (defaults to esphome::millis).
- * Useful for testing.
- */
-void ha_discovery_manager_set_time_fn(
-  ha_discovery_manager_t* self,
-  uint32_t (*get_time_ms)(void));
 
 /* Test-only exports: exposed when HA_DISCOVERY_TEST_EXPORT is defined. */
 #ifdef HA_DISCOVERY_TEST_EXPORT
