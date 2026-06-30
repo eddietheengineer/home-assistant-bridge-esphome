@@ -728,11 +728,13 @@ def _strip_pair_role_word(name: str) -> str:
     Examples:
         'Fan Configuration in Cooling Status'  -> 'Fan Configuration in Cooling'
         'Freeze Sentinel Request'               -> 'Freeze Sentinel'
+        'Water Heater Boost Mode State - Status/Actual'  -> 'Water Heater Boost Mode State'
+        'Water Heater Boost Mode State - Requested/Desired' -> 'Water Heater Boost Mode State'
     """
-    # Strip the word wherever it appears as a complete word (word boundaries)
-    result = re.sub(r'\b(?:Status|Request)\b', '', name, flags=re.IGNORECASE)
-    # Collapse multiple spaces and strip surrounding whitespace
-    result = re.sub(r'\s+', ' ', result).strip()
+    # Strip pair role words and optional trailing slash (e.g. "Status/Actual" -> "")
+    result = re.sub(r'\b(?:Status|Request|Requested|Desired|Actual|Setting)\b/?', '', name, flags=re.IGNORECASE)
+    # Collapse multiple spaces, strip trailing punctuation, and trim
+    result = re.sub(r'\s+', ' ', result).strip().rstrip('- ').strip()
     return result
 
 
