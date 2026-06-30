@@ -7,3 +7,4 @@
 [submodule "lib/public-appliance-api-documentation"]
 	path = lib/public-appliance-api-documentation
 	url = https://github.com/eddietheengineer/public-appliance-api-documentation.git
+	branch = feat/per-field-ha-metadata
