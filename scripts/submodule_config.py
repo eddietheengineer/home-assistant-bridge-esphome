@@ -5,5 +5,5 @@ submodule commit SHA. Update this value whenever the submodule is updated.
 """
 
 # Commit SHA of lib/public-appliance-api-documentation submodule
-# Current: 53874e6 - chore: remove stale report files and add to .gitignore
-SUBMODULE_SHA = "53874e65e4836823615765bcd923972dbdacb0a6"
+# Current: bea43ff - fix: stop scripts from writing stale report files to doc/
+SUBMODULE_SHA = "bea43ffb8e09f7950844bcd2ed961203c52c017e"

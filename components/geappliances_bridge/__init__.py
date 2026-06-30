@@ -188,7 +188,7 @@ def load_appliance_types() -> dict[int, str]:
 
     # If local paths failed, try fetching from GitHub as fallback.
     # This SHA mirrors scripts/submodule_config.py SUBMODULE_SHA — update both.
-    _SUBMODULE_SHA = "53874e65e4836823615765bcd923972dbdacb0a6"
+    _SUBMODULE_SHA = "bea43ffb8e09f7950844bcd2ed961203c52c017e"
     url = f"https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/{_SUBMODULE_SHA}/appliance_api_erd_definitions.json"
     _LOGGER.info("Fetching ERD definitions from GitHub: %s", url)
     try:
