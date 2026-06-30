@@ -70,6 +70,23 @@ VALID_DEVICE_CLASSES = {
         'volume_storage', 'volume_flow_rate', 'water', 'weight',
         'wind_direction', 'wind_speed',
     },
+    'number': {
+        'absolute_humidity', 'apparent_power', 'aqi', 'area',
+        'atmospheric_pressure', 'battery', 'blood_glucose_concentration',
+        'carbon_monoxide', 'carbon_dioxide', 'conductivity', 'current',
+        'data_rate', 'data_size', 'distance', 'duration', 'energy',
+        'energy_distance', 'energy_storage', 'frequency', 'gas',
+        'humidity', 'illuminance', 'irradiance', 'moisture',
+        'nitrogen_dioxide', 'nitrogen_monoxide', 'nitrous_oxide', 'ozone',
+        'ph', 'pm1', 'pm10', 'pm25', 'pm4', 'power_factor', 'power',
+        'precipitation', 'precipitation_intensity', 'pressure',
+        'reactive_energy', 'reactive_power', 'signal_strength',
+        'sound_pressure', 'speed', 'sulphur_dioxide', 'temperature',
+        'temperature_delta', 'volatile_organic_compounds',
+        'volatile_organic_compounds_parts', 'voltage', 'volume',
+        'volume_storage', 'volume_flow_rate', 'water', 'weight',
+        'wind_direction', 'wind_speed',
+    },
 }
 
 
