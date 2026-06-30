@@ -1367,9 +1367,32 @@ def find_erd_definitions_json() -> Optional[Path]:
 
 
 def fetch_erd_definitions_from_github() -> Optional[dict]:
-    """Fetch ERD definitions from GitHub as fallback."""
+    """Fetch ERD definitions from GitHub, using the submodule commit if available."""
+    import subprocess
     import urllib.request as urllib
-    url = "https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/main/appliance_api_erd_definitions.json"
+
+    # Try to get the submodule commit SHA
+    script_dir = Path(__file__).parent
+    repo_root = script_dir.parent
+    submodule_path = repo_root / 'lib' / 'public-appliance-api-documentation'
+
+    commit_sha = None
+    if submodule_path.exists():
+        try:
+            result = subprocess.run(
+                ['git', '-C', str(submodule_path), 'rev-parse', 'HEAD'],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode == 0:
+                commit_sha = result.stdout.strip()
+        except Exception:
+            pass
+
+    if commit_sha:
+        url = f"https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/{commit_sha}/appliance_api_erd_definitions.json"
+    else:
+        url = "https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/feat/add-validation-scripts/appliance_api_erd_definitions.json"
+
     print(f"Fetching ERD definitions from GitHub: {url}", file=sys.stderr)
     try:
         with urllib.urlopen(url, timeout=10) as response:
