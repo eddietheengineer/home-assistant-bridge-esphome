@@ -1391,7 +1391,9 @@ def fetch_erd_definitions_from_github() -> Optional[dict]:
     if commit_sha:
         url = f"https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/{commit_sha}/appliance_api_erd_definitions.json"
     else:
-        url = "https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/feat/add-validation-scripts/appliance_api_erd_definitions.json"
+        # Hardcoded submodule commit SHA for Docker/ESPHome Dashboard builds
+        # where the submodule isn't checked out. Update this when the submodule moves.
+        url = f"https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/a802cc181c829770e04df7b600ff327e0f9f7812/appliance_api_erd_definitions.json"
 
     print(f"Fetching ERD definitions from GitHub: {url}", file=sys.stderr)
     try:
