@@ -5,5 +5,5 @@ submodule commit SHA. Update this value whenever the submodule is updated.
 """
 
 # Commit SHA of lib/public-appliance-api-documentation submodule
-# Current: a802cc1 - docs: add scripts/README.md describing each script's role
-SUBMODULE_SHA = "a802cc181c829770e04df7b600ff327e0f9f7812"
+# Current: b12e394 - chore: remove stale scaling_suggestions.md (all 7 suggestions applied)
+SUBMODULE_SHA = "b12e3945f3cb41d8876638433ed76071554e2b4d"
