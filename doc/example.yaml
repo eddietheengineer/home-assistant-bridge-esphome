@@ -32,7 +32,7 @@ esp32:
 
 # External component configuration
 external_components:
-  - source: github://eddietheengineer/home-assistant-bridge-esphome@develop
+  - source: github://eddietheengineer/home-assistant-bridge-esphome
     components: [ geappliances_bridge ]
 
 # MQTT configuration for Home Assistant
@@ -53,7 +53,7 @@ uart:
     baud_rate: 230400
 
   - id: gea2_uart
-    tx_pin: GPIO9  # D9 on Xiao ESP32-C3
+    tx_pin: GPIO9   # D9 on Xiao ESP32-C3
     rx_pin: GPIO10  # D10 on Xiao ESP32-C3
     baud_rate: 19200
     rx_full_threshold: 1
@@ -63,24 +63,10 @@ uart:
 geappliances_bridge:
   gea3_uart_id: gea3_uart
   gea2_uart_id: gea2_uart
-  # device_id: "YourDeviceId"             # Optional: Uncomment to use a custom device ID
+  # device_id: YourDeviceId               # Optional: Uncomment to use a custom device ID
   # mode: auto                            # Default: auto   Options: auto, subscribe, poll
   # polling_interval: 10000               # Default: 10000 ms (10 seconds), used when in polling mode
   # appliance_api_parsing: true           # Default: true, restricts polling to appliance-supported ERDs
-  # filter_config_topics: true           # Default: true, filters internal/diagnostic entities from HA discovery
+  # filter_config_topics: true            # Default: true, filters internal/diagnostic entities from HA discovery
   # throttle_rate_seconds: 0              # Default: 0 (disabled), minimum seconds between publishes per ERD (0-255)
   # generate_device_config: false         # Default: true, generates MQTT Autodiscovery payloads (experimental)
-
-  # Diagnostic sensors and button are auto-created by default (discovery: false).
-  # To customize:
-  # erd_publish_rate_sensor:
-  #   name: "ERD Publish Rate"
-  # erd_cache_entries_sensor:
-  #   name: "ERD Cache Entries"
-  # erd_cache_updates_sensor:
-  #   name: "ERD Cache Update Rate"
-  # mqtt_publish_rate_sensor:
-  #   name: "MQTT Publish Rate"
-  # To disable any entity, set it to false:
-  # erd_publish_rate_sensor: false
-  # discovery_refresh_button: false

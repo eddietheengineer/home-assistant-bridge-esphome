@@ -25,7 +25,7 @@ esp32:
 
 # External component configuration
 external_components:
-  - source: github://eddietheengineer/home-assistant-bridge-esphome@develop
+  - source: github://eddietheengineer/home-assistant-bridge-esphome
     components: [ geappliances_bridge ]
 
 # MQTT configuration for Home Assistant
@@ -47,7 +47,7 @@ uart:
     baud_rate: 230400
 
   - id: gea2_uart
-    tx_pin: GPIO9  # D9 on Xiao ESP32-C3
+    tx_pin: GPIO9   # D9 on Xiao ESP32-C3
     rx_pin: GPIO10  # D10 on Xiao ESP32-C3
     baud_rate: 19200
     rx_full_threshold: 1
@@ -57,15 +57,13 @@ uart:
 geappliances_bridge:
   gea3_uart_id: gea3_uart
   gea2_uart_id: gea2_uart
-  # device_id: "YourDeviceId"             # Optional: Uncomment to use a custom device ID
+  # device_id: YourDeviceId               # Optional: Uncomment to use a custom device ID
   # mode: auto                            # Default: auto   Options: auto, subscribe, poll
   # polling_interval: 10000               # Default: 10000 ms (10 seconds), used when in polling mode
   # appliance_api_parsing: true           # Default: true, restricts polling to appliance-supported ERDs
   # throttle_rate_seconds: 0              # Default: 0 (disabled), min seconds between publishes per ERD (0-255)
   # filter_config_topics: true            # Default: true, filters internal/diagnostic entities from HA discovery
 
-  # Diagnostic sensors and discovery refresh button are auto-created by default.
-  # To disable: erd_publish_rate_sensor: false, discovery_refresh_button: false, etc.
 ```
 
 ## Configurable Parameters
@@ -111,12 +109,9 @@ The `appliance_api_parsing` parameter is **optional** (default: `true`). When en
 
 ## Additional Configuration Options
 
-- **`adapter_address`** (default: `0xE4`) — The bridge's address on the GEA bus.
-- **`custom_erds`** (default: none) — A list of additional ERD IDs to poll beyond the standard list. Useful for ERDs not yet in the appliance API documentation.
 - **`throttle_rate_seconds`** (default: `0`) — Minimum interval in seconds between MQTT publishes for any individual ERD. Set to 0 to disable (publish on every update). Range: 0–255. Useful for reducing MQTT traffic when the appliance generates frequent updates.
 - **`generate_device_config`** (default: `false`) — Currently disabled
 - **`filter_config_topics`** (default: `true`) — Filters out internal/diagnostic entities (firmware metadata, commissioning state, usage profiles, cycle definitions, fault data, etc.) from Home Assistant MQTT discovery. Reduces entity count by ~19% (from ~9,310 to ~7,520) and firmware data by ~8.8%. Set to `false` to include all entities.
-- **Diagnostic sensors** (`erd_publish_rate_sensor`, `erd_cache_entries_sensor`, `erd_cache_updates_sensor`, `mqtt_publish_rate_sensor`) — Auto-created by default with `discovery: false` (only visible via ESPHome API, not MQTT discovery). Set to `false` to disable, or provide a dict to customize (e.g. `name`).
 - **`discovery_refresh_button`** — Auto-created by default with `discovery: false`. Exposes an ESPHome button entity that triggers a Home Assistant MQTT discovery cleanup when pressed. Useful for clearing stale discovery topics after firmware updates or configuration changes. Set to `false` to disable, or provide a dict to customize (e.g. `name`).
 
 
