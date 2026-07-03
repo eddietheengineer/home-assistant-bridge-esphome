@@ -81,19 +81,6 @@ LDLIBS := -lstdc++ -lCppUTest -lCppUTestExt -lm
 
 BUILD_DEPS += $(MAKEFILE_LIST)
 
-# Generate erd_lists.h from JSON before building
-ERD_LISTS_HEADER := components/geappliances_bridge/erd_lists.h
-ERD_DEFINITIONS_JSON := lib/public-appliance-api-documentation/appliance_api_erd_definitions.json
-
-# Generate appliance_api_feature_lists.h from appliance_api.json before building
-APPLIANCE_API_FEATURE_LISTS_HEADER := components/geappliances_bridge/appliance_api_feature_lists.h
-APPLIANCE_API_JSON := lib/public-appliance-api-documentation/appliance_api.json
-
-BUILD_DEPS += $(ERD_LISTS_HEADER) $(APPLIANCE_API_FEATURE_LISTS_HEADER)
-
-$(ERD_LISTS_HEADER) $(APPLIANCE_API_FEATURE_LISTS_HEADER): $(ERD_DEFINITIONS_JSON) $(APPLIANCE_API_JSON) scripts/generate_erd_lists.py
-	@echo Generating ERD lists and feature API lists...
-	@python3 scripts/generate_erd_lists.py
 
 
 .PHONY: test
