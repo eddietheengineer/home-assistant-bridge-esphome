@@ -1,14 +1,7 @@
 """ESPHome component for GE Appliances Bridge."""
 from __future__ import annotations
 
-import json
 import logging
-import os
-import re
-import subprocess
-import sys
-import urllib.error
-import urllib.request
 from typing import Any
 
 import esphome.codegen as cg
@@ -75,204 +68,6 @@ def _make_state_class(value: str):
 
 
 
-def sanitize_appliance_name(name: str) -> str:
-    """Sanitize appliance type name for use in C++ identifiers.
-
-    Replaces special characters with readable equivalents and removes
-    any non-alphanumeric characters to create valid C++ identifiers.
-
-    Args:
-        name: The appliance type name to sanitize
-
-    Returns:
-        A sanitized string suitable for use as a C++ identifier
-    """
-    # Replace special characters with more readable equivalents
-    replacements = {
-        ' ': '',
-        '/': '',
-        '&': 'And',
-        '-': '',
-        '(': '',
-        ')': '',
-    }
-    
-    result = name
-    for old, new in replacements.items():
-        result = result.replace(old, new)
-    
-    # Remove any remaining non-alphanumeric characters
-    result = re.sub(r'[^a-zA-Z0-9]', '', result)
-    return result
-
-
-def _find_json_paths(component_dir: str) -> list[tuple[str, str]]:
-    """Search for JSON files from the public-appliance-api-documentation library.
-
-    Returns a list of (location_name, resolved_path) tuples for both
-    appliance_api_erd_definitions.json and appliance_api.json, in search order.
-    Only paths that actually exist on disk are returned.
-    """
-    results: list[tuple[str, str]] = []
-    seen: set[str] = set()
-
-    for filename in ("appliance_api_erd_definitions.json", "appliance_api.json"):
-        # Path 1: Local submodule (for local development)
-        p = os.path.normpath(os.path.join(
-            component_dir, "..", "..", "lib", "public-appliance-api-documentation", filename))
-        if p not in seen and os.path.exists(p):
-            results.append(("local submodule", p))
-            seen.add(p)
-
-        # Path 2: ESPHome library cache in user home
-        p = os.path.join(os.path.expanduser("~"), ".esphome", "external_files", "libraries",
-                         "public-appliance-api-documentation", filename)
-        if p not in seen and os.path.exists(p):
-            results.append(("ESPHome cache (home)", p))
-            seen.add(p)
-
-        # Path 3: ESPHome library cache in /config (Home Assistant add-on)
-        p = os.path.join("/config", ".esphome", "external_files", "libraries",
-                         "public-appliance-api-documentation", filename)
-        if p not in seen and os.path.exists(p):
-            results.append(("ESPHome cache (/config)", p))
-            seen.add(p)
-
-        # Path 3b: ESPHome library cache in /data (Docker container)
-        p = os.path.join("/data", ".esphome", "external_files", "libraries",
-                         "public-appliance-api-documentation", filename)
-        if p not in seen and os.path.exists(p):
-            results.append(("ESPHome cache (/data)", p))
-            seen.add(p)
-
-        # Path 4: ESPHome library cache relative to component
-        p = os.path.normpath(os.path.join(
-            component_dir, "..", "..", ".esphome", "external_files", "libraries",
-            "public-appliance-api-documentation", filename))
-        if p not in seen and os.path.exists(p):
-            results.append(("ESPHome cache (relative)", p))
-            seen.add(p)
-
-        # Path 5: Parent lib directory
-        parent_dir = os.path.dirname(os.path.dirname(component_dir))
-        p = os.path.normpath(os.path.join(
-            parent_dir, "lib", "public-appliance-api-documentation", filename))
-        if p not in seen and os.path.exists(p):
-            results.append(("parent library path", p))
-            seen.add(p)
-
-    return results
-
-def load_appliance_types() -> dict[int, str]:
-    """Load appliance type mappings from the API documentation library.
-
-    Tries multiple locations to find the appliance type definitions JSON,
-    falling back to GitHub if no local copy is available.
-
-    Returns:
-        Dictionary mapping appliance type IDs (int) to names (str)
-    """
-    component_dir = os.path.dirname(__file__)
-    data = None
-
-    for location_name, json_path in _find_json_paths(component_dir):
-        if not json_path.endswith("appliance_api_erd_definitions.json"):
-            continue
-        try:
-            with open(json_path, 'r') as f:
-                data = json.load(f)
-            _LOGGER.info("Loaded appliance types from %s: %s", location_name, json_path)
-            break
-        except Exception as e:
-            _LOGGER.warning("Failed to load from %s (%s): %s", location_name, json_path, str(e))
-
-    # If local paths failed, try fetching from GitHub as fallback.
-    # This SHA mirrors scripts/submodule_config.py SUBMODULE_SHA — update both.
-    _SUBMODULE_SHA = "6d30882232f400faa7788bf3016f9b56c2f83c0b"
-    url = f"https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/{_SUBMODULE_SHA}/appliance_api_erd_definitions.json"
-    _LOGGER.info("Fetching ERD definitions from GitHub: %s", url)
-    try:
-        with urllib.request.urlopen(url, timeout=5) as response:
-            data = json.loads(response.read().decode('utf-8'))
-        _LOGGER.info("Successfully fetched appliance types from GitHub (fallback)")
-    except urllib.error.HTTPError as e:
-        _LOGGER.error(
-            "HTTP error fetching appliance API documentation (status %d): %s. Using fallback mapping.",
-            e.code, str(e)
-        )
-        return {
-            0: "Unknown",
-            255: "Unknown"
-        }
-    except urllib.error.URLError as e:
-        _LOGGER.error(
-            "Network error fetching appliance API documentation: %s. Using fallback mapping.",
-            str(e.reason)
-        )
-        return {
-            0: "Unknown",
-            255: "Unknown"
-        }
-    except Exception as e:
-        _LOGGER.error(
-            "Unexpected error fetching appliance API documentation: %s. Using fallback mapping.",
-            str(e)
-        )
-        return {
-            0: "Unknown",
-            255: "Unknown"
-        }
-
-    # Parse the data
-    try:
-        # Find the ERD with id "0x0008" (Appliance Type)
-        for erd in data.get("erds", []):
-            if erd.get("id") == "0x0008":
-                # Extract the enum values
-                erd_data = erd.get("data", [])
-                if erd_data and erd_data[0].get("type") == "enum":
-                    values = erd_data[0].get("values", {})
-                    # Convert string keys to integers and sanitize values for C++
-                    mapping = {}
-                    for key, value in values.items():
-                        int_key = int(key)
-                        sanitized = sanitize_appliance_name(value)
-                        mapping[int_key] = sanitized
-
-                    _LOGGER.info("Loaded %d appliance type mappings", len(mapping))
-                    return mapping
-    except Exception as e:
-        _LOGGER.error("Failed to parse appliance types: %s", str(e))
-
-    # Fallback mapping
-    _LOGGER.warning("Using fallback appliance type mapping")
-    return {
-        0: "Unknown",
-        255: "Unknown"
-    }
-
-
-def generate_appliance_type_function(appliance_types: dict[int, str]) -> str:
-    """Generate C++ code for the appliance type to string function."""
-    # Generate switch cases with consistent indentation
-    cases = []
-    for type_id, type_name in sorted(appliance_types.items()):
-        cases.append(f'    case {type_id}: return "{type_name}";')
-    
-    cases_str = "\n".join(cases)
-    
-    # Generate the function with consistent 2-space indentation
-    function_code = f'''
-std::string appliance_type_to_string(uint8_t appliance_type) {{
-  // Auto-generated from public-appliance-api-documentation
-  // ERD 0x0008 - Appliance Type enum mapping
-  switch (appliance_type) {{
-{cases_str}
-    default: return "Unknown";
-  }}
-}}
-'''
-    return function_code
 
 def validate_at_least_one_uart(config: dict[str, Any]) -> dict[str, Any]:
     """Validate that at least one UART ID is specified.
@@ -360,7 +155,6 @@ async def to_code(config: dict[str, Any]) -> None:
     # silent breakage from upstream branch movement)
     cg.add_library("https://github.com/ryanplusplus/tiny#3747b6ff65eec4b38367c3c8fa94e6ed2a1ccf35", None)
     cg.add_library("https://github.com/geappliances/tiny-gea-api#4fa8fee8297e24baa91bfe4a464088a73e7c6a5a", None)
-    cg.add_library("https://github.com/geappliances/public-appliance-api-documentation#6f567e49c84bec838bf84036d0915398f0c2eb63", None)
     
     var = cg.new_Pvariable(config[CONF_ID])
     # Deprecation warning for polling_onlypublish_onchange
@@ -470,9 +264,3 @@ async def to_code(config: dict[str, Any]) -> None:
     for erd in config[CONF_CUSTOM_ERDS]:
         cg.add(var.add_custom_erd(erd))
     
-    # Load appliance types from JSON and generate C++ mapping function
-    appliance_types = load_appliance_types()
-    function_code = generate_appliance_type_function(appliance_types)
-    
-    # Add the generated function to the global namespace
-    cg.add_global(cg.RawStatement(function_code))
