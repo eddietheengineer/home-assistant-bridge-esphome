@@ -28,14 +28,12 @@ compress_ha_discovery.py      -->  components/geappliances_bridge/ha_discovery_d
 ## Running the Pipeline
 
 ```bash
-python3 scripts/ha_discovery/run_pipeline.py
+python3 scripts/ha_discovery/run_pipeline.py [--no-filter]
 ```
 
-By default, if `appliance_api_erd_definitions_processed.json` already exists, the pipeline skips the auto-detect steps and goes straight from the processed file to JSONL generation. Use `--reprocess` to regenerate from scratch:
+Add `--no-filter` to also regenerate the unfiltered variant (`ha_discovery_data_unfiltered.inc`).
 
-```bash
-python3 scripts/ha_discovery/run_pipeline.py --reprocess
-```
+**Always run this before committing changes to the processed JSON or generator scripts.** It regenerates all derived artifacts (JSONL files, compressed headers) so ESPHome builds use the latest data.
 
 ## Directory Structure
 
