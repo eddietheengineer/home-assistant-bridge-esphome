@@ -186,13 +186,13 @@ def generate_header(input_dir: Path, header_name: str = "ha_discovery_data") -> 
     lines.append('')
     
     return '\n'.join(lines)
-def generate_header_to_file(input_dir: Path, output_dir: Path, header_name: str = "ha_discovery_data") -> None:
-    """Generate the compressed header and write it to output_dir/components/geappliances_bridge/<header_name>.h.
+def generate_header_to_file(input_dir: Path, output_dir: Path, header_name: str = "ha_discovery_data", extension: str = ".h") -> None:
+    """Generate the compressed header and write it to output_dir/components/geappliances_bridge/<header_name><extension>.
 
     Used by generate_erd_lists.py for in-process generation.
     output_dir is the repo root (parent of ha_discovery/).
     """
-    output_file = output_dir / 'components' / 'geappliances_bridge' / f'{header_name}.h'
+    output_file = output_dir / 'components' / 'geappliances_bridge' / f'{header_name}{extension}'
     header = generate_header(input_dir, header_name)
     print(f"Writing compressed header to {output_file}")
     output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -207,13 +207,15 @@ def main():
                         help="Input directory containing JSONL files (default: repo_root/ha_discovery)")
     parser.add_argument("--header-name", default="ha_discovery_data",
                         help="Base name for the output header (default: ha_discovery_data)")
+    parser.add_argument("--extension", default=".h",
+                        help="File extension for output (default: .h)")
     args = parser.parse_args()
 
     script_dir = Path(__file__).parent
     repo_root = script_dir.parent.parent.parent
 
     input_dir = Path(args.input_dir) if args.input_dir else repo_root / 'ha_discovery'
-    output_file = repo_root / 'components' / 'geappliances_bridge' / f'{args.header_name}.h'
+    output_file = repo_root / 'components' / 'geappliances_bridge' / f'{args.header_name}{args.extension}'
 
     if not input_dir.exists():
         print(f"Error: {input_dir} does not exist.", file=sys.stderr)
