@@ -1240,10 +1240,10 @@
 {"i":"577e","n":"Bridge/Sync Closed-Loop Cooking Configuration - Derivative Term Value","d":"number","ds":20,"u":"°F","mn":0.0,"mx":0.0,"st":1.0,"vt":"{{ (value[30:38] | int(base=16)) - 4294967296 if (value[30:38] | int(base=16)) >= 2147483648 else (value[30:38] | int(base=16)) }}","fi":"derivative_term_value"}
 {"i":"577e","n":"Bridge/Sync Closed-Loop Cooking Configuration - Derivative Term qBits","d":"number","ds":20,"u":"°F","mn":0.0,"mx":0.0,"st":1.0,"vt":"{{ value[38:40] | int(base=16) }}","fi":"derivative_term_qbits"}
 {"i":"577f","n":"Set Pan Type","d":"select","ds":1,"dc":"enum","vt":"{{ {'00': 'Generic', '01': 'Stainless', '02': 'Cast Iron', 'ff': 'Not Set'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Generic': '00', 'Stainless': '01', 'Cast Iron': '02', 'Not Set': 'ff'}[value] }}","o":"[\"Generic\", \"Stainless\", \"Cast Iron\", \"Not Set\"]"}
-{"i":"5780","n":"Front Left Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
-{"i":"5781","n":"Rear Left Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
-{"i":"5782","n":"Front Center Left Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
-{"i":"5783","n":"Rear Center Left Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
+{"i":"5780","n":"Front Left Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
+{"i":"5781","n":"Rear Left Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
+{"i":"5782","n":"Front Center Left Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
+{"i":"5783","n":"Rear Center Left Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"5786","n":"Right-Center Front Closed-Loop Cooking Status - Primary Device Family","d":"sensor","ds":16,"dc":"enum","vt":"{{ {'00': 'Built-In Sensor', '01': 'Paragon Sensor', '02': 'Hestan Cue', '03': 'Combustion', 'ff': 'Invalid'}.get(value[0:2], 'Unknown') }}"}
 {"i":"5786","n":"Right-Center Front Closed-Loop Cooking Status - Primary Device Status","d":"sensor","ds":16,"dc":"enum","vt":"{{ {'00': 'No devices available', '01': 'Device(s) available but not selected', '02': 'Device selected', '03': 'Device selected and in local closed-loop control (non-editable)', '04': 'Device selected and in local closed-loop control (editable)', '05': 'Device selected and in remote closed-loop control', 'ff': 'Invalid'}.get(value[2:4], 'Unknown') }}","fi":"primary_device_status"}
 {"i":"5786","n":"Right-Center Front Closed-Loop Cooking Status - Last 4 Digits of MAC Address","d":"sensor","ds":16,"vt":"{{ value[4:8] | int(base=16) }}","fi":"last_4_digits_of_mac_address"}
@@ -1282,9 +1282,9 @@
 {"i":"5789","n":"Right-Center Rear Closed-Loop Cooking Configuration - Integral Term qBits","d":"number","ds":20,"u":"°F","mn":0.0,"mx":0.0,"st":1.0,"vt":"{{ value[28:30] | int(base=16) }}","fi":"integral_term_qbits"}
 {"i":"5789","n":"Right-Center Rear Closed-Loop Cooking Configuration - Derivative Term Value","d":"number","ds":20,"u":"°F","mn":0.0,"mx":0.0,"st":1.0,"vt":"{{ (value[30:38] | int(base=16)) - 4294967296 if (value[30:38] | int(base=16)) >= 2147483648 else (value[30:38] | int(base=16)) }}","fi":"derivative_term_value"}
 {"i":"5789","n":"Right-Center Rear Closed-Loop Cooking Configuration - Derivative Term qBits","d":"number","ds":20,"u":"°F","mn":0.0,"mx":0.0,"st":1.0,"vt":"{{ value[38:40] | int(base=16) }}","fi":"derivative_term_qbits"}
-{"i":"578a","n":"Front Right Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
-{"i":"578b","n":"Rear Right Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
-{"i":"578c","n":"Bridge/Sync Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
+{"i":"578a","n":"Front Right Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
+{"i":"578b","n":"Rear Right Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
+{"i":"578c","n":"Bridge/Sync Closed Loop Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"5790","n":"Estimated Minutes Remaining in Cavity 1 - Estimated Minutes Remaining","d":"sensor","ds":4,"u":"min","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"5790","n":"Estimated Minutes Remaining in Cavity 1 - Estimated Minutes Remaining Status","d":"sensor","ds":4,"u":"min","dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Pending', '02': 'Active', '03': 'Complete'}.get(value[4:6], 'Unknown') }}","fi":"estimated_minutes_remaining_status"}
 {"i":"5790","n":"Estimated Minutes Remaining in Cavity 1 - Padding","d":"sensor","ds":4,"u":"min","vt":"{{ value[6:8] | int(base=16) }}","fi":"padding"}
