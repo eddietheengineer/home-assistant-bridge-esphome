@@ -41,6 +41,17 @@
 {"i":"4056","n":"defrost","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"defrost"}
 {"i":"4056","n":"evaporatorFrosted","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"evaporatorfrosted"}
 {"i":"4056","n":"vaporLocked","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"vaporlocked"}
+{"i":"4056","n":"unused[0]","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"unused_0"}
+{"i":"4056","n":"unused[1]","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"unused_1"}
+{"i":"4056","n":"unused[2]","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"unused_2"}
+{"i":"4056","n":"unused[3]","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"unused_3"}
+{"i":"4056","n":"unused[4]","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"unused_4"}
+{"i":"4056","n":"unused[5]","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"unused_5"}
+{"i":"4056","n":"unused[6]","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"unused_6"}
+{"i":"4056","n":"unused[7]","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"unused_7"}
+{"i":"4056","n":"unused[8]","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"unused_8"}
+{"i":"4056","n":"unused[9]","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"unused_9"}
+{"i":"4056","n":"unused[10]","d":"sensor","ds":32,"vt":"{{ value | int(base=16) }}","fi":"unused_10"}
 {"i":"4058","n":"Fault_T2Fail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 72057594037927936) % 2 else '00' }}","fi":"fault_t2fail","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_T1T2VotingFailUsingT1","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 144115188075855872) % 2 else '00' }}","fi":"fault_t1t2votingfailusingt1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_SabbathKeeperLostComms","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 288230376151711744) % 2 else '00' }}","fi":"fault_sabbathkeeperlostcomms","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -50,29 +61,49 @@
 {"i":"4058","n":"Fault_DryTank","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 4611686018427387904) % 2 else '00' }}","fi":"fault_drytank","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_ConcurrentLoad","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 9223372036854775808) % 2 else '00' }}","fi":"fault_concurrentload","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"HeatPumpDryTankDetectionActive","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 281474976710656) % 2 else '00' }}","fi":"heatpumpdrytankdetectionactive","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_UpperElement","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 562949953421312) % 2 else '00' }}","fi":"failure_upperelement","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_UpperElementFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 1125899906842624) % 2 else '00' }}","fi":"fault_upperelementfail","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_LowerElement","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 2251799813685248) % 2 else '00' }}","fi":"failure_lowerelement","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_LowerElementFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 4503599627370496) % 2 else '00' }}","fi":"fault_lowerelementfail","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_T1Fail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 9007199254740992) % 2 else '00' }}","fi":"fault_t1fail","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_LowLineVoltage","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 18014398509481984) % 2 else '00' }}","fi":"fault_lowlinevoltage","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_DirtyFilter","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 36028797018963968) % 2 else '00' }}","fi":"fault_dirtyfilter","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_T3aDrift","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 1099511627776) % 2 else '00' }}","fi":"failure_t3adrift","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_T3aFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 2199023255552) % 2 else '00' }}","fi":"fault_t3afail","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_T3bDrift","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 4398046511104) % 2 else '00' }}","fi":"failure_t3bdrift","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_T3bFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 8796093022208) % 2 else '00' }}","fi":"fault_t3bfail","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_T4Fail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 17592186044416) % 2 else '00' }}","fi":"fault_t4fail","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_T5Drift","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 35184372088832) % 2 else '00' }}","fi":"failure_t5drift","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_T5Fail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 70368744177664) % 2 else '00' }}","fi":"fault_t5fail","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_Fan","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 140737488355328) % 2 else '00' }}","fi":"failure_fan","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_FanFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 4294967296) % 2 else '00' }}","fi":"fault_fanfail","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_Inverter","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 8589934592) % 2 else '00' }}","fi":"failure_inverter","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_InverterHeartbeat","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 17179869184) % 2 else '00' }}","fi":"failure_inverterheartbeat","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_InverterFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 34359738368) % 2 else '00' }}","fi":"fault_inverterfail","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_InverterApiMismatch","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 68719476736) % 2 else '00' }}","fi":"fault_inverterapimismatch","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_LowCompressorPower","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 137438953472) % 2 else '00' }}","fi":"failure_lowcompressorpower","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_HighCompressorPower","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 274877906944) % 2 else '00' }}","fi":"failure_highcompressorpower","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_HighCompressorDischargeTemp","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 549755813888) % 2 else '00' }}","fi":"failure_highcompressordischargetemp","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_CompressorFail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"fault_compressorfail","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_Defrost","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"failure_defrost","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_Defrost","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 67108864) % 2 else '00' }}","fi":"fault_defrost","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_AmbientTemperatureOutOfRange","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 134217728) % 2 else '00' }}","fi":"fault_ambienttemperatureoutofrange","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_CondensateSensor","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 268435456) % 2 else '00' }}","fi":"fault_condensatesensor","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_CondensateDrainPan","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 536870912) % 2 else '00' }}","fi":"fault_condensatedrainpan","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_VaporLocked","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 1073741824) % 2 else '00' }}","fi":"failure_vaporlocked","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_VaporLocked","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 2147483648) % 2 else '00' }}","fi":"fault_vaporlocked","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_LowCompressorDischargeTemp","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 65536) % 2 else '00' }}","fi":"failure_lowcompressordischargetemp","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_LowCompressorDischargeTemp","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 131072) % 2 else '00' }}","fi":"fault_lowcompressordischargetemp","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_EvaporatorFrosted","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 262144) % 2 else '00' }}","fi":"failure_evaporatorfrosted","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_EvaporatorFrosted","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 524288) % 2 else '00' }}","fi":"fault_evaporatorfrosted","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_SuperHeatControl","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 1048576) % 2 else '00' }}","fi":"failure_superheatcontrol","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_SuperHeatControl","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 2097152) % 2 else '00' }}","fi":"fault_superheatcontrol","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_EevPositionError","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 4194304) % 2 else '00' }}","fi":"failure_eevpositionerror","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_EevPositionError","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 8388608) % 2 else '00' }}","fi":"fault_eevpositionerror","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"Failure_SealedSystemLeak","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 256) % 2 else '00' }}","fi":"failure_sealedsystemleak","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Fault_SealedSystemLeak","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 512) % 2 else '00' }}","fi":"fault_sealedsystemleak","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"reserved","d":"binary_sensor","ds":8,"vt":"{{ ((value[0:16] | int(base=16)) // 1024) % 64 }}","fi":"reserved","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4058","n":"reserved","d":"binary_sensor","ds":8,"vt":"{{ ((value[0:16] | int(base=16)) // 1) % 256 }}","fi":"reserved_0","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"405f","n":"Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"4060","n":"Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"4061","n":"Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
@@ -81,11 +112,13 @@
 {"i":"4064","n":"Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"4065","n":"Current","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"4066","n":"Voltage","d":"sensor","ds":2,"u":"V","dc":"voltage","sc":"measurement","vt":"{{ value | int(base=16) }}"}
+{"i":"4068","n":"Relay status.Reserved","d":"sensor","ds":2,"vt":"{{ ((value[0:4] | int(base=16)) // 256) % 256 }}","fi":"relay_status_reserved"}
 {"i":"4068","n":"Relay status.DLB","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 1) % 2 else '00' }}","fi":"relay_status_dlb","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4068","n":"Relay status.Compressor","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 2) % 2 else '00' }}","fi":"relay_status_compressor","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4068","n":"Relay status.Upper element","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 4) % 2 else '00' }}","fi":"relay_status_upper_element","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4068","n":"Relay status.Lower element","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 8) % 2 else '00' }}","fi":"relay_status_lower_element","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4068","n":"Relay status.Fan","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 16) % 2 else '00' }}","fi":"relay_status_fan","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4068","n":"Relay status.Reserved","d":"sensor","ds":2,"vt":"{{ ((value[0:4] | int(base=16)) // 32) % 8 }}","fi":"relay_status_reserved_0"}
 {"i":"4069","n":"State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not flowing', '01': 'Small flow', '02': 'Medium flow', '04': 'Large flow'}.get(value[:2], 'Unknown') }}"}
 {"i":"406e","n":"Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"4081","n":"Mode","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Alarm not active', '01': 'Alarm active'}.get(value[:2], 'Unknown') }}"}

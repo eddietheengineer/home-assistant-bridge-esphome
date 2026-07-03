@@ -2,7 +2,8 @@
 """Run the full HA discovery pipeline.
 
 Orchestrates the sequence of scripts that convert source ERD definitions
-into compressed HA discovery data (both filtered and unfiltered variants):
+into compressed HA discovery data. All entities are included in the output;
+runtime filtering is controlled by the filter_config_topics config option.
 
   1. validate_json_format.py     - validate source JSON
   2. generate_flattened_review.py - flatten ERDs, one entry per sub-field
@@ -12,10 +13,8 @@ into compressed HA discovery data (both filtered and unfiltered variants):
   6. auto_detect_scaling.py      - infer scaling_factor
   7. auto_detect_pairings.py     - detect Request/Status pairs
   8. post_process.py             - fix cross-field consistency
-  9. generate_ha_discovery.py    - produce ha_discovery/*.jsonl (filtered)
-  10. generate_ha_discovery.py   - produce ha_discovery_unfiltered/*.jsonl
-  11. compress_ha_discovery.py   - produce ha_discovery_data.h (filtered)
-  12. compress_ha_discovery.py   - produce ha_discovery_data_unfiltered.h
+  9. generate_ha_discovery.py    - produce ha_discovery/*.jsonl (all entities)
+  10. compress_ha_discovery.py   - produce ha_discovery_data.h
 
 Usage:
     python3 scripts/ha_discovery/run_pipeline.py [--reprocess]
@@ -41,8 +40,7 @@ SOURCE_ERD_JSON = SUBMODULE_DIR / "appliance_api_erd_definitions.json"
 SOURCE_API_JSON = SUBMODULE_DIR / "appliance_api.json"
 PROCESSED_JSON = REPO_ROOT / "appliance_api_erd_definitions_processed.json"
 
-FILTERED_DIR = REPO_ROOT / "ha_discovery"
-UNFILTERED_DIR = REPO_ROOT / "ha_discovery_unfiltered"
+HA_DISCOVERY_DIR = REPO_ROOT / "ha_discovery"
 
 # Steps 1-8: shared preprocessing
 PREPROCESS_STEPS = [
@@ -109,33 +107,6 @@ def run_step(step):
     return True
 
 
-def generate_and_compress(output_dir: Path, header_name: str, filter_config_topics: bool):
-    """Generate JSONL for a variant and compress it."""
-    label = "filtered" if filter_config_topics else "unfiltered"
-    print(f"\n  Generating {label} variant -> {output_dir}")
-
-    gen_step = {
-        "name": f"Generate {label} HA discovery JSONL",
-        "script": GENERATORS / "generate_ha_discovery.py",
-        "args": ["--processed", str(PROCESSED_JSON), "--output-dir", str(output_dir)],
-    }
-    if not filter_config_topics:
-        gen_step["args"].append("--no-filter")
-
-    if not run_step(gen_step):
-        return False
-
-    comp_step = {
-        "name": f"Compress {label} HA discovery",
-        "script": GENERATORS / "compress_ha_discovery.py",
-        "args": ["--input-dir", str(output_dir), "--header-name", header_name],
-    }
-    if not run_step(comp_step):
-        return False
-
-    return True
-
-
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Run the full HA discovery pipeline.")
@@ -175,19 +146,28 @@ def main():
     else:
         print(f"  Using existing processed file: {PROCESSED_JSON}")
 
-    # Generate and compress both variants
-    if not generate_and_compress(FILTERED_DIR, "ha_discovery_data", filter_config_topics=True):
+    # Step 9: Generate JSONL (all entities, no filtering - done at runtime)
+    gen_step = {
+        "name": "Generate HA discovery JSONL",
+        "script": GENERATORS / "generate_ha_discovery.py",
+        "args": ["--processed", str(PROCESSED_JSON), "--output-dir", str(HA_DISCOVERY_DIR), "--no-filter"],
+    }
+    if not run_step(gen_step):
         sys.exit(1)
 
-    if not generate_and_compress(UNFILTERED_DIR, "ha_discovery_data_unfiltered", filter_config_topics=False):
+    # Step 10: Compress
+    comp_step = {
+        "name": "Compress HA discovery",
+        "script": GENERATORS / "compress_ha_discovery.py",
+        "args": ["--input-dir", str(HA_DISCOVERY_DIR), "--header-name", "ha_discovery_data"],
+    }
+    if not run_step(comp_step):
         sys.exit(1)
 
     print()
     print("Pipeline complete!")
-    print(f"  Filtered JSONL:    {FILTERED_DIR}")
-    print(f"  Unfiltered JSONL:  {UNFILTERED_DIR}")
-    print(f"  Filtered header:   {REPO_ROOT / 'components' / 'geappliances_bridge' / 'ha_discovery_data.h'}")
-    print(f"  Unfiltered header: {REPO_ROOT / 'components' / 'geappliances_bridge' / 'ha_discovery_data_unfiltered.h'}")
+    print(f"  JSONL files:   {HA_DISCOVERY_DIR}")
+    print(f"  Compressed header: {REPO_ROOT / 'components' / 'geappliances_bridge' / 'ha_discovery_data.h'}")
 
 
 if __name__ == "__main__":

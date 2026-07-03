@@ -8,7 +8,7 @@
  */
 
 #include "ha_discovery_manager.h"
-#include "ha_discovery_selector.h"
+#include "ha_discovery_data.h"
 #include "geappliances_bridge_log.h"
 
 #include <cstdio>
@@ -265,6 +265,121 @@ static int chunk_decompress(ha_discovery_manager_t* self, const uint8_t* compres
 #endif /* USE_ESP_IDF */
 
 /* ------------------------------------------------------------------ */
+/* Runtime config topic filtering                                     */
+/* ------------------------------------------------------------------ */
+
+/* Keywords that mark an entity as internal/diagnostic.
+ * If filter_config_topics is enabled and the entity name contains
+ * any of these (case-insensitive), the entity is skipped. */
+static const char* FILTER_KEYWORDS[] = {
+    "linux diagnostics",
+    "gea", "interface diagnostic",
+    "non-volatile usage warning",
+    "reset reason",
+    "seconds since last reset",
+    "program counter", "failed assertion",
+    "fault code",
+    "configuration hash",
+    "schedule hash",
+    "sha-256",
+    "boot loader version",
+    "supported image types",
+    "ready to enter boot",
+    "engineering revision setup",
+    "csm fault data",
+    "alexa", "registration",
+    "matter", "commissioning", "onboarding",
+    "voice module",
+    "push notification",
+    "limit", "min", "max",
+    "allowable", "range data",
+    "expiration limit",
+    "target temperature range",
+    "modification available",
+    "action available",
+    "editable",
+    "available", "mode",
+    "action availability",
+    "available", "setting",
+    "availability",
+    "supported", "feature",
+    "supported", "state",
+    "supported", "equipment",
+    "supported", "sound theme",
+    "supported", "notification",
+    "supported", "setting",
+    "supported", "device",
+    "requested", "parameter",
+    "request", "setting",
+    "request", "mask",
+    "request", "configuration",
+    "clock time",
+    "ntp",
+    "time zone",
+    "daylight saving",
+    "calendar",
+    "wifi", "status",
+    "network", "status",
+    "signal", "strength",
+    "ble", "master",
+    "bluetooth", "master",
+    "electrical", "pricing",
+    "demand response",
+    "time of use", "pricing",
+    "pricing", "structure",
+    "still frame",
+    "image upload",
+    "camera", "configuration",
+    "camera", "stream",
+    "inference id",
+    "cook cam", "upload",
+    "sound level",
+    "sound theme",
+    "available sound",
+    "number of sound level",
+    "enhanced feature",
+    "cec",
+    "core-enhanced-cloud",
+    "request enabled enhanced",
+    "current enabled enhanced",
+    "usage profile",
+    "current report",
+    "feature configuration",
+    "cycle definition",
+    "latched key status",
+    "dip switch",
+    "most recent cycle status",
+    "unused",
+    "reserved",
+    "service mode",
+    "issue",
+    "fault",
+    "faulted",
+    "diagnostic",
+    "failure",
+    NULL
+};
+
+static bool should_filter_config_topic(const char* name)
+{
+    /* Convert name to lowercase for comparison. */
+    char lower[256];
+    size_t i, name_len = strlen(name);
+    if (name_len >= sizeof(lower)) name_len = sizeof(lower) - 1;
+    for (i = 0; i < name_len; i++) {
+        lower[i] = (char)(name[i] >= 'A' && name[i] <= 'Z' ? name[i] + 32 : name[i]);
+    }
+    lower[name_len] = '\0';
+
+    for (size_t k = 0; FILTER_KEYWORDS[k] != NULL; k++) {
+        if (strstr(lower, FILTER_KEYWORDS[k]) != NULL) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* ------------------------------------------------------------------ */
 /* Process a single JSONL line: build topic/payload in shared buffers */
 /* ------------------------------------------------------------------ */
 
@@ -283,6 +398,12 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
 
     if (!json_get_str(line, "n", &val, &len)) return false;
     json_unescape(val, len, self->entity_name_buf, sizeof(self->entity_name_buf));
+
+    /* Runtime config topic filtering. */
+    if (self->filter_config_topics && should_filter_config_topic(self->entity_name_buf)) {
+        self->total_filtered++;
+        return false;
+    }
 
     if (!json_get_str(line, "d", &val, &len)) return false;
     json_unescape(val, len, self->domain_buf, sizeof(self->domain_buf));
