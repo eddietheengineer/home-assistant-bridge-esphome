@@ -8,7 +8,7 @@
  */
 
 #include "ha_discovery_manager.h"
-#include "ha_discovery_data.h"
+#include "ha_discovery_selector.h"
 #include "geappliances_bridge_log.h"
 
 #include <cstdio>

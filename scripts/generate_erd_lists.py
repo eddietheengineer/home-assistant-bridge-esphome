@@ -514,18 +514,6 @@ def main():
         "--output-dir",
         help="Override output directory for generated headers (default: component-dir)",
     )
-    parser.add_argument(
-        "--filter-config-topics",
-        action="store_true",
-        default=True,
-        help="Filter out internal metadata, diagnostics, and commissioning entities from HA discovery (default: true).",
-    )
-    parser.add_argument(
-        "--no-filter-config-topics",
-        action="store_false",
-        dest="filter_config_topics",
-        help="Disable filtering of internal/diagnostic entities from HA discovery.",
-    )
     args = parser.parse_args()
 
     script_dir = Path(__file__).parent
@@ -542,8 +530,7 @@ def main():
             return Path(found)
         local = repo_root / "lib" / "public-appliance-api-documentation" / filename
         # Fetch from GitHub as last resort (ESPHome Docker, clean cache, etc.)
-        # Uses the exact submodule commit SHA from submodule_config.py.
-        url = f"https://raw.githubusercontent.com/eddietheengineer/public-appliance-api-documentation/{SUBMODULE_SHA}/{filename}"
+        url = f"https://raw.githubusercontent.com/geappliances/public-appliance-api-documentation/{SUBMODULE_SHA}/{filename}"
         print(f"Local {filename} not found, fetching from GitHub: {url}", file=sys.stderr)
         try:
             tmp = Path("/tmp") / filename
@@ -636,58 +623,6 @@ def main():
     print(f"\nWriting generated header to {api_output_file}")
     with open(api_output_file, 'w') as f:
         f.write(api_header_content)
-    # Generate HA discovery JSONL files and compress into ha_discovery_data.h
-    # all in-process to avoid path resolution issues between subprocesses
-    # in ESPHome cache environments.
-    ha_discovery_script = script_dir / 'generate_ha_discovery.py'
-    if ha_discovery_script.exists():
-        print(f"\nGenerating HA discovery JSONL files...")
-        sys.path.insert(0, str(script_dir))
-        import generate_ha_discovery as gen
-        import compress_ha_discovery as comp
-
-
-        # Load ERD definitions: try local file first, always fall back to GitHub
-        erd_data = None
-        if json_file.exists():
-            try:
-                with open(json_file, 'r') as f:
-                    erd_data = json.load(f)
-            except Exception as e:
-                print(f"Failed to load ERD definitions from {json_file}: {e}", file=sys.stderr)
-                erd_data = None
-        if erd_data is None:
-            erd_data = gen.fetch_erd_definitions_from_github()
-        if erd_data is not None:
-            erds = erd_data.get('erds', [])
-            print(f"Found {len(erds)} ERD definitions", file=sys.stderr)
-
-            # Generate JSONL content (in memory, no disk I/O needed)
-            jsonl_by_cat = gen.generate_ha_discovery_jsonl_by_category(
-                erds, args.filter_config_topics)
-
-            # Write JSONL files for the Makefile build path
-            output_dir = repo_root / 'ha_discovery'
-            output_dir.mkdir(parents=True, exist_ok=True)
-            total_entries = 0
-            for cat, content in jsonl_by_cat.items():
-                outfile = output_dir / f'{cat}.jsonl'
-                with open(outfile, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                n = content.count('\n')
-                total_entries += n
-                print(f"  {cat}: {n} entities -> {cat}.jsonl ({len(content):,} bytes)",
-                      file=sys.stderr)
-            print(f"\nTotal entities generated: {total_entries}", file=sys.stderr)
-
-            # Compress and write ha_discovery_data.h directly
-            comp.generate_header_to_file(output_dir, repo_root)
-        else:
-            print("Warning: Could not load ERD definitions, skipping HA discovery.",
-                  file=sys.stderr)
-    else:
-        print(f"\nWarning: {ha_discovery_script} not found, skipping HA discovery generation",
-              file=sys.stderr)
 
     print("Done!")
 

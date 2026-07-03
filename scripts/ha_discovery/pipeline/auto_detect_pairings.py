@@ -1,0 +1,293 @@
+#!/usr/bin/env python3
+"""Auto-detect paired ERD (Request/Status) relationships at the field level.
+
+Finds sequential ERD ID pairs where one has "Request" and the other "Status"
+in the name, with matching base names. Then matches individual fields between
+the request and status ERDs based on normalized name similarity.
+
+Populates review.paired_erd and review.pair_role on matched field entries.
+
+Usage:
+    python3 scripts/auto_detect_pairings.py
+"""
+
+import argparse
+import json
+import os
+import re
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def load_json(path):
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+
+def strip_request_status(name):
+    """Strip 'Request' or 'Status' suffix from an ERD name, handling trailing content."""
+    n = re.sub(r'\s*(request|status)\s*$', '', name, flags=re.IGNORECASE).strip()
+    # Also strip trailing numbers after Request/Status (e.g. "Request 0" -> base)
+    n = re.sub(r'\s*(request|status)\s*\d+\s*$', '', n, flags=re.IGNORECASE).strip()
+    return n
+
+
+def normalize_field_name(name):
+    """Normalize a field name for comparison.
+
+    Strips Request/Status suffixes, parenthetical hints,
+    and dot-qualified prefixes (e.g. 'Settings.Cook Action' -> 'cook action').
+    Preserves array indices [0], [1], etc. for matching.
+    """
+    n = name.lower()
+    # Strip parenthetical hints at end FIRST (so "Status (0-100)" -> "Status")
+    n = re.sub(r'\s*\(.*?\)\s*$', '', n)
+    # Strip Request/Status suffixes
+    n = re.sub(r'\s*(request|status)\s*$', '', n, flags=re.IGNORECASE)
+    # Take the last dot-qualified segment (leaf name)
+    parts = n.split('.')
+    n = parts[-1].strip()
+    # Normalize whitespace
+    n = re.sub(r'\s+', ' ', n).strip()
+    return n
+
+
+def extract_array_index(name):
+    """Extract array index from field name, or None if not an array field."""
+    m = re.search(r'\[(\d+)\]', name)
+    return int(m.group(1)) if m else None
+
+
+def stem_word(w):
+    """Simple stemming: remove common suffixes."""
+    for suffix in ['ed', 'ing', 'ly', 'es', 's']:
+        if w.endswith(suffix) and len(w) - len(suffix) >= 2:
+            return w[:-len(suffix)]
+    return w
+
+
+def field_match_score(req_name, stat_name):
+    """Score how well two field names match.
+
+    Returns 0-100. >=50 is considered a match.
+    """
+    rn = normalize_field_name(req_name)
+    sn = normalize_field_name(stat_name)
+
+    # Exact match
+    if rn == sn:
+        return 100
+
+    # One contains the other
+    if rn in sn or sn in rn:
+        return 70
+
+    # Word overlap with stemming
+    rw = set(stem_word(w) for w in rn.replace('/', ' ').split())
+    sw = set(stem_word(w) for w in sn.replace('/', ' ').split())
+    common = rw & sw
+
+    if not common:
+        return 0
+
+    # Require at least one meaningful common word (not single char)
+    meaningful = {w for w in common if len(w) > 1}
+    if not meaningful:
+        return 0
+
+    min_len = min(len(rw), len(sw))
+    ratio = len(meaningful) / min_len
+
+    if ratio >= 0.8:
+        return 60
+    if ratio >= 0.5 and len(meaningful) >= 2:
+        return 50
+
+    return 0
+
+
+def match_fields(req_fields, stat_fields):
+    """Match request fields to status fields.
+
+    Returns list of (req_entry, stat_entry, score) tuples for matched pairs.
+    Requires exact normalized name match plus matching type, offset, and size.
+    Uses greedy matching: each field can only be matched once.
+    """
+    matches = []
+    used_stat = set()
+
+    # Build index of status fields by normalized name
+    stat_by_name = {}
+    for sf in stat_fields:
+        key = normalize_field_name(sf['field_name'])
+        if key not in stat_by_name:
+            stat_by_name[key] = []
+        stat_by_name[key].append(sf)
+
+    for rf in req_fields:
+        key = normalize_field_name(rf['field_name'])
+        if key not in stat_by_name:
+            continue
+
+        for sf in stat_by_name[key]:
+            if id(sf) in used_stat:
+                continue
+            # Must have same type
+            if rf['field_type'] != sf['field_type']:
+                continue
+            # Must have same byte offset
+            if rf['field_offset'] != sf['field_offset']:
+                continue
+            # Must have same size
+            if rf['field_size'] != sf['field_size']:
+                continue
+            # For bit-fields, must have same bit offset
+            rb = rf.get('field_bits')
+            sb = sf.get('field_bits')
+            if rb is not None or sb is not None:
+                if rb != sb:
+                    continue
+            # For array fields, must have same index
+            ri = extract_array_index(rf['field_name'])
+            si = extract_array_index(sf['field_name'])
+            if ri is not None or si is not None:
+                if ri != si:
+                    continue
+
+            matches.append((rf, sf, 100))
+            used_stat.add(id(sf))
+            break  # each request field matches at most one status field
+
+    return matches
+
+
+def find_erd_pairs(erd_by_id, erd_ids):
+    """Find all Request/Status ERD pairs (including those with field count differences).
+
+    Returns list of (request_erd_id, status_erd_id) tuples.
+    """
+    pairs = []
+
+    for i, erd_id in enumerate(erd_ids):
+        if i + 1 >= len(erd_ids):
+            continue
+
+        next_id = erd_ids[i + 1]
+        erd = erd_by_id[erd_id]
+        next_erd = erd_by_id[next_id]
+
+        nl = erd['name'].lower()
+        nxl = next_erd['name'].lower()
+
+        has_req = 'request' in nl
+        has_stat = 'status' in nl
+        next_req = 'request' in nxl
+        next_stat = 'status' in nxl
+
+        if not ((has_req and next_stat) or (has_stat and next_req)):
+            continue
+
+        base1 = strip_request_status(erd['name'])
+        base2 = strip_request_status(next_erd['name'])
+        if base1.lower() != base2.lower():
+            continue
+
+        req_id = erd_id if has_req else next_id
+        stat_id = next_id if has_req else erd_id
+
+        pairs.append((req_id, stat_id))
+
+    return pairs
+
+
+def apply_pairings(entries, erd_by_id, erd_ids):
+    """Find ERD pairs and match fields, setting paired_erd/pair_role.
+
+    Clears any existing pairings first, then re-computes from scratch.
+    Returns (num_pairs, num_field_matches) counts.
+    """
+    # Clear existing pairings
+    for e in entries:
+        e['review']['paired_erd'] = None
+        e['review']['pair_role'] = None
+
+
+    total_matches = 0
+    pairs = find_erd_pairs(erd_by_id, erd_ids)
+
+    for req_id, stat_id in pairs:
+        req_entries = [e for e in entries if e['erd_id'] == req_id]
+        stat_entries = [e for e in entries if e['erd_id'] == stat_id]
+
+        matches = match_fields(req_entries, stat_entries)
+
+        for req_entry, stat_entry, score in matches:
+            req_entry['review']['paired_erd'] = stat_id
+            req_entry['review']['pair_role'] = 'request'
+            stat_entry['review']['paired_erd'] = req_id
+            stat_entry['review']['pair_role'] = 'status'
+            total_matches += 2
+
+    return len(pairs), total_matches
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Auto-detect paired ERD (Request/Status) relationships at field level.'
+    )
+    parser.add_argument(
+        '--input',
+        default=os.path.join(REPO_ROOT, 'appliance_api_erd_definitions_processed.json'),
+        help='Input processed file (default: appliance_api_erd_definitions_processed.json)',
+    )
+    parser.add_argument(
+        '--output',
+        default=os.path.join(REPO_ROOT, 'appliance_api_erd_definitions_processed.json'),
+        help='Output path (default: overwrites input)',
+    )
+    parser.add_argument(
+        '--verbose',
+        action='store_true',
+        help='Print detailed matching info for each pair',
+    )
+    args = parser.parse_args()
+
+    entries = load_json(args.input)
+
+    # Build ERD index
+    erd_by_id = {}
+    for e in entries:
+        erd_id = e['erd_id']
+        if erd_id not in erd_by_id:
+            erd_by_id[erd_id] = {
+                'id': erd_id,
+                'name': e['erd_name'],
+                'fields': [],
+                'operations': e['erd_operations'],
+            }
+        erd_by_id[erd_id]['fields'].append(e)
+
+    erd_ids = sorted(erd_by_id.keys(), key=lambda x: int(x, 16))
+
+    num_pairs, num_matches = apply_pairings(entries, erd_by_id, erd_ids)
+
+    print(f"Found {num_pairs} Request/Status ERD pairs")
+    print(f"Matched {num_matches} field entries ({num_matches // 2} field pairs)")
+
+    # Show summary
+    paired_entries = [e for e in entries if e['review'].get('paired_erd')]
+    roles = {}
+    for e in paired_entries:
+        r = e['review']['pair_role']
+        roles[r] = roles.get(r, 0) + 1
+    print(f"Roles: {roles}")
+
+    with open(args.output, 'w', encoding='utf-8') as f:
+        json.dump(entries, f, indent=2, ensure_ascii=False)
+
+    print(f"Output: {args.output}")
+
+
+if __name__ == '__main__':
+    main()

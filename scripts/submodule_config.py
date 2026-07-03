@@ -5,5 +5,5 @@ submodule commit SHA. Update this value whenever the submodule is updated.
 """
 
 # Commit SHA of lib/public-appliance-api-documentation submodule
-# Current: 6d30882 - feat: add validate_json_format.py and wire to CI workflow
-SUBMODULE_SHA = "6d30882232f400faa7788bf3016f9b56c2f83c0b"
+# c6a413d - Generated updated documentation
+SUBMODULE_SHA = "c6a413dd188dfa344b78597a3f35bade98c0fe49"

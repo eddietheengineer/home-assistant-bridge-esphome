@@ -24,5 +24,3 @@ packages/
 
 # CodeQL
 _codeql_detected_source_root
-# Generated HA discovery JSONL (regenerated at compile time)
-ha_discovery/
