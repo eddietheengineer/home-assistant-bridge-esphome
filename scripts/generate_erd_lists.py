@@ -517,17 +517,13 @@ def main():
     component_dir = os.path.normpath(args.component_dir)
     output_dir = os.path.normpath(args.output_dir) if args.output_dir else component_dir
 
-    # Resolve JSON file paths: CLI arg > component-local > local submodule
+    # Resolve JSON file paths: CLI arg > auto-search > local submodule
     def resolve_json(filename, cli_arg):
         if cli_arg and os.path.exists(cli_arg):
             return Path(cli_arg)
         found = find_json_file(filename, component_dir)
         if found:
             return Path(found)
-        # Check component-local erd_data directory (ESPHome external component)
-        local_erd = Path(component_dir) / "erd_data" / filename
-        if local_erd.exists():
-            return local_erd
         return repo_root / "lib" / "public-appliance-api-documentation" / filename
 
     # -------------------------------------------------------------------------
