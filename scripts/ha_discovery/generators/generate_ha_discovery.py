@@ -451,6 +451,8 @@ def _byte_subfield_value_template(field: Dict, erd_scaling: int) -> str:
         hex_chars = size * 2
         mapping = ', '.join(f"'{k:0{hex_chars}x}': '{_jinja2_escape(v)}'" for k, v in valid_pairs)
         return f"{{{{ {{{mapping}}}.get(value[{hex_start}:{hex_end}], 'Unknown') }}}}"
+    elif field_type == 'string':
+        return _string_subfield_value_template(field)
     elif field_type == 'bool':
         return f"{{{{ '01' if value[{hex_start}:{hex_end}] != '00' else '00' }}}}"
     else:
@@ -474,6 +476,31 @@ def _byte_subfield_value_template(field: Dict, erd_scaling: int) -> str:
                     f" / {erd_scaling} | round({dp}) }}}}")
         else:
             return f"{{{{ value[{hex_start}:{hex_end}] | int(base=16) }}}}"
+def _string_subfield_value_template(field: Dict) -> str:
+    """Generate a Jinja2 value_template that decodes a string sub-field from hex.
+
+    Converts each hex byte pair in the sliced range to ASCII, skipping
+    null bytes and stripping trailing '_' padding.
+    """
+    offset = field.get('offset', 0)
+    size = field.get('size', 1)
+    hex_start = offset * 2
+    hex_end = (offset + size) * 2
+
+    chars = ''.join(chr(i) for i in range(0x20, 0x7F))
+    chars_escaped = chars.replace("'", "\\'")
+    return (
+        "{% set chars = '" + chars_escaped + "' %}"
+        "{% set ns = namespace(value='') %}"
+        "{% set slice = value[" + str(hex_start) + ":" + str(hex_end) + "] %}"
+        "{% for i in range(0, slice | length, 2) %}"
+        "{% set b = slice[i:i+2] | int(base=16) %}"
+        "{% if b >= 0x20 and b <= 0x7E %}"
+        "{% set ns.value = ns.value ~ chars[b - 0x20] %}"
+        "{% endif %}"
+        "{% endfor %}"
+        "{{ ns.value.rstrip('_') }}"
+    )
 
 
 def _bitfield_sub_value_template(field: Dict) -> str:
