@@ -108,6 +108,28 @@ def erd_id_to_hex(erd_id_str: str) -> str:
     """Convert ERD ID string to lowercase hex, zero-padded to 4 chars."""
     return format(parse_erd_id(erd_id_str), '04x')
 
+def _infer_scaling_from_description(desc: str) -> Optional[int]:
+    """Extract a scaling factor from an ERD description string.
+
+    Parses patterns like 'Kelvin x 32', 'degrees F x 10', 'Wh x 100'.
+    Returns the integer factor or None if no pattern is found.
+    """
+    m = re.search(r'x\s+(\d+)', desc)
+    if m:
+        return int(m.group(1))
+    return None
+def _decimal_places(scaling_factor: int) -> int:
+    """Return the number of decimal places needed to represent 1/scaling_factor exactly.
+
+    For powers of 10 this is simply the number of digits (e.g. 10 -> 1, 100 -> 2).
+    For other factors (e.g. 32) it finds the smallest dp where round(1/sf, dp) == 1/sf.
+    """
+    if scaling_factor <= 0:
+        return 0
+    for dp in range(1, 10):
+        if round(1.0 / scaling_factor, dp) == 1.0 / scaling_factor:
+            return dp
+    return 3  # fallback
 
 def get_category(erd_id: int) -> Optional[str]:
     """Return the category name for an ERD ID, or None if unclassified."""
@@ -459,7 +481,7 @@ def _byte_subfield_value_template(field: Dict, erd_scaling: int) -> str:
             max_val = 2 ** (size * 8)
             half_val = max_val // 2
             if erd_scaling and erd_scaling > 1:
-                dp = {10: 1, 100: 2}.get(erd_scaling, 3)
+                dp = _decimal_places(erd_scaling)
                 return (f"{{{{ ((value[{hex_start}:{hex_end}] | int(base=16)) - {max_val}"
                         f" if (value[{hex_start}:{hex_end}] | int(base=16)) >= {half_val}"
                         f" else (value[{hex_start}:{hex_end}] | int(base=16)))"
@@ -469,7 +491,7 @@ def _byte_subfield_value_template(field: Dict, erd_scaling: int) -> str:
                         f" if (value[{hex_start}:{hex_end}] | int(base=16)) >= {half_val}"
                         f" else (value[{hex_start}:{hex_end}] | int(base=16)) }}}}")
         elif erd_scaling and erd_scaling > 1:
-            dp = {10: 1, 100: 2}.get(erd_scaling, 3)
+            dp = _decimal_places(erd_scaling)
             return (f"{{{{ (value[{hex_start}:{hex_end}] | int(base=16))"
                     f" / {erd_scaling} | round({dp}) }}}}")
         else:
@@ -551,7 +573,7 @@ def _compute_sensor_value_template(scaling_factor: int, data_size: int, signed: 
         max_val = 2 ** (data_size * 8)
         half_val = max_val // 2
         if scaling_factor > 1:
-            dp = {10: 1, 100: 2}.get(scaling_factor, 3)
+            dp = _decimal_places(scaling_factor)
             return (f'{{{{ ((value | int(base=16)) - {max_val}'
                     f' if (value | int(base=16)) >= {half_val}'
                     f' else (value | int(base=16))) / {scaling_factor} | round({dp}) }}}}')
@@ -559,12 +581,7 @@ def _compute_sensor_value_template(scaling_factor: int, data_size: int, signed: 
                 f' if (value | int(base=16)) >= {half_val}'
                 f' else (value | int(base=16)) }}}}')
     if scaling_factor > 1:
-        if scaling_factor == 10:
-            dp = 1
-        elif scaling_factor == 100:
-            dp = 2
-        else:
-            dp = 3
+        dp = _decimal_places(scaling_factor)
         return f'{{{{ (value | int(base=16)) / {scaling_factor} | round({dp}) }}}}'
     return '{{ value | int(base=16) }}'
 
@@ -1194,8 +1211,11 @@ def _build_erds_from_flat_list(flat_entries: List[Dict], no_filter: bool = False
             erd['device_class'] = review['device_class']
         if review.get('unit_of_measurement'):
             erd['unit_of_measurement'] = review['unit_of_measurement']
-        if review.get('scaling_factor') is not None:
-            erd['scaling_factor'] = review['scaling_factor']
+        sf = review.get('scaling_factor')
+        if sf is None:
+            sf = _infer_scaling_from_description(first.get('erd_description', ''))
+        if sf is not None:
+            erd['scaling_factor'] = sf
         if review.get('state_class'):
             erd['state_class'] = review['state_class']
         if review.get('paired_erd'):
