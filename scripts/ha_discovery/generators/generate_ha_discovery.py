@@ -803,9 +803,9 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 payload_on: str = '', payload_off: str = '',
                 state_on: str = '', state_off: str = '',
                 min_val: float = 0.0, max_val: float = 0.0, step_val: float = 1.0) -> None:
-        # Skip availability/allowability metadata — not actionable in HA.
+        # Skip availability/allowability metadata and padding — not actionable in HA.
         combined = (name + ' ' + field_id).lower()
-        if 'allowed' in combined or 'available' in combined:
+        if 'allowed' in combined or 'available' in combined or 'padding' in combined:
             return
         entries.append({
             'erd_id': erd_id_int,

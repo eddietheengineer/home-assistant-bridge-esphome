@@ -315,7 +315,6 @@
 {"i":"9207","n":"Toaster Oven Current Cooking Parameters - Count","d":"sensor","ds":12,"vt":"{{ value[16:18] | int(base=16) }}","fi":"count"}
 {"i":"9207","n":"Toaster Oven Current Cooking Parameters - Cook Mode","d":"sensor","ds":12,"dc":"enum","vt":"{{ {'00': 'Air Fry', '01': 'Bake', '02': 'Broil', '03': 'Roast', '04': 'Reheat', '05': 'Warm', '06': 'Slow Cook', '07': 'Dehydrate', '08': 'Proof', '09': 'Cookie', '0a': 'Pizza', '0b': 'Bagel', '0c': 'Toast', '0d': 'Crisp Finish', '0e': 'Cake', '0f': 'Cookie with Preferences', '10': 'Pizza with Preferences', '11': 'Convection Bake'}.get(value[18:20], 'Unknown') }}","fi":"cook_mode"}
 {"i":"9207","n":"Toaster Oven Current Cooking Parameters - Preferences","d":"sensor","ds":12,"vt":"{{ value[20:22] | int(base=16) }}","fi":"preferences"}
-{"i":"9207","n":"Toaster Oven Current Cooking Parameters - Padding","d":"sensor","ds":12,"vt":"{{ value[22:24] | int(base=16) }}","fi":"padding"}
 {"i":"9209","n":"Toaster Oven Current State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Sleep', '01': 'Standby', '02': 'Initialization', '03': 'Cooking', '04': 'Preheating', '05': 'Idle', '06': 'Temperature Achieved', '07': 'Cooking Complete'}.get(value[:2], 'Unknown') }}"}
 {"i":"920a","n":"Toaster Oven Current Air Fry Mode Cooking Parameters","d":"sensor","ds":28,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"920a","n":"Toaster Oven Current Air Fry Mode Cooking Parameters - Temperature Used","d":"binary_sensor","ds":28,"vt":"{{ '01' if ((value[52:56] | int(base=16)) // 256) % 2 else '00' }}","fi":"temperature_used","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -734,7 +733,6 @@
 {"i":"9421","n":"Auto Warm Enable Current Setting - Auto Warm Setting Editable","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"auto_warm_setting_editable","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9421","n":"Auto Warm Enable Current Setting - Auto Warm Setting Status","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"auto_warm_setting_status","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9423","n":"Auto Warm Current Time - Auto Warm Time Option Editable","d":"binary_sensor","ds":4,"vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
-{"i":"9423","n":"Auto Warm Current Time - Padding","d":"binary_sensor","ds":4,"vt":"{{ value[2:4] | int(base=16) }}","fi":"padding"}
 {"i":"9423","n":"Auto Warm Current Time - Auto Warm Time","d":"binary_sensor","ds":4,"vt":"{{ value[4:8] | int(base=16) }}","fi":"auto_warm_time"}
 {"i":"9425","n":"Auto Warm Current Temperature - Auto Warm Temperature Option Editable","d":"binary_sensor","ds":2,"vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
 {"i":"9425","n":"Auto Warm Current Temperature - Auto Warm Temperature","d":"binary_sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"auto_warm_temperature"}
@@ -753,7 +751,6 @@
 {"i":"9430","n":"Early Completion Notification Time Limits - Early Completion Notification Time Min","d":"sensor","ds":2,"u":"min","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"9430","n":"Early Completion Notification Time Limits - Early Completion Notification Time Max","d":"sensor","ds":2,"u":"min","vt":"{{ value[2:4] | int(base=16) }}","fi":"early_completion_notification_time_max"}
 {"i":"9431","n":"Current Igniter Temperature - Igniter Temperature Editable","d":"binary_sensor","ds":4,"vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
-{"i":"9431","n":"Current Igniter Temperature - Padding","d":"binary_sensor","ds":4,"vt":"{{ value[2:4] | int(base=16) }}","fi":"padding"}
 {"i":"9431","n":"Current Igniter Temperature - Igniter Temperature","d":"binary_sensor","ds":4,"vt":"{{ value[4:8] | int(base=16) }}","fi":"igniter_temperature"}
 {"i":"9433","n":"Igniter Temperature Limits - Igniter Temperature Min","d":"sensor","ds":4,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"9433","n":"Igniter Temperature Limits - Igniter Temperature Max","d":"sensor","ds":4,"u":"°F","vt":"{{ value[4:8] | int(base=16) }}","fi":"igniter_temperature_max"}
@@ -806,12 +803,9 @@
 {"i":"9505","n":"Sourdough Starter Push Notifications - Crock Removed Alert Supported","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 2048) % 2 else '00' }}","fi":"crock_removed_alert_supported","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9505","n":"Sourdough Starter Push Notifications - Power Loss Alert Supported","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 4096) % 2 else '00' }}","fi":"power_loss_alert_supported","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9506","n":"Time Since Complete - Timer Active","d":"binary_sensor","ds":4,"vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
-{"i":"9506","n":"Time Since Complete - Padding","d":"binary_sensor","ds":4,"vt":"{{ value[2:4] | int(base=16) }}","fi":"padding"}
 {"i":"9506","n":"Time Since Complete - Time Since Complete","d":"binary_sensor","ds":4,"vt":"{{ value[4:8] | int(base=16) }}","fi":"time_since_complete"}
 {"i":"9507","n":"Time To Crock Full - Timer Active","d":"binary_sensor","ds":4,"vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
-{"i":"9507","n":"Time To Crock Full - Padding","d":"binary_sensor","ds":4,"vt":"{{ value[2:4] | int(base=16) }}","fi":"padding"}
 {"i":"9507","n":"Time To Crock Full - Time To Crock Full","d":"binary_sensor","ds":4,"vt":"{{ value[4:8] | int(base=16) }}","fi":"time_to_crock_full"}
 {"i":"9508","n":"Time Until Next Feed - Timer Active","d":"binary_sensor","ds":4,"vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
-{"i":"9508","n":"Time Until Next Feed - Padding","d":"binary_sensor","ds":4,"vt":"{{ value[2:4] | int(base=16) }}","fi":"padding"}
 {"i":"9508","n":"Time Until Next Feed - Time Until Next Feed","d":"binary_sensor","ds":4,"vt":"{{ value[4:8] | int(base=16) }}","fi":"time_until_next_feed"}
 {"i":"9509","n":"Crock Present","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}

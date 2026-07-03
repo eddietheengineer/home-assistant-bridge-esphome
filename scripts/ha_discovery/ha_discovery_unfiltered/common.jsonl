@@ -47,7 +47,6 @@
 {"i":"0503","n":"Camera Stream Authentication Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'None', '01': 'Pending', '02': 'Failure', '03': 'Success'}.get(value[:2], 'Unknown') }}"}
 {"i":"0504","n":"Camera Stream Termination Reason","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'NotTerminated', '01': 'UserStopped', '02': 'WifiDisconnected', '03': 'CookModeInvalid', '04': 'Timeout', '05': 'CameraMissing', '06': 'AuthenticationFailed', '07': 'ProcessCheckFailed', '08': 'SabbathModeOn'}.get(value[:2], 'Unknown') }}"}
 {"i":"0600","n":"Supported Enhanced Features - Supported Feature Count","d":"sensor","ds":32,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"0600","n":"Supported Enhanced Features - padding","d":"sensor","ds":32,"vt":"{{ value[2:4] | int(base=16) }}","fi":"padding"}
 {"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[4:8] | int(base=16) }}","fi":"supported_digital_feature"}
 {"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[8:12] | int(base=16) }}","fi":"supported_digital_feature"}
 {"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[12:16] | int(base=16) }}","fi":"supported_digital_feature"}
