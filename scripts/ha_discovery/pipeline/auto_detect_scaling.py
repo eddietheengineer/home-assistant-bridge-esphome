@@ -340,11 +340,22 @@ def apply_detection(entries):
 
         total_checked += 1
 
-        # Always reset before re-detecting
+        # Reset unit_of_measurement before re-detecting (always overwrite).
+        # scaling_factor is only reset if we actually detect a new value.
         review['unit_of_measurement'] = None
-        review['scaling_factor'] = None
 
         unit, scale = detect_unit_and_scaling(field_name, entry.get('field_bits'))
+        if scale is None:
+            # Try field name as fallback: "CLC Temperature x 100"
+            m = re.search(r'x\s+(\d+)', field_name)
+            if m:
+                scale = int(m.group(1))
+        if scale is None:
+            # Try ERD description as fallback: "Kelvin x 32", "degrees F x 10"
+            desc = entry.get('erd_description', '')
+            m = re.search(r'x\s+(\d+)', desc)
+            if m:
+                scale = int(m.group(1))
         if unit is None and scale is None:
             continue
 

@@ -836,8 +836,8 @@
 {"i":"2113","n":"Auto Dose Option Allowable - Auto Detergent + Softener","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 1) % 2 else '00' }}","fi":"auto_detergent_softener","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"2113","n":"Auto Dose Option Allowable - Manual Detergent + Softener","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 2) % 2 else '00' }}","fi":"manual_detergent_softener","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"2115","n":"Active Intelligent Option Current","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"211b","n":"Signal Option Current","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"211c","n":"Signal Option Allowable","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"211b","n":"Signal Option Current","d":"binary_sensor","ds":1,"u":"dBm","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"211c","n":"Signal Option Allowable","d":"binary_sensor","ds":1,"u":"dBm","vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"211e","n":"Commercial Laundry Payment V1 Attribute Bitmap - FreeMode_NoAppInteraction","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 16) % 2 else '00' }}","fi":"freemode_noappinteraction","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"211e","n":"Commercial Laundry Payment V1 Attribute Bitmap - FreeMode_App","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 32) % 2 else '00' }}","fi":"freemode_app","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"211e","n":"Commercial Laundry Payment V1 Attribute Bitmap - Coin Box","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 64) % 2 else '00' }}","fi":"coin_box","pon":"01","poff":"00","son":"01","soff":"00"}
