@@ -369,60 +369,6 @@ async def to_code(config: dict[str, Any]) -> None:
             "polling_onlypublish_onchange is deprecated and will be removed in a future release. "
             "The component now always publishes only on change."
 )
-    # Generate required headers from appliance API documentation.
-    # erd_lists.h and appliance_api_feature_lists.h are always required.
-    # generate_erd_lists.py also calls generate_ha_discovery.py as a side effect.
-    component_dir = os.path.dirname(os.path.abspath(__file__))
-    repo_root = os.path.normpath(os.path.join(component_dir, "..", ".."))
-    scripts_dir = os.path.join(repo_root, "scripts")
-
-    # Resolve JSON file paths using the same multi-path search as load_appliance_types().
-    # This is critical for ESPHome external component builds where the repo is copied
-    # to a cache directory and git submodules are not initialized.
-    erd_defs_path = None
-    api_json_path = None
-    for location_name, json_path in _find_json_paths(component_dir):
-        if json_path.endswith("appliance_api_erd_definitions.json"):
-            erd_defs_path = json_path
-        elif json_path.endswith("appliance_api.json"):
-            api_json_path = json_path
-
-    cmd = [sys.executable, os.path.join(scripts_dir, "generate_erd_lists.py"),
-           "--component-dir", component_dir]
-    if erd_defs_path:
-        cmd.extend(["--erd-definitions", erd_defs_path])
-    if api_json_path:
-        cmd.extend(["--appliance-api", api_json_path])
-    if not config.get(CONF_FILTER_CONFIG_TOPICS, True):
-        cmd.append("--no-filter-config-topics")
-
-    try:
-        _LOGGER.info("Generating ERD lists and feature API lists...")
-        result = subprocess.run(
-            cmd,
-            cwd=repo_root,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        _LOGGER.info("ERD lists generated successfully")
-    except subprocess.CalledProcessError as e:
-        _LOGGER.error(
-            "ERD lists generation failed: %s. "
-            "Build will fail without erd_lists.h and appliance_api_feature_lists.h.",
-            e.stderr if e.stderr else str(e)
-        )
-        raise
-    except FileNotFoundError as e:
-        _LOGGER.error(
-            "ERD lists generation script not found: %s. "
-            "Build will fail without erd_lists.h and appliance_api_feature_lists.h.",
-            str(e)
-        )
-        raise
-
-    # HA discovery compression is now handled by generate_erd_lists.py
-    # (in-process, after JSONL generation). No separate step needed.
     await cg.register_component(var, config)
     # Ensure USE_ESP_IDF is defined for ESP-IDF builds so that
     # platform-specific code in our component compiles correctly.
