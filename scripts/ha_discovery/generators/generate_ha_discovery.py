@@ -244,8 +244,9 @@ def _clean_field_name(name: str) -> str:
     """
     # Keep trailing array index like [0], [1], etc. for uniqueness
     # (removed: name = re.sub(r'\s*\[\d+\]\s*$', '', name))
-    # Remove trailing parenthetical group like ' (hours)', ' (volts)'
+    # Remove parenthetical groups: either trailing, or before an array index
     result = re.sub(r'\s*\([^)]*\)\s*(?=\[\d+\])', '', name)
+    result = re.sub(r'\s*\([^)]*\)\s*$', '', result)
     return result.strip()
 
 
@@ -850,7 +851,8 @@ def _paired_field_vt(field: Dict, paired_erd_str: str, pair_role: str,
     if pair_role == 'request' and paired_erd_str and paired_erd_str in erd_by_id:
         paired = _find_paired_field(field, paired_erd_str, erd_by_id)
         if paired is not None:
-            return _byte_subfield_value_template(paired, scaling_factor)
+            p_scaling = int(paired.get('scaling_factor') or scaling_factor)
+            return _byte_subfield_value_template(paired, p_scaling)
     return _byte_subfield_value_template(field, scaling_factor)
 
 
@@ -950,12 +952,14 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
         erd_data = erd.get('data', [])
         data_size = get_erd_byte_size(erd_data) or 1
 
-        # Skip "Request" ERDs that lack a proper request/status pair.
+        # Skip request ERDs that are paired but lack a valid status counterpart.
         # Unpaired request ERDs exposed as sensors would allow uncontrolled
         # writes — only generate them when pair_role='request' with a
         # valid paired_erd pointing to a status ERD.
-        if 'Request' in name:
-            if not (pair_role == 'request' and paired_erd_str and paired_erd_str in erd_by_id):
+        # Standalone "Request" ERDs (e.g., "Water Filter Reset Request")
+        # that are not paired should be generated normally.
+        if pair_role == 'request':
+            if not (paired_erd_str and paired_erd_str in erd_by_id):
                 continue
 
         # Skip status ERD if its paired request ERD is a controllable domain
@@ -976,11 +980,15 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     processed_status.add(erd_id_int)
                     continue
 
-        # For domains that are always single-entity (select/button), force single.
-        # For number/switch, still check if there are multiple data fields that
-        # should be split into sub-entities (e.g. Clock Time with Hours/Minutes/Seconds).
+        # For domains that are always single-entity (select/button), force single
+        # ONLY if there's a single non-reserved field. If there are multiple fields
+        # with different per-field domains, use the natural classification instead.
         if ha_domain in ('select', 'button'):
-            classification = 'single'
+            nr_fields = _get_non_reserved_fields(erd_data)
+            if len(nr_fields) <= 1:
+                classification = 'single'
+            else:
+                classification = _classify_erd_data(erd_data)
         else:
             classification = _classify_erd_data(erd_data)
 
@@ -1296,7 +1304,7 @@ def generate_ha_discovery_jsonl_by_category(erds: List[Dict]) -> Dict[str, str]:
             domain = e['domain']
 
             # Skip select entities without options (broken in HA)
-            if domain == 'select' and not e['options_json']:
+            if domain == 'select' and (not e['options_json'] or e['options_json'] == '[]'):
                 continue
 
             # Skip number entities with zero range (mn == mx, invalid in HA)
