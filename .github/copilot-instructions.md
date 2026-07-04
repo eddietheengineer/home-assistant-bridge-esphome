@@ -17,4 +17,4 @@ OVERRIDES = {
 }
 ```
 
-After adding an override, run `python3 scripts/ha_discovery/run_pipeline.py --no-filter` and commit all generated files.
+After adding an override, run `python3 scripts/ha_discovery/run_pipeline.py` and commit all generated files.

@@ -1371,7 +1371,6 @@ def main():
         # Processed JSON is a flat list; group by erd_id to build ERD objects
         erds = _build_erds_from_flat_list(data)
     else:
-        erds = _build_erds_from_flat_list(data)
         json_file = find_erd_definitions_json()
         if json_file is not None:
             print(f"Reading ERD definitions from {json_file}", file=sys.stderr)
