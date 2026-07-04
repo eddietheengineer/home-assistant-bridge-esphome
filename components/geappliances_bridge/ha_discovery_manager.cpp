@@ -40,7 +40,12 @@ GEA_TAG(TAG) = "ha_discovery";
 /* Extract a JSON string value for the given key.
  * Returns a pointer to the first character of the value (after opening quote)
  * and sets *out_len to the length (not including closing quote).
- * Returns NULL if key not found or value is not a string. */
+ * Returns NULL if key not found or value is not a string.
+ *
+ * KNOWN LIMITATION: Key detection checks *(p-1) for {, ,, [ to distinguish
+ * keys from values. This works for our pipeline-generated JSONL (flat objects,
+ * no escaped quotes in keys) but could produce false positives with escaped
+ * quotes in nested values. Acceptable since input is pipeline-controlled. */
 static const char* json_get_str(const char* json, const char* key,
                                  const char** out_value, size_t* out_len)
 {
@@ -534,6 +539,8 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             self->total_filtered++;
             return false;
         }
+        /* Copy prefix first, then append suffix. */
+        memcpy(self->topic_buf, self->domain_topic_prefix, prefix_len);
         size_t remaining = sizeof(self->topic_buf) - prefix_len - 1; /* -1 for null */
         if (self->field_id_buf[0]) {
             snprintf(self->topic_buf + prefix_len, remaining, "%s_%s/config", erd_id_hex, self->field_id_buf);
@@ -546,7 +553,6 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             self->total_filtered++;
             return false;
         }
-        memcpy(self->topic_buf, self->domain_topic_prefix, prefix_len);
     }
 
     /* Build payload directly in shared buffer.

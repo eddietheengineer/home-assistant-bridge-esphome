@@ -311,10 +311,9 @@ void GeappliancesBridge::loop() {
        * zeroes the struct, it corrupts heap metadata and crashes the idle task. */
       ha_discovery_cleanup_destroy(&this->ha_discovery_manager_.cleanup);
 
-      // Feed the watchdog before blocking — the 500 ms delay exceeds the
-      // default TWDT timeout (30 ms) and would trigger a reset.
+      // Feed the watchdog before reboot — the delay was removed as it
+      // blocks the main loop and the reboot discards all state anyway.
       esp_task_wdt_reset();
-      vTaskDelay(pdMS_TO_TICKS(500));
       esphome::App.reboot();
     }
 #endif
@@ -373,14 +372,13 @@ void GeappliancesBridge::run_protocol_stack_()
   // so tiny_timer_group_run() fires both poll callbacks on every call.  By
   // disabling the inactive adapter, its poll() returns early without reading
   // bytes or publishing events to an interface that isn't being driven.
-  uint32_t loop_start = esphome::millis();
+  uint32_t loop_start_ms = esphome::millis();
   if (this->gea2_uart_ != nullptr && this->uart_ != nullptr) {
     esphome_uart_adapter_set_enabled(&this->uart_adapter_, !need_gea2_loop);
     esphome_uart_adapter_set_enabled(&this->gea2_uart_adapter_, need_gea2_loop);
   }
 
   if (need_gea2_loop) {
-    uint32_t loop_start_ms = millis();
     // Initialize gea2_last_ms_ on first entry so we don't replay accumulated
     // boot time as thousands of spurious msec interrupts.
     if (this->gea2_last_ms_ == 0) {
@@ -390,11 +388,11 @@ void GeappliancesBridge::run_protocol_stack_()
     // If the loop exceeds this, break to avoid starving the ESPHome
     // framework watchdog (which fires at 30 ms intervals).
     static constexpr uint32_t GEA2_LOOP_HARD_CAP_MS = GEA2_LOOP_DURATION_MS * 2;
-    while (millis() - loop_start_ms < GEA2_LOOP_DURATION_MS) {
+    while (esphome::millis() - loop_start_ms < GEA2_LOOP_DURATION_MS) {
       // Safety break: if we've exceeded the hard cap, exit immediately.
       // This can happen if millis() jumps (e.g., after deep sleep wake)
       // or if the interface_run call stalls unexpectedly.
-      if (millis() - loop_start_ms >= GEA2_LOOP_HARD_CAP_MS) {
+      if (esphome::millis() - loop_start_ms >= GEA2_LOOP_HARD_CAP_MS) {
         ESP_LOGW(TAG, "GEA2 tight loop exceeded hard cap (%u ms), breaking",
                  static_cast<unsigned>(GEA2_LOOP_HARD_CAP_MS));
         break;
@@ -467,7 +465,7 @@ void GeappliancesBridge::run_protocol_stack_()
       }
     }
   }
-  uint32_t loop_elapsed = esphome::millis() - loop_start;
+  uint32_t loop_elapsed = esphome::millis() - loop_start_ms;
   if (loop_elapsed >= 1000) {
     ESP_LOGW(TAG, "Long run_protocol_stack: %ums (mode=%s, polling=%s)",
              loop_elapsed, this->mode_ == BRIDGE_MODE_SUBSCRIBE ? "sub" : (this->mode_ == BRIDGE_MODE_AUTO ? "auto" : "poll"),
@@ -562,7 +560,7 @@ void GeappliancesBridge::dump_config() {
   ESP_LOGCONFIG(TAG, "  Client Address: 0x%02X", this->client_address_);
   ESP_LOGCONFIG(TAG, "  Host Address: 0x%02X", this->autodiscovery_manager_.get_host_address());
   if (this->uart_ != nullptr) {
-    ESP_LOGCONFIG(TAG, "  GEA3 UART: configured (baud %lu)", baud);
+    ESP_LOGCONFIG(TAG, "  GEA3 UART: configured (baud %lu)", GeappliancesBridge::baud);
   }
   if (this->gea2_uart_ != nullptr) {
     ESP_LOGCONFIG(TAG, "  GEA2 UART: configured (baud %u)", 19200u);

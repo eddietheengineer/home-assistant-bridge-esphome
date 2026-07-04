@@ -1171,8 +1171,9 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 b_p_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_s_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_s_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
+                f_scaling = int(field.get('scaling_factor') or scaling_factor)
                 collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
-                        '', scaling_factor, data_size, f_paired_id, f_pair_role,
+                        '', f_scaling, data_size, f_paired_id, f_pair_role,
                         vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
 
         elif classification == 'mixed':
@@ -1255,9 +1256,9 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 b_p_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_p_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_s_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
-                b_s_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
+                f_scaling = int(field.get('scaling_factor') or scaling_factor)
                 collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
-                        '', scaling_factor, data_size, f_paired_id, f_pair_role,
+                        '', f_scaling, data_size, f_paired_id, f_pair_role,
                         vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
 
         elif classification == 'version':
@@ -1475,7 +1476,7 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
                 field['device_class'] = field_review['device_class'] or ''
             if field_review.get('state_class'):
                 field['state_class'] = field_review['state_class']
-            if field_review.get('scaling_factor'):
+            if field_review.get('scaling_factor') is not None:
                 field['scaling_factor'] = field_review['scaling_factor']
             if field_review.get('unit_of_measurement'):
                 field['unit_of_measurement'] = field_review['unit_of_measurement']

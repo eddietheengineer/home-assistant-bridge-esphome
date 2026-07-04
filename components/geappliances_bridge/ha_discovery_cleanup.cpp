@@ -157,7 +157,8 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     if (payload_len == 0) return;
 
     /* Guard against oversized topics: if topic_len >= HA_CLEANUP_TOPIC_BUF_SIZE,
-     * the uint16_t cast of (topic_len + 1) could overflow to 0. */
+     * the topic won't fit in topic_buf. The uint16_t cast of (topic_len + 1)
+     * is also safe since HA_CLEANUP_TOPIC_BUF_SIZE (6144) < UINT16_MAX. */
     if (topic_len >= HA_CLEANUP_TOPIC_BUF_SIZE) {
         self->dropped_count++;
         return;
