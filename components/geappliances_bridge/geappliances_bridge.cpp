@@ -294,13 +294,21 @@ void GeappliancesBridge::loop() {
     ha_discovery_manager_run(&this->ha_discovery_manager_);
   }
 
-  /* If cleanup-only finished, restart the device so normal boot republishes. */
+  /* If cleanup-only finished, restart the device so normal discovery republishes. */
   if (this->discovery_refresh_in_progress_) {
 #ifdef USE_ESP_IDF
     ha_discovery_cleanup_run(&this->ha_discovery_manager_.cleanup);
     if (ha_discovery_cleanup_is_done(&this->ha_discovery_manager_.cleanup)) {
       this->discovery_refresh_in_progress_ = false;
       ESP_LOGI(TAG, "HA discovery cleanup complete, restarting device...");
+
+      /* Destroy the cleanup module before reboot to unsubscribe the wildcard
+       * topic and zero the callback arg. The ESP-IDF MQTT event queue may have
+       * dropped the unsubscribe ack (seen as 'Dropped N inbound MQTT events'),
+       * leaving the subscription active. If the callback fires after teardown
+       * zeroes the struct, it corrupts heap metadata and crashes the idle task. */
+      ha_discovery_cleanup_destroy(&this->ha_discovery_manager_.cleanup);
+
       // Allow final retained-clear publishes to transmit before reboot (fixes C5).
       vTaskDelay(pdMS_TO_TICKS(500));
       esphome::App.reboot();
