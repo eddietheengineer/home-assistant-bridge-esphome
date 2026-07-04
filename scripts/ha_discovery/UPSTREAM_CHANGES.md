@@ -44,7 +44,8 @@ These are read-only processed temperature values. Remove `write` from `erd_opera
 ## Remove `write` from Actual Setpoint Temperature
 
 This is a read-only reported value. Remove `write` from `erd_operations` for:
-
 | ERD  | Name                      |
 |------|---------------------------|
 | 0x4026 | Actual Setpoint Temperature |
+| 0x7907 | Position of Expansion valve EEV0 |
+| 0x7938 | Compressor speed target |
