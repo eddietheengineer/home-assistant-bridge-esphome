@@ -2169,7 +2169,7 @@
 {"i":"5b10","n":"Boost Duration Limits - Maximum Boost Duration","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"maximum_boost_duration"}
 {"i":"5b11","n":"Delay Off Duration Limits - Min Delay Off Duration","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"5b11","n":"Delay Off Duration Limits - Max Delay Off Duration","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"max_delay_off_duration"}
-{"i":"5b13","n":"Hood Actual Fan Speed","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"5b13","n":"Hood Actual Fan Speed","d":"sensor","ds":1,"u":"rpm","vt":"{{ value | int(base=16) }}"}
 {"i":"5b17","n":"Hood Actual Light Level","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b1a","n":"Hood Actual Delay Off Mode","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Disabled', '01': 'Enabled', 'ff': 'Not Available'}.get(value[:2], 'Unknown') }}"}
 {"i":"5b1c","n":"Hood Actual Delay Off Duration","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
