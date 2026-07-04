@@ -57,10 +57,10 @@
 {"i":"5022","n":"Mis-use Push Notifications - Probe Installed During Broil Cavity 2","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[0:12] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"probe_installed_during_broil_cavity_2","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5022","n":"Mis-use Push Notifications - Door Open During Bake Cavity 2","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[0:12] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"door_open_during_bake_cavity_2","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5022","n":"Mis-use Push Notifications - Door Open During Bake and Elements Deactivated Cavity 2","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[0:12] | int(base=16)) // 67108864) % 2 else '00' }}","fi":"door_open_during_bake_and_elements_deactivated_cavity_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5023","n":"Accent Lighting - Custom Color Active","d":"switch","ds":12,"p":"5024","r":"request","vt":"{{ value[0:2] }}"}
-{"i":"5023","n":"Accent Lighting - Brightness","d":"switch","ds":12,"p":"5024","r":"request","vt":"{{ value[2:4] }}","fi":"brightness"}
-{"i":"5023","n":"Accent Lighting - Temperature","d":"switch","ds":12,"p":"5024","r":"request","vt":"{{ value[4:8] }}","fi":"temperature"}
-{"i":"5023","n":"Accent Lighting - Custom Color Code","d":"switch","ds":12,"p":"5024","r":"request","vt":"{{ value[8:16] }}","fi":"custom_color_code"}
+{"i":"5023","n":"Accent Lighting - Custom Color Active","d":"switch","ds":12,"p":"5024","r":"request","vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"5023","n":"Accent Lighting - Brightness","d":"switch","ds":12,"p":"5024","r":"request","vt":"{{ value[2:4] }}","fi":"brightness","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"5023","n":"Accent Lighting - Temperature","d":"switch","ds":12,"p":"5024","r":"request","vt":"{{ value[4:8] }}","fi":"temperature","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"5023","n":"Accent Lighting - Custom Color Code","d":"switch","ds":12,"p":"5024","r":"request","vt":"{{ value[8:16] }}","fi":"custom_color_code","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5025","n":"Accent Lighting Supported Settings - Brightness Min","d":"sensor","ds":16,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"5025","n":"Accent Lighting Supported Settings - Brightness Max","d":"sensor","ds":16,"vt":"{{ value[2:4] | int(base=16) }}","fi":"brightness_max"}
 {"i":"5025","n":"Accent Lighting Supported Settings - Color Temperature Min","d":"sensor","ds":16,"vt":"{{ value[4:8] | int(base=16) }}","fi":"color_temperature_min"}
@@ -82,7 +82,7 @@
 {"i":"5060","n":"AI Bake Oven Status - Oven AI Bake State","d":"sensor","ds":20,"dc":"enum","vt":"{{ {'00': 'Initializing', '01': 'Session ID Confirmation', '02': 'Camera On', '03': 'Doneness Selected', '04': 'Food Misidentified', '05': 'Baking', '06': 'Bake Complete', '07': 'User Feedback Pending', '08': 'User Feedback', 'fe': 'Fault', 'ff': 'Inactive'}.get(value[8:10], 'Unknown') }}","fi":"oven_ai_bake_state"}
 {"i":"5060","n":"AI Bake Oven Status - Doneness Level Selected","d":"sensor","ds":20,"dc":"enum","vt":"{{ {'01': 'Light', '02': 'Medium', '03': 'Dark', '04': 'Roasted', '05': 'Toasted', 'fe': 'Cloud Selected', 'ff': 'Invalid'}.get(value[10:12], 'Unknown') }}","fi":"doneness_level_selected"}
 {"i":"5060","n":"AI Bake Oven Status - User Satisfaction Selected","d":"sensor","ds":20,"dc":"enum","vt":"{{ {'00': 'Skipped', '01': 'Level 1', '02': 'Level 2', '03': 'Level 3', '04': 'Level 4', '05': 'Level 5', '06': 'Level 6', '07': 'Level 7', '08': 'Level 8', '09': 'Level 9', '0a': 'Level 10', 'ff': 'Invalid'}.get(value[12:14], 'Unknown') }}","fi":"user_satisfaction_selected"}
-{"i":"5061","n":"AI Bake Cloud Status","d":"number","ds":80,"mn":0.0,"mx":0.0,"st":1.0,"vt":"{{ value[0:8] | int(base=16) }}"}
+{"i":"5061","n":"AI Bake Cloud Status","d":"number","ds":80,"mn":0.0,"mx":0.0,"st":1.0,"vt":"{{ value[0:8] | int(base=16) }}","m":"box"}
 {"i":"5061","n":"AI Bake Cloud Status - Invalid","d":"binary_sensor","ds":80,"vt":"{{ '01' if ((value[80:84] | int(base=16)) // 1) % 2 else '00' }}","fi":"invalid","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5061","n":"AI Bake Cloud Status - Light Supported","d":"binary_sensor","ds":80,"vt":"{{ '01' if ((value[80:84] | int(base=16)) // 2) % 2 else '00' }}","fi":"light_supported","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5061","n":"AI Bake Cloud Status - Medium Supported","d":"binary_sensor","ds":80,"vt":"{{ '01' if ((value[80:84] | int(base=16)) // 4) % 2 else '00' }}","fi":"medium_supported","pon":"01","poff":"00","son":"01","soff":"00"}

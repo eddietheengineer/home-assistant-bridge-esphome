@@ -234,9 +234,9 @@
 {"i":"905b","n":"Coffee Brewer Supported Features - Grind Time Delta Supported","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 2) % 2 else '00' }}","fi":"grind_time_delta_supported","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"905b","n":"Coffee Brewer Supported Features - Favorites Supported","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 4) % 2 else '00' }}","fi":"favorites_supported","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"905c","n":"Coffee Maker Model","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Invalid', '01': 'Grind and Brew', '02': 'Drip Coffee', '03': 'Drip Coffee Refresh'}.get(value[:2], 'Unknown') }}"}
-{"i":"905e","n":"Delay Start - Delay Start Enabled","d":"switch","ds":3,"p":"905d","r":"request","vt":"{{ value[0:2] }}"}
-{"i":"905e","n":"Delay Start - Hours: Time of Day","d":"switch","ds":3,"p":"905d","r":"request","vt":"{{ value[2:4] }}","fi":"hours_time_of_day"}
-{"i":"905e","n":"Delay Start - Minutes: Time of Day","d":"switch","ds":3,"p":"905d","r":"request","vt":"{{ value[4:6] }}","fi":"minutes_time_of_day"}
+{"i":"905e","n":"Delay Start - Delay Start Enabled","d":"switch","ds":3,"p":"905d","r":"request","vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"905e","n":"Delay Start - Hours: Time of Day","d":"switch","ds":3,"p":"905d","r":"request","vt":"{{ value[2:4] }}","fi":"hours_time_of_day","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"905e","n":"Delay Start - Minutes: Time of Day","d":"switch","ds":3,"p":"905d","r":"request","vt":"{{ value[4:6] }}","fi":"minutes_time_of_day","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"905f","n":"Coffee Brewer Supported Features v1 - Display Numeric Strength","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"display_numeric_strength","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"905f","n":"Coffee Brewer Supported Features v1 - Temperature Edit Supported","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 512) % 2 else '00' }}","fi":"temperature_edit_supported","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"905f","n":"Coffee Brewer Supported Features v1 - Volume Edit Supported","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 1024) % 2 else '00' }}","fi":"volume_edit_supported","pon":"01","poff":"00","son":"01","soff":"00"}

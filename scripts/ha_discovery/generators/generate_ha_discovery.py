@@ -1062,7 +1062,11 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                         vt = _paired_field_vt(field, paired_erd_str, pair_role, erd_by_id, scaling_factor)
                 collect(erd_id_int, entity_name, ha_domain, f_unit, f_dev_cls,
                         f_state_cls, scaling_factor, data_size, paired_erd_id,
-                        pair_role, vt, '', '', fid, '', '', '', '', '')
+                        pair_role, vt, '', '', fid, '',
+                        '01' if ha_domain == 'switch' else '',
+                        '00' if ha_domain == 'switch' else '',
+                        '01' if ha_domain == 'switch' else '',
+                        '00' if ha_domain == 'switch' else '')
 
         elif classification == 'bitfield':
             for field in _get_non_reserved_fields(erd_data):
@@ -1099,7 +1103,12 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                         p_vt = _paired_field_vt(primary, paired_erd_str, pair_role, erd_by_id, scaling_factor)
                 collect(erd_id_int, display_name, ha_domain, unit, p_dev_cls,
                         state_class, scaling_factor, data_size, paired_erd_id,
-                        pair_role, p_vt, '', '', '', '', '', '', '', '')
+                        pair_role, p_vt, '', '', '',
+                        'box' if ha_domain == 'number' else '',
+                        '01' if ha_domain == 'switch' else '',
+                        '00' if ha_domain == 'switch' else '',
+                        '01' if ha_domain == 'switch' else '',
+                        '00' if ha_domain == 'switch' else '')
 
             for field in [d for d in erd_data
                           if _has_bits(d) and not _is_reserved_field(d.get('name', ''))]:
