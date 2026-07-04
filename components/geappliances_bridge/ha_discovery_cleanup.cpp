@@ -352,7 +352,7 @@ void ha_discovery_cleanup_destroy(ha_discovery_cleanup_t* self)
     self->get_time_ms = NULL;
 
     if (self->subscribed && self->mqtt_client != NULL) {
-        mqtt_client_t* client = self->mqtt_client;
+        i_mqtt_client_t* client = self->mqtt_client;
         self->mqtt_client = NULL;
         char sub_topic[128];
         snprintf(sub_topic, sizeof(sub_topic),
