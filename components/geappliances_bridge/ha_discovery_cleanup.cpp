@@ -64,6 +64,9 @@ GEA_TAG(TAG) = "ha_cleanup";
  * remaining in the queue (0 means all flushed). */
 CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
 {
+    /* Guard against NULL mqtt_client (e.g., called after destroy). */
+    if (self->mqtt_client == NULL) return self->queue_count;
+
     /* topic[] is 256 bytes. Topics from the wildcard subscription are bounded
      * by HA_CLEANUP_TOPIC_BUF_SIZE entries in topic_buf. Each topic is at most
      * ~200 bytes (homeassistant/{domain}/{device_id}/{entity_id}/config).
@@ -83,6 +86,23 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
      * pointer into the buffer. */
     strncpy(topic, self->topic_buf, sizeof(topic) - 1);
     topic[sizeof(topic) - 1] = '\0';
+
+    /* Detect truncation: if the topic was longer than our stack buffer,
+     * skip it to avoid publishing to a malformed topic. */
+    if (strlen(topic) != strlen(self->topic_buf)) {
+        ESP_LOGW(TAG, "Topic truncated during flush, skipping");
+        consumed = (uint16_t)(strlen(self->topic_buf) + 1);
+        if (consumed > self->queue_write_pos) {
+            consumed = self->queue_write_pos;
+        }
+        memmove(self->topic_buf, self->topic_buf + consumed,
+                self->queue_write_pos - consumed);
+        self->queue_write_pos -= consumed;
+        self->queue_count--;
+        remaining = self->queue_count;
+        vPortExitCritical();
+        return remaining;
+    }
     consumed = (uint16_t)(strlen(self->topic_buf) + 1);
 
     /* Safety clamp: prevent underflow if buffer is corrupted. */
