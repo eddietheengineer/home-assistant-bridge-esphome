@@ -505858,8 +505858,8 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
-      "scaling_factor": null,
+      "unit_of_measurement": "%",
+      "scaling_factor": 100,
       "state_class": null,
       "paired_erd": null,
       "pair_role": null,
@@ -505903,8 +505903,8 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
-      "scaling_factor": null,
+      "unit_of_measurement": "%",
+      "scaling_factor": 100,
       "state_class": null,
       "paired_erd": null,
       "pair_role": null,
