@@ -980,17 +980,9 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     processed_status.add(erd_id_int)
                     continue
 
-        # For domains that are always single-entity (select/button), force single
-        # ONLY if there's a single non-reserved field. If there are multiple fields
-        # with different per-field domains, use the natural classification instead.
-        if ha_domain in ('select', 'button'):
-            nr_fields = _get_non_reserved_fields(erd_data)
-            if len(nr_fields) <= 1:
-                classification = 'single'
-            else:
-                classification = _classify_erd_data(erd_data)
-        else:
-            classification = _classify_erd_data(erd_data)
+        # Classification is purely data-driven: look at the actual fields
+        # and decide based on their structure, not ERD-level hints.
+        classification = _classify_erd_data(erd_data)
 
         if classification == 'single':
             vt, ct, opts = '', '', ''
