@@ -1430,7 +1430,7 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
     for erd_id, entries in groups.items():
         # Use the first entry to get ERD-level metadata
         first = entries[0]
-        review = first.get('review', {})
+        review = first.get('review') or {}
 
         # Build data array from field-level info
         data_fields = []
@@ -1446,7 +1446,7 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
             if entry.get('field_bits'):
                 field['bits'] = entry['field_bits']
             # Store per-field review metadata for mixed-pairing ERDs
-            field_review = entry.get('review', {})
+            field_review = entry.get('review') or {}
             if field_review.get('paired_erd'):
                 field['paired_erd'] = field_review['paired_erd']
             if field_review.get('pair_role'):
