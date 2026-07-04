@@ -64,7 +64,7 @@ GEA_TAG(TAG) = "ha_cleanup";
  * remaining in the queue (0 means all flushed). */
 CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
 {
-    /* Guard against NULL mqtt_client (e.g., called after destroy). */
+    if (self == NULL) return 0;
     if (self->mqtt_client == NULL) return self->queue_count;
 
     /* topic[] is 256 bytes. Topics from the wildcard subscription are bounded
@@ -231,6 +231,7 @@ void ha_discovery_cleanup_start(ha_discovery_cleanup_t* self)
 
 void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
 {
+    if (self == NULL) return;
     if (self->mqtt_client == NULL) {
         /* No MQTT client — skip cleanup, mark done. */
         self->state = ha_cleanup_state_done;
@@ -361,34 +362,37 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
 
 void ha_discovery_cleanup_destroy(ha_discovery_cleanup_t* self)
 {
-    if (self->device_id == NULL) {
-        memset(self, 0, sizeof(*self));
-        return;
-    }
+    if (self == NULL) return;
 
-    /* Null get_time_ms before unsubscribe to guard against the callback
-     * firing after the unsubscribe ack is dropped (use-after-free variant).
-     * The callback checks get_time_ms == NULL and returns early. */
+    /* Null get_time_ms first to poison the callback, preventing it from
+     * firing on a partially-destroyed struct. */
     self->get_time_ms = NULL;
 
+    /* Unsubscribe if we ever subscribed, regardless of whether device_id
+     * is set. device_id == NULL only means "never configured", but a
+     * double-destroy could have already zeroed it. */
     if (self->subscribed && self->mqtt_client != NULL) {
         i_mqtt_client_t* client = self->mqtt_client;
         self->mqtt_client = NULL;
-        char sub_topic[128];
-        snprintf(sub_topic, sizeof(sub_topic),
-            "homeassistant/+/%s/#", self->device_id);
-        mqtt_client_unsubscribe(client, sub_topic);
+        if (self->device_id != NULL) {
+            char sub_topic[128];
+            snprintf(sub_topic, sizeof(sub_topic),
+                "homeassistant/+/%s/#", self->device_id);
+            mqtt_client_unsubscribe(client, sub_topic);
+        }
         self->subscribed = false;
     }
     memset(self, 0, sizeof(*self));
 }
 ha_cleanup_state_t ha_discovery_cleanup_get_state(ha_discovery_cleanup_t* self)
 {
+    if (self == NULL) return ha_cleanup_state_done;
     return self->state;
 }
 
 bool ha_discovery_cleanup_is_done(ha_discovery_cleanup_t* self)
 {
+    if (self == NULL) return true;
     return self->state == ha_cleanup_state_done;
 }
 
