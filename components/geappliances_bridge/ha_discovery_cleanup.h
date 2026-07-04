@@ -40,7 +40,7 @@ typedef enum {
 #ifdef HA_CLEANUP_TEST_BUF_SIZE
   #define HA_CLEANUP_TOPIC_BUF_SIZE HA_CLEANUP_TEST_BUF_SIZE
 #else
-  #define HA_CLEANUP_TOPIC_BUF_SIZE 16384
+  #define HA_CLEANUP_TOPIC_BUF_SIZE 6144
 #endif
 
 /* Context */
