@@ -19,3 +19,14 @@ These ERDs list `write` in `erd_operations` but are only writable when Sensor Lo
 | 0x7132 | Inside target fan speed          |
 | 0x7133 | Outside target fan speed         |
 | 0x7601 | Inverter Actual Speed RPM        |
+
+## Remove `write` from EEV Position ERDs
+
+These ERDs are read-only status values reported by the appliance. They should not be writeable. Remove `write` from `erd_operations` for:
+
+| ERD  | Name                    |
+|------|-------------------------|
+| 0x7512 | EEV1 Desired Position  |
+| 0x7513 | EEV2 Desired Position  |
+| 0x7514 | EEV1 Actual Position   |
+| 0x7515 | EEV2 Actual Position   |

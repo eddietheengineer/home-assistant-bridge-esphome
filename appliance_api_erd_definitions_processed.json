@@ -513076,7 +513076,7 @@
     "field_values": null,
     "field_bits": null,
     "review": {
-      "ha_domain": "number",
+      "ha_domain": "sensor",
       "device_class": null,
       "unit_of_measurement": null,
       "scaling_factor": null,
@@ -513122,7 +513122,7 @@
     "field_values": null,
     "field_bits": null,
     "review": {
-      "ha_domain": "number",
+      "ha_domain": "sensor",
       "device_class": null,
       "unit_of_measurement": null,
       "scaling_factor": null,
@@ -513167,7 +513167,7 @@
     "field_values": null,
     "field_bits": null,
     "review": {
-      "ha_domain": "number",
+      "ha_domain": "sensor",
       "device_class": null,
       "unit_of_measurement": null,
       "scaling_factor": null,
@@ -513212,7 +513212,7 @@
     "field_values": null,
     "field_bits": null,
     "review": {
-      "ha_domain": "number",
+      "ha_domain": "sensor",
       "device_class": null,
       "unit_of_measurement": null,
       "scaling_factor": null,

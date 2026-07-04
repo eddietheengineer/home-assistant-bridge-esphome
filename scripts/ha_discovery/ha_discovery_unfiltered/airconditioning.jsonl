@@ -122,10 +122,10 @@
 {"i":"7507","n":"External Thermostat fault state","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'No fault', '01': 'Fault'}.get(value[:2], 'Unknown') }}"}
 {"i":"750b","n":"Make-up Air fan 1 actual speed","d":"sensor","ds":2,"u":"rpm","vt":"{{ value | int(base=16) }}"}
 {"i":"7511","n":"EEV Control Type","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Idle', '01': 'Linear Control', '02': 'Constant Control', '03': 'PI Control', '04': 'High-gain PI Control'}.get(value[:2], 'Unknown') }}"}
-{"i":"7512","n":"EEV1 Desired Position","d":"number","ds":2,"mn":-32768.0,"mx":32767.0,"st":1.0,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}","ct":"{{ '%04x' % ((value | int) % 65536) }}","m":"box"}
-{"i":"7513","n":"EEV2 Desired Position","d":"number","ds":2,"mn":-32768.0,"mx":32767.0,"st":1.0,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}","ct":"{{ '%04x' % ((value | int) % 65536) }}","m":"box"}
-{"i":"7514","n":"EEV1 Actual Position","d":"number","ds":2,"mn":0.0,"mx":65535.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}","m":"box"}
-{"i":"7515","n":"EEV2 Actual Position","d":"number","ds":2,"mn":0.0,"mx":65535.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}","m":"box"}
+{"i":"7512","n":"EEV1 Desired Position","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
+{"i":"7513","n":"EEV2 Desired Position","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
+{"i":"7514","n":"EEV1 Actual Position","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"7515","n":"EEV2 Actual Position","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"7516","n":"Target Superheat Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"7517","n":"Current Superheat Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"7518","n":"EEV Linear Controller Desired Position","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
