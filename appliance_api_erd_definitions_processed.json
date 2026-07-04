@@ -620972,7 +620972,7 @@
       "ha_domain": "sensor",
       "device_class": "energy",
       "unit_of_measurement": "kWh",
-      "scaling_factor": null,
+      "scaling_factor": 1000,
       "state_class": "total",
       "paired_erd": null,
       "pair_role": null,

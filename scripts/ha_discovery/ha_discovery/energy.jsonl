@@ -168,7 +168,7 @@
 {"i":"d02b","n":"Electrical Pricing Time of Use Schedule Hash Status - Season 4 - Electrical Pricing Time of Use Schedule Sha256","d":"sensor","ds":32,"vt":"{{ value[58:60] | int(base=16) }}","fi":"electrical_pricing_time_of_use_schedule_sha256"}
 {"i":"d02b","n":"Electrical Pricing Time of Use Schedule Hash Status - Season 4 - Electrical Pricing Time of Use Schedule Sha256","d":"sensor","ds":32,"vt":"{{ value[60:62] | int(base=16) }}","fi":"electrical_pricing_time_of_use_schedule_sha256"}
 {"i":"d02b","n":"Electrical Pricing Time of Use Schedule Hash Status - Season 4 - Electrical Pricing Time of Use Schedule Sha256","d":"sensor","ds":32,"vt":"{{ value[62:64] | int(base=16) }}","fi":"electrical_pricing_time_of_use_schedule_sha256"}
-{"i":"d030","n":"Appliance Cumulative Energy","d":"sensor","ds":4,"u":"kWh","dc":"energy","sc":"total","vt":"{{ value | int(base=16) }}"}
+{"i":"d030","n":"Appliance Cumulative Energy","d":"sensor","ds":4,"u":"kWh","dc":"energy","sc":"total","sf":1000,"vt":"{{ (value | int(base=16)) / 1000 | round(3) }}"}
 {"i":"d203","n":"End of cycle (Tub 1)","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"d204","n":"Cycle Time Remaining Tub 1","d":"sensor","ds":2,"u":"min","vt":"{{ value | int(base=16) }}"}
 {"i":"d205","n":"DSM Power Usage Tub 1 - Instantaneous Power","d":"sensor","ds":11,"dc":"power","sc":"measurement","vt":"{{ value[0:4] | int(base=16) }}"}
