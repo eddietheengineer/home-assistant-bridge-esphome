@@ -379,6 +379,7 @@ static const char* FILTER_KEYWORDS[] = {
  * so the 256-byte buffer always has headroom. Long-term: replace with a
  * case-insensitive strstr variant to eliminate the stack allocation. */
 static bool should_filter_config_topic(const char* name)
+{
     /* Convert name to lowercase for comparison. */
     char lower[256];
     size_t i, name_len = strlen(name);
