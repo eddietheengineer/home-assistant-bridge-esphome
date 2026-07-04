@@ -245,7 +245,7 @@ def _clean_field_name(name: str) -> str:
     # Keep trailing array index like [0], [1], etc. for uniqueness
     # (removed: name = re.sub(r'\s*\[\d+\]\s*$', '', name))
     # Remove trailing parenthetical group like ' (hours)', ' (volts)'
-    result = re.sub(r'\s*\([^)]*\)\s*$', '', name)
+    result = re.sub(r'\s*\([^)]*\)\s*(?=\[\d+\])', '', name)
     return result.strip()
 
 
@@ -1101,12 +1101,14 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     if f_ha_domain == 'switch':
                         vt = _paired_switch_vt(field, f_paired_erd, f_pair_role, erd_by_id)
                     else:
-                        vt = _paired_field_vt(field, f_paired_erd, f_pair_role, erd_by_id, scaling_factor)
+                        f_scaling = int(field.get('scaling_factor') or scaling_factor)
+                        vt = _paired_field_vt(field, f_paired_erd, f_pair_role, erd_by_id, f_scaling)
                     opts, ct = '', ''
                 # Compute min/max/step for number sub-fields
                 f_min, f_max, f_step = 0.0, 0.0, 1.0
                 if f_ha_domain == 'number':
-                    f_min, f_max, f_step = _compute_number_range(f_type, scaling_factor)
+                    f_scaling = int(field.get('scaling_factor') or scaling_factor)
+                    f_min, f_max, f_step = _compute_number_range(f_type, f_scaling)
                 collect(erd_id_int, entity_name, f_ha_domain, f_unit, f_dev_cls,
                         f_state_cls, scaling_factor, data_size, f_paired_id,
                         f_pair_role, vt, ct, opts, fid, '',
@@ -1177,11 +1179,13 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                         if p_ha_domain == 'switch':
                             p_vt = _paired_switch_vt(primary, p_paired_erd, p_pair_role, erd_by_id)
                         else:
-                            p_vt = _paired_field_vt(primary, p_paired_erd, p_pair_role, erd_by_id, scaling_factor)
+                            p_scaling = int(primary.get('scaling_factor') or scaling_factor)
+                            p_vt = _paired_field_vt(primary, p_paired_erd, p_pair_role, erd_by_id, p_scaling)
                     # Compute min/max/step for number primary fields
                     p_min, p_max, p_step = 0.0, 0.0, 1.0
                     if p_ha_domain == 'number':
-                        p_min, p_max, p_step = _compute_number_range(p_type, scaling_factor)
+                        p_scaling = int(primary.get('scaling_factor') or scaling_factor)
+                        p_min, p_max, p_step = _compute_number_range(p_type, p_scaling)
                     collect(erd_id_int, display_name, p_ha_domain, unit, p_dev_cls,
                             primary.get('state_class') or state_class, scaling_factor, data_size, p_paired_id,
                             p_pair_role, p_vt, '', '', '',
@@ -1432,6 +1436,10 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
                 field['device_class'] = field_review['device_class'] or ''
             if field_review.get('state_class'):
                 field['state_class'] = field_review['state_class']
+            if 'scaling_factor' in field_review:
+                field['scaling_factor'] = field_review['scaling_factor']
+            if field_review.get('unit_of_measurement'):
+                field['unit_of_measurement'] = field_review['unit_of_measurement']
             data_fields.append(field)
 
         erd = {
