@@ -1092,13 +1092,18 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                         vt = _paired_switch_vt(field, f_paired_erd, f_pair_role, erd_by_id)
                     else:
                         vt = _paired_field_vt(field, f_paired_erd, f_pair_role, erd_by_id, scaling_factor)
+                # Compute min/max/step for number sub-fields
+                f_min, f_max, f_step = 0.0, 0.0, 1.0
+                if f_ha_domain == 'number':
+                    f_min, f_max, f_step = _compute_number_range(f_type, scaling_factor)
                 collect(erd_id_int, entity_name, f_ha_domain, f_unit, f_dev_cls,
                         f_state_cls, scaling_factor, data_size, f_paired_id,
                         f_pair_role, vt, '', '', fid, '',
                         '01' if f_ha_domain == 'switch' else '',
                         '00' if f_ha_domain == 'switch' else '',
                         '01' if f_ha_domain == 'switch' else '',
-                        '00' if f_ha_domain == 'switch' else '')
+                        '00' if f_ha_domain == 'switch' else '',
+                        f_min, f_max, f_step)
 
         elif classification == 'bitfield':
             for field in _get_non_reserved_fields(erd_data):
@@ -1149,6 +1154,10 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                         p_vt = _paired_switch_vt(primary, p_paired_erd, p_pair_role, erd_by_id)
                     else:
                         p_vt = _paired_field_vt(primary, p_paired_erd, p_pair_role, erd_by_id, scaling_factor)
+                # Compute min/max/step for number primary fields
+                p_min, p_max, p_step = 0.0, 0.0, 1.0
+                if p_ha_domain == 'number':
+                    p_min, p_max, p_step = _compute_number_range(p_type, scaling_factor)
                 collect(erd_id_int, display_name, p_ha_domain, unit, p_dev_cls,
                         primary.get('state_class') or state_class, scaling_factor, data_size, p_paired_id,
                         p_pair_role, p_vt, '', '', '',
@@ -1156,7 +1165,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                         '01' if p_ha_domain == 'switch' else '',
                         '00' if p_ha_domain == 'switch' else '',
                         '01' if p_ha_domain == 'switch' else '',
-                        '00' if p_ha_domain == 'switch' else '')
+                        '00' if p_ha_domain == 'switch' else '',
+                        p_min, p_max, p_step)
 
             for field in [d for d in erd_data
                           if _has_bits(d) and not _is_reserved_field(d.get('name', ''))]:
