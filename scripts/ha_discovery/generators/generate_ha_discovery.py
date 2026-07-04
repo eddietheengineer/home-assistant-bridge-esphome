@@ -41,7 +41,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 # Valid HA device_class values per domain. Invalid combos are silently dropped.
 VALID_DEVICE_CLASSES = {
-    'button': {'restart'},
+    'button': {'identify', 'restart', 'update'},
     'switch': {'outlet', 'switch'},
     'binary_sensor': {
         'battery', 'battery_charging', 'carbon_monoxide', 'cold',
@@ -69,6 +69,24 @@ VALID_DEVICE_CLASSES = {
         'volume_storage', 'volume_flow_rate', 'water', 'weight',
         'wind_direction', 'wind_speed',
     },
+    'number': {
+        'absolute_humidity', 'apparent_power', 'aqi', 'area',
+        'atmospheric_pressure', 'battery', 'blood_glucose_concentration',
+        'carbon_monoxide', 'carbon_dioxide', 'conductivity', 'current',
+        'data_rate', 'data_size', 'distance', 'duration',
+        'energy', 'energy_distance', 'energy_storage', 'frequency',
+        'gas', 'humidity', 'illuminance', 'irradiance', 'moisture',
+        'monetary', 'nitrogen_dioxide', 'nitrogen_monoxide',
+        'nitrous_oxide', 'ozone', 'ph', 'pm1', 'pm10', 'pm25', 'pm4',
+        'power', 'power_factor', 'precipitation', 'precipitation_intensity',
+        'pressure', 'reactive_energy', 'reactive_power', 'signal_strength',
+        'sound_pressure', 'speed', 'sulphur_dioxide', 'temperature',
+        'temperature_delta', 'volatile_organic_compounds',
+        'volatile_organic_compounds_parts', 'voltage', 'volume',
+        'volume_storage', 'volume_flow_rate', 'water', 'weight',
+        'wind_direction', 'wind_speed',
+    },
+    'select': set(),
 }
 
 def _is_valid_device_class(domain: str, device_class: str) -> bool:
@@ -1067,7 +1085,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 f_ha_domain = field.get('ha_domain') or ha_domain
                 if f_ha_domain == 'binary_sensor' and f_type == 'enum':
                     f_dev_cls = ''
-                    vt = _compute_binary_sensor_value_template(data_size)
+                    field_size = field.get('size', 1)
+                    vt = _compute_binary_sensor_value_template(field_size)
                 else:
                     if f_ha_domain == 'switch':
                         vt = _paired_switch_vt(field, f_paired_erd, f_pair_role, erd_by_id)
@@ -1123,7 +1142,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 if p_ha_domain == 'binary_sensor' and p_type == 'enum':
                     # binary_sensor can't display enum labels; use ON/OFF
                     p_dev_cls = ''
-                    p_vt = _compute_binary_sensor_value_template(data_size)
+                    p_field_size = primary.get('size', 1)
+                    p_vt = _compute_binary_sensor_value_template(p_field_size)
                 else:
                     if p_ha_domain == 'switch':
                         p_vt = _paired_switch_vt(primary, p_paired_erd, p_pair_role, erd_by_id)
@@ -1209,12 +1229,23 @@ def generate_ha_discovery_jsonl_by_category(erds: List[Dict]) -> Dict[str, str]:
     entries = _collect_ha_discovery_entries(erds)
 
     categorized: Dict[str, list] = {cat: [] for cat in CATEGORIES}
+    uncategorized = []
     for entry in entries:
         eid = entry['erd_id']
+        matched = False
         for cat, (lo, hi) in CATEGORIES.items():
             if lo <= eid <= hi:
                 categorized[cat].append(entry)
+                matched = True
                 break
+        if not matched:
+            uncategorized.append(entry)
+
+    if uncategorized:
+        ids = [f"0x{e['erd_id']:04x}" for e in uncategorized]
+        print(f"WARNING: {len(uncategorized)} ERD(s) in undefined category gaps: "
+              f"{', '.join(ids[:20])}{'...' if len(ids) > 20 else ''}",
+              file=sys.stderr)
 
     result: Dict[str, str] = {}
     for cat in CATEGORIES:
@@ -1223,21 +1254,32 @@ def generate_ha_discovery_jsonl_by_category(erds: List[Dict]) -> Dict[str, str]:
             continue
         lines = []
         for e in cat_entries:
+            # --- entity validation ---
+            domain = e['domain']
+
+            # Skip select entities without options (broken in HA)
+            if domain == 'select' and not e['options_json']:
+                continue
+
+            # Skip number entities with zero range (mn == mx, invalid in HA)
+            if domain == 'number' and e.get('min_val') == e.get('max_val'):
+                continue
+
             obj: Dict[str, Any] = {
                 'i': f'{e["erd_id"]:04x}',
                 'n': e['name'],
-                'd': e['domain'],
+                'd': domain,
                 'ds': e['data_size'],
             }
             # Omit fields that equal their defaults to save space
             if e['unit']:                         obj['u']  = e['unit']
-            if e['device_class'] and _is_valid_device_class(e['domain'], e['device_class']):
+            if e['device_class'] and _is_valid_device_class(domain, e['device_class']):
                 obj['dc'] = e['device_class']
             if e['state_class']:                  obj['sc'] = e['state_class']
             if e['scaling_factor'] != 1:          obj['sf'] = e['scaling_factor']
-            if e['domain'] == 'number' and e.get('min_val') is not None:      obj['mn'] = e['min_val']
-            if e['domain'] == 'number' and e.get('max_val') is not None:      obj['mx'] = e['max_val']
-            if e['domain'] == 'number' and e.get('step_val') is not None:     obj['st'] = e['step_val']
+            if domain == 'number' and e.get('min_val') is not None:      obj['mn'] = e['min_val']
+            if domain == 'number' and e.get('max_val') is not None:      obj['mx'] = e['max_val']
+            if domain == 'number' and e.get('step_val') is not None:     obj['st'] = e['step_val']
             if e['paired_erd_id']:                obj['p']  = f'{e["paired_erd_id"]:04x}'
             if e['pair_role']:                    obj['r']  = e['pair_role']
             if e['value_template']:               obj['vt'] = e['value_template']

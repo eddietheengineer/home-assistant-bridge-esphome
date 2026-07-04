@@ -22,10 +22,8 @@ import json
 import os
 import sys
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-sys.path.insert(0, SCRIPT_DIR)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pipeline_utils import SCRIPT_DIR, REPO_ROOT, load_json
 from ha_constants import (
     DEVICE_CLASS_KEYWORDS,
     DEVICE_CLASS_EXCLUSIONS,
@@ -239,9 +237,6 @@ def apply_detection(entries):
     return total_checked, total_matched, total_applied
 
 
-def load_json(path):
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
 
 
 def main():

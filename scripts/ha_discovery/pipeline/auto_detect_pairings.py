@@ -15,14 +15,11 @@ import argparse
 import json
 import os
 import re
+import sys
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pipeline_utils import SCRIPT_DIR, REPO_ROOT, load_json
 
-
-def load_json(path):
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
 
 
 def strip_request_status(name):

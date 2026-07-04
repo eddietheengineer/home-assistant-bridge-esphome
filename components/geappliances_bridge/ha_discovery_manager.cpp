@@ -373,8 +373,12 @@ static const char* FILTER_KEYWORDS[] = {
     NULL
 };
 
+/* should_filter_config_topic: converts entity name to lowercase for keyword
+ * matching. Uses a 256-byte stack buffer (lower[]). Entity names from the
+ * pipeline are bounded by entity_name_buf[160] in ha_discovery_manager_t,
+ * so the 256-byte buffer always has headroom. Long-term: replace with a
+ * case-insensitive strstr variant to eliminate the stack allocation. */
 static bool should_filter_config_topic(const char* name)
-{
     /* Convert name to lowercase for comparison. */
     char lower[256];
     size_t i, name_len = strlen(name);
@@ -474,7 +478,10 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
         }
     }
 
-    /* Build unique_id */
+    /* Build unique_id.
+     * unique_id_buf is 160 bytes. Worst case: device_id[128] + "_erd_"(5) +
+     * erd_id_hex(4) + "_"(1) + field_id_buf[72] = 210 bytes. snprintf truncates
+     * safely. Long-term: increase unique_id_buf or validate combined length. */
     if (self->field_id_buf[0]) {
         snprintf(self->unique_id_buf, sizeof(self->unique_id_buf), "%s_erd_%s_%s", self->device_id, erd_id_hex, self->field_id_buf);
     } else {
@@ -500,8 +507,11 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     }
 
     /* Build topic using pre-computed domain prefix if available.
-     * Manual concatenation to avoid format-truncation warnings — snprintf
-     * can't prove the combined length fits in topic_buf[192]. */
+     * domain_topic_prefix is 128 bytes. Worst case: "homeassistant/"(14) +
+     * domain_buf[32] + "/"(1) + device_id[128] + "/"(1) = 176 bytes. snprintf
+     * truncates safely. Long-term: increase domain_topic_prefix or validate
+     * combined length. Manual concatenation below avoids format-truncation
+     * warnings — snprintf can't prove the combined length fits in topic_buf[192]. */
     if (self->domain_topic_prefix[0] == '\0' || strcmp(self->domain_buf, self->current_domain_prefix_buf) != 0) {
         /* Domain changed or first use — rebuild prefix. */
         snprintf(self->domain_topic_prefix, sizeof(self->domain_topic_prefix),

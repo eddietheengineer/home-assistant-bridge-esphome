@@ -64,6 +64,10 @@ GEA_TAG(TAG) = "ha_cleanup";
  * remaining in the queue (0 means all flushed). */
 CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
 {
+    /* topic[] is 256 bytes. Topics from the wildcard subscription are bounded
+     * by HA_CLEANUP_TOPIC_BUF_SIZE entries in topic_buf. Each topic is at most
+     * ~200 bytes (homeassistant/{domain}/{device_id}/{entity_id}/config).
+     * strncpy truncates safely. Long-term: validate topic length before copy. */
     char topic[256];
     uint16_t consumed;
     uint16_t remaining;
@@ -109,7 +113,13 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
 /* Callback for homeassistant/+/{device_id}/# wildcard subscription during cleanup.
  * Stores the full topic string in the buffer for republishing from the main loop.
  * Keeps the callback short — no outbound publish call — so the MQTT task's
- * inbound queue drains fast and retained message bursts don't overflow. */
+ * inbound queue drains fast and retained message bursts don't overflow.
+ *
+ * THREAD SAFETY: This callback runs in the ESP-IDF MQTT task context (a separate
+ * FreeRTOS task). Shared state (topic_buf, queue_write_pos, queue_count) is
+ * protected by vPortEnterCritical()/vPortExitCritical(). This is safe on
+ * single-core ESP32-C3 where critical sections disable interrupts. On dual-core
+ * ESP32, a mutex would be needed instead. The code assumes single-core. */
 CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     (void)payload;
