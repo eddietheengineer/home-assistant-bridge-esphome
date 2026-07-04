@@ -190,6 +190,10 @@ def _compute_number_range(data_type: str, scaling_factor: int) -> Tuple[float, f
         'u32': (0, 4294967295),
         'i32': (-2147483648, 2147483647),
     }
+    # Defensive: scaling_factor=0 would cause ZeroDivisionError.
+    # post_process.py Rule 4 should catch this, but guard here too.
+    if scaling_factor <= 0:
+        scaling_factor = 1
     raw_min, raw_max = bounds.get(data_type, (0, 255))
     step = 1.0 / scaling_factor
     return (raw_min / scaling_factor, raw_max / scaling_factor, step)
@@ -1107,6 +1111,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 f_paired_erd = field.get('paired_erd') or paired_erd_str
                 f_paired_id = parse_erd_id(f_paired_erd) if f_paired_erd else 0
                 f_ha_domain = field.get('ha_domain') or ha_domain
+                # Per-field scaling — used for VT, CT, range, and stored in entry.
+                f_scaling = int(field.get('scaling_factor') or scaling_factor)
                 if f_ha_domain == 'binary_sensor' and f_type == 'enum':
                     f_dev_cls = ''
                     field_size = field.get('size', 1)
@@ -1125,21 +1131,18 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     if f_ha_domain == 'switch':
                         vt = _paired_switch_vt(field, f_paired_erd, f_pair_role, erd_by_id)
                     else:
-                        f_scaling = int(field.get('scaling_factor') or scaling_factor)
                         vt = _paired_field_vt(field, f_paired_erd, f_pair_role, erd_by_id, f_scaling)
                     opts, ct = '', ''
                     if f_ha_domain == 'number' and f_pair_role == 'request':
                         field_size = field.get('size', 1)
-                        f_scaling = int(field.get('scaling_factor') or scaling_factor)
                         signed = _is_signed_type(f_type)
                         ct = _number_command_template(field_size, f_scaling, signed)
                 # Compute min/max/step for number sub-fields
                 f_min, f_max, f_step = 0.0, 0.0, 1.0
                 if f_ha_domain == 'number':
-                    f_scaling = int(field.get('scaling_factor') or scaling_factor)
                     f_min, f_max, f_step = _compute_number_range(f_type, f_scaling)
                 collect(erd_id_int, entity_name, f_ha_domain, f_unit, f_dev_cls,
-                        f_state_cls, scaling_factor, data_size, f_paired_id,
+                        f_state_cls, f_scaling, data_size, f_paired_id,
                         f_pair_role, vt, ct, opts, fid, '',
                         '01' if f_ha_domain == 'switch' else '',
                         '00' if f_ha_domain == 'switch' else '',
@@ -1187,6 +1190,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 p_paired_erd = primary.get('paired_erd') or paired_erd_str
                 p_paired_id = parse_erd_id(p_paired_erd) if p_paired_erd else 0
                 p_ha_domain = primary.get('ha_domain') or ha_domain
+                # Per-field scaling — used for VT, CT, range, and stored in entry.
+                p_scaling = int(primary.get('scaling_factor') or scaling_factor)
 
                 # Skip the primary field if it's paired to a controllable request ERD
                 # (switch/select/number) — the request ERD handles state+command.
@@ -1209,7 +1214,6 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                             p_vt = _paired_switch_vt(primary, p_paired_erd, p_pair_role, erd_by_id)
                             p_ct = ''
                         else:
-                            p_scaling = int(primary.get('scaling_factor') or scaling_factor)
                             p_vt = _paired_field_vt(primary, p_paired_erd, p_pair_role, erd_by_id, p_scaling)
                             p_ct = ''
                             if p_ha_domain == 'number' and p_pair_role == 'request':
@@ -1219,11 +1223,10 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     # Compute min/max/step for number primary fields
                     p_min, p_max, p_step = 0.0, 0.0, 1.0
                     if p_ha_domain == 'number':
-                        p_scaling = int(primary.get('scaling_factor') or scaling_factor)
                         p_min, p_max, p_step = _compute_number_range(p_type, p_scaling)
                     p_unit = primary.get('unit_of_measurement') or unit
                     collect(erd_id_int, display_name, p_ha_domain, p_unit, p_dev_cls,
-                            primary.get('state_class') or state_class, scaling_factor, data_size, p_paired_id,
+                            primary.get('state_class') or state_class, p_scaling, data_size, p_paired_id,
                             p_pair_role, p_vt, p_ct, '', '',
                             'box' if p_ha_domain == 'number' else '',
                             '01' if p_ha_domain == 'switch' else '',

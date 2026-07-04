@@ -5,6 +5,7 @@ Applies these rules:
 1. Clear unit_of_measurement for binary_sensor/switch (they shouldn't have units).
 2. Clear device_class for number domain (except temperature).
 3. Add state_class=measurement for sensor with device_class but no state_class.
+4. Fix scaling_factor=0 to 1 for sensor/number domains (semantically invalid).
 
 Run this after all auto-detection scripts for a clean state.
 """
