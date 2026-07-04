@@ -44,6 +44,11 @@ def main():
     run([sys.executable, str(pipeline / "auto_detect_scaling.py"),
          "--input", str(processed), "--output", str(processed)])
 
+    # Step 1.5: Post-process (reapply overrides)
+    print("Step 1.5: Post-process...", file=sys.stderr)
+    run([sys.executable, str(pipeline / "post_process.py"),
+         "--input", str(processed), "--output", str(processed)])
+
     # Step 2: Generate filtered JSONL
     print("Step 2: Generate filtered JSONL...", file=sys.stderr)
     run([sys.executable, str(generators / "generate_ha_discovery.py"),
