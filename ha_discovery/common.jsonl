@@ -113,7 +113,7 @@
 {"i":"0704","n":"Linux Diagnostics - Memory Usage - Total","d":"sensor","ds":16,"u":"MB","vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"0704","n":"Linux Diagnostics - Memory Usage - Used","d":"sensor","ds":16,"u":"MB","vt":"{{ value[8:16] | int(base=16) }}","fi":"used"}
 {"i":"0704","n":"Linux Diagnostics - Memory Usage - Total","d":"sensor","ds":16,"u":"MB","vt":"{{ value[16:24] | int(base=16) }}","fi":"total"}
-{"i":"0704","n":"Linux Diagnostics - Memory Usage - Used","d":"sensor","ds":16,"u":"MB","vt":"{{ value[24:32] | int(base=16) }}","fi":"used"}
+{"i":"0704","n":"Linux Diagnostics - Memory Usage - Used","d":"sensor","ds":16,"u":"MB","vt":"{{ value[24:32] | int(base=16) }}","fi":"used_1"}
 {"i":"0705","n":"Linux Diagnostics - Load Averages - 1 Minute","d":"sensor","ds":6,"sf":100,"vt":"{{ (value[0:4] | int(base=16)) / 100 | round(2) }}"}
 {"i":"0705","n":"Linux Diagnostics - Load Averages - 5 Minute","d":"sensor","ds":6,"sf":100,"vt":"{{ (value[4:8] | int(base=16)) / 100 | round(2) }}","fi":"5_minute"}
 {"i":"0705","n":"Linux Diagnostics - Load Averages - 15 Minute","d":"sensor","ds":6,"sf":100,"vt":"{{ (value[8:12] | int(base=16)) / 100 | round(2) }}","fi":"15_minute"}
@@ -121,13 +121,13 @@
 {"i":"0707","n":"Linux Diagnostics - Disk Usage - Total","d":"sensor","ds":40,"u":"MB","vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"0707","n":"Linux Diagnostics - Disk Usage - Used","d":"sensor","ds":40,"u":"MB","vt":"{{ value[8:16] | int(base=16) }}","fi":"used"}
 {"i":"0707","n":"Linux Diagnostics - Disk Usage - Total","d":"sensor","ds":40,"u":"MB","vt":"{{ value[16:24] | int(base=16) }}","fi":"total"}
-{"i":"0707","n":"Linux Diagnostics - Disk Usage - Used","d":"sensor","ds":40,"u":"MB","vt":"{{ value[24:32] | int(base=16) }}","fi":"used"}
-{"i":"0707","n":"Linux Diagnostics - Disk Usage - Total","d":"sensor","ds":40,"u":"MB","vt":"{{ value[32:40] | int(base=16) }}","fi":"total"}
-{"i":"0707","n":"Linux Diagnostics - Disk Usage - Used","d":"sensor","ds":40,"u":"MB","vt":"{{ value[40:48] | int(base=16) }}","fi":"used"}
-{"i":"0707","n":"Linux Diagnostics - Disk Usage - Total","d":"sensor","ds":40,"u":"MB","vt":"{{ value[48:56] | int(base=16) }}","fi":"total"}
-{"i":"0707","n":"Linux Diagnostics - Disk Usage - Used","d":"sensor","ds":40,"u":"MB","vt":"{{ value[56:64] | int(base=16) }}","fi":"used"}
-{"i":"0707","n":"Linux Diagnostics - Disk Usage - Total","d":"sensor","ds":40,"u":"MB","vt":"{{ value[64:72] | int(base=16) }}","fi":"total"}
-{"i":"0707","n":"Linux Diagnostics - Disk Usage - Used","d":"sensor","ds":40,"u":"MB","vt":"{{ value[72:80] | int(base=16) }}","fi":"used"}
+{"i":"0707","n":"Linux Diagnostics - Disk Usage - Used","d":"sensor","ds":40,"u":"MB","vt":"{{ value[24:32] | int(base=16) }}","fi":"used_1"}
+{"i":"0707","n":"Linux Diagnostics - Disk Usage - Total","d":"sensor","ds":40,"u":"MB","vt":"{{ value[32:40] | int(base=16) }}","fi":"total_1"}
+{"i":"0707","n":"Linux Diagnostics - Disk Usage - Used","d":"sensor","ds":40,"u":"MB","vt":"{{ value[40:48] | int(base=16) }}","fi":"used_2"}
+{"i":"0707","n":"Linux Diagnostics - Disk Usage - Total","d":"sensor","ds":40,"u":"MB","vt":"{{ value[48:56] | int(base=16) }}","fi":"total_2"}
+{"i":"0707","n":"Linux Diagnostics - Disk Usage - Used","d":"sensor","ds":40,"u":"MB","vt":"{{ value[56:64] | int(base=16) }}","fi":"used_3"}
+{"i":"0707","n":"Linux Diagnostics - Disk Usage - Total","d":"sensor","ds":40,"u":"MB","vt":"{{ value[64:72] | int(base=16) }}","fi":"total_3"}
+{"i":"0707","n":"Linux Diagnostics - Disk Usage - Used","d":"sensor","ds":40,"u":"MB","vt":"{{ value[72:80] | int(base=16) }}","fi":"used_4"}
 {"i":"0708","n":"GEA2/3 Interface Diagnostics (Interface 1) - Valid Packets Received","d":"sensor","ds":56,"vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"0708","n":"GEA2/3 Interface Diagnostics (Interface 1) - Invalid Length Packets Received","d":"sensor","ds":56,"vt":"{{ value[8:16] | int(base=16) }}","fi":"invalid_length_packets_received"}
 {"i":"0708","n":"GEA2/3 Interface Diagnostics (Interface 1) - Invalid CRC Packets Received","d":"sensor","ds":56,"vt":"{{ value[16:24] | int(base=16) }}","fi":"invalid_crc_packets_received"}
@@ -215,7 +215,7 @@
 {"i":"070e","n":"Non-Volatile Usage Warning or Error Details - ERD ID","d":"sensor","ds":12,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"070e","n":"Non-Volatile Usage Warning or Error Details - Writes to ERD during period","d":"sensor","ds":12,"vt":"{{ value[4:8] | int(base=16) }}","fi":"writes_to_erd_during_period"}
 {"i":"070e","n":"Non-Volatile Usage Warning or Error Details - Estimated ERD writes per year","d":"sensor","ds":12,"vt":"{{ value[8:16] | int(base=16) }}","fi":"estimated_erd_writes_per_year"}
-{"i":"070e","n":"Non-Volatile Usage Warning or Error Details - Estimated ERD writes per year","d":"sensor","ds":12,"vt":"{{ value[16:24] | int(base=16) }}","fi":"estimated_erd_writes_per_year"}
+{"i":"070e","n":"Non-Volatile Usage Warning or Error Details - Estimated ERD writes per year","d":"sensor","ds":12,"vt":"{{ value[16:24] | int(base=16) }}","fi":"estimated_erd_writes_per_year_1"}
 {"i":"070f","n":"Non-Volatile Usage Warning Threshold Exceeded","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0710","n":"Non-Volatile Usage Error Threshold Exceeded","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0800","n":"Current Sound Theme","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Default', '01': 'Classical', '02': 'Morse Code'}.get(value[:2], 'Unknown') }}"}

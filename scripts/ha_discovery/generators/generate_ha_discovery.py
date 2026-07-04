@@ -899,6 +899,21 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
     ha_erds = [e for e in erds if 'ha_domain' in e]
     entries: List[Dict] = []
 
+    # Track (erd_id, field_id) to detect and resolve collisions.
+    _field_id_counts: Dict[tuple, int] = {}
+
+    def _make_unique_field_id(erd_id_int: int, field_id: str) -> str:
+        """If field_id is empty or unique for this ERD, return as-is.
+        Otherwise append a counter to disambiguate (e.g., 'auto_detergent_1')."""
+        if not field_id:
+            return field_id
+        key = (erd_id_int, field_id)
+        count = _field_id_counts.get(key, 0)
+        _field_id_counts[key] = count + 1
+        if count == 0:
+            return field_id
+        return f'{field_id}_{count}'
+
     def collect(erd_id_int: int, name: str, domain: str, unit: str,
                 dev_cls: str, state_cls: str, scaling: int, d_size: int,
                 paired_id: int, role: str, val_tmpl: str, cmd_tmpl: str,
@@ -910,6 +925,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
         combined = (name + ' ' + field_id).lower()
         if 'allowed' in combined or 'available' in combined:
             return
+        # Ensure field_id is unique within this ERD to avoid unique_id collisions.
+        fid = _make_unique_field_id(erd_id_int, field_id)
         entries.append({
             'erd_id': erd_id_int,
             'name': name,
@@ -924,7 +941,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             'value_template': val_tmpl,
             'command_template': cmd_tmpl,
             'options_json': opts,
-            'field_id': field_id,
+            'field_id': fid,
             'mode': mode,
             'payload_on': payload_on,
             'payload_off': payload_off,
@@ -935,7 +952,6 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             'step_val': step_val,
         })
 
-    processed_status = set()
 
     for erd in ha_erds:
         erd_id_int = parse_erd_id(erd['id'])
@@ -977,7 +993,6 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     for f in erd_data if not _is_reserved_field(f.get('name', ''))
                 )
                 if all_paired:
-                    processed_status.add(erd_id_int)
                     continue
 
         # For domains that are always single-entity (select/button), force single

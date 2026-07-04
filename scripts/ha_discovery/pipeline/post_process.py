@@ -84,6 +84,7 @@ def apply_post_processing(entries):
     cleared_unit = 0
     cleared_dc = 0
     added_sc = 0
+    fixed_scaling = 0
 
     for entry in entries:
         review = entry.setdefault('review', {})
@@ -115,7 +116,13 @@ def apply_post_processing(entries):
                 review['state_class'] = 'measurement'
                 added_sc += 1
 
-    return cleared_unit, cleared_dc, added_sc
+        # Rule 4: scaling_factor=0 is semantically invalid (would zero all values).
+        # Only override for sensor/number domains where scaling matters.
+        if ha_domain in ('sensor', 'number') and review.get('scaling_factor') == 0:
+            review['scaling_factor'] = 1
+            fixed_scaling += 1
+
+    return cleared_unit, cleared_dc, added_sc, fixed_scaling
 
 
 
@@ -136,12 +143,13 @@ def main():
     args = parser.parse_args()
 
     entries = load_json(args.input)
-    cleared_unit, cleared_dc, added_sc = apply_post_processing(entries)
+    cleared_unit, cleared_dc, added_sc, fixed_scaling = apply_post_processing(entries)
     n_overrides = apply_overrides(entries)
 
     print(f"Cleared {cleared_unit} unit_of_measurement values for binary_sensor/switch")
     print(f"Cleared {cleared_dc} device_class values for non-temperature number")
     print(f"Added {added_sc} state_class=measurement for sensors with device_class")
+    print(f"Fixed {fixed_scaling} scaling_factor=0 values to 1")
     print(f"Reapplied {n_overrides} override fields")
 
     if args.output:
