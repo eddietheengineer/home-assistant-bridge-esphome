@@ -21,7 +21,7 @@ def main():
     repo_root = script_dir.parent.parent
     generators = script_dir / "generators"
     pipeline = script_dir / "pipeline"
-    processed = repo_root / "appliance_api_erd_definitions_processed.json"
+    processed = script_dir / "appliance_api_erd_definitions_processed.json"
     ha_dir = repo_root / "ha_discovery"
 
     def run(cmd, **kwargs):

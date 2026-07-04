@@ -8,7 +8,7 @@ Scripts to convert GE Appliances ERD definitions into Home Assistant MQTT Discov
 appliance_api_erd_definitions.json (submodule)
     |
     v
-generate_flattened_review.py  -->  appliance_api_erd_definitions_processed.json
+generate_flattened_review.py  -->  appliance_api_erd_definitions_processed.json (in this dir)
     |
     v
 auto_detect_ha_domain.py      -->  populate ha_domain

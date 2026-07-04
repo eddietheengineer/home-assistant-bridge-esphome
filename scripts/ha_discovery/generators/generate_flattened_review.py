@@ -150,7 +150,7 @@ def main():
     )
     parser.add_argument(
         '--output',
-        default=os.path.join(REPO_ROOT, 'appliance_api_erd_definitions_processed.json'),
+        default=os.path.join(SCRIPT_DIR, '..', 'appliance_api_erd_definitions_processed.json'),
         help='Output path (default: appliance_api_erd_definitions_processed.json)',
     )
     parser.add_argument(
