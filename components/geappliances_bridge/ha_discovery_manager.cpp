@@ -484,9 +484,8 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     }
 
     /* Build unique_id.
-     * unique_id_buf is 160 bytes. Worst case: device_id[128] + "_erd_"(5) +
-     * erd_id_hex(4) + "_"(1) + field_id_buf[72] = 210 bytes. snprintf truncates
-     * safely. Long-term: increase unique_id_buf or validate combined length. */
+     * unique_id_buf is 160 bytes. Worst case: device_id[64] + "_erd_"(5) +
+     * erd_id_hex(4) + "_"(1) + field_id_buf[72] = 146 bytes. Fits. */
     if (self->field_id_buf[0]) {
         snprintf(self->unique_id_buf, sizeof(self->unique_id_buf), "%s_erd_%s_%s", self->device_id, erd_id_hex, self->field_id_buf);
     } else {
@@ -513,14 +512,19 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
 
     /* Build topic using pre-computed domain prefix if available.
      * domain_topic_prefix is 128 bytes. Worst case: "homeassistant/"(14) +
-     * domain_buf[32] + "/"(1) + device_id[128] + "/"(1) = 176 bytes. snprintf
-     * truncates safely. Long-term: increase domain_topic_prefix or validate
-     * combined length. Manual concatenation below avoids format-truncation
-     * warnings — snprintf can't prove the combined length fits in topic_buf[192]. */
+     * domain_buf[32] + "/"(1) + device_id[64] + "/"(1) = 112 bytes.
+     * topic_buf is 192 bytes. Suffix is at most ~86 bytes (erd_id[4] + "_" + field_id[72] + "/config[7]").
+     * Total worst case: 112 + 86 = 198, slightly over 192. Truncation is detected below. */
     if (self->domain_topic_prefix[0] == '\0' || strcmp(self->domain_buf, self->current_domain_prefix_buf) != 0) {
         /* Domain changed or first use — rebuild prefix. */
         snprintf(self->domain_topic_prefix, sizeof(self->domain_topic_prefix),
             "homeassistant/%s/%s/", self->domain_buf, self->device_id);
+        /* Detect prefix truncation: if it doesn't end with '/', it was cut short. */
+        size_t plen = strlen(self->domain_topic_prefix);
+        if (plen == 0 || self->domain_topic_prefix[plen - 1] != '/') {
+            self->total_filtered++;
+            return false;
+        }
         strncpy(self->current_domain_prefix_buf, self->domain_buf, sizeof(self->current_domain_prefix_buf) - 1);
         self->current_domain_prefix_buf[sizeof(self->current_domain_prefix_buf) - 1] = '\0';
     }
@@ -535,6 +539,12 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             snprintf(self->topic_buf + prefix_len, remaining, "%s_%s/config", erd_id_hex, self->field_id_buf);
         } else {
             snprintf(self->topic_buf + prefix_len, remaining, "%s/config", erd_id_hex);
+        }
+        /* Detect suffix truncation: if topic doesn't end with '/config', it was cut short. */
+        size_t topic_len = strlen(self->topic_buf);
+        if (topic_len < 7 || strcmp(self->topic_buf + topic_len - 7, "/config") != 0) {
+            self->total_filtered++;
+            return false;
         }
         memcpy(self->topic_buf, self->domain_topic_prefix, prefix_len);
     }

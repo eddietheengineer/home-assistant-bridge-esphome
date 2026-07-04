@@ -17,6 +17,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pipeline_utils import SCRIPT_DIR, REPO_ROOT, load_json
+from ha_constants import SENSOR_DEVICE_CLASS_STATE_CLASSES
 
 
 def _word_bound(name_lower, kw):
@@ -78,18 +79,9 @@ def infer_state_class(entry):
             return 'total_increasing', 0.8
 
     # --- Measurement: instantaneous values ---
-    # Per HA SENSOR_DEVICE_CLASS_STATE_CLASSES:
-    # - volume only allows total/total_increasing (not measurement)
-    # - power only allows measurement/total (not total_increasing)
-    # - energy only allows total/total_increasing (not measurement)
-    # - gas only allows total/total_increasing (not measurement)
-    # - water only allows total/total_increasing (not measurement)
-    measurement_classes = [
-        'temperature', 'humidity', 'pressure', 'voltage', 'current',
-        'frequency', 'signal_strength', 'battery',
-        'illuminance', 'pm25', 'weight',
-    ]
-    if device_class in measurement_classes:
+    # Only assign 'measurement' if the device_class allows it per HA spec.
+    valid_states = SENSOR_DEVICE_CLASS_STATE_CLASSES.get(device_class, set())
+    if 'measurement' in valid_states:
         # Exclude cumulative/total fields from measurement
         if not any(kw in name_lower for kw in total_keywords):
             return 'measurement', 0.9

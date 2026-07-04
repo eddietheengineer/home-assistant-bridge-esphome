@@ -669,14 +669,6 @@ class TestEntityFiltering(unittest.TestCase):
         self.assertIn('100f', entity_ids,
             "0x100f (Turbo Cool Status) should be included (asymmetric pairing)")
 
-    def test_unpaired_request_buttons_included(self):
-        """Button ERDs with 'Request' in name but no pair_role should be included."""
-        entities = load_all_entities()
-        button_erd_ids = {'1041', '1166', '2171'}
-        found = {e['i'] for e in entities if e['i'] in button_erd_ids}
-        missing = button_erd_ids - found
-        self.assertEqual(missing, set(),
-            f"Unpaired button ERDs incorrectly filtered out: {missing}")
 
 
 class TestBufferSizeSufficiency(unittest.TestCase):

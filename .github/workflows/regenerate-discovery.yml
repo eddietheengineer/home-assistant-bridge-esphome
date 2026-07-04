@@ -32,6 +32,13 @@ jobs:
       with:
         python-version: '3.x'
 
+    - name: Validate submodule commit input
+      run: |
+        if ! [[ "${{ github.event.inputs.submodule_commit }}" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "ERROR: submodule_commit must be a 40-character hexadecimal SHA"
+          exit 1
+        fi
+
     - name: Update submodule to specified commit
       run: |
         cd lib/public-appliance-api-documentation

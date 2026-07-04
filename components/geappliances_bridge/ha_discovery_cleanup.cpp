@@ -156,7 +156,12 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     /* If the payload is empty, it's our own echo from a previous clear — skip. */
     if (payload_len == 0) return;
 
-    /* Store the full topic string: [topic:variable][null:1] */
+    /* Guard against oversized topics: if topic_len >= HA_CLEANUP_TOPIC_BUF_SIZE,
+     * the uint16_t cast of (topic_len + 1) could overflow to 0. */
+    if (topic_len >= HA_CLEANUP_TOPIC_BUF_SIZE) {
+        self->dropped_count++;
+        return;
+    }
     uint16_t needed = (uint16_t)(topic_len + 1);
 
     vPortEnterCritical();
