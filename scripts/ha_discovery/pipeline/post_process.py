@@ -14,11 +14,9 @@ import json
 import os
 import sys
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-sys.path.insert(0, SCRIPT_DIR)
-from ha_constants import VALID_DEVICE_CLASSES
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pipeline_utils import SCRIPT_DIR, REPO_ROOT, load_json
+from ha_constants import SENSOR_DEVICE_CLASS_STATE_CLASSES, SENSOR_NON_NUMERIC_DEVICE_CLASSES, VALID_DEVICE_CLASSES
 
 
 
@@ -72,7 +70,7 @@ def apply_overrides(entries):
     for entry in entries:
         erd_id = entry.get("erd_id", "").lower()
         if erd_id in OVERRIDES:
-            review = entry.get("review", {})
+            review = entry.setdefault("review", {})
             for key, val in OVERRIDES[erd_id].items():
                 if review.get(key) != val:
                     review[key] = val
@@ -88,7 +86,7 @@ def apply_post_processing(entries):
     added_sc = 0
 
     for entry in entries:
-        review = entry.get('review', {})
+        review = entry.setdefault('review', {})
         ha_domain = review.get('ha_domain')
         device_class = review.get('device_class')
         state_class = review.get('state_class')
@@ -105,21 +103,20 @@ def apply_post_processing(entries):
                 cleared_dc += 1
 
         # Rule 3: sensor with device_class should have state_class, but only
-        # for numeric device classes. Non-numeric (enum, timestamp, date, uptime)
-        # output text strings — state_class on these causes HA LTS errors.
-        NON_NUMERIC_DEVICE_CLASSES = {'enum', 'timestamp', 'date', 'uptime'}
+        # for device classes that actually support 'measurement'.
+        # Non-numeric (enum, timestamp, date, uptime) output text strings.
+        # Some numeric classes only allow 'total'/'total_increasing' (energy, gas,
+        # water, volume, reactive_energy, monetary) or 'measurement_angle' (wind_direction).
         if (ha_domain == 'sensor' and device_class
                 and not state_class
-                and device_class not in NON_NUMERIC_DEVICE_CLASSES):
-            review['state_class'] = 'measurement'
-            added_sc += 1
+                and device_class not in SENSOR_NON_NUMERIC_DEVICE_CLASSES):
+            valid_states = SENSOR_DEVICE_CLASS_STATE_CLASSES.get(device_class, set())
+            if 'measurement' in valid_states:
+                review['state_class'] = 'measurement'
+                added_sc += 1
 
     return cleared_unit, cleared_dc, added_sc
 
-
-def load_json(path):
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
 
 
 def main():

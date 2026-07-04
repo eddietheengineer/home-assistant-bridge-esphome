@@ -18,8 +18,9 @@ import json
 import os
 import re
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pipeline_utils import SCRIPT_DIR, REPO_ROOT, load_json
 
 # Mapping from normalized parenthetical suffix -> (unit_of_measurement, scaling_factor).
 # Keys are lowercase. Values are (unit, scale) where None means "don't set".
@@ -331,7 +332,7 @@ def apply_detection(entries):
 
     for entry in entries:
         field_name = entry.get('field_name', '')
-        review = entry.get('review', {})
+        review = entry.setdefault('review', {})
 
         # Skip non-numeric types — unit/scaling only applies to numeric fields.
         field_type = entry.get('field_type', '')
@@ -358,13 +359,12 @@ def apply_detection(entries):
         total_matched += 1
         applied = False
 
-        # Only overwrite unit_of_measurement when we actually detected one,
-        # preserving manually set units not recognized by the auto-detector.
-        if unit is not None:
+        # Only write when not already set, preserving manual overrides.
+        if unit is not None and not review.get('unit_of_measurement'):
             review['unit_of_measurement'] = unit
             applied = True
 
-        if scale is not None and scale != 1:
+        if scale is not None and scale != 1 and 'scaling_factor' not in review:
             review['scaling_factor'] = scale
             applied = True
 
@@ -373,10 +373,6 @@ def apply_detection(entries):
 
     return total_checked, total_matched, total_applied
 
-
-def load_json(path):
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
 
 
 def main():

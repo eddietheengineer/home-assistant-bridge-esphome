@@ -15,8 +15,8 @@ import os
 import re
 import sys
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pipeline_utils import SCRIPT_DIR, REPO_ROOT, load_json
 
 
 def _word_bound(name_lower, kw):
@@ -113,10 +113,14 @@ def apply_detection(entries):
             continue
 
         total_checked += 1
-        review = entry.get('review', {})
+        review = entry.setdefault('review', {})
 
         sc, confidence = infer_state_class(entry)
         if sc is None:
+            continue
+
+        # Only write when not already set, preserving manual overrides.
+        if review.get('state_class'):
             continue
 
         total_matched += 1
@@ -126,10 +130,6 @@ def apply_detection(entries):
 
     return total_checked, total_matched, total_applied
 
-
-def load_json(path):
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
 
 
 def main():

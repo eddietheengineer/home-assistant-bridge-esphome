@@ -41,7 +41,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 # Valid HA device_class values per domain. Invalid combos are silently dropped.
 VALID_DEVICE_CLASSES = {
-    'button': {'restart'},
+    'button': {'identify', 'restart', 'update'},
     'switch': {'outlet', 'switch'},
     'binary_sensor': {
         'battery', 'battery_charging', 'carbon_monoxide', 'cold',
@@ -69,6 +69,24 @@ VALID_DEVICE_CLASSES = {
         'volume_storage', 'volume_flow_rate', 'water', 'weight',
         'wind_direction', 'wind_speed',
     },
+    'number': {
+        'absolute_humidity', 'apparent_power', 'aqi', 'area',
+        'atmospheric_pressure', 'battery', 'blood_glucose_concentration',
+        'carbon_monoxide', 'carbon_dioxide', 'conductivity', 'current',
+        'data_rate', 'data_size', 'distance', 'duration',
+        'energy', 'energy_distance', 'energy_storage', 'frequency',
+        'gas', 'humidity', 'illuminance', 'irradiance', 'moisture',
+        'monetary', 'nitrogen_dioxide', 'nitrogen_monoxide',
+        'nitrous_oxide', 'ozone', 'ph', 'pm1', 'pm10', 'pm25', 'pm4',
+        'power', 'power_factor', 'precipitation', 'precipitation_intensity',
+        'pressure', 'reactive_energy', 'reactive_power', 'signal_strength',
+        'sound_pressure', 'speed', 'sulphur_dioxide', 'temperature',
+        'temperature_delta', 'volatile_organic_compounds',
+        'volatile_organic_compounds_parts', 'voltage', 'volume',
+        'volume_storage', 'volume_flow_rate', 'water', 'weight',
+        'wind_direction', 'wind_speed',
+    },
+    'select': set(),
 }
 
 def _is_valid_device_class(domain: str, device_class: str) -> bool:
@@ -222,12 +240,13 @@ def _clean_field_name(name: str) -> str:
 
     E.g. 'Hours (hours)' -> 'Hours',
          'Line Input Voltage Volts x 100 (volts)' -> 'Line Input Voltage Volts x 100',
-         'Option n Drying Temperature (Fahrenheit x 10)[0]' -> 'Option n Drying Temperature'.
+         'Option n Drying Temperature (Fahrenheit x 10)[0]' -> 'Option n Drying Temperature[0]'.
     """
-    # Remove trailing array index like [0], [1], etc.
-    name = re.sub(r'\s*\[\d+\]\s*$', '', name)
-    # Remove trailing parenthetical group like ' (hours)', ' (volts)'
-    result = re.sub(r'\s*\([^)]*\)\s*$', '', name)
+    # Keep trailing array index like [0], [1], etc. for uniqueness
+    # (removed: name = re.sub(r'\s*\[\d+\]\s*$', '', name))
+    # Remove parenthetical groups: either trailing, or before an array index
+    result = re.sub(r'\s*\([^)]*\)\s*(?=\[\d+\])', '', name)
+    result = re.sub(r'\s*\([^)]*\)\s*$', '', result)
     return result.strip()
 
 
@@ -832,7 +851,8 @@ def _paired_field_vt(field: Dict, paired_erd_str: str, pair_role: str,
     if pair_role == 'request' and paired_erd_str and paired_erd_str in erd_by_id:
         paired = _find_paired_field(field, paired_erd_str, erd_by_id)
         if paired is not None:
-            return _byte_subfield_value_template(paired, scaling_factor)
+            p_scaling = int(paired.get('scaling_factor') or scaling_factor)
+            return _byte_subfield_value_template(paired, p_scaling)
     return _byte_subfield_value_template(field, scaling_factor)
 
 
@@ -932,12 +952,14 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
         erd_data = erd.get('data', [])
         data_size = get_erd_byte_size(erd_data) or 1
 
-        # Skip "Request" ERDs that lack a proper request/status pair.
+        # Skip request ERDs that are paired but lack a valid status counterpart.
         # Unpaired request ERDs exposed as sensors would allow uncontrolled
         # writes — only generate them when pair_role='request' with a
         # valid paired_erd pointing to a status ERD.
-        if 'Request' in name:
-            if not (pair_role == 'request' and paired_erd_str and paired_erd_str in erd_by_id):
+        # Standalone "Request" ERDs (e.g., "Water Filter Reset Request")
+        # that are not paired should be generated normally.
+        if pair_role == 'request':
+            if not (paired_erd_str and paired_erd_str in erd_by_id):
                 continue
 
         # Skip status ERD if its paired request ERD is a controllable domain
@@ -958,11 +980,15 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     processed_status.add(erd_id_int)
                     continue
 
-        # For domains that are always single-entity (select/button), force single.
-        # For number/switch, still check if there are multiple data fields that
-        # should be split into sub-entities (e.g. Clock Time with Hours/Minutes/Seconds).
+        # For domains that are always single-entity (select/button), force single
+        # ONLY if there's a single non-reserved field. If there are multiple fields
+        # with different per-field domains, use the natural classification instead.
         if ha_domain in ('select', 'button'):
-            classification = 'single'
+            nr_fields = _get_non_reserved_fields(erd_data)
+            if len(nr_fields) <= 1:
+                classification = 'single'
+            else:
+                classification = _classify_erd_data(erd_data)
         else:
             classification = _classify_erd_data(erd_data)
 
@@ -1057,9 +1083,10 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 entity_name = f'{display_name} - {leaf}'
                 fid = '' if idx == 0 else _field_slug(leaf)
                 f_type = field.get('type', '')
-                f_dev_cls = 'enum' if f_type == 'enum' else (field.get('device_class') or device_class)
+                f_dc = field.get('device_class') or ''
+                f_dev_cls = f_dc or ('enum' if f_type == 'enum' else '')
                 f_state_cls = field.get('state_class') or state_class
-                f_unit = _infer_unit_from_field_name(leaf, unit)
+                f_unit = field.get('unit_of_measurement') or _infer_unit_from_field_name(leaf, unit)
                 # Use per-field pairing/domain if available (mixed-pairing ERDs)
                 f_pair_role = field.get('pair_role') or pair_role
                 f_paired_erd = field.get('paired_erd') or paired_erd_str
@@ -1067,19 +1094,43 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 f_ha_domain = field.get('ha_domain') or ha_domain
                 if f_ha_domain == 'binary_sensor' and f_type == 'enum':
                     f_dev_cls = ''
-                    vt = _compute_binary_sensor_value_template(data_size)
+                    field_size = field.get('size', 1)
+                    vt = _compute_binary_sensor_value_template(field_size)
+                elif f_ha_domain == 'select' and f_type == 'enum':
+                    f_dev_cls = ''
+                    field_size = field.get('size', 1)
+                    enum_vals = field.get('values', {})
+                    if enum_vals:
+                        opts, vt, ct = _select_options_and_templates(enum_vals, field_size)
+                    else:
+                        # No enum values; fall back to sensor-style VT
+                        vt = _enum_sensor_value_template(enum_vals, field_size)
+                        opts, ct = '', ''
                 else:
                     if f_ha_domain == 'switch':
                         vt = _paired_switch_vt(field, f_paired_erd, f_pair_role, erd_by_id)
                     else:
-                        vt = _paired_field_vt(field, f_paired_erd, f_pair_role, erd_by_id, scaling_factor)
+                        f_scaling = int(field.get('scaling_factor') or scaling_factor)
+                        vt = _paired_field_vt(field, f_paired_erd, f_pair_role, erd_by_id, f_scaling)
+                    opts, ct = '', ''
+                    if f_ha_domain == 'number' and f_pair_role == 'request':
+                        field_size = field.get('size', 1)
+                        f_scaling = int(field.get('scaling_factor') or scaling_factor)
+                        signed = _is_signed_type(f_type)
+                        ct = _number_command_template(field_size, f_scaling, signed)
+                # Compute min/max/step for number sub-fields
+                f_min, f_max, f_step = 0.0, 0.0, 1.0
+                if f_ha_domain == 'number':
+                    f_scaling = int(field.get('scaling_factor') or scaling_factor)
+                    f_min, f_max, f_step = _compute_number_range(f_type, f_scaling)
                 collect(erd_id_int, entity_name, f_ha_domain, f_unit, f_dev_cls,
                         f_state_cls, scaling_factor, data_size, f_paired_id,
-                        f_pair_role, vt, '', '', fid, '',
+                        f_pair_role, vt, ct, opts, fid, '',
                         '01' if f_ha_domain == 'switch' else '',
                         '00' if f_ha_domain == 'switch' else '',
                         '01' if f_ha_domain == 'switch' else '',
-                        '00' if f_ha_domain == 'switch' else '')
+                        '00' if f_ha_domain == 'switch' else '',
+                        f_min, f_max, f_step)
 
         elif classification == 'bitfield':
             for field in _get_non_reserved_fields(erd_data):
@@ -1114,29 +1165,57 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             )
             if primary:
                 p_type = primary.get('type', '')
-                p_dev_cls = 'enum' if p_type == 'enum' else (primary.get('device_class') or device_class)
+                p_dc = primary.get('device_class') or ''
+                p_dev_cls = p_dc or ('enum' if p_type == 'enum' else '')
                 # Use per-field pairing/domain if available (mixed-pairing ERDs)
                 p_pair_role = primary.get('pair_role') or pair_role
                 p_paired_erd = primary.get('paired_erd') or paired_erd_str
                 p_paired_id = parse_erd_id(p_paired_erd) if p_paired_erd else 0
                 p_ha_domain = primary.get('ha_domain') or ha_domain
-                if p_ha_domain == 'binary_sensor' and p_type == 'enum':
-                    # binary_sensor can't display enum labels; use ON/OFF
-                    p_dev_cls = ''
-                    p_vt = _compute_binary_sensor_value_template(data_size)
-                else:
-                    if p_ha_domain == 'switch':
-                        p_vt = _paired_switch_vt(primary, p_paired_erd, p_pair_role, erd_by_id)
+
+                # Skip the primary field if it's paired to a controllable request ERD
+                # (switch/select/number) — the request ERD handles state+command.
+                # Only generate the primary if it's unpaired or the paired request
+                # ERD is not a controllable domain.
+                skip_primary = False
+                if p_pair_role == 'status' and p_paired_erd and p_paired_erd in erd_by_id:
+                    req = erd_by_id[p_paired_erd]
+                    if req.get('pair_role') == 'request' and req.get('ha_domain') in ('switch', 'select', 'number'):
+                        skip_primary = True
+
+                if not skip_primary:
+                    if p_ha_domain == 'binary_sensor' and p_type == 'enum':
+                        # binary_sensor can't display enum labels; use ON/OFF
+                        p_dev_cls = ''
+                        p_field_size = primary.get('size', 1)
+                        p_vt = _compute_binary_sensor_value_template(p_field_size)
                     else:
-                        p_vt = _paired_field_vt(primary, p_paired_erd, p_pair_role, erd_by_id, scaling_factor)
-                collect(erd_id_int, display_name, p_ha_domain, unit, p_dev_cls,
-                        primary.get('state_class') or state_class, scaling_factor, data_size, p_paired_id,
-                        p_pair_role, p_vt, '', '', '',
-                        'box' if p_ha_domain == 'number' else '',
-                        '01' if p_ha_domain == 'switch' else '',
-                        '00' if p_ha_domain == 'switch' else '',
-                        '01' if p_ha_domain == 'switch' else '',
-                        '00' if p_ha_domain == 'switch' else '')
+                        if p_ha_domain == 'switch':
+                            p_vt = _paired_switch_vt(primary, p_paired_erd, p_pair_role, erd_by_id)
+                            p_ct = ''
+                        else:
+                            p_scaling = int(primary.get('scaling_factor') or scaling_factor)
+                            p_vt = _paired_field_vt(primary, p_paired_erd, p_pair_role, erd_by_id, p_scaling)
+                            p_ct = ''
+                            if p_ha_domain == 'number' and p_pair_role == 'request':
+                                p_field_size = primary.get('size', 1)
+                                p_signed = _is_signed_type(p_type)
+                                p_ct = _number_command_template(p_field_size, p_scaling, p_signed)
+                    # Compute min/max/step for number primary fields
+                    p_min, p_max, p_step = 0.0, 0.0, 1.0
+                    if p_ha_domain == 'number':
+                        p_scaling = int(primary.get('scaling_factor') or scaling_factor)
+                        p_min, p_max, p_step = _compute_number_range(p_type, p_scaling)
+                    p_unit = primary.get('unit_of_measurement') or unit
+                    collect(erd_id_int, display_name, p_ha_domain, p_unit, p_dev_cls,
+                            primary.get('state_class') or state_class, scaling_factor, data_size, p_paired_id,
+                            p_pair_role, p_vt, p_ct, '', '',
+                            'box' if p_ha_domain == 'number' else '',
+                            '01' if p_ha_domain == 'switch' else '',
+                            '00' if p_ha_domain == 'switch' else '',
+                            '01' if p_ha_domain == 'switch' else '',
+                            '00' if p_ha_domain == 'switch' else '',
+                            p_min, p_max, p_step)
 
             for field in [d for d in erd_data
                           if _has_bits(d) and not _is_reserved_field(d.get('name', ''))]:
@@ -1209,12 +1288,23 @@ def generate_ha_discovery_jsonl_by_category(erds: List[Dict]) -> Dict[str, str]:
     entries = _collect_ha_discovery_entries(erds)
 
     categorized: Dict[str, list] = {cat: [] for cat in CATEGORIES}
+    uncategorized = []
     for entry in entries:
         eid = entry['erd_id']
+        matched = False
         for cat, (lo, hi) in CATEGORIES.items():
             if lo <= eid <= hi:
                 categorized[cat].append(entry)
+                matched = True
                 break
+        if not matched:
+            uncategorized.append(entry)
+
+    if uncategorized:
+        ids = [f"0x{e['erd_id']:04x}" for e in uncategorized]
+        print(f"WARNING: {len(uncategorized)} ERD(s) in undefined category gaps: "
+              f"{', '.join(ids[:20])}{'...' if len(ids) > 20 else ''}",
+              file=sys.stderr)
 
     result: Dict[str, str] = {}
     for cat in CATEGORIES:
@@ -1223,21 +1313,32 @@ def generate_ha_discovery_jsonl_by_category(erds: List[Dict]) -> Dict[str, str]:
             continue
         lines = []
         for e in cat_entries:
+            # --- entity validation ---
+            domain = e['domain']
+
+            # Skip select entities without options (broken in HA)
+            if domain == 'select' and not e['options_json']:
+                continue
+
+            # Skip number entities with zero range (mn == mx, invalid in HA)
+            if domain == 'number' and e.get('min_val') == e.get('max_val'):
+                continue
+
             obj: Dict[str, Any] = {
                 'i': f'{e["erd_id"]:04x}',
                 'n': e['name'],
-                'd': e['domain'],
+                'd': domain,
                 'ds': e['data_size'],
             }
             # Omit fields that equal their defaults to save space
             if e['unit']:                         obj['u']  = e['unit']
-            if e['device_class'] and _is_valid_device_class(e['domain'], e['device_class']):
+            if e['device_class'] and _is_valid_device_class(domain, e['device_class']):
                 obj['dc'] = e['device_class']
             if e['state_class']:                  obj['sc'] = e['state_class']
             if e['scaling_factor'] != 1:          obj['sf'] = e['scaling_factor']
-            if e['domain'] == 'number' and e.get('min_val') is not None:      obj['mn'] = e['min_val']
-            if e['domain'] == 'number' and e.get('max_val') is not None:      obj['mx'] = e['max_val']
-            if e['domain'] == 'number' and e.get('step_val') is not None:     obj['st'] = e['step_val']
+            if domain == 'number' and e.get('min_val') is not None:      obj['mn'] = e['min_val']
+            if domain == 'number' and e.get('max_val') is not None:      obj['mx'] = e['max_val']
+            if domain == 'number' and e.get('step_val') is not None:     obj['st'] = e['step_val']
             if e['paired_erd_id']:                obj['p']  = f'{e["paired_erd_id"]:04x}'
             if e['pair_role']:                    obj['r']  = e['pair_role']
             if e['value_template']:               obj['vt'] = e['value_template']
@@ -1329,7 +1430,7 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
     for erd_id, entries in groups.items():
         # Use the first entry to get ERD-level metadata
         first = entries[0]
-        review = first.get('review', {})
+        review = first.get('review') or {}
 
         # Build data array from field-level info
         data_fields = []
@@ -1345,7 +1446,7 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
             if entry.get('field_bits'):
                 field['bits'] = entry['field_bits']
             # Store per-field review metadata for mixed-pairing ERDs
-            field_review = entry.get('review', {})
+            field_review = entry.get('review') or {}
             if field_review.get('paired_erd'):
                 field['paired_erd'] = field_review['paired_erd']
             if field_review.get('pair_role'):
@@ -1353,9 +1454,13 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
             if field_review.get('ha_domain'):
                 field['ha_domain'] = field_review['ha_domain']
             if field_review.get('device_class') is not None:
-                field['device_class'] = field_review['device_class']
+                field['device_class'] = field_review['device_class'] or ''
             if field_review.get('state_class'):
                 field['state_class'] = field_review['state_class']
+            if field_review.get('scaling_factor'):
+                field['scaling_factor'] = field_review['scaling_factor']
+            if field_review.get('unit_of_measurement'):
+                field['unit_of_measurement'] = field_review['unit_of_measurement']
             data_fields.append(field)
 
         erd = {
