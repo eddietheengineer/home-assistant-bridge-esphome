@@ -1,4 +1,4 @@
-{"i":"4008","n":"Mixing valve home state request","d":"switch","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"4008","n":"Mixing valve home state request","d":"switch","ds":1,"vt":"{{ value[0:2] | int(base=16) }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4009","n":"Mixing valve home state","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Mixing valve normal operation', '01': 'Mixing valve full cold', '02': 'Mixing valve cycling to cold', '03': 'Mixing valve cycling to normal position'}.get(value[:2], 'Unknown') }}"}
 {"i":"400a","n":"Mixing valve step offset","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"400b","n":"Mixing valve absolute position","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}

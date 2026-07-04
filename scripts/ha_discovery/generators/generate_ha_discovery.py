@@ -782,6 +782,73 @@ def _get_primary_field(erd_by_id: Dict[str, Dict], paired_erd_str: str):
             return d
     return None
 
+def _find_paired_field(request_field: Dict, paired_erd_str: str,
+                       erd_by_id: Dict[str, Dict]) -> Optional[Dict]:
+    """Find the matching field in the paired ERD by name or (offset, size).
+
+    Returns the paired field dict, or None if no match is found.
+    Strategy: (1) name match after stripping Request/Status suffix,
+    (2) (offset, size) fallback, (3) None.
+    """
+    if not paired_erd_str or paired_erd_str not in erd_by_id:
+        return None
+    paired_data = erd_by_id[paired_erd_str].get('data', [])
+
+    req_name = request_field.get('name', '')
+    req_offset = request_field.get('offset', 0)
+    req_size = request_field.get('size', 1)
+
+    # Strip "Request"/"Status" suffix for name matching.
+    def _strip_role(n: str) -> str:
+        n = n.strip()
+        for suffix in (' request', ' status'):
+            if n.lower().endswith(suffix):
+                return n[:len(n) - len(suffix)].strip()
+        return n
+
+    req_stripped = _strip_role(req_name)
+
+    # (1) Name match.
+    for d in paired_data:
+        d_stripped = _strip_role(d.get('name', ''))
+        if d_stripped == req_stripped:
+            return d
+
+    # (2) (offset, size) fallback.
+    for d in paired_data:
+        if d.get('offset', 0) == req_offset and d.get('size', 1) == req_size:
+            return d
+
+    return None
+
+
+def _paired_field_vt(field: Dict, paired_erd_str: str, pair_role: str,
+                     erd_by_id: Dict[str, Dict], scaling_factor: int) -> str:
+    """Return a Jinja2 value_template for a field, using the paired status
+    field's offset/size/type when pair_role is 'request'.
+
+    For non-paired ERDs or status role, uses the field's own attributes.
+    """
+    if pair_role == 'request' and paired_erd_str and paired_erd_str in erd_by_id:
+        paired = _find_paired_field(field, paired_erd_str, erd_by_id)
+        if paired is not None:
+            return _byte_subfield_value_template(paired, scaling_factor)
+    return _byte_subfield_value_template(field, scaling_factor)
+
+
+def _paired_bitfield_vt(field: Dict, paired_erd_str: str, pair_role: str,
+                        erd_by_id: Dict[str, Dict]) -> str:
+    """Return a Jinja2 value_template for a bitfield sub-field, using the
+    paired status field's offset/bits when pair_role is 'request'.
+
+    For non-paired ERDs or status role, uses the field's own attributes.
+    """
+    if pair_role == 'request' and paired_erd_str and paired_erd_str in erd_by_id:
+        paired = _find_paired_field(field, paired_erd_str, erd_by_id)
+        if paired is not None:
+            return _bitfield_sub_value_template(paired)
+    return _bitfield_sub_value_template(field)
+
 
 def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
     """Process all ERDs with ha_domain metadata and return a list of entry dicts.
@@ -897,10 +964,21 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 vt = _compute_binary_sensor_value_template(data_size)
             elif ha_domain == 'switch':
                 # For paired switches, read state from the status ERD's primary field.
-                vt = _paired_primary_field_template(erd_by_id, paired_erd_str, 1, True) or ''
+                pf = _get_primary_field(erd_by_id, paired_erd_str)
+                if pf is None:
+                    pf = {'name': '', 'type': 'u8', 'offset': 0, 'size': 1}
+                vt = _paired_field_vt(pf, paired_erd_str, pair_role, erd_by_id, 1) or ''
             elif ha_domain == 'select':
                 ev, fs = _get_first_enum_field_info(erd_data)
                 if ev:
+                    # For paired request ERDs, use the status field's enum values
+                    # for the VT so it decodes the actual appliance state.
+                    if pair_role == 'request' and paired_erd_str and paired_erd_str in erd_by_id:
+                        enum_field = next((d for d in erd_data if d.get('type') == 'enum'), None)
+                        if enum_field:
+                            paired = _find_paired_field(enum_field, paired_erd_str, erd_by_id)
+                            if paired and paired.get('values'):
+                                ev = paired['values']
                     opts, vt, ct = _select_options_and_templates(ev, fs)
                 else:
                     # No enum values to populate options; skip rather than emit
@@ -965,7 +1043,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     f_dev_cls = ''
                     vt = _compute_binary_sensor_value_template(data_size)
                 else:
-                    vt = _byte_subfield_value_template(field, scaling_factor)
+                    vt = _paired_field_vt(field, paired_erd_str, pair_role, erd_by_id, scaling_factor)
                 collect(erd_id_int, entity_name, ha_domain, f_unit, f_dev_cls,
                         f_state_cls, scaling_factor, data_size, paired_erd_id,
                         pair_role, vt, '', '', fid, '', '', '', '', '')
@@ -976,7 +1054,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 fid = _field_slug(leaf)
                 bits_size = field.get('bits', {}).get('size', 1)
                 sub_domain = 'binary_sensor' if bits_size == 1 else 'sensor'
-                vt = _bitfield_sub_value_template(field)
+                vt = _paired_bitfield_vt(field, paired_erd_str, pair_role, erd_by_id)
                 b_p_on = '01' if sub_domain == 'binary_sensor' else ''
                 b_p_off = '00' if sub_domain == 'binary_sensor' else ''
                 b_s_on = '01' if sub_domain == 'binary_sensor' else ''
@@ -999,7 +1077,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     p_dev_cls = ''
                     p_vt = _compute_binary_sensor_value_template(data_size)
                 else:
-                    p_vt = _byte_subfield_value_template(primary, scaling_factor)
+                    p_vt = _paired_field_vt(primary, paired_erd_str, pair_role, erd_by_id, scaling_factor)
                 collect(erd_id_int, display_name, ha_domain, unit, p_dev_cls,
                         state_class, scaling_factor, data_size, paired_erd_id,
                         pair_role, p_vt, '', '', '', '', '', '', '', '')
@@ -1010,7 +1088,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 fid = _field_slug(leaf)
                 bits_size = field.get('bits', {}).get('size', 1)
                 sub_domain = 'binary_sensor' if bits_size == 1 else 'sensor'
-                vt = _bitfield_sub_value_template(field)
+                vt = _paired_bitfield_vt(field, paired_erd_str, pair_role, erd_by_id)
                 b_p_on = '01' if sub_domain == 'binary_sensor' else ''
                 b_p_off = '00' if sub_domain == 'binary_sensor' else ''
                 b_s_on = '01' if sub_domain == 'binary_sensor' else ''

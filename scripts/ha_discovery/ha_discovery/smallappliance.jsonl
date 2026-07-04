@@ -249,7 +249,7 @@
 {"i":"905f","n":"Coffee Brewer Supported Features v1 - Favorites Supported","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 2) % 2 else '00' }}","fi":"favorites_supported","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9100","n":"Ice Maker Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Making ice', '01': 'Defrosting', '02': 'Cleaning', '03': 'Ice bin full', '04': 'Add water', '05': 'Ice bin missing', '06': 'Idle', '07': 'Missing water source', '08': 'Lid Open'}.get(value[:2], 'Unknown') }}"}
 {"i":"9101","n":"Ice Maker Light","d":"select","ds":1,"dc":"enum","vt":"{{ {'00': 'Off', '01': 'On', '02': 'Dim'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Off': '00', 'On': '01', 'Dim': '02'}[value] }}","o":"[\"Off\", \"On\", \"Dim\"]"}
-{"i":"9102","n":"Ice Maker Cloud Schedule Enabled","d":"switch","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"9102","n":"Ice Maker Cloud Schedule Enabled","d":"switch","ds":1,"vt":"{{ value[0:2] | int(base=16) }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9104","n":"Ice Maker Filter Status","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9105","n":"Under Counter Ice Maker Notifications - Clean soon","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 1) % 2 else '00' }}","fi":"clean_soon","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9105","n":"Under Counter Ice Maker Notifications - Clean now","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 2) % 2 else '00' }}","fi":"clean_now","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -257,7 +257,7 @@
 {"i":"9105","n":"Under Counter Ice Maker Notifications - Replace filter now","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 8) % 2 else '00' }}","fi":"replace_filter_now","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9105","n":"Under Counter Ice Maker Notifications - Door alarm active","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 16) % 2 else '00' }}","fi":"door_alarm_active","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9106","n":"Ice Maker Cleaning Required","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"9107","n":"Ice Maker Power","d":"switch","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"9107","n":"Ice Maker Power","d":"switch","ds":1,"vt":"{{ value[0:2] | int(base=16) }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9108","n":"Ice Maker Ice Production","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"9109","n":"Ice Maker Cube Size","d":"select","ds":1,"dc":"enum","vt":"{{ {'00': 'Small', '01': 'Standard', '02': 'Large'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Small': '00', 'Standard': '01', 'Large': '02'}[value] }}","o":"[\"Small\", \"Standard\", \"Large\"]"}
 {"i":"910a","n":"Under Counter Ice Maker Bin Full","d":"binary_sensor","ds":1,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -511,7 +511,7 @@
 {"i":"9222","n":"Toaster Oven Current Toast Mode Cooking Parameters - Max Shade Used","d":"binary_sensor","ds":28,"vt":"{{ '01' if ((value[52:56] | int(base=16)) // 8) % 2 else '00' }}","fi":"max_shade_used","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9222","n":"Toaster Oven Current Toast Mode Cooking Parameters - Min Count Used","d":"binary_sensor","ds":28,"vt":"{{ '01' if ((value[52:56] | int(base=16)) // 16) % 2 else '00' }}","fi":"min_count_used","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9222","n":"Toaster Oven Current Toast Mode Cooking Parameters - Max Count Used","d":"binary_sensor","ds":28,"vt":"{{ '01' if ((value[52:56] | int(base=16)) // 32) % 2 else '00' }}","fi":"max_count_used","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"9224","n":"Toaster Oven Door Alarm Silence","d":"switch","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"9224","n":"Toaster Oven Door Alarm Silence","d":"switch","ds":1,"vt":"{{ value[0:2] | int(base=16) }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9225","n":"Toaster Oven Reset Cooking Parameters for the Selected Cooking Mode","d":"select","ds":1,"dc":"enum","vt":"{{ {'00': 'Air Fry', '01': 'Bake', '02': 'Broil', '03': 'Roast', '04': 'Reheat', '05': 'Warm', '06': 'Slow Cook', '07': 'Dehydrate', '08': 'Proof', '09': 'Cookie', '0a': 'Pizza', '0b': 'Bagel', '0c': 'Toast', '0d': 'Crisp Finish', '0e': 'Cake', '0f': 'Cookie with Preferences', '10': 'Pizza with Preferences'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Air Fry': '00', 'Bake': '01', 'Broil': '02', 'Roast': '03', 'Reheat': '04', 'Warm': '05', 'Slow Cook': '06', 'Dehydrate': '07', 'Proof': '08', 'Cookie': '09', 'Pizza': '0a', 'Bagel': '0b', 'Toast': '0c', 'Crisp Finish': '0d', 'Cake': '0e', 'Cookie with Preferences': '0f', 'Pizza with Preferences': '10'}[value] }}","o":"[\"Air Fry\", \"Bake\", \"Broil\", \"Roast\", \"Reheat\", \"Warm\", \"Slow Cook\", \"Dehydrate\", \"Proof\", \"Cookie\", \"Pizza\", \"Bagel\", \"Toast\", \"Crisp Finish\", \"Cake\", \"Cookie with Preferences\", \"Pizza with Preferences\"]"}
 {"i":"9226","n":"Toaster Oven Current Crisp Finish Mode Cooking Parameters","d":"sensor","ds":28,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"9226","n":"Toaster Oven Current Crisp Finish Mode Cooking Parameters - Temperature Used","d":"binary_sensor","ds":28,"vt":"{{ '01' if ((value[52:56] | int(base=16)) // 256) % 2 else '00' }}","fi":"temperature_used","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -618,7 +618,7 @@
 {"i":"9303","n":"Mixer Control Settings Limits - Torque Profile Max Delta Torque","d":"sensor","ds":18,"vt":"{{ (value[16:20] | int(base=16)) - 65536 if (value[16:20] | int(base=16)) >= 32768 else (value[16:20] | int(base=16)) }}","fi":"torque_profile_max_delta_torque"}
 {"i":"9303","n":"Mixer Control Settings Limits - Torque Profile Min Baseline Sample Time","d":"sensor","ds":18,"vt":"{{ value[20:24] | int(base=16) }}","fi":"torque_profile_min_baseline_sample_time"}
 {"i":"9303","n":"Mixer Control Settings Limits - Torque Profile Max Baseline Sample Time","d":"sensor","ds":18,"vt":"{{ value[24:28] | int(base=16) }}","fi":"torque_profile_max_baseline_sample_time"}
-{"i":"9304","n":"Mixer Pause Mixing Cycle","d":"switch","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"9304","n":"Mixer Pause Mixing Cycle","d":"switch","ds":1,"vt":"{{ value[0:2] | int(base=16) }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9305","n":"Mixer State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Idle', '01': 'Mixing', '02': 'Paused'}.get(value[:2], 'Unknown') }}"}
 {"i":"9306","n":"Mixer Notifications - Out of Balance","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"out_of_balance","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9306","n":"Mixer Notifications - Sudden Stop","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 512) % 2 else '00' }}","fi":"sudden_stop","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -637,8 +637,8 @@
 {"i":"930a","n":"Cycle Timer Absolute Time Modification","d":"select","ds":8,"dc":"enum","vt":"{{ {'00': 'Subtract Cycle Time', '01': 'Add Cycle Time'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Subtract Cycle Time': '00', 'Add Cycle Time': '01'}[value] }}","o":"[\"Subtract Cycle Time\", \"Add Cycle Time\"]"}
 {"i":"930b","n":"Scale Mode Current Units","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Metric', '01': 'US Standard'}.get(value[:2], 'Unknown') }}"}
 {"i":"930d","n":"Scale Current Target Weight","d":"sensor","ds":2,"u":"g","dc":"weight","sc":"measurement","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
-{"i":"930f","n":"Scale Mode Enable","d":"switch","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"9310","n":"Tare Scale","d":"switch","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"930f","n":"Scale Mode Enable","d":"switch","ds":1,"vt":"{{ value[0:2] | int(base=16) }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"9310","n":"Tare Scale","d":"switch","ds":1,"vt":"{{ value[0:2] | int(base=16) }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9312","n":"Mixer Supported Equipment","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Generic', '01': 'First Gen Motor Drives 500W to 600W'}.get(value[0:2], 'Unknown') }}"}
 {"i":"9312","n":"Mixer Supported Equipment - Paddle Attachment Supported","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 256) % 2 else '00' }}","fi":"paddle_attachment_supported","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9312","n":"Mixer Supported Equipment - Whisk Attachment Supported","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 512) % 2 else '00' }}","fi":"whisk_attachment_supported","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -755,7 +755,7 @@
 {"i":"9433","n":"Igniter Temperature Limits - Igniter Temperature Min","d":"sensor","ds":4,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"9433","n":"Igniter Temperature Limits - Igniter Temperature Max","d":"sensor","ds":4,"u":"°F","vt":"{{ value[4:8] | int(base=16) }}","fi":"igniter_temperature_max"}
 {"i":"9434","n":"Reset Cooking Parameters","d":"select","ds":1,"dc":"enum","vt":"{{ {'00': 'All', '01': 'Custom', '02': 'Keep Warm', '03': 'Brisket', '04': 'Pork Rib', '05': 'Pork Butt', '06': 'Wings', '07': 'Chicken', '08': 'Salmon'}.get(value[:2], 'Unknown') }}","ct":"{{ {'All': '00', 'Custom': '01', 'Keep Warm': '02', 'Brisket': '03', 'Pork Rib': '04', 'Pork Butt': '05', 'Wings': '06', 'Chicken': '07', 'Salmon': '08'}[value] }}","o":"[\"All\", \"Custom\", \"Keep Warm\", \"Brisket\", \"Pork Rib\", \"Pork Butt\", \"Wings\", \"Chicken\", \"Salmon\"]"}
-{"i":"9435","n":"Restore Factory Defaults","d":"switch","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"9435","n":"Restore Factory Defaults","d":"switch","ds":1,"vt":"{{ value[0:2] | int(base=16) }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9436","n":"Smoker Type","d":"sensor","ds":1,"vt":"{{ {'00': 'Arden Indoor Smoker'}.get(value[:2], 'Unknown') }}"}
 {"i":"9437","n":"Smoker Push Notifications - Cooking Started","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 256) % 2 else '00' }}","fi":"cooking_started","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9437","n":"Smoker Push Notifications - Cooking Complete","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 512) % 2 else '00' }}","fi":"cooking_complete","pon":"01","poff":"00","son":"01","soff":"00"}

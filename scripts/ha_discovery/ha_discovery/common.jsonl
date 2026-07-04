@@ -1,6 +1,6 @@
 {"i":"0001","n":"Model Number","d":"sensor","ds":32,"vt":"{% set chars = ' !\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~' %}{% set ns = namespace(value='') %}{% for i in range(0, value | length, 2) %}{% set b = value[i:i+2] | int(base=16) %}{% if b >= 0x20 and b <= 0x7E %}{% set ns.value = ns.value ~ chars[b - 0x20] %}{% endif %}{% endfor %}{{ ns.value.rstrip('_') }}"}
 {"i":"0002","n":"Serial Number","d":"sensor","ds":32,"vt":"{% set chars = ' !\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~' %}{% set ns = namespace(value='') %}{% for i in range(0, value | length, 2) %}{% set b = value[i:i+2] | int(base=16) %}{% if b >= 0x20 and b <= 0x7E %}{% set ns.value = ns.value ~ chars[b - 0x20] %}{% endif %}{% endfor %}{{ ns.value.rstrip('_') }}"}
-{"i":"0004","n":"Control User Interface Locked","d":"switch","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"0004","n":"Control User Interface Locked","d":"switch","ds":1,"vt":"{{ value[0:2] | int(base=16) }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0005","n":"Clock Time - Hours","d":"number","ds":3,"u":"h","mn":0.0,"mx":0.0,"st":1.0,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"0005","n":"Clock Time - Minutes","d":"number","ds":3,"u":"h","mn":0.0,"mx":0.0,"st":1.0,"vt":"{{ value[2:4] | int(base=16) }}","fi":"minutes"}
 {"i":"0005","n":"Clock Time - Seconds","d":"number","ds":3,"u":"h","mn":0.0,"mx":0.0,"st":1.0,"vt":"{{ value[4:6] | int(base=16) }}","fi":"seconds"}
@@ -23,7 +23,7 @@
 {"i":"003a","n":"Application Version","d":"sensor","ds":4,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}"}
 {"i":"003b","n":"Parametric Version","d":"sensor","ds":4,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}"}
 {"i":"003c","n":"Auxiliary Version","d":"sensor","ds":4,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}"}
-{"i":"004f","n":"Enhanced Sabbath Mode Status","d":"switch","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"004f","n":"Enhanced Sabbath Mode Status","d":"switch","ds":1,"vt":"{{ value[0:2] | int(base=16) }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0050","n":"Timer","d":"number","ds":2,"u":"min","mn":0.0,"mx":65535.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}","m":"box"}
 {"i":"0099","n":"Brand ID","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'GEA - Covers all GEA Brands (GE, Profile, Cafe, Monogram, Hotpoint)', '02': 'Haier', '03': 'Mabe', '04': 'Fisher & Paykel', '05': 'GE', '06': 'Profile', '07': 'Cafe', '08': 'Monogram', '09': 'Hotpoint', '0a': 'Haier FPA', '0b': 'Adora', '0c': 'Allied', '0d': 'Lennox', '0e': 'FirstBuild'}.get(value[:2], 'Unknown') }}"}
 {"i":"009c","n":"Matter Product ID","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
