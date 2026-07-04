@@ -52,6 +52,7 @@ def apply_overrides(entries):
         "0x4026": {"ha_domain": "sensor"},
         "0x7907": {"ha_domain": "sensor", "unit_of_measurement": "steps"},
         "0x7938": {"ha_domain": "sensor"},
+        "0x710b": {"ha_domain": "sensor"},
         # --- Fan speed: add rpm unit ---
         "0x7136": {"unit_of_measurement": "rpm"},
         "0x7137": {"unit_of_measurement": "rpm"},
