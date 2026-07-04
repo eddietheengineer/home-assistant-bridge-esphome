@@ -534187,7 +534187,7 @@
       "ha_domain": "sensor",
       "device_class": "temperature",
       "unit_of_measurement": "\u00b0F",
-      "scaling_factor": 140,
+      "scaling_factor": null,
       "state_class": "measurement",
       "paired_erd": null,
       "pair_role": null,
