@@ -240,10 +240,10 @@ def _clean_field_name(name: str) -> str:
 
     E.g. 'Hours (hours)' -> 'Hours',
          'Line Input Voltage Volts x 100 (volts)' -> 'Line Input Voltage Volts x 100',
-         'Option n Drying Temperature (Fahrenheit x 10)[0]' -> 'Option n Drying Temperature'.
+         'Option n Drying Temperature (Fahrenheit x 10)[0]' -> 'Option n Drying Temperature[0]'.
     """
-    # Remove trailing array index like [0], [1], etc.
-    name = re.sub(r'\s*\[\d+\]\s*$', '', name)
+    # Keep trailing array index like [0], [1], etc. for uniqueness
+    # (removed: name = re.sub(r'\s*\[\d+\]\s*$', '', name))
     # Remove trailing parenthetical group like ' (hours)', ' (volts)'
     result = re.sub(r'\s*\([^)]*\)\s*$', '', name)
     return result.strip()

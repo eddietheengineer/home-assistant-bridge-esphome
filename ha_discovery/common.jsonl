@@ -47,21 +47,21 @@
 {"i":"0503","n":"Camera Stream Authentication Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'None', '01': 'Pending', '02': 'Failure', '03': 'Success'}.get(value[:2], 'Unknown') }}"}
 {"i":"0504","n":"Camera Stream Termination Reason","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'NotTerminated', '01': 'UserStopped', '02': 'WifiDisconnected', '03': 'CookModeInvalid', '04': 'Timeout', '05': 'CameraMissing', '06': 'AuthenticationFailed', '07': 'ProcessCheckFailed', '08': 'SabbathModeOn'}.get(value[:2], 'Unknown') }}"}
 {"i":"0600","n":"Supported Enhanced Features - Supported Feature Count","d":"sensor","ds":32,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[4:8] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[8:12] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[12:16] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[16:20] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[20:24] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[24:28] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[28:32] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[32:36] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[36:40] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[40:44] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[44:48] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[48:52] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[52:56] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[56:60] | int(base=16) }}","fi":"supported_digital_feature"}
-{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature","d":"sensor","ds":32,"vt":"{{ value[60:64] | int(base=16) }}","fi":"supported_digital_feature"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[0]","d":"sensor","ds":32,"vt":"{{ value[4:8] | int(base=16) }}","fi":"supported_digital_feature_0"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[1]","d":"sensor","ds":32,"vt":"{{ value[8:12] | int(base=16) }}","fi":"supported_digital_feature_1"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[2]","d":"sensor","ds":32,"vt":"{{ value[12:16] | int(base=16) }}","fi":"supported_digital_feature_2"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[3]","d":"sensor","ds":32,"vt":"{{ value[16:20] | int(base=16) }}","fi":"supported_digital_feature_3"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[4]","d":"sensor","ds":32,"vt":"{{ value[20:24] | int(base=16) }}","fi":"supported_digital_feature_4"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[5]","d":"sensor","ds":32,"vt":"{{ value[24:28] | int(base=16) }}","fi":"supported_digital_feature_5"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[6]","d":"sensor","ds":32,"vt":"{{ value[28:32] | int(base=16) }}","fi":"supported_digital_feature_6"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[7]","d":"sensor","ds":32,"vt":"{{ value[32:36] | int(base=16) }}","fi":"supported_digital_feature_7"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[8]","d":"sensor","ds":32,"vt":"{{ value[36:40] | int(base=16) }}","fi":"supported_digital_feature_8"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[9]","d":"sensor","ds":32,"vt":"{{ value[40:44] | int(base=16) }}","fi":"supported_digital_feature_9"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[10]","d":"sensor","ds":32,"vt":"{{ value[44:48] | int(base=16) }}","fi":"supported_digital_feature_10"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[11]","d":"sensor","ds":32,"vt":"{{ value[48:52] | int(base=16) }}","fi":"supported_digital_feature_11"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[12]","d":"sensor","ds":32,"vt":"{{ value[52:56] | int(base=16) }}","fi":"supported_digital_feature_12"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[13]","d":"sensor","ds":32,"vt":"{{ value[56:60] | int(base=16) }}","fi":"supported_digital_feature_13"}
+{"i":"0600","n":"Supported Enhanced Features - Supported Digital Feature[14]","d":"sensor","ds":32,"vt":"{{ value[60:64] | int(base=16) }}","fi":"supported_digital_feature_14"}
 {"i":"0602","n":"Current Enabled Enhanced Features","d":"sensor","ds":8,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 1 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 256) % 2 else '00' }}","fi":"digital_feature_1_enabled","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 2 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 512) % 2 else '00' }}","fi":"digital_feature_2_enabled","pon":"01","poff":"00","son":"01","soff":"00"}
