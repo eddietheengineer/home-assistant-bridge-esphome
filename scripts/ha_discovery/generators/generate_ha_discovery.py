@@ -1155,29 +1155,41 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 p_paired_erd = primary.get('paired_erd') or paired_erd_str
                 p_paired_id = parse_erd_id(p_paired_erd) if p_paired_erd else 0
                 p_ha_domain = primary.get('ha_domain') or ha_domain
-                if p_ha_domain == 'binary_sensor' and p_type == 'enum':
-                    # binary_sensor can't display enum labels; use ON/OFF
-                    p_dev_cls = ''
-                    p_field_size = primary.get('size', 1)
-                    p_vt = _compute_binary_sensor_value_template(p_field_size)
-                else:
-                    if p_ha_domain == 'switch':
-                        p_vt = _paired_switch_vt(primary, p_paired_erd, p_pair_role, erd_by_id)
+
+                # Skip the primary field if it's paired to a controllable request ERD
+                # (switch/select/number) — the request ERD handles state+command.
+                # Only generate the primary if it's unpaired or the paired request
+                # ERD is not a controllable domain.
+                skip_primary = False
+                if p_pair_role == 'status' and p_paired_erd and p_paired_erd in erd_by_id:
+                    req = erd_by_id[p_paired_erd]
+                    if req.get('pair_role') == 'request' and req.get('ha_domain') in ('switch', 'select', 'number'):
+                        skip_primary = True
+
+                if not skip_primary:
+                    if p_ha_domain == 'binary_sensor' and p_type == 'enum':
+                        # binary_sensor can't display enum labels; use ON/OFF
+                        p_dev_cls = ''
+                        p_field_size = primary.get('size', 1)
+                        p_vt = _compute_binary_sensor_value_template(p_field_size)
                     else:
-                        p_vt = _paired_field_vt(primary, p_paired_erd, p_pair_role, erd_by_id, scaling_factor)
-                # Compute min/max/step for number primary fields
-                p_min, p_max, p_step = 0.0, 0.0, 1.0
-                if p_ha_domain == 'number':
-                    p_min, p_max, p_step = _compute_number_range(p_type, scaling_factor)
-                collect(erd_id_int, display_name, p_ha_domain, unit, p_dev_cls,
-                        primary.get('state_class') or state_class, scaling_factor, data_size, p_paired_id,
-                        p_pair_role, p_vt, '', '', '',
-                        'box' if p_ha_domain == 'number' else '',
-                        '01' if p_ha_domain == 'switch' else '',
-                        '00' if p_ha_domain == 'switch' else '',
-                        '01' if p_ha_domain == 'switch' else '',
-                        '00' if p_ha_domain == 'switch' else '',
-                        p_min, p_max, p_step)
+                        if p_ha_domain == 'switch':
+                            p_vt = _paired_switch_vt(primary, p_paired_erd, p_pair_role, erd_by_id)
+                        else:
+                            p_vt = _paired_field_vt(primary, p_paired_erd, p_pair_role, erd_by_id, scaling_factor)
+                    # Compute min/max/step for number primary fields
+                    p_min, p_max, p_step = 0.0, 0.0, 1.0
+                    if p_ha_domain == 'number':
+                        p_min, p_max, p_step = _compute_number_range(p_type, scaling_factor)
+                    collect(erd_id_int, display_name, p_ha_domain, unit, p_dev_cls,
+                            primary.get('state_class') or state_class, scaling_factor, data_size, p_paired_id,
+                            p_pair_role, p_vt, '', '', '',
+                            'box' if p_ha_domain == 'number' else '',
+                            '01' if p_ha_domain == 'switch' else '',
+                            '00' if p_ha_domain == 'switch' else '',
+                            '01' if p_ha_domain == 'switch' else '',
+                            '00' if p_ha_domain == 'switch' else '',
+                            p_min, p_max, p_step)
 
             for field in [d for d in erd_data
                           if _has_bits(d) and not _is_reserved_field(d.get('name', ''))]:

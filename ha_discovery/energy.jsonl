@@ -57,7 +57,6 @@
 {"i":"d01f","n":"Appliance Gas Type","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'Natural Gas', '02': 'Liquid Propane'}.get(value[:2], 'Unknown') }}"}
 {"i":"d020","n":"Appliance Cumulative Hot Water Usage (mL)","d":"sensor","ds":4,"u":"mL","vt":"{{ value | int(base=16) }}"}
 {"i":"d021","n":"Appliance Cumulative Cold Water Usage (mL)","d":"sensor","ds":4,"u":"mL","vt":"{{ value | int(base=16) }}"}
-{"i":"d022","n":"Electrical Pricing Structure Selection","d":"sensor","ds":6,"dc":"enum","p":"d023","r":"status","vt":"{{ {'0000': 'None', '0001': 'Time Of Use', '0002': 'Block', '0003': 'TierBlock', '0004': 'BlockTier'}.get(value[0:4], 'Unknown') }}"}
 {"i":"d022","n":"Electrical Pricing Structure Selection - None","d":"binary_sensor","ds":6,"p":"d023","r":"status","vt":"{{ '01' if ((value[4:8] | int(base=16)) // 256) % 2 else '00' }}","fi":"none","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"d022","n":"Electrical Pricing Structure Selection - Time of Use","d":"binary_sensor","ds":6,"p":"d023","r":"status","vt":"{{ '01' if ((value[4:8] | int(base=16)) // 512) % 2 else '00' }}","fi":"time_of_use","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"d022","n":"Electrical Pricing Structure Selection - Blocks","d":"binary_sensor","ds":6,"p":"d023","r":"status","vt":"{{ '01' if ((value[4:8] | int(base=16)) // 1024) % 2 else '00' }}","fi":"blocks","pon":"01","poff":"00","son":"01","soff":"00"}
