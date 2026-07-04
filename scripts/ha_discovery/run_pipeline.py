@@ -10,7 +10,6 @@ Steps:
     3. Generate unfiltered JSONL files (if --no-filter).
     4. Compress filtered JSONL into ha_discovery_data.h.
     5. Compress unfiltered JSONL into ha_discovery_data_unfiltered.inc.
-    6. Copy JSONL files to ha_discovery/ and ha_discovery_unfiltered/.
 """
 
 import argparse
@@ -32,8 +31,7 @@ def main():
     pipeline = script_dir / "pipeline"
     processed = repo_root / "appliance_api_erd_definitions_processed.json"
     ha_dir = repo_root / "ha_discovery"
-    gen_dir = script_dir / "ha_discovery"
-    unfiltered_gen_dir = script_dir / "ha_discovery_unfiltered"
+    unfiltered_ha_dir = repo_root / "ha_discovery_unfiltered"
 
     def run(cmd, **kwargs):
         print(f"  {' '.join(str(c) for c in cmd)}", file=sys.stderr)
@@ -53,41 +51,27 @@ def main():
     print("Step 2: Generate filtered JSONL...", file=sys.stderr)
     run([sys.executable, str(generators / "generate_ha_discovery.py"),
          "--processed", str(processed),
-         "--output-dir", str(gen_dir)])
+         "--output-dir", str(ha_dir)])
 
     # Step 3: Compress filtered
     print("Step 3: Compress filtered header...", file=sys.stderr)
     run([sys.executable, str(generators / "compress_ha_discovery.py"),
-         "--input-dir", str(gen_dir),
+         "--input-dir", str(ha_dir),
          "--header-name", "ha_discovery_data"])
 
-    # Step 4: Copy filtered JSONL to ha_discovery/
-    print("Step 4: Copy filtered JSONL to ha_discovery/...", file=sys.stderr)
-    ha_dir.mkdir(parents=True, exist_ok=True)
-    for f in gen_dir.glob("*.jsonl"):
-        dest = ha_dir / f.name
-        dest.write_bytes(f.read_bytes())
-
-    # Step 5: Unfiltered variant (optional)
+    # Step 4: Unfiltered variant (optional)
     if args.no_filter:
-        print("Step 5: Generate unfiltered JSONL...", file=sys.stderr)
+        print("Step 4: Generate unfiltered JSONL...", file=sys.stderr)
         run([sys.executable, str(generators / "generate_ha_discovery.py"),
              "--processed", str(processed),
              "--no-filter",
-             "--output-dir", str(unfiltered_gen_dir)])
+             "--output-dir", str(unfiltered_ha_dir)])
 
-        print("Step 6: Compress unfiltered header...", file=sys.stderr)
+        print("Step 5: Compress unfiltered header...", file=sys.stderr)
         run([sys.executable, str(generators / "compress_ha_discovery.py"),
-             "--input-dir", str(unfiltered_gen_dir),
+             "--input-dir", str(unfiltered_ha_dir),
              "--header-name", "ha_discovery_data_unfiltered",
              "--extension", ".inc"])
-
-        # Copy unfiltered JSONL to ha_discovery_unfiltered/
-        unfiltered_ha_dir = repo_root / "ha_discovery_unfiltered"
-        unfiltered_ha_dir.mkdir(parents=True, exist_ok=True)
-        for f in unfiltered_gen_dir.glob("*.jsonl"):
-            dest = unfiltered_ha_dir / f.name
-            dest.write_bytes(f.read_bytes())
 
     print("Done!", file=sys.stderr)
 

@@ -263,7 +263,7 @@ class TestCompressEdgeCases(unittest.TestCase):
         """Verify all actual JSONL chunks decompress to <= HA_DISCOVERY_DECOMP_BUF_SIZE (18432)."""
         import glob as glob_mod
         DECOMP_BUF_SIZE = 18432
-        jsonl_dir = Path(__file__).parent / "ha_discovery" / "ha_discovery"
+        jsonl_dir = Path(__file__).parent.parent / "ha_discovery"
         for jsonl_path in sorted(jsonl_dir.glob("*.jsonl")):
             raw = jsonl_path.read_bytes()
             chunks = compress.split_into_chunks(raw)
