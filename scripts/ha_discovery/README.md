@@ -28,24 +28,20 @@ compress_ha_discovery.py      -->  components/geappliances_bridge/ha_discovery_d
 ## Running the Pipeline
 
 ```bash
-python3 scripts/ha_discovery/run_pipeline.py [--no-filter]
+python3 scripts/ha_discovery/run_pipeline.py
 ```
-
-Add `--no-filter` to also regenerate the unfiltered variant (`ha_discovery_data_unfiltered.inc`).
 
 **Always run this before committing changes to the processed JSON or generator scripts.** It regenerates all derived artifacts (JSONL files, compressed headers) so ESPHome builds use the latest data.
 
 ## Directory Structure
 
-- `pipeline/` - Auto-detection and validation scripts
+- `pipeline/` - Auto-detection scripts
   - `auto_detect_ha_domain.py` - Assign HA domain based on field type/name
   - `auto_detect_device_class.py` - Assign device_class based on keywords
   - `auto_detect_state_class.py` - Assign state_class for sensors
   - `auto_detect_scaling.py` - Infer scaling_factor from field name patterns
   - `auto_detect_pairings.py` - Detect Request/Status ERD pairs
   - `post_process.py` - Fix cross-field consistency issues
-  - `validate_json_format.py` - Validate source JSON format
-  - `validator_utils.py` - Shared validation utilities
   - `ha_constants.py` - HA domain/device_class constants and mappings
 
 - `generators/` - Code generation scripts
