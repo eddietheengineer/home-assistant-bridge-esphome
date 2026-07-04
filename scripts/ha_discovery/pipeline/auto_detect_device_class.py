@@ -240,7 +240,7 @@ def apply_detection(entries):
             continue
 
         total_checked += 1
-        review = entry.setdefault('review', {})
+        review = entry.get('review', {})
 
         dc, confidence = infer_device_class(entry)
         if dc is None:

@@ -332,7 +332,7 @@ def apply_detection(entries):
 
     for entry in entries:
         field_name = entry.get('field_name', '')
-        review = entry.setdefault('review', {})
+        review = entry.get('review', {})
 
         # Skip non-numeric types — unit/scaling only applies to numeric fields.
         field_type = entry.get('field_type', '')

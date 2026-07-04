@@ -8,6 +8,8 @@
 #ifdef USE_ESP32
 #include "esp_system.h"
 #include "esp_task_wdt.h"
+#elif defined(USE_ESP_IDF_STUBS)
+#include "esp-idf/esp_task_wdt.h"
 #endif
 
 GEA_TAG(TAG) = "geappliances_bridge";

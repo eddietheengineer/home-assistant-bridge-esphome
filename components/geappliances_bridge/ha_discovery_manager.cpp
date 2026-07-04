@@ -378,8 +378,7 @@ static const char* FILTER_KEYWORDS[] = {
  * pipeline are bounded by entity_name_buf[160] in ha_discovery_manager_t,
  * so the 256-byte buffer always has headroom. Long-term: replace with a
  * case-insensitive strstr variant to eliminate the stack allocation. */
-static bool should_filter_config_topic(const char* name)
-{
+static bool should_filter_config_topic(const char* name) {
     /* Convert name to lowercase for comparison. */
     char lower[256];
     size_t i, name_len = strlen(name);

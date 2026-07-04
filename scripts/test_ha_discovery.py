@@ -484,15 +484,13 @@ class TestGeneratedTemplatesMatchERD(unittest.TestCase):
                     f'{obj["n"]} is select but has no command_template')
 
     def test_number_has_command_template(self):
-        """Number entities with a paired request ERD have command_template."""
+        """Number entities have command_template."""
         for obj in self.entities:
             if obj['d'] != 'number':
                 continue
             with self.subTest(entity=obj['n']):
-                # Only numbers with a paired request ERD need a command_template
-                if obj.get('r') == 'request' and obj.get('p'):
-                    self.assertIn('ct', obj,
-                        f'{obj["n"]} is a paired number but has no command_template')
+                self.assertIn('ct', obj,
+                    f'{obj["n"]} is number but has no command_template')
 
     def test_no_bitwise_operators_in_any_template(self):
         """No template uses >> or & bitwise operators (invalid in Jinja2)."""
@@ -665,6 +663,78 @@ class TestEntityFiltering(unittest.TestCase):
             "0x100e (Turbo Freeze Status) should be included (asymmetric pairing)")
         self.assertIn('100f', entity_ids,
             "0x100f (Turbo Cool Status) should be included (asymmetric pairing)")
+
+
+
+class TestDeduplicateFieldIds(unittest.TestCase):
+    """Test that _deduplicate_field_ids resolves collisions correctly."""
+
+    def test_no_collision_passes_through(self):
+        """Entries with unique field_ids are unchanged."""
+        entries = [
+            {'erd_id': 0x301b, 'field_id': 'temp_high', 'value_template': '{{ value[0:2] }}'},
+            {'erd_id': 0x301b, 'field_id': 'temp_low', 'value_template': '{{ value[2:4] }}'},
+        ]
+        gen._deduplicate_field_ids(entries)
+        self.assertEqual(entries[0]['field_id'], 'temp_high')
+        self.assertEqual(entries[1]['field_id'], 'temp_low')
+
+    def test_collision_with_value_template(self):
+        """Colliding field_ids are disambiguated using byte offset from value_template."""
+        entries = [
+            {'erd_id': 0x301b, 'field_id': 'index', 'value_template': '{{ value[0:2] }}'},
+            {'erd_id': 0x301b, 'field_id': 'index', 'value_template': '{{ value[4:6] }}'},
+            {'erd_id': 0x301b, 'field_id': 'index', 'value_template': '{{ value[8:10] }}'},
+        ]
+        gen._deduplicate_field_ids(entries)
+        self.assertEqual(entries[0]['field_id'], 'index')  # first occurrence kept
+        self.assertEqual(entries[1]['field_id'], 'index_4')
+        self.assertEqual(entries[2]['field_id'], 'index_8')
+
+    def test_collision_without_value_template(self):
+        """Colliding entries without value_template use a counter fallback."""
+        entries = [
+            {'erd_id': 0x1041, 'field_id': 'press', 'value_template': ''},
+            {'erd_id': 0x1041, 'field_id': 'press', 'value_template': ''},
+            {'erd_id': 0x1041, 'field_id': 'press', 'value_template': ''},
+        ]
+        gen._deduplicate_field_ids(entries)
+        self.assertEqual(entries[0]['field_id'], 'press')
+        self.assertEqual(entries[1]['field_id'], 'press_1')
+        self.assertEqual(entries[2]['field_id'], 'press_2')
+
+    def test_collision_across_different_erds_is_independent(self):
+        """Same field_id in different ERDs is NOT a collision."""
+        entries = [
+            {'erd_id': 0x301b, 'field_id': 'temp', 'value_template': '{{ value[0:2] }}'},
+            {'erd_id': 0x301c, 'field_id': 'temp', 'value_template': '{{ value[0:2] }}'},
+        ]
+        gen._deduplicate_field_ids(entries)
+        self.assertEqual(entries[0]['field_id'], 'temp')
+        self.assertEqual(entries[1]['field_id'], 'temp')
+
+    def test_empty_field_id_skipped(self):
+        """Entries with empty field_id are not modified."""
+        entries = [
+            {'erd_id': 0x301b, 'field_id': '', 'value_template': '{{ value[0:2] }}'},
+            {'erd_id': 0x301b, 'field_id': '', 'value_template': '{{ value[2:4] }}'},
+        ]
+        gen._deduplicate_field_ids(entries)
+        self.assertEqual(entries[0]['field_id'], '')
+        self.assertEqual(entries[1]['field_id'], '')
+
+    def test_new_id_collides_with_existing(self):
+        """If the disambiguated id already exists, a suffix is appended."""
+        entries = [
+            {'erd_id': 0x301b, 'field_id': 'index', 'value_template': '{{ value[0:2] }}'},
+            {'erd_id': 0x301b, 'field_id': 'index_4', 'value_template': '{{ value[2:4] }}'},
+            {'erd_id': 0x301b, 'field_id': 'index', 'value_template': '{{ value[4:6] }}'},
+        ]
+        gen._deduplicate_field_ids(entries)
+        self.assertEqual(entries[0]['field_id'], 'index')
+        self.assertEqual(entries[1]['field_id'], 'index_4')
+        # Third entry would get index_4, but that's taken, so it gets index_4_1
+        self.assertEqual(entries[2]['field_id'], 'index_4_1')
 
 
 

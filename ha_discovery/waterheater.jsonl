@@ -35,17 +35,17 @@
 {"i":"4056","n":"Diagnostic Failure counts - defrost","d":"sensor","ds":32,"vt":"{{ value[36:38] | int(base=16) }}","fi":"defrost"}
 {"i":"4056","n":"Diagnostic Failure counts - evaporatorFrosted","d":"sensor","ds":32,"vt":"{{ value[38:40] | int(base=16) }}","fi":"evaporatorfrosted"}
 {"i":"4056","n":"Diagnostic Failure counts - vaporLocked","d":"sensor","ds":32,"vt":"{{ value[40:42] | int(base=16) }}","fi":"vaporlocked"}
-{"i":"4056","n":"Diagnostic Failure counts - unused[0]","d":"sensor","ds":32,"vt":"{{ value[42:44] | int(base=16) }}","fi":"unused_0"}
-{"i":"4056","n":"Diagnostic Failure counts - unused[1]","d":"sensor","ds":32,"vt":"{{ value[44:46] | int(base=16) }}","fi":"unused_1"}
-{"i":"4056","n":"Diagnostic Failure counts - unused[2]","d":"sensor","ds":32,"vt":"{{ value[46:48] | int(base=16) }}","fi":"unused_2"}
-{"i":"4056","n":"Diagnostic Failure counts - unused[3]","d":"sensor","ds":32,"vt":"{{ value[48:50] | int(base=16) }}","fi":"unused_3"}
-{"i":"4056","n":"Diagnostic Failure counts - unused[4]","d":"sensor","ds":32,"vt":"{{ value[50:52] | int(base=16) }}","fi":"unused_4"}
-{"i":"4056","n":"Diagnostic Failure counts - unused[5]","d":"sensor","ds":32,"vt":"{{ value[52:54] | int(base=16) }}","fi":"unused_5"}
-{"i":"4056","n":"Diagnostic Failure counts - unused[6]","d":"sensor","ds":32,"vt":"{{ value[54:56] | int(base=16) }}","fi":"unused_6"}
-{"i":"4056","n":"Diagnostic Failure counts - unused[7]","d":"sensor","ds":32,"vt":"{{ value[56:58] | int(base=16) }}","fi":"unused_7"}
-{"i":"4056","n":"Diagnostic Failure counts - unused[8]","d":"sensor","ds":32,"vt":"{{ value[58:60] | int(base=16) }}","fi":"unused_8"}
-{"i":"4056","n":"Diagnostic Failure counts - unused[9]","d":"sensor","ds":32,"vt":"{{ value[60:62] | int(base=16) }}","fi":"unused_9"}
-{"i":"4056","n":"Diagnostic Failure counts - unused[10]","d":"sensor","ds":32,"vt":"{{ value[62:64] | int(base=16) }}","fi":"unused_10"}
+{"i":"4056","n":"Diagnostic Failure counts - unused","d":"sensor","ds":32,"vt":"{{ value[42:44] | int(base=16) }}","fi":"unused"}
+{"i":"4056","n":"Diagnostic Failure counts - unused","d":"sensor","ds":32,"vt":"{{ value[44:46] | int(base=16) }}","fi":"unused"}
+{"i":"4056","n":"Diagnostic Failure counts - unused","d":"sensor","ds":32,"vt":"{{ value[46:48] | int(base=16) }}","fi":"unused"}
+{"i":"4056","n":"Diagnostic Failure counts - unused","d":"sensor","ds":32,"vt":"{{ value[48:50] | int(base=16) }}","fi":"unused"}
+{"i":"4056","n":"Diagnostic Failure counts - unused","d":"sensor","ds":32,"vt":"{{ value[50:52] | int(base=16) }}","fi":"unused"}
+{"i":"4056","n":"Diagnostic Failure counts - unused","d":"sensor","ds":32,"vt":"{{ value[52:54] | int(base=16) }}","fi":"unused"}
+{"i":"4056","n":"Diagnostic Failure counts - unused","d":"sensor","ds":32,"vt":"{{ value[54:56] | int(base=16) }}","fi":"unused"}
+{"i":"4056","n":"Diagnostic Failure counts - unused","d":"sensor","ds":32,"vt":"{{ value[56:58] | int(base=16) }}","fi":"unused"}
+{"i":"4056","n":"Diagnostic Failure counts - unused","d":"sensor","ds":32,"vt":"{{ value[58:60] | int(base=16) }}","fi":"unused"}
+{"i":"4056","n":"Diagnostic Failure counts - unused","d":"sensor","ds":32,"vt":"{{ value[60:62] | int(base=16) }}","fi":"unused"}
+{"i":"4056","n":"Diagnostic Failure counts - unused","d":"sensor","ds":32,"vt":"{{ value[62:64] | int(base=16) }}","fi":"unused"}
 {"i":"4058","n":"Heating Issues - Fault_T2Fail","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 72057594037927936) % 2 else '00' }}","fi":"fault_t2fail","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Heating Issues - Fault_T1T2VotingFailUsingT1","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 144115188075855872) % 2 else '00' }}","fi":"fault_t1t2votingfailusingt1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4058","n":"Heating Issues - Fault_SabbathKeeperLostComms","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 288230376151711744) % 2 else '00' }}","fi":"fault_sabbathkeeperlostcomms","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -134,8 +134,5 @@
 {"i":"411d","n":"Water Heater Dad Mode Delay In Minutes","d":"number","ds":1,"u":"min","mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"4125","n":"Water Heater Current Cost Of Power","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown cost', '01': 'Cost lower than average', '02': 'Average cost', '03': 'Cost higher than average'}.get(value[:2], 'Unknown') }}"}
 {"i":"4220","n":"Water Heater Boost Mode State - Status/Actual","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"4221","n":"Water Heater Boost Mode State - Requested/Desired","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4222","n":"Shutoff Water Valve Position/State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not fitted', '01': 'Open', '02': 'Closed', '03': 'Transition'}.get(value[:2], 'Unknown') }}"}
-{"i":"4223","n":"Requested Water Valve Position","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4225","n":"Water Heater Active State - Status/Actual","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"4226","n":"Water Heater Active State - Requested/Desired","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
