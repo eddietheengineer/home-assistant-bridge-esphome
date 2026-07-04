@@ -1087,18 +1087,29 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     f_dev_cls = ''
                     field_size = field.get('size', 1)
                     vt = _compute_binary_sensor_value_template(field_size)
+                elif f_ha_domain == 'select' and f_type == 'enum':
+                    f_dev_cls = ''
+                    field_size = field.get('size', 1)
+                    enum_vals = field.get('values', {})
+                    if enum_vals:
+                        opts, vt, ct = _select_options_and_templates(enum_vals, field_size)
+                    else:
+                        # No enum values; fall back to sensor-style VT
+                        vt = _enum_sensor_value_template(enum_vals, field_size)
+                        opts, ct = '', ''
                 else:
                     if f_ha_domain == 'switch':
                         vt = _paired_switch_vt(field, f_paired_erd, f_pair_role, erd_by_id)
                     else:
                         vt = _paired_field_vt(field, f_paired_erd, f_pair_role, erd_by_id, scaling_factor)
+                    opts, ct = '', ''
                 # Compute min/max/step for number sub-fields
                 f_min, f_max, f_step = 0.0, 0.0, 1.0
                 if f_ha_domain == 'number':
                     f_min, f_max, f_step = _compute_number_range(f_type, scaling_factor)
                 collect(erd_id_int, entity_name, f_ha_domain, f_unit, f_dev_cls,
                         f_state_cls, scaling_factor, data_size, f_paired_id,
-                        f_pair_role, vt, '', '', fid, '',
+                        f_pair_role, vt, ct, opts, fid, '',
                         '01' if f_ha_domain == 'switch' else '',
                         '00' if f_ha_domain == 'switch' else '',
                         '01' if f_ha_domain == 'switch' else '',
