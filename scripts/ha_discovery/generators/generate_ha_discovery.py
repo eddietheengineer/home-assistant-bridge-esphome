@@ -849,6 +849,21 @@ def _paired_bitfield_vt(field: Dict, paired_erd_str: str, pair_role: str,
             return _bitfield_sub_value_template(paired)
     return _bitfield_sub_value_template(field)
 
+def _paired_switch_vt(field: Dict, paired_erd_str: str, pair_role: str,
+                      erd_by_id: Dict[str, Dict]) -> str:
+    """Return a raw hex extraction VT for a switch, using the paired status
+    field's offset/size. Output matches state_on/state_off (e.g. '01'/'00').
+    """
+    if pair_role == 'request' and paired_erd_str and paired_erd_str in erd_by_id:
+        paired = _find_paired_field(field, paired_erd_str, erd_by_id)
+        if paired is not None:
+            field = paired
+    offset = field.get('offset', 0)
+    size = field.get('size', 1)
+    hex_start = offset * 2
+    hex_end = (offset + size) * 2
+    return f"{{{{ value[{hex_start}:{hex_end}] }}}}"
+
 
 def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
     """Process all ERDs with ha_domain metadata and return a list of entry dicts.
@@ -960,14 +975,12 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 elif data_size <= 4:
                     signed = _is_signed_type(_get_primary_data_type(erd_data))
                     vt = _compute_sensor_value_template(scaling_factor, data_size, signed)
-            elif ha_domain == 'binary_sensor':
-                vt = _compute_binary_sensor_value_template(data_size)
             elif ha_domain == 'switch':
                 # For paired switches, read state from the status ERD's primary field.
                 pf = _get_primary_field(erd_by_id, paired_erd_str)
                 if pf is None:
                     pf = {'name': '', 'type': 'u8', 'offset': 0, 'size': 1}
-                vt = _paired_field_vt(pf, paired_erd_str, pair_role, erd_by_id, 1) or ''
+                vt = _paired_switch_vt(pf, paired_erd_str, pair_role, erd_by_id)
             elif ha_domain == 'select':
                 ev, fs = _get_first_enum_field_info(erd_data)
                 if ev:
@@ -1043,7 +1056,10 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     f_dev_cls = ''
                     vt = _compute_binary_sensor_value_template(data_size)
                 else:
-                    vt = _paired_field_vt(field, paired_erd_str, pair_role, erd_by_id, scaling_factor)
+                    if ha_domain == 'switch':
+                        vt = _paired_switch_vt(field, paired_erd_str, pair_role, erd_by_id)
+                    else:
+                        vt = _paired_field_vt(field, paired_erd_str, pair_role, erd_by_id, scaling_factor)
                 collect(erd_id_int, entity_name, ha_domain, f_unit, f_dev_cls,
                         f_state_cls, scaling_factor, data_size, paired_erd_id,
                         pair_role, vt, '', '', fid, '', '', '', '', '')
@@ -1077,7 +1093,10 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     p_dev_cls = ''
                     p_vt = _compute_binary_sensor_value_template(data_size)
                 else:
-                    p_vt = _paired_field_vt(primary, paired_erd_str, pair_role, erd_by_id, scaling_factor)
+                    if ha_domain == 'switch':
+                        p_vt = _paired_switch_vt(primary, paired_erd_str, pair_role, erd_by_id)
+                    else:
+                        p_vt = _paired_field_vt(primary, paired_erd_str, pair_role, erd_by_id, scaling_factor)
                 collect(erd_id_int, display_name, ha_domain, unit, p_dev_cls,
                         state_class, scaling_factor, data_size, paired_erd_id,
                         pair_role, p_vt, '', '', '', '', '', '', '', '')
