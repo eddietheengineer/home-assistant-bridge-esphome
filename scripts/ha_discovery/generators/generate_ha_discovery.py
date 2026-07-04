@@ -1114,7 +1114,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             )
             if primary:
                 p_type = primary.get('type', '')
-                p_dev_cls = 'enum' if p_type == 'enum' else device_class
+                p_dev_cls = 'enum' if p_type == 'enum' else (primary.get('device_class') or device_class)
                 # Use per-field pairing/domain if available (mixed-pairing ERDs)
                 p_pair_role = primary.get('pair_role') or pair_role
                 p_paired_erd = primary.get('paired_erd') or paired_erd_str
@@ -1130,7 +1130,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     else:
                         p_vt = _paired_field_vt(primary, p_paired_erd, p_pair_role, erd_by_id, scaling_factor)
                 collect(erd_id_int, display_name, p_ha_domain, unit, p_dev_cls,
-                        state_class, scaling_factor, data_size, p_paired_id,
+                        primary.get('state_class') or state_class, scaling_factor, data_size, p_paired_id,
                         p_pair_role, p_vt, '', '', '',
                         'box' if p_ha_domain == 'number' else '',
                         '01' if p_ha_domain == 'switch' else '',
