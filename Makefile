@@ -117,9 +117,4 @@ clean:
 pytest:
 	@python3 -m pytest scripts/test_generate_erd_lists.py scripts/test_ha_discovery.py -v
 
-.PHONY: test-unfiltered
-test-unfiltered:
-	@echo Running tests with unfiltered HA discovery data...
-	@$(MAKE) test CPPFLAGS="$(CPPFLAGS) -DHA_DISCOVERY_UNFILTERED"
-
 -include $(DEPS)

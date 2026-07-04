@@ -1269,7 +1269,7 @@ def fetch_erd_definitions_from_github() -> Optional[dict]:
         return None
 
 
-def _build_erds_from_flat_list(flat_entries: List[Dict], no_filter: bool = False) -> List[Dict]:
+def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
     """Convert the flat processed JSON list into grouped ERD objects.
 
     The processed JSON is a flat list where each entry represents one field
@@ -1332,9 +1332,7 @@ def _build_erds_from_flat_list(flat_entries: List[Dict], no_filter: bool = False
         if review.get('pair_role'):
             erd['pair_role'] = review['pair_role']
 
-        # Skip filtered entries unless --no-filter is used
-        if not no_filter and review.get('filtered'):
-            continue
+        pass
 
         erds.append(erd)
 
@@ -1352,8 +1350,6 @@ def main():
                         help="Path to processed ERD definitions JSON (flat list format).")
     parser.add_argument("--output-dir", type=str, default=None,
                         help="Output directory for JSONL files.")
-    parser.add_argument("--no-filter", action="store_true",
-                        help="Include all entities without filtering.")
     args = parser.parse_args()
 
     script_dir = Path(__file__).parent
@@ -1373,9 +1369,9 @@ def main():
             print(f"Failed to read {args.processed}: {e}", file=sys.stderr)
             sys.exit(1)
         # Processed JSON is a flat list; group by erd_id to build ERD objects
-        erds = _build_erds_from_flat_list(data, no_filter=args.no_filter)
+        erds = _build_erds_from_flat_list(data)
     else:
-        # Try to find the JSON file locally (raw format)
+        erds = _build_erds_from_flat_list(data)
         json_file = find_erd_definitions_json()
         if json_file is not None:
             print(f"Reading ERD definitions from {json_file}", file=sys.stderr)

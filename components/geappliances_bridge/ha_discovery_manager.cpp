@@ -8,11 +8,7 @@
  */
 
 #include "ha_discovery_manager.h"
-#ifdef HA_DISCOVERY_UNFILTERED
-#include "ha_discovery_data_unfiltered.inc"
-#else
 #include "ha_discovery_data.h"
-#endif
 #include "geappliances_bridge_log.h"
 
 #include <cstdio>

@@ -8,8 +8,7 @@ Steps:
     1. Run auto_detect_scaling on the processed JSON (in-place).
     2. Post-process (reapply overrides).
     3. Generate JSONL files to ha_discovery/.
-    4. Compress filtered JSONL into ha_discovery_data.h.
-    5. Compress unfiltered JSONL into ha_discovery_data_unfiltered.inc.
+    4. Compress JSONL into ha_discovery_data.h.
 """
 
 import subprocess
@@ -45,18 +44,11 @@ def main():
          "--processed", str(processed),
          "--output-dir", str(ha_dir)])
 
-    # Step 4: Compress filtered header
-    print("Step 4: Compress filtered header...", file=sys.stderr)
+    # Step 4: Compress into ha_discovery_data.h
+    print("Step 4: Compress header...", file=sys.stderr)
     run([sys.executable, str(generators / "compress_ha_discovery.py"),
          "--input-dir", str(ha_dir),
          "--header-name", "ha_discovery_data"])
-
-    # Step 5: Compress unfiltered header from same JSONL
-    print("Step 5: Compress unfiltered header...", file=sys.stderr)
-    run([sys.executable, str(generators / "compress_ha_discovery.py"),
-         "--input-dir", str(ha_dir),
-         "--header-name", "ha_discovery_data_unfiltered",
-         "--extension", ".inc"])
 
     print("Done!", file=sys.stderr)
 
