@@ -1104,6 +1104,11 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                         f_scaling = int(field.get('scaling_factor') or scaling_factor)
                         vt = _paired_field_vt(field, f_paired_erd, f_pair_role, erd_by_id, f_scaling)
                     opts, ct = '', ''
+                    # Generate command_template for number entities on request ERDs
+                    if f_ha_domain == 'number' and f_pair_role == 'request':
+                        field_size = field.get('size', 1)
+                        signed = _is_signed_type(f_type)
+                        ct = _number_command_template(field_size, f_scaling, signed)
                 # Compute min/max/step for number sub-fields
                 f_min, f_max, f_step = 0.0, 0.0, 1.0
                 if f_ha_domain == 'number':
@@ -1178,9 +1183,16 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     else:
                         if p_ha_domain == 'switch':
                             p_vt = _paired_switch_vt(primary, p_paired_erd, p_pair_role, erd_by_id)
+                            p_ct = ''
                         else:
                             p_scaling = int(primary.get('scaling_factor') or scaling_factor)
                             p_vt = _paired_field_vt(primary, p_paired_erd, p_pair_role, erd_by_id, p_scaling)
+                            p_ct = ''
+                            # Generate command_template for number entities on request ERDs
+                            if p_ha_domain == 'number' and p_pair_role == 'request':
+                                p_field_size = primary.get('size', 1)
+                                p_signed = _is_signed_type(p_type)
+                                p_ct = _number_command_template(p_field_size, p_scaling, p_signed)
                     # Compute min/max/step for number primary fields
                     p_min, p_max, p_step = 0.0, 0.0, 1.0
                     if p_ha_domain == 'number':
@@ -1188,7 +1200,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                         p_min, p_max, p_step = _compute_number_range(p_type, p_scaling)
                     collect(erd_id_int, display_name, p_ha_domain, unit, p_dev_cls,
                             primary.get('state_class') or state_class, scaling_factor, data_size, p_paired_id,
-                            p_pair_role, p_vt, '', '', '',
+                            p_pair_role, p_vt, p_ct, '', '',
                             'box' if p_ha_domain == 'number' else '',
                             '01' if p_ha_domain == 'switch' else '',
                             '00' if p_ha_domain == 'switch' else '',

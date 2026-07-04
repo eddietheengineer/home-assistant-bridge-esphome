@@ -1416,7 +1416,7 @@
 {"i":"1313","n":"Grow Profile Chamber 3 - Data[239]","d":"number","ds":240,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value[478:480] | int(base=16) }}","fi":"data_239"}
 {"i":"1314","n":"Water Intake Configuration","d":"select","ds":1,"vt":"{{ {'00': 'Water Tank', '01': 'Water Supply Line'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Water Tank': '00', 'Water Supply Line': '01'}[value] }}","o":"[\"Water Tank\", \"Water Supply Line\"]"}
 {"i":"1315","n":"Paused Mode - Paused Mode Request","d":"select","ds":8,"p":"1327","r":"request","vt":"{{ {'00': 'Exit', '01': 'Enter'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Exit': '00', 'Enter': '01'}[value] }}","o":"[\"Exit\", \"Enter\"]"}
-{"i":"1315","n":"Paused Mode - Request ID","d":"number","ds":8,"mn":0.0,"mx":4294967295.0,"st":1.0,"p":"1327","r":"request","vt":"{{ value[8:16] | int(base=16) }}","fi":"request_id"}
+{"i":"1315","n":"Paused Mode - Request ID","d":"number","ds":8,"mn":0.0,"mx":4294967295.0,"st":1.0,"p":"1327","r":"request","vt":"{{ value[8:16] | int(base=16) }}","ct":"{{ '%08x' % (value | int) }}","fi":"request_id"}
 {"i":"1316","n":"Display Chamber Remaining Minutes","d":"sensor","ds":2,"u":"min","vt":"{{ value | int(base=16) }}"}
 {"i":"1317","n":"Actual Display always on feature","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1318","n":"Actual growing week chamber 1","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
