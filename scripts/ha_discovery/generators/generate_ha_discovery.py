@@ -1075,7 +1075,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 entity_name = f'{display_name} - {leaf}'
                 fid = '' if idx == 0 else _field_slug(leaf)
                 f_type = field.get('type', '')
-                f_dev_cls = 'enum' if f_type == 'enum' else (field.get('device_class') or device_class)
+                f_dc = field.get('device_class') or ''
+                f_dev_cls = f_dc or ('enum' if f_type == 'enum' else '')
                 f_state_cls = field.get('state_class') or state_class
                 f_unit = _infer_unit_from_field_name(leaf, unit)
                 # Use per-field pairing/domain if available (mixed-pairing ERDs)
@@ -1149,7 +1150,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             )
             if primary:
                 p_type = primary.get('type', '')
-                p_dev_cls = 'enum' if p_type == 'enum' else (primary.get('device_class') or device_class)
+                p_dc = primary.get('device_class') or ''
+                p_dev_cls = p_dc or ('enum' if p_type == 'enum' else '')
                 # Use per-field pairing/domain if available (mixed-pairing ERDs)
                 p_pair_role = primary.get('pair_role') or pair_role
                 p_paired_erd = primary.get('paired_erd') or paired_erd_str
@@ -1427,8 +1429,8 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
                 field['pair_role'] = field_review['pair_role']
             if field_review.get('ha_domain'):
                 field['ha_domain'] = field_review['ha_domain']
-            if field_review.get('device_class') is not None:
-                field['device_class'] = field_review['device_class']
+            if 'device_class' in field_review:
+                field['device_class'] = field_review['device_class'] or ''
             if field_review.get('state_class'):
                 field['state_class'] = field_review['state_class']
             data_fields.append(field)
