@@ -30,3 +30,13 @@ These ERDs are read-only status values reported by the appliance. They should no
 | 0x7513 | EEV2 Desired Position  |
 | 0x7514 | EEV1 Actual Position   |
 | 0x7515 | EEV2 Actual Position   |
+
+## Remove `write` from Processed Ambient Temperature ERDs
+
+These are read-only processed temperature values. Remove `write` from `erd_operations` for:
+
+| ERD  | Name                                              |
+|------|---------------------------------------------------|
+| 0x7104 | Processed Inside ambient temperature              |
+| 0x7114 | Processed indoor ambient temperature (rounded)    |
+| 0x7115 | Processed outdoor ambient temperature (rounded)   |
