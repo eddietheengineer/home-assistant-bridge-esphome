@@ -125,6 +125,9 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     (void)payload;
     ha_discovery_cleanup_t* self = (ha_discovery_cleanup_t*)arg;
 
+    /* Guard against callback firing after destroy (memset zeroes struct). */
+    if (self == NULL || self->get_time_ms == NULL) return;
+
     /* Only remove config topics. */
     size_t topic_len = strlen(topic);
     if (topic_len < 7) return;
@@ -342,11 +345,19 @@ void ha_discovery_cleanup_destroy(ha_discovery_cleanup_t* self)
         memset(self, 0, sizeof(*self));
         return;
     }
+
+    /* Null get_time_ms before unsubscribe to guard against the callback
+     * firing after the unsubscribe ack is dropped (use-after-free variant).
+     * The callback checks get_time_ms == NULL and returns early. */
+    self->get_time_ms = NULL;
+
     if (self->subscribed && self->mqtt_client != NULL) {
+        mqtt_client_t* client = self->mqtt_client;
+        self->mqtt_client = NULL;
         char sub_topic[128];
         snprintf(sub_topic, sizeof(sub_topic),
             "homeassistant/+/%s/#", self->device_id);
-        mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
+        mqtt_client_unsubscribe(client, sub_topic);
         self->subscribed = false;
     }
     memset(self, 0, sizeof(*self));

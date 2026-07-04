@@ -186,6 +186,10 @@ static void build_sorted_erd_list(ha_discovery_manager_t* self)
 
 static void build_device_json(ha_discovery_manager_t* self)
 {
+    if (self->device_id == NULL) {
+        self->device_json_buf[0] = '\0';
+        return;
+    }
     int pos = snprintf(self->device_json_buf, sizeof(self->device_json_buf),
         "{\"identifiers\":[\"");
 
@@ -403,6 +407,7 @@ static bool should_filter_config_topic(const char* name) {
 #ifdef USE_ESP_IDF
 static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
 {
+    if (self->device_id == NULL) return false;
     const char* val = NULL;
     size_t len = 0;
 
@@ -521,6 +526,10 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     }
     {
         size_t prefix_len = strlen(self->domain_topic_prefix);
+        if (prefix_len >= sizeof(self->topic_buf)) {
+            self->total_filtered++;
+            return false;
+        }
         size_t remaining = sizeof(self->topic_buf) - prefix_len - 1; /* -1 for null */
         if (self->field_id_buf[0]) {
             snprintf(self->topic_buf + prefix_len, remaining, "%s_%s/config", erd_id_hex, self->field_id_buf);

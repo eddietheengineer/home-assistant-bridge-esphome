@@ -113,10 +113,14 @@ def apply_detection(entries):
             continue
 
         total_checked += 1
-        review = entry.get('review', {})
+        review = entry.setdefault('review', {})
 
         sc, confidence = infer_state_class(entry)
         if sc is None:
+            continue
+
+        # Only write when not already set, preserving manual overrides.
+        if review.get('state_class'):
             continue
 
         total_matched += 1

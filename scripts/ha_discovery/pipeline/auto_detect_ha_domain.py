@@ -223,10 +223,14 @@ def apply_detection(entries):
 
     for entry in entries:
         total_checked += 1
-        review = entry.get('review', {})
+        review = entry.setdefault('review', {})
 
         domain, confidence = infer_ha_domain(entry)
         if domain is None:
+            continue
+
+        # Only write when not already set, preserving manual overrides.
+        if review.get('ha_domain'):
             continue
 
         total_matched += 1

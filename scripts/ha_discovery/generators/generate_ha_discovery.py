@@ -1453,11 +1453,11 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
                 field['pair_role'] = field_review['pair_role']
             if field_review.get('ha_domain'):
                 field['ha_domain'] = field_review['ha_domain']
-            if 'device_class' in field_review:
+            if field_review.get('device_class') is not None:
                 field['device_class'] = field_review['device_class'] or ''
             if field_review.get('state_class'):
                 field['state_class'] = field_review['state_class']
-            if 'scaling_factor' in field_review:
+            if field_review.get('scaling_factor'):
                 field['scaling_factor'] = field_review['scaling_factor']
             if field_review.get('unit_of_measurement'):
                 field['unit_of_measurement'] = field_review['unit_of_measurement']

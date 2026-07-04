@@ -240,10 +240,14 @@ def apply_detection(entries):
             continue
 
         total_checked += 1
-        review = entry.get('review', {})
+        review = entry.setdefault('review', {})
 
         dc, confidence = infer_device_class(entry)
         if dc is None:
+            continue
+
+        # Only write when not already set, preserving manual overrides.
+        if review.get('device_class') is not None:
             continue
 
         total_matched += 1
