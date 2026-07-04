@@ -111,7 +111,8 @@ def match_fields(req_fields, stat_fields):
     """Match request fields to status fields.
 
     Returns list of (req_entry, stat_entry, score) tuples for matched pairs.
-    Requires exact normalized name match plus matching type, offset, and size.
+    First tries exact normalized name match plus matching type, offset, and size.
+    Falls back to fuzzy name matching via field_match_score when exact match fails.
     Uses greedy matching: each field can only be matched once.
     """
     matches = []
@@ -125,6 +126,7 @@ def match_fields(req_fields, stat_fields):
             stat_by_name[key] = []
         stat_by_name[key].append(sf)
 
+    # Phase 1: exact structural match
     for rf in req_fields:
         key = normalize_field_name(rf['field_name'])
         if key not in stat_by_name:
@@ -159,44 +161,70 @@ def match_fields(req_fields, stat_fields):
             used_stat.add(id(sf))
             break  # each request field matches at most one status field
 
+    # Phase 2: fuzzy match for unmatched request fields
+    for rf in req_fields:
+        # Skip if already matched
+        if any(m[0] is rf for m in matches):
+            continue
+
+        best_sf = None
+        best_score = 0
+        for sf in stat_fields:
+            if id(sf) in used_stat:
+                continue
+            score = field_match_score(rf['field_name'], sf['field_name'])
+            if score >= 50 and score > best_score:
+                best_score = score
+                best_sf = sf
+
+        if best_sf is not None:
+            matches.append((rf, best_sf, best_score))
+            used_stat.add(id(best_sf))
+
     return matches
 
 
 def find_erd_pairs(erd_by_id, erd_ids):
-    """Find all Request/Status ERD pairs (including those with field count differences).
+    """Find all Request/Status ERD pairs, including non-adjacent ones.
+
+    Searches all pairs of ERDs (not just adjacent) to find Request/Status
+    relationships. Uses name-based matching: strips 'Request'/'Status'
+    suffixes and compares the base names.
 
     Returns list of (request_erd_id, status_erd_id) tuples.
     """
     pairs = []
+    n = len(erd_ids)
 
-    for i, erd_id in enumerate(erd_ids):
-        if i + 1 >= len(erd_ids):
-            continue
-
-        next_id = erd_ids[i + 1]
-        erd = erd_by_id[erd_id]
-        next_erd = erd_by_id[next_id]
-
+    for i in range(n):
+        erd = erd_by_id[erd_ids[i]]
         nl = erd['name'].lower()
-        nxl = next_erd['name'].lower()
-
         has_req = 'request' in nl
         has_stat = 'status' in nl
-        next_req = 'request' in nxl
-        next_stat = 'status' in nxl
 
-        if not ((has_req and next_stat) or (has_stat and next_req)):
+        if not has_req and not has_stat:
             continue
 
         base1 = strip_request_status(erd['name'])
-        base2 = strip_request_status(next_erd['name'])
-        if base1.lower() != base2.lower():
-            continue
 
-        req_id = erd_id if has_req else next_id
-        stat_id = next_id if has_req else erd_id
+        for j in range(i + 1, n):
+            next_erd = erd_by_id[erd_ids[j]]
+            nxl = next_erd['name'].lower()
+            next_req = 'request' in nxl
+            next_stat = 'status' in nxl
 
-        pairs.append((req_id, stat_id))
+            if not ((has_req and next_stat) or (has_stat and next_req)):
+                continue
+
+            base2 = strip_request_status(next_erd['name'])
+            if base1.lower() != base2.lower():
+                continue
+
+            req_id = erd_ids[i] if has_req else erd_ids[j]
+            stat_id = erd_ids[j] if has_req else erd_ids[i]
+
+            pairs.append((req_id, stat_id))
+            break  # each ERD can only be in one pair
 
     return pairs
 
@@ -207,11 +235,11 @@ def apply_pairings(entries, erd_by_id, erd_ids):
     Clears any existing pairings first, then re-computes from scratch.
     Returns (num_pairs, num_field_matches) counts.
     """
-    # Clear existing pairings
+    # Clear existing pairings, using setdefault for entries without 'review'
     for e in entries:
-        e['review']['paired_erd'] = None
-        e['review']['pair_role'] = None
-
+        review = e.setdefault('review', {})
+        review['paired_erd'] = None
+        review['pair_role'] = None
 
     total_matches = 0
     pairs = find_erd_pairs(erd_by_id, erd_ids)
@@ -223,10 +251,12 @@ def apply_pairings(entries, erd_by_id, erd_ids):
         matches = match_fields(req_entries, stat_entries)
 
         for req_entry, stat_entry, score in matches:
-            req_entry['review']['paired_erd'] = stat_id
-            req_entry['review']['pair_role'] = 'request'
-            stat_entry['review']['paired_erd'] = req_id
-            stat_entry['review']['pair_role'] = 'status'
+            req_review = req_entry.setdefault('review', {})
+            stat_review = stat_entry.setdefault('review', {})
+            req_review['paired_erd'] = stat_id
+            req_review['pair_role'] = 'request'
+            stat_review['paired_erd'] = req_id
+            stat_review['pair_role'] = 'status'
             total_matches += 2
 
     return len(pairs), total_matches

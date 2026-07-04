@@ -214,7 +214,11 @@ def infer_ha_domain(entry):
 
 
 def apply_detection(entries):
-    """Walk all entries, detect ha_domain, and overwrite review field."""
+    """Walk all entries, detect ha_domain, and overwrite review field.
+
+    Only overwrites ha_domain when a new value is detected, preserving
+    manually assigned domains not inferred by the detector.
+    """
     total_checked = 0
     total_matched = 0
     total_applied = 0
@@ -222,8 +226,6 @@ def apply_detection(entries):
     for entry in entries:
         total_checked += 1
         review = entry.get('review', {})
-
-        review['ha_domain'] = None
 
         domain, confidence = infer_ha_domain(entry)
         if domain is None:

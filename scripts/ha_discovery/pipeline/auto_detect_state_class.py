@@ -60,7 +60,7 @@ def infer_state_class(entry):
         # Exclude averages (instantaneous derived values)
         if 'average' in name_lower:
             return None, None
-        if device_class in ('energy', 'gas', 'water', 'volume', 'power'):
+        if device_class in ('energy', 'gas', 'water', 'volume'):
             return 'total', 0.9
 
     # --- Total_increasing: counters that only increase ---
@@ -98,7 +98,11 @@ def infer_state_class(entry):
 
 
 def apply_detection(entries):
-    """Walk all entries, detect state_class, and overwrite review field."""
+    """Walk all entries, detect state_class, and overwrite review field.
+
+    Only overwrites state_class when a new value is detected, preserving
+    manually assigned state_class not inferred by the detector.
+    """
     total_checked = 0
     total_matched = 0
     total_applied = 0
@@ -110,9 +114,6 @@ def apply_detection(entries):
 
         total_checked += 1
         review = entry.get('review', {})
-
-        # Always reset before re-detecting (idempotent)
-        review['state_class'] = None
 
         sc, confidence = infer_state_class(entry)
         if sc is None:

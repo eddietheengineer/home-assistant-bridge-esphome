@@ -48,9 +48,9 @@ static const char* json_get_str(const char* json, const char* key,
     const char* p = json;
 
     while ((p = strstr(p, "\"")) != NULL) {
-        /* Verify this " is the start of a key (preceded by { or ,),
+        /* Verify this " is the start of a key (preceded by {, ,, or [),
          * not a value that happens to match the key name. */
-        if (p > json && *(p - 1) != '{' && *(p - 1) != ',') { p++; continue; }
+        if (p > json && *(p - 1) != '{' && *(p - 1) != ',' && *(p - 1) != '[') { p++; continue; }
         if (strncmp(p + 1, key, key_len) == 0 && p[key_len + 1] == '\"') {
             p = p + key_len + 3;
             while (*p == ' ' || *p == '\t') p++;
@@ -58,7 +58,7 @@ static const char* json_get_str(const char* json, const char* key,
                 *out_value = p + 1;
                 const char* end = p + 1;
                 while (*end && *end != '"') {
-                    if (*end == '\\') end++;  /* skip escaped char */
+                    if (*end == '\\' && *(end + 1)) end++;  /* skip escaped char, guard against unterminated escape */
                     end++;
                 }
                 *out_len = (size_t)(end - *out_value);
@@ -187,9 +187,22 @@ static void build_sorted_erd_list(ha_discovery_manager_t* self)
 static void build_device_json(ha_discovery_manager_t* self)
 {
     int pos = snprintf(self->device_json_buf, sizeof(self->device_json_buf),
-        "{\"identifiers\":[\"%s\"],\"name\":\"", self->device_id);
+        "{\"identifiers\":[\"");
 
-    /* Escape device_id */
+    /* Escape device_id for identifiers */
+    for (const char* p = self->device_id; *p && pos < (int)sizeof(self->device_json_buf) - 8; p++) {
+        unsigned char c = (unsigned char)*p;
+        if (c == '"') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\"");
+        else if (c == '\\') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\\");
+        else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F)) pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\u%04x", c);
+        else { self->device_json_buf[pos++] = (char)c; }
+    }
+    if (pos < (int)sizeof(self->device_json_buf) - 64) {
+        pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+            "\"],\"name\":\"");
+    }
+
+    /* Escape device_id for name */
     for (const char* p = self->device_id; *p && pos < (int)sizeof(self->device_json_buf) - 8; p++) {
         unsigned char c = (unsigned char)*p;
         if (c == '"') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\"");

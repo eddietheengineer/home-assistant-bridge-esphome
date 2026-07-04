@@ -5,14 +5,21 @@ Usage:
     python3 scripts/ha_discovery/run_pipeline.py
 
 Steps:
-    1. Run auto_detect_scaling on the processed JSON (in-place).
-    2. Post-process (reapply overrides).
-    3. Generate JSONL files to ha_discovery/.
-    4. Compress JSONL into ha_discovery_data.h.
+    1. Run auto_detect_pairings on the processed JSON (in-place).
+    2. Run auto_detect_ha_domain on the processed JSON (in-place).
+    3. Run auto_detect_device_class on the processed JSON (in-place).
+    4. Run auto_detect_scaling on the processed JSON (in-place).
+    5. Run auto_detect_state_class on the processed JSON (in-place).
+    6. Post-process (reapply overrides).
+    7. Generate JSONL files to ha_discovery/.
+    8. Compress JSONL into ha_discovery_data.h.
 """
 
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -24,31 +31,72 @@ def main():
     processed = script_dir / "appliance_api_erd_definitions_processed.json"
     ha_dir = repo_root / "ha_discovery"
 
-    def run(cmd, **kwargs):
+    def run(cmd, step_name):
         print(f"  {' '.join(str(c) for c in cmd)}", file=sys.stderr)
-        subprocess.run(cmd, check=True, **kwargs)
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"ERROR: {step_name} failed with exit code {e.returncode}", file=sys.stderr)
+            raise
 
-    # Step 1: Auto-detect scaling
-    print("Step 1: Auto-detect scaling...", file=sys.stderr)
-    run([sys.executable, str(pipeline / "auto_detect_scaling.py"),
-         "--input", str(processed), "--output", str(processed)])
+    # Helper: run a pipeline script with atomic write (temp file + rename).
+    def run_pipeline_script(script_name, step_name):
+        script = pipeline / script_name
+        # Write to a temp file in the same directory, then atomically rename.
+        fd, tmp_path = tempfile.mkstemp(
+            suffix='.json', dir=str(processed.parent), prefix='.tmp_' + processed.name
+        )
+        os.close(fd)
+        try:
+            run(
+                [sys.executable, str(script),
+                 "--input", str(processed), "--output", tmp_path],
+                step_name,
+            )
+            shutil.move(tmp_path, str(processed))
+        except Exception:
+            # Clean up temp file on failure.
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
 
-    # Step 2: Post-process (reapply overrides)
-    print("Step 2: Post-process...", file=sys.stderr)
-    run([sys.executable, str(pipeline / "post_process.py"),
-         "--input", str(processed), "--output", str(processed)])
+    # Step 1: Auto-detect pairings
+    print("Step 1: Auto-detect pairings...", file=sys.stderr)
+    run_pipeline_script("auto_detect_pairings.py", "auto_detect_pairings")
 
-    # Step 3: Generate JSONL
-    print("Step 3: Generate JSONL...", file=sys.stderr)
+    # Step 2: Auto-detect ha_domain
+    print("Step 2: Auto-detect ha_domain...", file=sys.stderr)
+    run_pipeline_script("auto_detect_ha_domain.py", "auto_detect_ha_domain")
+
+    # Step 3: Auto-detect device_class
+    print("Step 3: Auto-detect device_class...", file=sys.stderr)
+    run_pipeline_script("auto_detect_device_class.py", "auto_detect_device_class")
+
+    # Step 4: Auto-detect scaling
+    print("Step 4: Auto-detect scaling...", file=sys.stderr)
+    run_pipeline_script("auto_detect_scaling.py", "auto_detect_scaling")
+
+    # Step 5: Auto-detect state_class
+    print("Step 5: Auto-detect state_class...", file=sys.stderr)
+    run_pipeline_script("auto_detect_state_class.py", "auto_detect_state_class")
+
+    # Step 6: Post-process (reapply overrides)
+    print("Step 6: Post-process...", file=sys.stderr)
+    run_pipeline_script("post_process.py", "post_process")
+
+    # Step 7: Generate JSONL
+    print("Step 7: Generate JSONL...", file=sys.stderr)
     run([sys.executable, str(generators / "generate_ha_discovery.py"),
          "--processed", str(processed),
-         "--output-dir", str(ha_dir)])
+         "--output-dir", str(ha_dir)], "generate_ha_discovery")
 
-    # Step 4: Compress into ha_discovery_data.h
-    print("Step 4: Compress header...", file=sys.stderr)
+    # Step 8: Compress into ha_discovery_data.h
+    print("Step 8: Compress header...", file=sys.stderr)
     run([sys.executable, str(generators / "compress_ha_discovery.py"),
          "--input-dir", str(ha_dir),
-         "--header-name", "ha_discovery_data"])
+         "--header-name", "ha_discovery_data"], "compress_ha_discovery")
 
     print("Done!", file=sys.stderr)
 
