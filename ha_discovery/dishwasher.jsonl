@@ -24,7 +24,7 @@
 {"i":"3007","n":"User Settings - Door Wakeup","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 64) % 2 else '00' }}","fi":"door_wakeup","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3007","n":"User Settings - Wifi Enabled","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 128) % 2 else '00' }}","fi":"wifi_enabled","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3008","n":"Error - Error ID","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"3008","n":"Error - Error Active","d":"sensor","ds":2,"vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
+{"i":"3008","n":"Error - Error Active","d":"binary_sensor","ds":2,"vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
 {"i":"3009","n":"Cycle Counts - Started Cycles Counter","d":"sensor","ds":6,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"3009","n":"Cycle Counts - Completed Cycles Counter","d":"sensor","ds":6,"vt":"{{ value[4:8] | int(base=16) }}","fi":"completed_cycles_counter"}
 {"i":"3009","n":"Cycle Counts - Power On Reset Counter","d":"sensor","ds":6,"vt":"{{ value[8:12] | int(base=16) }}","fi":"power_on_reset_counter"}
@@ -221,7 +221,7 @@
 {"i":"3200","n":"Dish Feature Configuration - myFavorites","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[26:28] | int(base=16)) // 1) % 2 else '00' }}","fi":"myfavorites","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3200","n":"Dish Feature Configuration - quiet","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[26:28] | int(base=16)) // 2) % 2 else '00' }}","fi":"quiet","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3200","n":"Dish Feature Configuration - fast","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[26:28] | int(base=16)) // 4) % 2 else '00' }}","fi":"fast","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3201","n":"Preference Options Actual","d":"binary_sensor","ds":4,"vt":"{{ 'ON' if value[:8] | int(base=16) != 0 else 'OFF' }}"}
+{"i":"3201","n":"Preference Options Actual","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'Rinse aid off', '01': 'Rinse aid setting 1', '02': 'Rinse aid setting 2', '03': 'Rinse aid setting 3', '04': 'Rinse aid setting 4', '05': 'Rinse aid setting 5'}.get(value[2:4], 'Unknown') }}"}
 {"i":"3201","n":"Preference Options Actual - Cavity Light","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"cavity_light","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3201","n":"Preference Options Actual - Floor Light","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"floor_light","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3201","n":"Preference Options Actual - Auto Door","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"auto_door","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -245,7 +245,7 @@
 {"i":"3207","n":"User Settings Tub 1 - Door Wakeup","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 64) % 2 else '00' }}","fi":"door_wakeup","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3207","n":"User Settings Tub 1 - Wifi Enabled","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 128) % 2 else '00' }}","fi":"wifi_enabled","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3208","n":"Error Tub 1 - Error ID","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"3208","n":"Error Tub 1 - Error Active","d":"sensor","ds":2,"vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
+{"i":"3208","n":"Error Tub 1 - Error Active","d":"binary_sensor","ds":2,"vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
 {"i":"3209","n":"Cycle Counts Tub 1 - Started Cycles Counter","d":"sensor","ds":6,"vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"3209","n":"Cycle Counts Tub 1 - Completed Cycles Counter","d":"sensor","ds":6,"vt":"{{ value[4:8] | int(base=16) }}","fi":"completed_cycles_counter"}
 {"i":"3209","n":"Cycle Counts Tub 1 - Power On Reset Counter","d":"sensor","ds":6,"vt":"{{ value[8:12] | int(base=16) }}","fi":"power_on_reset_counter"}
@@ -476,7 +476,7 @@
 {"i":"322a","n":"Motor Identification Data - inputB","d":"sensor","ds":4,"vt":"{{ value[4:8] | int(base=16) }}","fi":"inputb"}
 {"i":"322b","n":"Silverware Wash Option State","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"322c","n":"Custom Cycle Index","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"p":"322d","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
-{"i":"322e","n":"Dish Favorite Settings","d":"switch","ds":12,"p":"322f","r":"request","vt":"{{ value[6:8] }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"322e","n":"Dish Favorite Settings","d":"number","ds":12,"mn":0.0,"mx":0.0,"st":1.0,"p":"322f","r":"request","vt":"{{ value[6:8] | int(base=16) }}","m":"box"}
 {"i":"322e","n":"Dish Favorite Settings - validStoredSettings","d":"switch","ds":12,"p":"322f","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"validstoredsettings","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"322e","n":"Dish Favorite Settings - steam","d":"switch","ds":12,"p":"322f","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"steam","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"322e","n":"Dish Favorite Settings - bottleBlast","d":"switch","ds":12,"p":"322f","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"bottleblast","pon":"01","poff":"00","son":"01","soff":"00"}

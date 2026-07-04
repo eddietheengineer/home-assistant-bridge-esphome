@@ -942,13 +942,21 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
 
         # Skip status ERD if its paired request ERD is a controllable domain
         # (switch/select/number) — the request ERD will handle both state+command.
+        # BUT only skip if ALL fields are paired; if some fields are unpaired,
+        # they should still be generated as independent sensors.
         if pair_role == 'status' and paired_erd_str and paired_erd_str in erd_by_id:
             paired = erd_by_id[paired_erd_str]
             paired_role = paired.get('pair_role') or ''
             paired_domain = paired.get('ha_domain') or ''
             if paired_role == 'request' and paired_domain in ('switch', 'select', 'number'):
-                processed_status.add(erd_id_int)
-                continue
+                # Check if all fields are paired to the same request ERD
+                all_paired = all(
+                    f.get('paired_erd') == paired_erd_str
+                    for f in erd_data if not _is_reserved_field(f.get('name', ''))
+                )
+                if all_paired:
+                    processed_status.add(erd_id_int)
+                    continue
 
         # For domains that are always single-entity (select/button), force single.
         # For number/switch, still check if there are multiple data fields that
@@ -1052,40 +1060,50 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 f_dev_cls = 'enum' if f_type == 'enum' else (device_class if idx == 0 else '')
                 f_state_cls = state_class if idx == 0 else ''
                 f_unit = _infer_unit_from_field_name(leaf, unit)
-                if ha_domain == 'binary_sensor' and f_type == 'enum':
+                # Use per-field pairing/domain if available (mixed-pairing ERDs)
+                f_pair_role = field.get('pair_role') or pair_role
+                f_paired_erd = field.get('paired_erd') or paired_erd_str
+                f_paired_id = parse_erd_id(f_paired_erd) if f_paired_erd else 0
+                f_ha_domain = field.get('ha_domain') or ha_domain
+                if f_ha_domain == 'binary_sensor' and f_type == 'enum':
                     f_dev_cls = ''
                     vt = _compute_binary_sensor_value_template(data_size)
                 else:
-                    if ha_domain == 'switch':
-                        vt = _paired_switch_vt(field, paired_erd_str, pair_role, erd_by_id)
+                    if f_ha_domain == 'switch':
+                        vt = _paired_switch_vt(field, f_paired_erd, f_pair_role, erd_by_id)
                     else:
-                        vt = _paired_field_vt(field, paired_erd_str, pair_role, erd_by_id, scaling_factor)
-                collect(erd_id_int, entity_name, ha_domain, f_unit, f_dev_cls,
-                        f_state_cls, scaling_factor, data_size, paired_erd_id,
-                        pair_role, vt, '', '', fid, '',
-                        '01' if ha_domain == 'switch' else '',
-                        '00' if ha_domain == 'switch' else '',
-                        '01' if ha_domain == 'switch' else '',
-                        '00' if ha_domain == 'switch' else '')
+                        vt = _paired_field_vt(field, f_paired_erd, f_pair_role, erd_by_id, scaling_factor)
+                collect(erd_id_int, entity_name, f_ha_domain, f_unit, f_dev_cls,
+                        f_state_cls, scaling_factor, data_size, f_paired_id,
+                        f_pair_role, vt, '', '', fid, '',
+                        '01' if f_ha_domain == 'switch' else '',
+                        '00' if f_ha_domain == 'switch' else '',
+                        '01' if f_ha_domain == 'switch' else '',
+                        '00' if f_ha_domain == 'switch' else '')
 
         elif classification == 'bitfield':
             for field in _get_non_reserved_fields(erd_data):
                 leaf = _clean_field_name(_leaf_field_name(field.get('name', '')))
                 fid = _field_slug(leaf)
                 bits_size = field.get('bits', {}).get('size', 1)
+                # Use per-field pairing/domain if available (mixed-pairing ERDs)
+                f_pair_role = field.get('pair_role') or pair_role
+                f_paired_erd = field.get('paired_erd') or paired_erd_str
+                f_paired_id = parse_erd_id(f_paired_erd) if f_paired_erd else 0
+                f_ha_domain = field.get('ha_domain') or ha_domain
                 # For paired request ERDs, inherit the parent domain (switch/select/number)
                 # so bitfield sub-entities are controllable, not read-only.
-                if pair_role == 'request' and ha_domain in ('switch', 'select', 'number'):
-                    sub_domain = ha_domain
+                if f_pair_role == 'request' and f_ha_domain in ('switch', 'select', 'number'):
+                    sub_domain = f_ha_domain
                 else:
                     sub_domain = 'binary_sensor' if bits_size == 1 else 'sensor'
-                vt = _paired_bitfield_vt(field, paired_erd_str, pair_role, erd_by_id)
+                vt = _paired_bitfield_vt(field, f_paired_erd, f_pair_role, erd_by_id)
                 b_p_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_p_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_s_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_s_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
                 collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
-                        '', scaling_factor, data_size, paired_erd_id, pair_role,
+                        '', scaling_factor, data_size, f_paired_id, f_pair_role,
                         vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
 
         elif classification == 'mixed':
@@ -1097,42 +1115,52 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
             if primary:
                 p_type = primary.get('type', '')
                 p_dev_cls = 'enum' if p_type == 'enum' else device_class
-                if ha_domain == 'binary_sensor' and p_type == 'enum':
+                # Use per-field pairing/domain if available (mixed-pairing ERDs)
+                p_pair_role = primary.get('pair_role') or pair_role
+                p_paired_erd = primary.get('paired_erd') or paired_erd_str
+                p_paired_id = parse_erd_id(p_paired_erd) if p_paired_erd else 0
+                p_ha_domain = primary.get('ha_domain') or ha_domain
+                if p_ha_domain == 'binary_sensor' and p_type == 'enum':
                     # binary_sensor can't display enum labels; use ON/OFF
                     p_dev_cls = ''
                     p_vt = _compute_binary_sensor_value_template(data_size)
                 else:
-                    if ha_domain == 'switch':
-                        p_vt = _paired_switch_vt(primary, paired_erd_str, pair_role, erd_by_id)
+                    if p_ha_domain == 'switch':
+                        p_vt = _paired_switch_vt(primary, p_paired_erd, p_pair_role, erd_by_id)
                     else:
-                        p_vt = _paired_field_vt(primary, paired_erd_str, pair_role, erd_by_id, scaling_factor)
-                collect(erd_id_int, display_name, ha_domain, unit, p_dev_cls,
-                        state_class, scaling_factor, data_size, paired_erd_id,
-                        pair_role, p_vt, '', '', '',
-                        'box' if ha_domain == 'number' else '',
-                        '01' if ha_domain == 'switch' else '',
-                        '00' if ha_domain == 'switch' else '',
-                        '01' if ha_domain == 'switch' else '',
-                        '00' if ha_domain == 'switch' else '')
+                        p_vt = _paired_field_vt(primary, p_paired_erd, p_pair_role, erd_by_id, scaling_factor)
+                collect(erd_id_int, display_name, p_ha_domain, unit, p_dev_cls,
+                        state_class, scaling_factor, data_size, p_paired_id,
+                        p_pair_role, p_vt, '', '', '',
+                        'box' if p_ha_domain == 'number' else '',
+                        '01' if p_ha_domain == 'switch' else '',
+                        '00' if p_ha_domain == 'switch' else '',
+                        '01' if p_ha_domain == 'switch' else '',
+                        '00' if p_ha_domain == 'switch' else '')
 
             for field in [d for d in erd_data
                           if _has_bits(d) and not _is_reserved_field(d.get('name', ''))]:
                 leaf = _clean_field_name(_leaf_field_name(field.get('name', '')))
                 fid = _field_slug(leaf)
                 bits_size = field.get('bits', {}).get('size', 1)
+                # Use per-field pairing/domain if available (mixed-pairing ERDs)
+                f_pair_role = field.get('pair_role') or pair_role
+                f_paired_erd = field.get('paired_erd') or paired_erd_str
+                f_paired_id = parse_erd_id(f_paired_erd) if f_paired_erd else 0
+                f_ha_domain = field.get('ha_domain') or ha_domain
                 # For paired request ERDs, inherit the parent domain (switch/select/number)
                 # so bitfield sub-entities are controllable, not read-only.
-                if pair_role == 'request' and ha_domain in ('switch', 'select', 'number'):
-                    sub_domain = ha_domain
+                if f_pair_role == 'request' and f_ha_domain in ('switch', 'select', 'number'):
+                    sub_domain = f_ha_domain
                 else:
                     sub_domain = 'binary_sensor' if bits_size == 1 else 'sensor'
-                vt = _paired_bitfield_vt(field, paired_erd_str, pair_role, erd_by_id)
+                vt = _paired_bitfield_vt(field, f_paired_erd, f_pair_role, erd_by_id)
                 b_p_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_p_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_s_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_s_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
                 collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
-                        '', scaling_factor, data_size, paired_erd_id, pair_role,
+                        '', scaling_factor, data_size, f_paired_id, f_pair_role,
                         vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
 
         elif classification == 'version':
@@ -1316,6 +1344,14 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
                 field['values'] = entry['field_values']
             if entry.get('field_bits'):
                 field['bits'] = entry['field_bits']
+            # Store per-field review metadata for mixed-pairing ERDs
+            field_review = entry.get('review', {})
+            if field_review.get('paired_erd'):
+                field['paired_erd'] = field_review['paired_erd']
+            if field_review.get('pair_role'):
+                field['pair_role'] = field_review['pair_role']
+            if field_review.get('ha_domain'):
+                field['ha_domain'] = field_review['ha_domain']
             data_fields.append(field)
 
         erd = {
@@ -1341,8 +1377,6 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
             erd['paired_erd'] = review['paired_erd']
         if review.get('pair_role'):
             erd['pair_role'] = review['pair_role']
-
-        pass
 
         erds.append(erd)
 

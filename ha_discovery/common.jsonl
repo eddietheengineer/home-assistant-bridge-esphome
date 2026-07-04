@@ -35,12 +35,12 @@
 {"i":"0400","n":"Matter Device Identify Type","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'None', '01': 'Light Output', '02': 'Visible Indicator', '03': 'Audible Beep', '04': 'Display', '05': 'Actuator'}.get(value[:2], 'Unknown') }}"}
 {"i":"0401","n":"Matter Device Identify Time Actual","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"0411","n":"Matter Device On-Off State - On-Off State","d":"binary_sensor","ds":2,"vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
-{"i":"0411","n":"Matter Device On-Off State - RequestId","d":"binary_sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"requestid"}
+{"i":"0411","n":"Matter Device On-Off State - RequestId","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"requestid"}
 {"i":"0413","n":"Matter Device Temperature Display Mode Actual","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Celsius', '01': 'Fahrenheit'}.get(value[:2], 'Unknown') }}"}
 {"i":"0414","n":"Matter Device Keypad Lockout","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'No lockout', '01': 'Level 1 reduced functionality', '02': 'Level 2 reduced functionality', '03': 'Level 3 reduced functionality', '04': 'Level 4 reduced functionality', '05': 'Least functionality available to user'}.get(value[:2], 'Unknown') }}"}
 {"i":"0415","n":"Matter Device Onboarding Pairing Code","d":"sensor","ds":21,"vt":"{% set chars = ' !\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~' %}{% set ns = namespace(value='') %}{% for i in range(0, value | length, 2) %}{% set b = value[i:i+2] | int(base=16) %}{% if b >= 0x20 and b <= 0x7E %}{% set ns.value = ns.value ~ chars[b - 0x20] %}{% endif %}{% endfor %}{{ ns.value.rstrip('_') }}"}
 {"i":"0417","n":"Matter Commissioning Window State - Request ID","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"0417","n":"Matter Commissioning Window State - State","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Closed', '01': 'Open'}.get(value[2:4], 'Unknown') }}","fi":"state"}
+{"i":"0417","n":"Matter Commissioning Window State - State","d":"binary_sensor","ds":2,"vt":"{{ 'ON' if value[:4] | int(base=16) != 0 else 'OFF' }}","fi":"state"}
 {"i":"0418","n":"Matter Fabric Count","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"0501","n":"Video Stream","d":"select","ds":1,"dc":"enum","vt":"{{ {'00': 'Stopped', '01': 'Running 720p', '02': 'Running 480p'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Stopped': '00', 'Running 720p': '01', 'Running 480p': '02'}[value] }}","o":"[\"Stopped\", \"Running 720p\", \"Running 480p\"]"}
 {"i":"0502","n":"Still Frame","d":"select","ds":2,"dc":"enum","vt":"{{ {'00': 'Idle', '01': 'Capture'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Idle': '00', 'Capture': '01'}[value] }}","o":"[\"Idle\", \"Capture\"]"}
