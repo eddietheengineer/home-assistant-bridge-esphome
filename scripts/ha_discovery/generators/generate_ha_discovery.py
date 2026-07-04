@@ -1073,12 +1073,17 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 leaf = _clean_field_name(_leaf_field_name(field.get('name', '')))
                 fid = _field_slug(leaf)
                 bits_size = field.get('bits', {}).get('size', 1)
-                sub_domain = 'binary_sensor' if bits_size == 1 else 'sensor'
+                # For paired request ERDs, inherit the parent domain (switch/select/number)
+                # so bitfield sub-entities are controllable, not read-only.
+                if pair_role == 'request' and ha_domain in ('switch', 'select', 'number'):
+                    sub_domain = ha_domain
+                else:
+                    sub_domain = 'binary_sensor' if bits_size == 1 else 'sensor'
                 vt = _paired_bitfield_vt(field, paired_erd_str, pair_role, erd_by_id)
-                b_p_on = '01' if sub_domain == 'binary_sensor' else ''
-                b_p_off = '00' if sub_domain == 'binary_sensor' else ''
-                b_s_on = '01' if sub_domain == 'binary_sensor' else ''
-                b_s_off = '00' if sub_domain == 'binary_sensor' else ''
+                b_p_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
+                b_p_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
+                b_s_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
+                b_s_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
                 collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
                         '', scaling_factor, data_size, paired_erd_id, pair_role,
                         vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
@@ -1115,12 +1120,17 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 leaf = _clean_field_name(_leaf_field_name(field.get('name', '')))
                 fid = _field_slug(leaf)
                 bits_size = field.get('bits', {}).get('size', 1)
-                sub_domain = 'binary_sensor' if bits_size == 1 else 'sensor'
+                # For paired request ERDs, inherit the parent domain (switch/select/number)
+                # so bitfield sub-entities are controllable, not read-only.
+                if pair_role == 'request' and ha_domain in ('switch', 'select', 'number'):
+                    sub_domain = ha_domain
+                else:
+                    sub_domain = 'binary_sensor' if bits_size == 1 else 'sensor'
                 vt = _paired_bitfield_vt(field, paired_erd_str, pair_role, erd_by_id)
-                b_p_on = '01' if sub_domain == 'binary_sensor' else ''
-                b_p_off = '00' if sub_domain == 'binary_sensor' else ''
-                b_s_on = '01' if sub_domain == 'binary_sensor' else ''
-                b_s_off = '00' if sub_domain == 'binary_sensor' else ''
+                b_p_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
+                b_p_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
+                b_s_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
+                b_s_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
                 collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
                         '', scaling_factor, data_size, paired_erd_id, pair_role,
                         vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
