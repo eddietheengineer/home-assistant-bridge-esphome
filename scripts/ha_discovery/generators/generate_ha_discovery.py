@@ -1095,9 +1095,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     if enum_vals:
                         opts, vt, ct = _select_options_and_templates(enum_vals, field_size)
                     else:
-                        # No enum values; fall back to sensor-style VT
-                        vt = _enum_sensor_value_template(enum_vals, field_size)
-                        opts, ct = '', ''
+                        # No enum values for select; skip this entity
+                        continue
                 else:
                     if f_ha_domain == 'switch':
                         vt = _paired_switch_vt(field, f_paired_erd, f_pair_role, erd_by_id)
