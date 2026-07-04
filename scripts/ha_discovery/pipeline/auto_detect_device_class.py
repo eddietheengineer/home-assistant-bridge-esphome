@@ -226,7 +226,11 @@ def infer_device_class(entry):
 
 
 def apply_detection(entries):
-    """Walk all entries, detect device_class, and overwrite review field."""
+    """Walk all entries, detect device_class, and overwrite review field.
+
+    Only overwrites device_class when a new value is detected, preserving
+    manually assigned device_class values not inferred by the detector.
+    """
     total_checked = 0
     total_matched = 0
     total_applied = 0
@@ -239,9 +243,6 @@ def apply_detection(entries):
 
         total_checked += 1
         review = entry.get('review', {})
-
-        # Always reset before re-detecting (idempotent)
-        review['device_class'] = None
 
         dc, confidence = infer_device_class(entry)
         if dc is None:
