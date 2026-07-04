@@ -534,6 +534,8 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             self->total_filtered++;
             return false;
         }
+        /* Copy prefix first so strlen() below reads initialized memory. */
+        memcpy(self->topic_buf, self->domain_topic_prefix, prefix_len);
         size_t remaining = sizeof(self->topic_buf) - prefix_len - 1; /* -1 for null */
         if (self->field_id_buf[0]) {
             snprintf(self->topic_buf + prefix_len, remaining, "%s_%s/config", erd_id_hex, self->field_id_buf);
@@ -546,7 +548,6 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             self->total_filtered++;
             return false;
         }
-        memcpy(self->topic_buf, self->domain_topic_prefix, prefix_len);
     }
 
     /* Build payload directly in shared buffer.
