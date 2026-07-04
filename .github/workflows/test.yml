@@ -1,13 +1,6 @@
 name: Tests
 
 on:
-  push:
-    branches:
-      - main
-      - develop
-      - 'fix/*'
-      - 'feature/*'
-
   pull_request:
 
 jobs:
@@ -28,7 +21,6 @@ jobs:
 
     - uses: actions/checkout@v4
       with:
-        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
         submodules: 'recursive'
 
     - run: make test -j${{ steps.cpu-cores.outputs.count }}
@@ -42,7 +34,6 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
         submodules: 'recursive'
 
     - name: Set up Python
