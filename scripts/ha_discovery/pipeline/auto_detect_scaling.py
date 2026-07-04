@@ -321,8 +321,8 @@ def detect_unit_and_scaling(field_name, field_bits=None):
 def apply_detection(entries):
     """Walk all entries, detect unit/scaling, and overwrite review fields.
 
-    Always resets unit_of_measurement and scaling_factor before re-detecting,
-    so each run produces the same result regardless of prior state.
+    Only resets unit_of_measurement when a new value is detected, preserving
+    manually set units not recognized by the auto-detector.
     Returns (total_checked, total_matched, total_applied) counts.
     """
     total_checked = 0
@@ -340,20 +340,16 @@ def apply_detection(entries):
 
         total_checked += 1
 
-        # Reset unit_of_measurement before re-detecting (always overwrite).
-        # scaling_factor is only reset if we actually detect a new value.
-        review['unit_of_measurement'] = None
-
         unit, scale = detect_unit_and_scaling(field_name, entry.get('field_bits'))
         if scale is None:
             # Try field name as fallback: "CLC Temperature x 100"
-            m = re.search(r'x\s+(\d+)', field_name)
+            m = re.search(r'\bx\s+(\d+)', field_name, re.IGNORECASE)
             if m:
                 scale = int(m.group(1))
         if scale is None:
             # Try ERD description as fallback: "Kelvin x 32", "degrees F x 10"
             desc = entry.get('erd_description', '')
-            m = re.search(r'x\s+(\d+)', desc)
+            m = re.search(r'\bx\s+(\d+)', desc, re.IGNORECASE)
             if m:
                 scale = int(m.group(1))
         if unit is None and scale is None:
@@ -362,6 +358,8 @@ def apply_detection(entries):
         total_matched += 1
         applied = False
 
+        # Only overwrite unit_of_measurement when we actually detected one,
+        # preserving manually set units not recognized by the auto-detector.
         if unit is not None:
             review['unit_of_measurement'] = unit
             applied = True

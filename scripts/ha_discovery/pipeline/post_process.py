@@ -17,6 +17,10 @@ import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+sys.path.insert(0, SCRIPT_DIR)
+from ha_constants import VALID_DEVICE_CLASSES
+
+
 
 def apply_overrides(entries):
     """Reapply documented overrides that auto-detection scripts may have reset.
@@ -48,6 +52,7 @@ def apply_overrides(entries):
         "0x4026": {"ha_domain": "sensor"},
         "0x7907": {"ha_domain": "sensor", "unit_of_measurement": "steps"},
         "0x7938": {"ha_domain": "sensor"},
+        "0x710b": {"ha_domain": "sensor"},
         # --- Fan speed: add rpm unit ---
         "0x7136": {"unit_of_measurement": "rpm"},
         "0x7137": {"unit_of_measurement": "rpm"},
@@ -93,10 +98,11 @@ def apply_post_processing(entries):
             review['unit_of_measurement'] = None
             cleared_unit += 1
 
-        # Rule 2: number domain should not have device_class (except temperature)
-        if ha_domain == 'number' and device_class and device_class != 'temperature':
-            review['device_class'] = None
-            cleared_dc += 1
+        # Rule 2: number domain device_class must be valid for number domain
+        if ha_domain == 'number' and device_class:
+            if device_class not in VALID_DEVICE_CLASSES.get('number', set()):
+                review['device_class'] = None
+                cleared_dc += 1
 
         # Rule 3: sensor with device_class should have state_class, but only
         # for numeric device classes. Non-numeric (enum, timestamp, date, uptime)

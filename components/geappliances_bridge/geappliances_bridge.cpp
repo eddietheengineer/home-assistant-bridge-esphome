@@ -309,7 +309,9 @@ void GeappliancesBridge::loop() {
        * zeroes the struct, it corrupts heap metadata and crashes the idle task. */
       ha_discovery_cleanup_destroy(&this->ha_discovery_manager_.cleanup);
 
-      // Allow final retained-clear publishes to transmit before reboot (fixes C5).
+      // Feed the watchdog before blocking — the 500 ms delay exceeds the
+      // default TWDT timeout (30 ms) and would trigger a reset.
+      esp_task_wdt_reset();
       vTaskDelay(pdMS_TO_TICKS(500));
       esphome::App.reboot();
     }
