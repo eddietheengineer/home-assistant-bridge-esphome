@@ -40,3 +40,11 @@ These are read-only processed temperature values. Remove `write` from `erd_opera
 | 0x7104 | Processed Inside ambient temperature              |
 | 0x7114 | Processed indoor ambient temperature (rounded)    |
 | 0x7115 | Processed outdoor ambient temperature (rounded)   |
+
+## Remove `write` from Actual Setpoint Temperature
+
+This is a read-only reported value. Remove `write` from `erd_operations` for:
+
+| ERD  | Name                      |
+|------|---------------------------|
+| 0x4026 | Actual Setpoint Temperature |
