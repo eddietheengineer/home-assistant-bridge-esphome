@@ -20,12 +20,12 @@
 {"i":"7023","n":"Outside fan run time in seconds","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
 {"i":"7049","n":"Capacity in BTU/h","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': '15k BTU/h', '01': '12k BTU/h', '02': '9k BTU/h', '03': '7k BTU/h', '04': '18k BTU/h', '05': '14k BTU/h', '06': '24k BTU/h', '07': '28k BTU/h', '08': '36k BTU/h', '09': '48k BTU/h', '0a': '60k BTU/h', '0b': '30k BTU/h', '0c': '20k BTU/h', '0d': '42k BTU/h', '0e': '54k BTU/h'}.get(value[:2], 'Unknown') }}"}
 {"i":"7050","n":"Air Conditioner Cycle Count","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
-{"i":"7053","n":"Air Purifier Status - Air Purifier Off","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"air_purifier_off","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7053","n":"Air Purifier Status - Ultraviolet sterilization","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"ultraviolet_sterilization","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7053","n":"Air Purifier Status - Ozone","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"ozone","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7053","n":"Air Purifier Status - Negative ions","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"negative_ions","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7053","n":"Air Purifier Status - PM2.5","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 16) % 2 else '00' }}","fi":"pm2_5","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7054","n":"Energy Conservation Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'None', '01': 'Simple', '02': 'Standard', '03': 'Advanced'}.get(value[:2], 'Unknown') }}"}
+{"i":"7051","n":"Air Purifier - Air Purifier Off","d":"binary_sensor","ds":1,"p":"7053","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"air_purifier_off","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7051","n":"Air Purifier - Ultraviolet sterilization","d":"binary_sensor","ds":1,"p":"7053","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"ultraviolet_sterilization","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7051","n":"Air Purifier - Ozone","d":"binary_sensor","ds":1,"p":"7053","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"ozone","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7051","n":"Air Purifier - Negative ions","d":"binary_sensor","ds":1,"p":"7053","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"negative_ions","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7051","n":"Air Purifier - PM2.5","d":"binary_sensor","ds":1,"p":"7053","r":"request","vt":"{{ '01' if ((value[0:2] | int(base=16)) // 16) % 2 else '00' }}","fi":"pm2_5","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7052","n":"Energy Conservation","d":"select","ds":1,"dc":"enum","p":"7054","r":"request","vt":"{{ {'00': 'None', '01': 'Simple', '02': 'Standard', '03': 'Advanced'}.get(value[:2], 'Unknown') }}","ct":"{{ {'None': '00', 'Simple': '01', 'Standard': '02', 'Advanced': '03'}[value] }}","o":"[\"None\", \"Simple\", \"Standard\", \"Advanced\"]"}
 {"i":"7100","n":"Inside ambient temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"7101","n":"Inside coil temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"7102","n":"Outside ambient temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
@@ -35,7 +35,7 @@
 {"i":"7107","n":"Processed Outside Ambient Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"7108","n":"Indoor Coil Vapor Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"710a","n":"Outdoor Coil Vapor Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
-{"i":"710b","n":"Humidity Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
+{"i":"710b","n":"Humidity Percentage","d":"number","ds":1,"u":"%","dc":"humidity","mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"710c","n":"Suction Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"710d","n":"Outdoor Coil Liquid temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"7114","n":"Processed indoor ambient temperature (rounded)","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
@@ -113,11 +113,7 @@
 {"i":"746c","n":"Auxiliary 24V Input Status - Central Desk Control Present","d":"binary_sensor","ds":5,"vt":"{{ '01' if ((value[2:10] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"central_desk_control_present","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"746c","n":"Auxiliary 24V Input Status - Occupancy Present","d":"binary_sensor","ds":5,"vt":"{{ '01' if ((value[2:10] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"occupancy_present","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"746f","n":"Heat Pump Lockout Temperature","d":"number","ds":2,"u":"°F","dc":"temperature","sf":10,"mn":-3276.8,"mx":3276.7,"st":0.1,"p":"746e","r":"request","vt":"{{ ((value[0:4] | int(base=16)) - 65536 if (value[0:4] | int(base=16)) >= 32768 else (value[0:4] | int(base=16))) / 10 | round(1) }}","ct":"{{ '%04x' % ((((value | float) * 10) | round | int) % 65536) }}","m":"box"}
-{"i":"7470","n":"Input Current Limiting Status - User Set Input Current Limiting Status","d":"sensor","ds":8,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"7470","n":"Input Current Limiting Status - Resolved Input Current Limiting Status","d":"sensor","ds":8,"vt":"{{ value[2:4] | int(base=16) }}","fi":"resolved_input_current_limiting_status"}
-{"i":"7470","n":"Input Current Limiting Status - Min Input Current Limit","d":"sensor","ds":8,"vt":"{{ value[4:8] | int(base=16) }}","fi":"min_input_current_limit"}
-{"i":"7470","n":"Input Current Limiting Status - Max Input Current Limit","d":"sensor","ds":8,"vt":"{{ value[8:12] | int(base=16) }}","fi":"max_input_current_limit"}
-{"i":"7470","n":"Input Current Limiting Status - Step Size","d":"sensor","ds":8,"vt":"{{ value[12:14] | int(base=16) }}","fi":"step_size"}
+{"i":"7471","n":"Input Current Limiting","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"p":"7470","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"7473","n":"Heat Source Optimization","d":"switch","ds":1,"p":"7472","r":"request","vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7507","n":"External Thermostat fault state","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'No fault', '01': 'Fault'}.get(value[:2], 'Unknown') }}"}
 {"i":"750b","n":"Make-up Air fan 1 actual speed","d":"sensor","ds":2,"u":"rpm","vt":"{{ value | int(base=16) }}"}
@@ -135,7 +131,7 @@
 {"i":"7602","n":"Inverter Desired Speed","d":"sensor","ds":2,"u":"rpm","vt":"{{ value | int(base=16) }}"}
 {"i":"7610","n":"Inverter IGBT Power","d":"sensor","ds":2,"u":"W","dc":"power","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"7612","n":"Inverter IGBT Temperature","d":"sensor","ds":2,"u":"°C","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
-{"i":"7700","n":"Power Status","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7701","n":"Power","d":"switch","ds":1,"p":"7700","r":"request","vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7703","n":"System Mode","d":"select","ds":1,"dc":"enum","p":"7702","r":"request","vt":"{{ {'00': 'Auto', '01': 'Heat', '02': 'Fan', '03': 'Cool'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Auto': '00', 'Heat': '01', 'Fan': '02', 'Cool': '03'}[value] }}","o":"[\"Auto\", \"Heat\", \"Fan\", \"Cool\"]"}
 {"i":"7705","n":"Temperature Setpoint Step Size Status - Minimum Step Size in Fahrenheit operation in Fahrenheit x 10","d":"sensor","ds":2,"u":"°F","sf":10,"vt":"{{ (value[0:2] | int(base=16)) / 10 | round(1) }}"}
 {"i":"7705","n":"Temperature Setpoint Step Size Status - Minimum Step Size in Celsius operation in Celsius x 10","d":"sensor","ds":2,"u":"°C","sf":10,"vt":"{{ (value[2:4] | int(base=16)) / 10 | round(1) }}","fi":"minimum_step_size_in_celsius_operation_in_celsius_x_10"}
@@ -311,7 +307,7 @@
 {"i":"7902","n":"4 way valve position","d":"select","ds":1,"dc":"enum","vt":"{{ {'00': 'Cool', '01': 'Heat'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Cool': '00', 'Heat': '01'}[value] }}","o":"[\"Cool\", \"Heat\"]"}
 {"i":"7903","n":"Inverter Volts and Amps - Inverter Volts","d":"sensor","ds":4,"u":"V","dc":"voltage","sc":"measurement","sf":10,"vt":"{{ (value[0:4] | int(base=16)) / 10 | round(1) }}"}
 {"i":"7903","n":"Inverter Volts and Amps - Inverter Amps","d":"sensor","ds":4,"u":"V","sf":10,"vt":"{{ (value[4:8] | int(base=16)) / 10 | round(1) }}","fi":"inverter_amps"}
-{"i":"7904","n":"Compressor speed actual","d":"sensor","ds":1,"u":"Hz","vt":"{{ value | int(base=16) }}"}
+{"i":"7904","n":"Compressor speed actual","d":"sensor","ds":1,"u":"Hz","dc":"frequency","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"7905","n":"Compressor Suction Temperature (Ts) and Discharge Temperature (Td) - Td Temperature","d":"sensor","ds":4,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value[0:4] | int(base=16)) - 65536 if (value[0:4] | int(base=16)) >= 32768 else (value[0:4] | int(base=16))) / 10 | round(1) }}"}
 {"i":"7905","n":"Compressor Suction Temperature (Ts) and Discharge Temperature (Td) - Ts Temperature","d":"sensor","ds":4,"u":"°F","sf":10,"vt":"{{ ((value[4:8] | int(base=16)) - 65536 if (value[4:8] | int(base=16)) >= 32768 else (value[4:8] | int(base=16))) / 10 | round(1) }}","fi":"ts_temperature"}
 {"i":"7906","n":"Outdoor Pipe temperature (Toci)","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
@@ -363,13 +359,13 @@
 {"i":"7931","n":"Usage Profile Data ODU - Maximum Ambient Temperature Ta max","d":"sensor","ds":84,"u":"min","vt":"{{ (value[116:120] | int(base=16)) - 65536 if (value[116:120] | int(base=16)) >= 32768 else (value[116:120] | int(base=16)) }}","fi":"maximum_ambient_temperature_ta_max"}
 {"i":"7931","n":"Usage Profile Data ODU - Minimum Ambient Temperature Ta min","d":"sensor","ds":84,"u":"min","vt":"{{ (value[120:124] | int(base=16)) - 65536 if (value[120:124] | int(base=16)) >= 32768 else (value[120:124] | int(base=16)) }}","fi":"minimum_ambient_temperature_ta_min"}
 {"i":"7931","n":"Usage Profile Data ODU - Maximum Inverter Heatsink Temperature","d":"sensor","ds":84,"u":"min","vt":"{{ (value[124:128] | int(base=16)) - 65536 if (value[124:128] | int(base=16)) >= 32768 else (value[124:128] | int(base=16)) }}","fi":"maximum_inverter_heatsink_temperature"}
-{"i":"7938","n":"Compressor speed target","d":"sensor","ds":1,"u":"Hz","vt":"{{ value | int(base=16) }}"}
+{"i":"7938","n":"Compressor speed target","d":"sensor","ds":1,"u":"Hz","dc":"frequency","vt":"{{ value | int(base=16) }}"}
+{"i":"795e","n":"Turbo/Quiet Mode Modifier","d":"select","ds":1,"dc":"enum","p":"7963","r":"request","vt":"{{ {'00': 'Normal', '01': 'Turbo', '02': 'Quiet', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Normal': '00', 'Turbo': '01', 'Quiet': '02', 'Not Applicable': 'ff'}[value] }}","o":"[\"Normal\", \"Turbo\", \"Quiet\", \"Not Applicable\"]"}
 {"i":"7960","n":"IDU DIP Switch Status - SW-1 or JMP8","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 16777216) % 2 else '00' }}","fi":"sw_1_or_jmp8","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7960","n":"IDU DIP Switch Status - JMP7","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 33554432) % 2 else '00' }}","fi":"jmp7","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7960","n":"IDU DIP Switch Status - JMP6","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 67108864) % 2 else '00' }}","fi":"jmp6","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7960","n":"IDU DIP Switch Status - JMP5","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 134217728) % 2 else '00' }}","fi":"jmp5","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7960","n":"IDU DIP Switch Status - SW-2 or JMP9","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 8388608) % 2 else '00' }}","fi":"sw_2_or_jmp9","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7963","n":"Turbo/Quiet Mode Modifier Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Normal', '01': 'Turbo', '02': 'Quiet', 'ff': 'Not Applicable'}.get(value[:2], 'Unknown') }}"}
 {"i":"7966","n":"Electric Room Heater Presence","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not Available', '01': 'Available', 'ff': 'Unknown'}.get(value[:2], 'Unknown') }}"}
 {"i":"7967","n":"Electric Room Heater Status","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7968","n":"Most Recent Fault Code Displayed - Cycle Number","d":"sensor","ds":16,"vt":"{{ value[0:8] | int(base=16) }}"}
@@ -534,7 +530,7 @@
 {"i":"7a45","n":"Matter Fan Control Cluster Percent Current","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"7b01","n":"Current Humidity - Humidity Sensor Presence","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Not present', '01': 'Present', 'ff': 'Unknown'}.get(value[0:2], 'Unknown') }}"}
 {"i":"7b01","n":"Current Humidity - Current Humidity","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"current_humidity"}
-{"i":"7b02","n":"Target Humidity","d":"number","ds":1,"u":"%","mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"7b02","n":"Target Humidity","d":"number","ds":1,"u":"%","dc":"humidity","mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"7b03","n":"Target Humidity Range - Minimum Target Humidity","d":"sensor","ds":2,"u":"%","dc":"humidity","sc":"measurement","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"7b03","n":"Target Humidity Range - Maximum Target Humidity","d":"sensor","ds":2,"u":"%","vt":"{{ value[2:4] | int(base=16) }}","fi":"maximum_target_humidity"}
 {"i":"7b05","n":"Sleep Mode","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
