@@ -122,13 +122,13 @@
 {"i":"7507","n":"External Thermostat fault state","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'No fault', '01': 'Fault'}.get(value[:2], 'Unknown') }}"}
 {"i":"750b","n":"Make-up Air fan 1 actual speed","d":"sensor","ds":2,"u":"rpm","vt":"{{ value | int(base=16) }}"}
 {"i":"7511","n":"EEV Control Type","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Idle', '01': 'Linear Control', '02': 'Constant Control', '03': 'PI Control', '04': 'High-gain PI Control'}.get(value[:2], 'Unknown') }}"}
-{"i":"7512","n":"EEV1 Desired Position","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
-{"i":"7513","n":"EEV2 Desired Position","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
-{"i":"7514","n":"EEV1 Actual Position","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"7515","n":"EEV2 Actual Position","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"7512","n":"EEV1 Desired Position","d":"sensor","ds":2,"u":"steps","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
+{"i":"7513","n":"EEV2 Desired Position","d":"sensor","ds":2,"u":"steps","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
+{"i":"7514","n":"EEV1 Actual Position","d":"sensor","ds":2,"u":"steps","vt":"{{ value | int(base=16) }}"}
+{"i":"7515","n":"EEV2 Actual Position","d":"sensor","ds":2,"u":"steps","vt":"{{ value | int(base=16) }}"}
 {"i":"7516","n":"Target Superheat Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"7517","n":"Current Superheat Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
-{"i":"7518","n":"EEV Linear Controller Desired Position","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
+{"i":"7518","n":"EEV Linear Controller Desired Position","d":"sensor","ds":2,"u":"steps","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"7519","n":"EEV Controller Offset","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"7600","n":"Compressor Control Type","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Idle', '01': 'Linear Control', '02': 'Constant Control', '03': 'PI Control', '04': 'High-gain PI Control'}.get(value[:2], 'Unknown') }}"}
 {"i":"7601","n":"Inverter Actual Speed RPM","d":"sensor","ds":2,"u":"rpm","vt":"{{ value | int(base=16) }}"}
@@ -315,7 +315,7 @@
 {"i":"7905","n":"Compressor Suction Temperature (Ts) and Discharge Temperature (Td) - Td Temperature","d":"sensor","ds":4,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value[0:4] | int(base=16)) - 65536 if (value[0:4] | int(base=16)) >= 32768 else (value[0:4] | int(base=16))) / 10 | round(1) }}"}
 {"i":"7905","n":"Compressor Suction Temperature (Ts) and Discharge Temperature (Td) - Ts Temperature","d":"sensor","ds":4,"u":"°F","sf":10,"vt":"{{ ((value[4:8] | int(base=16)) - 65536 if (value[4:8] | int(base=16)) >= 32768 else (value[4:8] | int(base=16))) / 10 | round(1) }}","fi":"ts_temperature"}
 {"i":"7906","n":"Outdoor Pipe temperature (Toci)","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
-{"i":"7907","n":"Position of Expansion valve EEV0","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"7907","n":"Position of Expansion valve EEV0","d":"sensor","ds":2,"u":"steps","vt":"{{ value | int(base=16) }}"}
 {"i":"790d","n":"High and Low Pressure switch status - High Pressure Switch Status","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Pressure Switch open', '01': 'Pressure Switch closed'}.get(value[0:2], 'Unknown') }}"}
 {"i":"790d","n":"High and Low Pressure switch status - Low Pressure Switch Status","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Pressure Switch open', '01': 'Pressure Switch closed'}.get(value[2:4], 'Unknown') }}","fi":"low_pressure_switch_status"}
 {"i":"790e","n":"ODU Gas Pipe temperatures (Tc1 - A,B,C,D,E) - Tc1-A Temperature","d":"sensor","ds":10,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value[0:4] | int(base=16)) - 65536 if (value[0:4] | int(base=16)) >= 32768 else (value[0:4] | int(base=16))) / 10 | round(1) }}"}
