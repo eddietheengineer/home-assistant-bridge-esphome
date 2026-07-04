@@ -249,6 +249,12 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
         ESP_LOGW(TAG, "Skipping cleanup (no device_id)");
         return;
     }
+    if (self->get_time_ms == NULL) {
+        /* No time function — can't track drain timers, mark done. */
+        self->state = ha_cleanup_state_done;
+        ESP_LOGW(TAG, "Skipping cleanup (no get_time_ms)");
+        return;
+    }
 
     /* Not yet subscribed — subscribe to all domains at once. */
     if (!self->subscribed) {
