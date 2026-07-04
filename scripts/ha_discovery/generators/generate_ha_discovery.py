@@ -1057,8 +1057,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 entity_name = f'{display_name} - {leaf}'
                 fid = '' if idx == 0 else _field_slug(leaf)
                 f_type = field.get('type', '')
-                f_dev_cls = 'enum' if f_type == 'enum' else (device_class if idx == 0 else '')
-                f_state_cls = state_class if idx == 0 else ''
+                f_dev_cls = 'enum' if f_type == 'enum' else (field.get('device_class') or device_class)
+                f_state_cls = field.get('state_class') or state_class
                 f_unit = _infer_unit_from_field_name(leaf, unit)
                 # Use per-field pairing/domain if available (mixed-pairing ERDs)
                 f_pair_role = field.get('pair_role') or pair_role
@@ -1352,6 +1352,10 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
                 field['pair_role'] = field_review['pair_role']
             if field_review.get('ha_domain'):
                 field['ha_domain'] = field_review['ha_domain']
+            if field_review.get('device_class') is not None:
+                field['device_class'] = field_review['device_class']
+            if field_review.get('state_class'):
+                field['state_class'] = field_review['state_class']
             data_fields.append(field)
 
         erd = {
