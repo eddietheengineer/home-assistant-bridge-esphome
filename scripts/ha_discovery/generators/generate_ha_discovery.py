@@ -240,12 +240,13 @@ def _clean_field_name(name: str) -> str:
 
     E.g. 'Hours (hours)' -> 'Hours',
          'Line Input Voltage Volts x 100 (volts)' -> 'Line Input Voltage Volts x 100',
-         'Option n Drying Temperature (Fahrenheit x 10)[0]' -> 'Option n Drying Temperature'.
+         'Option n Drying Temperature (Fahrenheit x 10)[0]' -> 'Option n Drying Temperature[0]'.
     """
-    # Remove trailing array index like [0], [1], etc.
-    name = re.sub(r'\s*\[\d+\]\s*$', '', name)
-    # Remove trailing parenthetical group like ' (hours)', ' (volts)'
-    result = re.sub(r'\s*\([^)]*\)\s*$', '', name)
+    # Keep trailing array index like [0], [1], etc. for uniqueness
+    # (removed: name = re.sub(r'\s*\[\d+\]\s*$', '', name))
+    # Remove parenthetical groups: either trailing, or before an array index
+    result = re.sub(r'\s*\([^)]*\)\s*(?=\[\d+\])', '', name)
+    result = re.sub(r'\s*\([^)]*\)\s*$', '', result)
     return result.strip()
 
 
@@ -979,11 +980,15 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                     processed_status.add(erd_id_int)
                     continue
 
-        # For domains that are always single-entity (select/button), force single.
-        # For number/switch, still check if there are multiple data fields that
-        # should be split into sub-entities (e.g. Clock Time with Hours/Minutes/Seconds).
+        # For domains that are always single-entity (select/button), force single
+        # ONLY if there's a single non-reserved field. If there are multiple fields
+        # with different per-field domains, use the natural classification instead.
         if ha_domain in ('select', 'button'):
-            classification = 'single'
+            nr_fields = _get_non_reserved_fields(erd_data)
+            if len(nr_fields) <= 1:
+                classification = 'single'
+            else:
+                classification = _classify_erd_data(erd_data)
         else:
             classification = _classify_erd_data(erd_data)
 
