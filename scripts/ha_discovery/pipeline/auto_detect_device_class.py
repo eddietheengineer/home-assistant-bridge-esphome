@@ -128,10 +128,11 @@ def infer_device_class(entry):
     erd_description = entry.get('erd_description', '')
     combined = name_lower + ' ' + erd_name.lower() + ' ' + erd_description.lower()
 
-    # --- Binary sensors: detect problem indicators ---
+    # --- Binary sensors: detect occupancy and problem indicators ---
     if ha_domain == 'binary_sensor':
-        problem_keywords = ['fault', 'issue', 'error', 'alarm', 'limited']
-        if any(kw in combined for kw in problem_keywords):
+        if any(kw in combined for kw in ['occupancy', 'occupied']):
+            return 'occupancy', 0.8
+        if any(kw in combined for kw in ['fault', 'issue', 'error', 'alarm', 'limited']):
             return 'problem', 0.8
 
     # Skip bit-fields (they're boolean indicators)
@@ -245,10 +246,9 @@ def apply_detection(entries):
 
     for entry in entries:
         field_type = entry.get('field_type', '')
-        # Process numeric types and enum types (enum needs device_class='enum' detection)
-        if field_type not in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32', 'enum'):
+        # Process numeric types, enum types, and bool (for occupancy/problem detection)
+        if field_type not in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32', 'enum', 'bool'):
             continue
-
         total_checked += 1
         review = entry.setdefault('review', {})
 

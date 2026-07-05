@@ -217,10 +217,10 @@
 {"i":"904e","n":"Tank Missing or Unlocked","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"904f","n":"Brew Basket Missing or Unlocked","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9050","n":"Disable Grinder Requested State","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"9051","n":"Coffee Brewer Current Brew Settings - Setting Gold","d":"binary_sensor","ds":12,"vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
-{"i":"9051","n":"Coffee Brewer Current Brew Settings - Setting Bloom Dwell","d":"binary_sensor","ds":12,"vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"setting_bloom_dwell"}
-{"i":"9051","n":"Coffee Brewer Current Brew Settings - Setting Bloom Pump","d":"binary_sensor","ds":12,"vt":"{{ '01' if value[4:6] != '00' else '00' }}","fi":"setting_bloom_pump"}
-{"i":"9051","n":"Coffee Brewer Current Brew Settings - Serving Single","d":"binary_sensor","ds":12,"vt":"{{ '01' if value[6:8] != '00' else '00' }}","fi":"serving_single"}
+{"i":"9051","n":"Coffee Brewer Current Brew Settings - Setting Gold","d":"binary_sensor","ds":12,"dc":"problem","vt":"{{ '01' if value[0:2] != '00' else '00' }}"}
+{"i":"9051","n":"Coffee Brewer Current Brew Settings - Setting Bloom Dwell","d":"binary_sensor","ds":12,"dc":"problem","vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"setting_bloom_dwell"}
+{"i":"9051","n":"Coffee Brewer Current Brew Settings - Setting Bloom Pump","d":"binary_sensor","ds":12,"dc":"problem","vt":"{{ '01' if value[4:6] != '00' else '00' }}","fi":"setting_bloom_pump"}
+{"i":"9051","n":"Coffee Brewer Current Brew Settings - Serving Single","d":"binary_sensor","ds":12,"dc":"problem","vt":"{{ '01' if value[6:8] != '00' else '00' }}","fi":"serving_single"}
 {"i":"9051","n":"Coffee Brewer Current Brew Settings - Strength","d":"sensor","ds":12,"sc":"measurement","vt":"{{ value[8:10] | int(base=16) }}","fi":"strength"}
 {"i":"9051","n":"Coffee Brewer Current Brew Settings - Temperature","d":"sensor","ds":12,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value[10:12] | int(base=16) }}","fi":"temperature"}
 {"i":"9051","n":"Coffee Brewer Current Brew Settings - Single Volume","d":"sensor","ds":12,"u":"oz","sc":"measurement","vt":"{{ value[12:14] | int(base=16) }}","fi":"single_volume"}
@@ -396,7 +396,7 @@
 {"i":"9203","n":"SDA Current Display Brightness Setting","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Low', '01': 'Medium', '02': 'High'}.get(value[:2], 'Unknown') }}"}
 {"i":"9204","n":"SDA Requested Display Brightness Setting","d":"select","ds":1,"vt":"{{ {'00': 'Low', '01': 'Medium', '02': 'High'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Low': '00', 'Medium': '01', 'High': '02'}[value] }}","o":"[\"Low\", \"Medium\", \"High\"]"}
 {"i":"9205","n":"Toaster Oven Door Status","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"9206","n":"Toaster Oven Door Alarm Status","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"9206","n":"Toaster Oven Door Alarm Status","d":"binary_sensor","ds":1,"dc":"problem","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9207","n":"Toaster Oven Current Cooking Parameters - Shade","d":"sensor","ds":12,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"9207","n":"Toaster Oven Current Cooking Parameters - Size","d":"sensor","ds":12,"dc":"enum","vt":"{{ {'00': 'Small', '01': 'Medium', '02': 'Large'}.get(value[2:4], 'Unknown') }}","fi":"size"}
 {"i":"9207","n":"Toaster Oven Current Cooking Parameters - Temperature","d":"sensor","ds":12,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value[4:8] | int(base=16) }}","fi":"temperature"}
@@ -852,7 +852,7 @@
 {"i":"9314","n":"Mixer Control v2 Current - Auto Sense Torque Delta Type","d":"sensor","ds":96,"dc":"enum","vt":"{{ {'00': 'Absolute (mN-m)', '01': 'Relative (Percent)'}.get(value[30:32], 'Unknown') }}","fi":"auto_sense_torque_delta_type"}
 {"i":"9314","n":"Mixer Control v2 Current - Baseline Window Duration","d":"sensor","ds":96,"u":"s","sc":"measurement","vt":"{{ value[32:36] | int(base=16) }}","fi":"baseline_window_duration"}
 {"i":"9314","n":"Mixer Control v2 Current - Auto Sense Baseline Type","d":"sensor","ds":96,"dc":"enum","vt":"{{ {'00': 'Single Sample At Start Time', '01': 'Max in Window', '02': 'Min in Window'}.get(value[36:38], 'Unknown') }}","fi":"auto_sense_baseline_type"}
-{"i":"9314","n":"Mixer Control v2 Current - Auto Sense Time After Peak Enabled","d":"binary_sensor","ds":96,"vt":"{{ '01' if value[38:40] != '00' else '00' }}","fi":"auto_sense_time_after_peak_enabled"}
+{"i":"9314","n":"Mixer Control v2 Current - Auto Sense Time After Peak Enabled","d":"binary_sensor","ds":96,"dc":"problem","vt":"{{ '01' if value[38:40] != '00' else '00' }}","fi":"auto_sense_time_after_peak_enabled"}
 {"i":"9314","n":"Mixer Control v2 Current - Auto Sense Time After Peak","d":"sensor","ds":96,"u":"s","sc":"measurement","vt":"{{ value[40:44] | int(base=16) }}","fi":"auto_sense_time_after_peak"}
 {"i":"9314","n":"Mixer Control v2 Current - Auto Sense Time Extend","d":"sensor","ds":96,"u":"s","sc":"measurement","vt":"{{ value[44:48] | int(base=16) }}","fi":"auto_sense_time_extend"}
 {"i":"9314","n":"Mixer Control v2 Current - Auto Sense Error Detect Min Valid Torque","d":"sensor","ds":96,"u":"mN·m","sc":"measurement","vt":"{{ (value[48:52] | int(base=16)) - 65536 if (value[48:52] | int(base=16)) >= 32768 else (value[48:52] | int(base=16)) }}","fi":"auto_sense_error_detect_min_valid_torque"}

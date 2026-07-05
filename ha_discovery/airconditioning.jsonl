@@ -215,13 +215,13 @@
 {"i":"7851","n":"Supported Notifications - Leak Sensor Critical Leakage Monitoring Notification","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 536870912) % 2 else '00' }}","fi":"leak_sensor_critical_leakage_monitoring_notification","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7851","n":"Supported Notifications - Multi-mode Conflict Notification","d":"binary_sensor","ds":4,"vt":"{{ '01' if ((value[0:8] | int(base=16)) // 1073741824) % 2 else '00' }}","fi":"multi_mode_conflict_notification","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7852","n":"Refrigerant Leak Sensor Service Life Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Nominal', '01': 'Approaching End of Service Life', '02': 'Service Life Exceeded'}.get(value[:2], 'Unknown') }}"}
-{"i":"7853","n":"Refrigerant Leak Sensor Self Inspection Error","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"7854","n":"Refrigerant Leak Sensor Communication Error","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7853","n":"Refrigerant Leak Sensor Self Inspection Error","d":"binary_sensor","ds":1,"dc":"problem","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7854","n":"Refrigerant Leak Sensor Communication Error","d":"binary_sensor","ds":1,"dc":"problem","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7855","n":"Refrigerant Leak Sensor LFL Percentage x10","d":"sensor","ds":2,"u":"%","sf":10,"vt":"{{ (value | int(base=16)) / 10 | round(1) }}"}
-{"i":"7856","n":"Refrigerant Leak Sensor Critical Leakage Error","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7856","n":"Refrigerant Leak Sensor Critical Leakage Error","d":"binary_sensor","ds":1,"dc":"problem","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7857","n":"Refrigerant Leak Sensor Enabled","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7858","n":"Refrigerant Leak Sensor Error Clear Request","d":"button","ds":1}
-{"i":"7859","n":"MultiMode Conflict Error","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"7859","n":"MultiMode Conflict Error","d":"binary_sensor","ds":1,"dc":"problem","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7900","n":"ODU DIP Switch Status - SW1-1","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 72057594037927936) % 2 else '00' }}","fi":"sw1_1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7900","n":"ODU DIP Switch Status - SW1-2","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 144115188075855872) % 2 else '00' }}","fi":"sw1_2","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"7900","n":"ODU DIP Switch Status - SW1-3","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 288230376151711744) % 2 else '00' }}","fi":"sw1_3","pon":"01","poff":"00","son":"01","soff":"00"}

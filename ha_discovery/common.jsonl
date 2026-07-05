@@ -216,7 +216,7 @@
 {"i":"070e","n":"Non-Volatile Usage Warning or Error Details - Estimated ERD writes per year","d":"sensor","ds":12,"sc":"measurement","vt":"{{ value[8:16] | int(base=16) }}","fi":"estimated_erd_writes_per_year"}
 {"i":"070e","n":"Non-Volatile Usage Warning or Error Details - Estimated ERD writes per year","d":"sensor","ds":12,"sc":"measurement","vt":"{{ value[16:24] | int(base=16) }}","fi":"estimated_erd_writes_per_year_1"}
 {"i":"070f","n":"Non-Volatile Usage Warning Threshold Exceeded","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"0710","n":"Non-Volatile Usage Error Threshold Exceeded","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"0710","n":"Non-Volatile Usage Error Threshold Exceeded","d":"binary_sensor","ds":1,"dc":"problem","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0800","n":"Current Sound Theme","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Default', '01': 'Classical', '02': 'Morse Code'}.get(value[:2], 'Unknown') }}"}
 {"i":"0801","n":"Sound Theme Request","d":"select","ds":1,"vt":"{{ {'00': 'Default', '01': 'Classical', '02': 'Morse Code'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Default': '00', 'Classical': '01', 'Morse Code': '02'}[value] }}","o":"[\"Default\", \"Classical\", \"Morse Code\"]"}
 {"i":"0802","n":"Supported Sound Themes - Default Theme","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 72057594037927936) % 2 else '00' }}","fi":"default_theme","pon":"01","poff":"00","son":"01","soff":"00"}

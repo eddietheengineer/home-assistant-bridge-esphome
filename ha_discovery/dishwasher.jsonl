@@ -24,7 +24,7 @@
 {"i":"3007","n":"User Settings - Door Wakeup","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 64) % 2 else '00' }}","fi":"door_wakeup","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3007","n":"User Settings - Wifi Enabled","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 128) % 2 else '00' }}","fi":"wifi_enabled","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3008","n":"Error - Error ID","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"3008","n":"Error - Error Active","d":"binary_sensor","ds":2,"sc":"measurement","vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
+{"i":"3008","n":"Error - Error Active","d":"binary_sensor","ds":2,"dc":"problem","sc":"measurement","vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
 {"i":"3009","n":"Cycle Counts - Started Cycles Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"3009","n":"Cycle Counts - Completed Cycles Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[4:8] | int(base=16) }}","fi":"completed_cycles_counter"}
 {"i":"3009","n":"Cycle Counts - Power On Reset Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[8:12] | int(base=16) }}","fi":"power_on_reset_counter"}
@@ -198,8 +198,8 @@
 {"i":"3107","n":"AC Line Voltage","d":"sensor","ds":2,"u":"V","dc":"voltage","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"3108","n":"Door Pocket Light State","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3109","n":"Demo Mode State","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"310a","n":"Critical Fault Status","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"310b","n":"Noncritical Fault Status","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"310a","n":"Critical Fault Status","d":"binary_sensor","ds":1,"dc":"problem","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"310b","n":"Noncritical Fault Status","d":"binary_sensor","ds":1,"dc":"problem","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"310c","n":"Smart Assist Cloud Notification","d":"switch","ds":1,"p":"310d","r":"request","vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3200","n":"Dish Feature Configuration","d":"sensor","ds":15,"sc":"measurement","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"3200","n":"Dish Feature Configuration - displayInHoursAndMinutes","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 1) % 2 else '00' }}","fi":"displayinhoursandminutes","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -248,7 +248,7 @@
 {"i":"3207","n":"User Settings Tub 1 - Door Wakeup","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 64) % 2 else '00' }}","fi":"door_wakeup","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3207","n":"User Settings Tub 1 - Wifi Enabled","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 128) % 2 else '00' }}","fi":"wifi_enabled","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3208","n":"Error Tub 1 - Error ID","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"3208","n":"Error Tub 1 - Error Active","d":"binary_sensor","ds":2,"sc":"measurement","vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
+{"i":"3208","n":"Error Tub 1 - Error Active","d":"binary_sensor","ds":2,"dc":"problem","sc":"measurement","vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
 {"i":"3209","n":"Cycle Counts Tub 1 - Started Cycles Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"3209","n":"Cycle Counts Tub 1 - Completed Cycles Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[4:8] | int(base=16) }}","fi":"completed_cycles_counter"}
 {"i":"3209","n":"Cycle Counts Tub 1 - Power On Reset Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[8:12] | int(base=16) }}","fi":"power_on_reset_counter"}
@@ -526,7 +526,7 @@
 {"i":"3230","n":"Latched Key Status - DishKey_SilverWareWash","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 536870912) % 2 else '00' }}","fi":"dishkey_silverwarewash","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3230","n":"Latched Key Status - DishKey_ConnectPlus","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 1073741824) % 2 else '00' }}","fi":"dishkey_connectplus","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3230","n":"Latched Key Status - DishKey_Sani","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 2147483648) % 2 else '00' }}","fi":"dishkey_sani","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3231","n":"Default to Eco Cycle Setting","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"3231","n":"Default to Eco Cycle Setting","d":"binary_sensor","ds":1,"dc":"problem","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3232","n":"Default to Eco Cycle Request","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3235","n":"Tub1 Water Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"3236","n":"Average Turbidity Tub 1","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value | int(base=16) }}"}
