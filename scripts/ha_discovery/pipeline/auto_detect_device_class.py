@@ -258,15 +258,16 @@ def apply_detection(entries):
 
         dc, confidence = infer_device_class(entry)
         if dc is None:
+            # Clear stale device_class from previous runs when the detector
+            # no longer finds a match (e.g., keyword logic changed).
+            if review.get('device_class') is not None:
+                review['device_class'] = None
             continue
 
-        # Only write when not already set, preserving manual overrides.
-        if review.get('device_class') is not None:
-            continue
-
-        total_matched += 1
+        # Always write when detected, overwriting stale or incorrect values.
         review['device_class'] = dc
         review['_dc_confidence'] = confidence
+        total_matched += 1
         total_applied += 1
 
     return total_checked, total_matched, total_applied

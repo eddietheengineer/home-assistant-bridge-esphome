@@ -526,7 +526,7 @@
 {"i":"3230","n":"Latched Key Status - DishKey_SilverWareWash","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 536870912) % 2 else '00' }}","fi":"dishkey_silverwarewash","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3230","n":"Latched Key Status - DishKey_ConnectPlus","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 1073741824) % 2 else '00' }}","fi":"dishkey_connectplus","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3230","n":"Latched Key Status - DishKey_Sani","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 2147483648) % 2 else '00' }}","fi":"dishkey_sani","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3231","n":"Default to Eco Cycle Setting","d":"binary_sensor","ds":1,"dc":"problem","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"3231","n":"Default to Eco Cycle Setting","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3232","n":"Default to Eco Cycle Request","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3235","n":"Tub1 Water Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"3236","n":"Average Turbidity Tub 1","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value | int(base=16) }}"}

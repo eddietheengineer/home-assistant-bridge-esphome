@@ -219,7 +219,7 @@
 {"i":"0710","n":"Non-Volatile Usage Error Threshold Exceeded","d":"binary_sensor","ds":1,"dc":"problem","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0800","n":"Current Sound Theme","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Default', '01': 'Classical', '02': 'Morse Code'}.get(value[:2], 'Unknown') }}"}
 {"i":"0801","n":"Sound Theme Request","d":"select","ds":1,"vt":"{{ {'00': 'Default', '01': 'Classical', '02': 'Morse Code'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Default': '00', 'Classical': '01', 'Morse Code': '02'}[value] }}","o":"[\"Default\", \"Classical\", \"Morse Code\"]"}
-{"i":"0802","n":"Supported Sound Themes - Default Theme","d":"binary_sensor","ds":8,"dc":"problem","vt":"{{ '01' if ((value[0:16] | int(base=16)) // 72057594037927936) % 2 else '00' }}","fi":"default_theme","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"0802","n":"Supported Sound Themes - Default Theme","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 72057594037927936) % 2 else '00' }}","fi":"default_theme","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0802","n":"Supported Sound Themes - Classical Theme","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 144115188075855872) % 2 else '00' }}","fi":"classical_theme","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0802","n":"Supported Sound Themes - Morse Code Theme","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[0:16] | int(base=16)) // 288230376151711744) % 2 else '00' }}","fi":"morse_code_theme","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0900","n":"Sign of Life","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}

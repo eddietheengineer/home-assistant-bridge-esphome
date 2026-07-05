@@ -928,7 +928,9 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
         # Skip availability/allowability metadata — not actionable in HA.
         combined = (name + ' ' + field_id).lower()
         # But don't skip real "allowed" values like "Allowed Setpoint".
-        if ('allowed' in combined and 'setpoint' not in combined) or 'available' in combined:
+        # Skip availability/allowability metadata, but not real data fields.
+        # "Allowed Setpoint", "Minimum Allowed X", "Maximum Allowed X" are real data.
+        if ('allowed' in combined and 'setpoint' not in combined and 'minimum allowed' not in combined and 'maximum allowed' not in combined) or 'available' in combined:
             return
         # Ensure field_id is unique within this ERD to avoid unique_id collisions.
         fid = _make_unique_field_id(erd_id_int, field_id)
