@@ -25,6 +25,7 @@ CONF_ADAPTER_ADDRESS = "adapter_address"
 CONF_DEVICE_ID = "device_id"
 CONF_MODE = "mode"
 CONF_POLLING_INTERVAL = "polling_interval"
+CONF_POLLING_ONLY_PUBLISH_ON_CHANGE = "polling_only_publish_on_change"
 CONF_APPLIANCE_API_PARSING = "appliance_api_parsing"
 CONF_CUSTOM_ERDS = "custom_erds"
 CONF_GENERATE_DEVICE_CONFIG = "generate_device_config"
@@ -101,6 +102,7 @@ CONFIG_SCHEMA = cv.Schema(
             upper=False
         ),
         cv.Optional(CONF_POLLING_INTERVAL, default=10000): cv.positive_int,
+        cv.Optional(CONF_POLLING_ONLY_PUBLISH_ON_CHANGE): cv.boolean,
         cv.Optional(CONF_APPLIANCE_API_PARSING, default=True): cv.boolean,
         cv.Optional(CONF_GENERATE_DEVICE_CONFIG, default=False): cv.boolean,
         cv.Optional(CONF_CUSTOM_ERDS, default=[]): cv.All(cv.ensure_list(
@@ -159,6 +161,14 @@ async def to_code(config: dict[str, Any]) -> None:
     # Ensure USE_ESP_IDF is defined for ESP-IDF builds so that
     # platform-specific code in our component compiles correctly.
     cg.add_build_flag("-DUSE_ESP_IDF")
+
+    # Warn if deprecated config option is used
+    if CONF_POLLING_ONLY_PUBLISH_ON_CHANGE in config:
+        _LOGGER.warning(
+            "polling_only_publish_on_change is deprecated. "
+            "The component now always publishes only on change. "
+            "This option will be removed in a future release."
+        )
 
     # Get optional GEA3 UART component reference
     if CONF_GEA3_UART_ID in config:
