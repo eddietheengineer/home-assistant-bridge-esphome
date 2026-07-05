@@ -43,16 +43,12 @@
 {"i":"d00c","n":"Temporary Temperature Offset Demand Response - Duration","d":"sensor","ds":44,"u":"min","p":"d00b","r":"status","vt":"{{ value[80:84] | int(base=16) }}","fi":"duration_4"}
 {"i":"d00c","n":"Temporary Temperature Offset Demand Response - Offset","d":"sensor","ds":44,"u":"°F","dc":"temperature","sc":"measurement","p":"d00b","r":"status","vt":"{{ (value[84:88] | int(base=16)) - 65536 if (value[84:88] | int(base=16)) >= 32768 else (value[84:88] | int(base=16)) }}","fi":"offset_4"}
 {"i":"d00e","n":"Cost of power cost/comfort slider","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"p":"d00f","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
-{"i":"d014","n":"Appliance Energy Usage Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"d015","n":"Appliance Energy Usage Estimated or Measured Flag","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Estimated', '01': 'Measured'}.get(value[:2], 'Unknown') }}"}
 {"i":"d016","n":"Appliance Cumulative Hot Water Usage (L)","d":"sensor","ds":4,"u":"L","vt":"{{ value | int(base=16) }}"}
-{"i":"d017","n":"Appliance Hot Water Usage Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"d018","n":"Appliance Hot Water Usage Estimated or Measured Flag","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Estimated', '01': 'Measured'}.get(value[:2], 'Unknown') }}"}
 {"i":"d019","n":"Appliance Cumulative Cold Water Usage (L)","d":"sensor","ds":4,"u":"L","vt":"{{ value | int(base=16) }}"}
-{"i":"d01a","n":"Appliance Cold Water Usage Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"d01b","n":"Appliance Cold Water Usage Estimated or Measured Flag","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Estimated', '01': 'Measured'}.get(value[:2], 'Unknown') }}"}
 {"i":"d01c","n":"Appliance Cumulative Gas Usage","d":"sensor","ds":4,"u":"ft³","dc":"gas","sc":"total","sf":10,"vt":"{{ (value | int(base=16)) / 10 | round(1) }}"}
-{"i":"d01d","n":"Appliance Gas Usage Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"d01e","n":"Appliance Gas Usage Estimated or Measured Flag","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Estimated', '01': 'Measured'}.get(value[:2], 'Unknown') }}"}
 {"i":"d01f","n":"Appliance Gas Type","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'Natural Gas', '02': 'Liquid Propane'}.get(value[:2], 'Unknown') }}"}
 {"i":"d020","n":"Appliance Cumulative Hot Water Usage (mL)","d":"sensor","ds":4,"u":"mL","vt":"{{ value | int(base=16) }}"}
@@ -515,10 +511,10 @@
 {"i":"d02b","n":"Electrical Pricing Time of Use Schedule Hash Status - Season 4 - Electrical Pricing Time of Use Schedule Sha256[29]","d":"sensor","ds":32,"vt":"{{ value[58:60] | int(base=16) }}","fi":"electrical_pricing_time_of_use_schedule_sha256_29"}
 {"i":"d02b","n":"Electrical Pricing Time of Use Schedule Hash Status - Season 4 - Electrical Pricing Time of Use Schedule Sha256[30]","d":"sensor","ds":32,"vt":"{{ value[60:62] | int(base=16) }}","fi":"electrical_pricing_time_of_use_schedule_sha256_30"}
 {"i":"d02b","n":"Electrical Pricing Time of Use Schedule Hash Status - Season 4 - Electrical Pricing Time of Use Schedule Sha256[31]","d":"sensor","ds":32,"vt":"{{ value[62:64] | int(base=16) }}","fi":"electrical_pricing_time_of_use_schedule_sha256_31"}
-{"i":"d02c","n":"Requested Appliance Energy Usage Update Period in Minutes","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
-{"i":"d02d","n":"Requested Appliance Hot Water Usage Update Period in Minutes","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
-{"i":"d02e","n":"Requested Appliance Cold Water Usage Update Period in Minutes","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
-{"i":"d02f","n":"Requested Appliance Gas Usage Update Period in Minutes","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"d02c","n":"Requested Appliance Energy Usage Update Period in Minutes","d":"number","ds":1,"u":"min","mn":0.0,"mx":255.0,"st":1.0,"p":"d014","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"d02d","n":"Requested Appliance Hot Water Usage Update Period in Minutes","d":"number","ds":1,"u":"min","mn":0.0,"mx":255.0,"st":1.0,"p":"d017","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"d02e","n":"Requested Appliance Cold Water Usage Update Period in Minutes","d":"number","ds":1,"u":"min","mn":0.0,"mx":255.0,"st":1.0,"p":"d01a","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"d02f","n":"Requested Appliance Gas Usage Update Period in Minutes","d":"number","ds":1,"u":"min","mn":0.0,"mx":255.0,"st":1.0,"p":"d01d","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"d030","n":"Appliance Cumulative Energy","d":"sensor","ds":4,"u":"kWh","dc":"energy","sc":"total","sf":1000,"vt":"{{ (value | int(base=16)) / 1000 | round(3) }}"}
 {"i":"d203","n":"End of cycle (Tub 1)","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"d204","n":"Cycle Time Remaining Tub 1","d":"sensor","ds":2,"u":"min","vt":"{{ value | int(base=16) }}"}

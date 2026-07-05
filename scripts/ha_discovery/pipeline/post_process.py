@@ -84,6 +84,19 @@ def apply_overrides(entries):
             "force_classification": "single",
             "value_template": "{{ ((value[0:8] | int(base=16)) * 2**32 + (value[8:16] | int(base=16))) / 1000000 | round(3) }}",
         },
+        # --- Usage update period pairs: pair Requested ↔ status, add min unit ---
+        # Energy
+        "0xd014": {"unit_of_measurement": "min", "paired_erd": "0xd02c", "pair_role": "status"},
+        "0xd02c": {"unit_of_measurement": "min", "paired_erd": "0xd014", "pair_role": "request"},
+        # Hot water
+        "0xd017": {"unit_of_measurement": "min", "paired_erd": "0xd02d", "pair_role": "status"},
+        "0xd02d": {"unit_of_measurement": "min", "paired_erd": "0xd017", "pair_role": "request"},
+        # Cold water
+        "0xd01a": {"unit_of_measurement": "min", "paired_erd": "0xd02e", "pair_role": "status"},
+        "0xd02e": {"unit_of_measurement": "min", "paired_erd": "0xd01a", "pair_role": "request"},
+        # Gas
+        "0xd01d": {"unit_of_measurement": "min", "paired_erd": "0xd02f", "pair_role": "status"},
+        "0xd02f": {"unit_of_measurement": "min", "paired_erd": "0xd01d", "pair_role": "request"},
     }
 
     applied = 0
