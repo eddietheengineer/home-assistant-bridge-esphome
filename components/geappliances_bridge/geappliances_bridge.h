@@ -23,6 +23,14 @@
 //   - tiny_gea3_interface, tiny_gea2_interface, tiny_gea3_erd_client
 //   - All manager and adapter classes in this component
 // =============================================================================
+// =============================================================================
+// C/C++ CONVENTION
+// =============================================================================
+// C structs + vtables: data-path components (erd_cache, bridges, interfaces,
+//   publishers, discovery). Portable, testable, no C++ overhead.
+// C++ classes: ESPHome integration layer (GeappliancesBridge, managers,
+//   adapters). Used only where ESPHome APIs or C++ features are needed.
+// =============================================================================
 
 #pragma once
 
