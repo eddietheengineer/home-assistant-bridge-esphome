@@ -50,7 +50,7 @@ struct gea2_tick_source_t {
   GeappliancesBridge* bridge;
 };
 
-static tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t* _self)
+tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t* _self)
 {
   auto* src = reinterpret_cast<gea2_tick_source_t*>(_self);
   GeappliancesBridge* br = src->bridge;
@@ -60,7 +60,7 @@ static tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t* _self)
   return 0;
 }
 static const i_tiny_time_source_api_t kGea2TickApi = { gea2_tick_ticks };
-static gea2_tick_source_t s_gea2_tick_source = { .base = { &kGea2TickApi } };
+static gea2_tick_source_t s_gea2_tick_source = { .base = { &kGea2TickApi }, .bridge = nullptr };
 
 void GeappliancesBridge::setup() {
   // Reset GEA2 state on re-init (deep sleep wake, ESPHome reconfiguration)
