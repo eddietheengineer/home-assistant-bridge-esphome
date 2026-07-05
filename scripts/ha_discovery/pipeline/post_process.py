@@ -95,6 +95,10 @@ def apply_overrides(entries):
         "0xd02f": {"unit_of_measurement": "min"},
         "0x5b27": {"unit_of_measurement": "min"},
         "0x5b28": {"unit_of_measurement": "min"},
+        # --- Mixing valve positions: add steps unit and state_class for plotting ---
+        "0x400a": {"unit_of_measurement": "steps", "state_class": "measurement"},
+        "0x400b": {"unit_of_measurement": "steps", "state_class": "measurement"},
+        "0x400c": {"unit_of_measurement": "steps", "state_class": "measurement"},
     }
 
     applied = 0
