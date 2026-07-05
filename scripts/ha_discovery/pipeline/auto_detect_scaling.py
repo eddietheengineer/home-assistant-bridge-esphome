@@ -335,6 +335,14 @@ def apply_detection(entries):
         # Skip non-numeric types — unit/scaling only applies to numeric fields.
         field_type = entry.get('field_type', '')
         if field_type not in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32'):
+            # Clear stale units/scaling from previous runs on non-numeric fields
+            # (e.g., enum fields that inherited units from a sibling field override).
+            if review.get('unit_of_measurement'):
+                review['unit_of_measurement'] = None
+                total_applied += 1
+            if review.get('scaling_factor'):
+                review['scaling_factor'] = None
+                total_applied += 1
             continue
 
         total_checked += 1

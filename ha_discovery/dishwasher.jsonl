@@ -36,7 +36,7 @@
 {"i":"300f","n":"Analog Inputs - A2D Turbidity","d":"sensor","ds":12,"vt":"{{ value[10:12] | int(base=16) }}","fi":"a2d_turbidity"}
 {"i":"300f","n":"Analog Inputs - A2D WaterTemperature","d":"sensor","ds":12,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value[12:14] | int(base=16) }}","fi":"a2d_watertemperature"}
 {"i":"300f","n":"Analog Inputs - A2D Personality","d":"sensor","ds":12,"vt":"{{ value[14:16] | int(base=16) }}","fi":"a2d_personality"}
-{"i":"3015","n":"Inlet Flow Rate - Inlet Flow Rate in GPM Multiplied by Ten Thousands","d":"sensor","ds":4,"vt":"{{ value[0:4] | int(base=16) }}"}
+{"i":"3015","n":"Inlet Flow Rate - Inlet Flow Rate in GPM Multiplied by Ten Thousands","d":"sensor","ds":4,"u":"gal/min","sf":10000,"vt":"{{ (value[0:4] | int(base=16)) / 10000 | round(3) }}"}
 {"i":"3015","n":"Inlet Flow Rate - Inlet Flow Rate Calculation Status","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'NotReady', '01': 'Ready', '02': 'Failed_CycleTerminatedBeforeMeasurementCompleted', '03': 'Failed_CirculationAndFillEndPressureDifferenceExceededThreshold', '04': 'Failed_DoorWasOpened', '05': 'Failed_WaterLevelDiagnosticsFaultOccurred', '06': 'Failed_TimerCounterOverflowed', '07': 'Failed_LookUpTableDataIndexBoundariesAreNotValid'}.get(value[4:6], 'Unknown') }}","fi":"inlet_flow_rate_calculation_status"}
 {"i":"301a","n":"CSM Life Count","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"301b","n":"CSM Fault Data","d":"sensor","ds":44,"vt":"{{ value[0:8] | int(base=16) }}"}

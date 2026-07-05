@@ -1117,6 +1117,10 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 f_dev_cls = f_dc or ('enum' if f_type == 'enum' else '')
                 f_state_cls = field.get('state_class') or state_class
                 f_unit = field.get('unit_of_measurement') or _infer_unit_from_field_name(leaf, unit)
+                # Don't inherit ERD-level unit/scaling for non-numeric fields
+                # (e.g., enum status fields shouldn't inherit gal/min from a sibling).
+                if f_type not in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32'):
+                    f_unit = ''
                 # Use per-field pairing/domain if available (mixed-pairing ERDs)
                 f_pair_role = field.get('pair_role') or pair_role
                 f_paired_erd = field.get('paired_erd') or paired_erd_str
@@ -1124,6 +1128,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 f_ha_domain = field.get('ha_domain') or ha_domain
                 # Per-field scaling — used for VT, CT, range, and stored in entry.
                 f_scaling = int(field.get('scaling_factor') or scaling_factor)
+                if f_type not in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32'):
+                    f_scaling = 1
                 if f_ha_domain == 'binary_sensor' and f_type == 'enum':
                     f_dev_cls = ''
                     field_size = field.get('size', 1)

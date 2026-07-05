@@ -939,7 +939,7 @@
 {"i":"211e","n":"Commercial Laundry Payment V1 Attribute Bitmap - Cycle Complete","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 128) % 2 else '00' }}","fi":"cycle_complete","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"211f","n":"Timed Cycle Total Duration Option Current","d":"sensor","ds":1,"u":"min","vt":"{{ value | int(base=16) }}"}
 {"i":"2120","n":"Timed Cycle Total Duration Option Request - Requested Minutes","d":"number","ds":2,"u":"min","mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"2120","n":"Timed Cycle Total Duration Option Request - Is Requested","d":"switch","ds":2,"u":"min","vt":"{{ value[2:4] }}","fi":"is_requested","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"2120","n":"Timed Cycle Total Duration Option Request - Is Requested","d":"switch","ds":2,"vt":"{{ value[2:4] }}","fi":"is_requested","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"2121","n":"Timed Cycle Total Duration Option Allowable Range - Range Min Minutes","d":"sensor","ds":3,"u":"min","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"2121","n":"Timed Cycle Total Duration Option Allowable Range - Range Max Minutes","d":"sensor","ds":3,"u":"min","vt":"{{ value[2:4] | int(base=16) }}","fi":"range_max_minutes"}
 {"i":"2122","n":"Laundry Combi Unit Remaining Wash Cycle Time","d":"sensor","ds":2,"u":"s","vt":"{{ value | int(base=16) }}"}
@@ -1653,10 +1653,10 @@
 {"i":"217c","n":"Drum Light Option Selection","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"217d","n":"Drum Light Option Request","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"217f","n":"Delay Start Status - Delay Duration Minutes","d":"sensor","ds":4,"u":"min","vt":"{{ value[0:4] | int(base=16) }}"}
-{"i":"217f","n":"Delay Start Status - Is Enabled","d":"binary_sensor","ds":4,"u":"min","vt":"{{ '01' if value[4:6] != '00' else '00' }}","fi":"is_enabled"}
+{"i":"217f","n":"Delay Start Status - Is Enabled","d":"binary_sensor","ds":4,"vt":"{{ '01' if value[4:6] != '00' else '00' }}","fi":"is_enabled"}
 {"i":"2180","n":"Delay Start Duration Request - Delay Start Duration Request In Minutes","d":"number","ds":4,"u":"min","mn":0.0,"mx":65535.0,"st":1.0,"vt":"{{ value[0:4] | int(base=16) }}"}
-{"i":"2180","n":"Delay Start Duration Request - Delay Start Option Request","d":"switch","ds":4,"u":"min","vt":"{{ value[4:6] }}","fi":"delay_start_option_request","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"2180","n":"Delay Start Duration Request - Is Requested","d":"switch","ds":4,"u":"min","vt":"{{ value[6:8] }}","fi":"is_requested","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"2180","n":"Delay Start Duration Request - Delay Start Option Request","d":"switch","ds":4,"vt":"{{ value[4:6] }}","fi":"delay_start_option_request","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"2180","n":"Delay Start Duration Request - Is Requested","d":"switch","ds":4,"vt":"{{ value[6:8] }}","fi":"is_requested","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"2181","n":"Delay Start Duration Allowable - Minimum Delay Duration In Minutes","d":"sensor","ds":6,"u":"min","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"2181","n":"Delay Start Duration Allowable - Maximum Delay Duration In Minutes","d":"sensor","ds":6,"u":"min","vt":"{{ value[4:8] | int(base=16) }}","fi":"maximum_delay_duration_in_minutes"}
 {"i":"2200","n":"Additional Cavity Machine State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Idle', '01': 'Standby', '02': 'Run', '03': 'Pause', '04': 'End Of Cycle', '05': 'DSM Delay Run', '06': 'Delay Run', '07': 'Delay Pause', '08': 'Drain Timeout', '09': 'Commissioning', '0a': 'Bulk Flush', '0b': 'Bluetooth Pairing', '80': 'Clean Speak'}.get(value[:2], 'Unknown') }}"}

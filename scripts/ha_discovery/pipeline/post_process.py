@@ -104,17 +104,39 @@ def apply_overrides(entries):
         # --- Average Turbidity: add NTU unit and measurement state_class for plotting ---
         "0x3036": {"unit_of_measurement": "NTU", "state_class": "measurement"},
         "0x3236": {"unit_of_measurement": "NTU", "state_class": "measurement"},
+        # --- Inlet Flow Rate: GPM with x10000 scaling (first field only) ---
+        "0x3015": {
+            "fields": {
+                "Inlet Flow Rate in GPM Multiplied by Ten Thousands": {
+                    "unit_of_measurement": "gal/min",
+                    "scaling_factor": 10000,
+                },
+            },
+        },
     }
 
     applied = 0
     for entry in entries:
         erd_id = entry.get("erd_id", "").lower()
-        if erd_id in OVERRIDES:
-            review = entry.setdefault("review", {})
-            for key, val in OVERRIDES[erd_id].items():
-                if review.get(key) != val:
-                    review[key] = val
-                    applied += 1
+        if erd_id not in OVERRIDES:
+            continue
+        override = OVERRIDES[erd_id]
+        field_name = entry.get('field_name', '')
+
+        # Overrides can be field-scoped (with 'fields' key) or ERD-level.
+        # ERD-level overrides apply to all fields of the ERD.
+        if 'fields' in override:
+            if field_name not in override['fields']:
+                continue
+            fields_override = override['fields'][field_name]
+        else:
+            fields_override = override
+
+        review = entry.setdefault("review", {})
+        for key, val in fields_override.items():
+            if review.get(key) != val:
+                review[key] = val
+                applied += 1
 
     return applied
 
