@@ -89,10 +89,10 @@ def validate_at_least_one_uart(config: dict[str, Any]) -> dict[str, Any]:
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(GeappliancesBridge),
-        cv.Optional(CONF_DEVICE_ID): cv.All(cv.string, cv.Length(max=91)),
+        cv.Optional(CONF_GEA3_UART_ID): cv.use_id(uart.UARTComponent),
         cv.Optional(CONF_GEA2_UART_ID): cv.use_id(uart.UARTComponent),
         cv.Optional(CONF_ADAPTER_ADDRESS, default=0xE4): cv.int_range(min=0x00, max=0xFF),
-        cv.Optional(CONF_DEVICE_ID): cv.All(cv.string, cv.Length(max=63)),
+        cv.Optional(CONF_DEVICE_ID): cv.All(cv.string, cv.Length(max=91)),
         cv.Optional(CONF_MODE, default=MODE_AUTO): cv.enum(
             {
                 MODE_POLL: MODE_POLL_VALUE,
