@@ -10970,7 +10970,7 @@
     },
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -10979,7 +10979,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {
@@ -11027,7 +11028,7 @@
     },
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -11036,7 +11037,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {
@@ -11084,7 +11086,7 @@
     },
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -11093,7 +11095,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {
@@ -11141,7 +11144,7 @@
     },
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -11150,7 +11153,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {
@@ -11198,7 +11202,7 @@
     },
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -11207,7 +11211,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {
@@ -11255,7 +11260,7 @@
     },
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -11264,7 +11269,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {
@@ -11312,7 +11318,7 @@
     },
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -11321,7 +11327,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {
@@ -11369,7 +11376,7 @@
     },
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -11378,7 +11385,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {
@@ -33499,7 +33507,7 @@
     },
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -33508,7 +33516,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {
@@ -33538,7 +33547,7 @@
     },
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -33547,7 +33556,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {
@@ -33577,7 +33587,7 @@
     },
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -33586,7 +33596,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {
@@ -33616,7 +33627,7 @@
     },
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -33625,7 +33636,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {
@@ -518604,7 +518616,7 @@
     },
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -518613,7 +518625,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {
@@ -529695,7 +529708,7 @@
     "field_bits": null,
     "review": {
       "ha_domain": "binary_sensor",
-      "device_class": null,
+      "device_class": "problem",
       "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
@@ -529704,7 +529717,8 @@
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_dc_confidence": 0.8
     }
   },
   {

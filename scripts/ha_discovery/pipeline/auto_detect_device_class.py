@@ -122,7 +122,17 @@ def infer_device_class(entry):
     field_type = entry.get('field_type', '')
     unit = entry.get('review', {}).get('unit_of_measurement')
     field_bits = entry.get('field_bits')
+    ha_domain = entry.get('review', {}).get('ha_domain')
     name_lower = field_name.lower()
+    erd_name = entry.get('erd_name', '')
+    erd_description = entry.get('erd_description', '')
+    combined = name_lower + ' ' + erd_name.lower() + ' ' + erd_description.lower()
+
+    # --- Binary sensors: detect problem indicators ---
+    if ha_domain == 'binary_sensor':
+        problem_keywords = ['fault', 'issue', 'error', 'alarm', 'limited']
+        if any(kw in combined for kw in problem_keywords):
+            return 'problem', 0.8
 
     # Skip bit-fields (they're boolean indicators)
     if field_bits is not None:
