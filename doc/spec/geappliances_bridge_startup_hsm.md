@@ -168,7 +168,6 @@ Steady-state operation. All recurring tasks run every loop iteration.
 
 - **On entry:** Logs that the bridge is in steady-state operation.
 - **On `signal_run_loop`:**
-  - Calls `svc->run_all_managers()` to run all managers (autodiscovery, device identity, feature bits).
   - Checks `svc->get_subscription_state()`. If `subscription_state_failed`, calls `svc->handle_subscription_failed()`.
   - Calls `svc->handle_polling_failed()`, `svc->log_poll_state_transitions()`, and `svc->maybe_start_custom_erd_polling()`.
 - **On exit:** No action.
@@ -226,7 +225,7 @@ startup_state_top (root — defers all unhandled signals)
   │
   └─ startup_state_running (terminal)
        ├─ entry: —
-       ├─ run_loop: run_all_managers(), if failed → handle_subscription_failed();
+       ├─ run_loop: if failed → handle_subscription_failed();
        │             handle_polling_failed(), log_poll_state_transitions(),
        │             maybe_start_custom_erd_polling()
        └─ exit: —

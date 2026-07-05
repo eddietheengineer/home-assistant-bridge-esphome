@@ -71,6 +71,42 @@ ErdPollListResult build_poll_list_(GeappliancesBridge* bridge)
   return build_erd_poll_list(config);
 }
 
+// ---------------------------------------------------------------------------
+// Shared polling bridge initialization (used by all three init paths)
+// ---------------------------------------------------------------------------
+
+void GeappliancesBridge::init_polling_bridge_(bool log_as_info)
+{
+  // Wire the discovery-complete callback BEFORE initializing the bridge,
+  // so the HSM cannot fire the callback before it's set (race condition
+  // when discovery completes synchronously on first entry).
+  this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
+    reinterpret_cast<GeappliancesBridge*>(ctx)->on_poll_discovery_complete_();
+  };
+  this->erd_bridge_poll_.on_discovery_complete_context = this;
+
+  auto result = build_poll_list_(this);
+  this->poll_probe_list_count_ = result.erds_count;
+  std::memcpy(this->poll_probe_list_, result.erds, result.erds_count * sizeof(uint16_t));
+
+  if (log_as_info) {
+    ESP_LOGI(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
+  } else {
+    ESP_LOGD(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
+  }
+
+  erd_bridge_poll_init(
+      &this->erd_bridge_poll_,
+      &this->timer_group_,
+      this->autodiscovery_manager_.get_active_erd_client(),
+      this->polling_interval_ms_,
+      this->autodiscovery_manager_.get_host_address(),
+      this->device_identity_manager_.get_appliance_type(),
+      this->poll_probe_list_,
+      this->poll_probe_list_count_,
+      &this->erd_cache_);
+  this->polling_bridge_initialized_ = true;
+}
 
 // ---------------------------------------------------------------------------
 // Startup: kick off feature-bit reading sequence
@@ -190,31 +226,8 @@ void GeappliancesBridge::initialize_erd_bridge_()
   ESP_LOGI(TAG, "Bridge mode: %s", mode_name);
   (void)mode_name; /* suppress -Wunused-but-set-variable when ESP_LOGI is stubbed */
 
-  // Wire the discovery-complete callback BEFORE initializing the bridge,
-  // so the HSM cannot fire the callback before it's set (race condition
-  // when discovery completes synchronously on first entry).
-  this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
-    reinterpret_cast<GeappliancesBridge*>(ctx)->on_poll_discovery_complete_();
-  };
-  this->erd_bridge_poll_.on_discovery_complete_context = this;
-
-  // Initialize the appropriate bridge(s).
   if (use_polling) {
-    auto result = build_poll_list_(this);
-    this->poll_probe_list_count_ = result.erds_count;
-    std::memcpy(this->poll_probe_list_, result.erds, result.erds_count * sizeof(uint16_t));
-    ESP_LOGD(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
-    erd_bridge_poll_init(
-      &this->erd_bridge_poll_,
-      &this->timer_group_,
-      this->autodiscovery_manager_.get_active_erd_client(),
-      this->polling_interval_ms_,
-      this->autodiscovery_manager_.get_host_address(),
-      this->device_identity_manager_.get_appliance_type(),
-      this->poll_probe_list_,
-      this->poll_probe_list_count_,
-      &this->erd_cache_);
-    this->polling_bridge_initialized_ = true;
+    this->init_polling_bridge_(false);
     // Mark bridge initialized BEFORE the probe phase starts, so that if
     // the probe completes synchronously and fires signal_bridge_ready,
     // check_steady_state() in the running entry can see the flag.
@@ -276,29 +289,7 @@ void GeappliancesBridge::start_custom_erd_polling_()
   // Both bridges subscribe to the same ERD client activity event, but they
   // handle different event types (subscription vs read_completed).
 
-  auto result = build_poll_list_(this);
-  this->poll_probe_list_count_ = result.erds_count;
-  std::memcpy(this->poll_probe_list_, result.erds, result.erds_count * sizeof(uint16_t));
-  ESP_LOGI(TAG, "Custom ERD polling list: %s (%u ERDs)", result.description, result.erds_count);
-
-  // Wire the discovery-complete callback BEFORE initializing the bridge,
-  // so the HSM cannot fire the callback before it's set.
-  this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
-    reinterpret_cast<GeappliancesBridge*>(ctx)->on_poll_discovery_complete_();
-  };
-  this->erd_bridge_poll_.on_discovery_complete_context = this;
-
-  erd_bridge_poll_init(
-      &this->erd_bridge_poll_,
-      &this->timer_group_,
-      this->autodiscovery_manager_.get_active_erd_client(),
-      this->polling_interval_ms_,
-      this->autodiscovery_manager_.get_host_address(),
-      this->device_identity_manager_.get_appliance_type(),
-      this->poll_probe_list_,
-      this->poll_probe_list_count_,
-      &this->erd_cache_);
-  this->polling_bridge_initialized_ = true;
+  this->init_polling_bridge_(true);
   this->custom_erd_polling_started_ = true;
 }
 
@@ -374,30 +365,7 @@ void GeappliancesBridge::handle_subscription_failed()
     this->polling_bridge_initialized_ = false;
   }
 
-  // Stand up the polling bridge.
-  // Wire the discovery-complete callback BEFORE initializing the bridge,
-  // so the HSM cannot fire the callback before it's set (race condition
-  // when discovery completes synchronously on first entry).
-  this->erd_bridge_poll_.on_discovery_complete = +[](void* ctx) {
-    reinterpret_cast<GeappliancesBridge*>(ctx)->on_poll_discovery_complete_();
-  };
-  this->erd_bridge_poll_.on_discovery_complete_context = this;
-
-  auto result = build_poll_list_(this);
-  this->poll_probe_list_count_ = result.erds_count;
-  std::memcpy(this->poll_probe_list_, result.erds, result.erds_count * sizeof(uint16_t));
-  ESP_LOGI(TAG, "Poll list: %s (%u ERDs)", result.description, result.erds_count);
-  erd_bridge_poll_init(
-      &this->erd_bridge_poll_,
-      &this->timer_group_,
-      this->autodiscovery_manager_.get_active_erd_client(),
-      this->polling_interval_ms_,
-      this->autodiscovery_manager_.get_host_address(),
-      this->device_identity_manager_.get_appliance_type(),
-      this->poll_probe_list_,
-      this->poll_probe_list_count_,
-      &this->erd_cache_);
-  this->polling_bridge_initialized_ = true;
+  this->init_polling_bridge_(true);
 
   // Signal the startup HSM that subscription fallback has occurred.
   tiny_hsm_send_signal(&this->startup_hsm_wrapper_.hsm, signal_subscription_fallback, nullptr);

@@ -25,7 +25,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `set_polling_interval(ms)` | Set polling interval (default 10000 ms) |
 | `set_appliance_api_parsing(bool)` | Enable feature bit-based ERD filtering (default true) |
 | `set_generate_device_config(bool)` | Deprecated, no-op |
-| `set_throttle_rate_seconds(rate)` | Set minimum interval (seconds) between publishes per ERD (default 0, range 0-255) |
+| `set_throttle_rate_seconds(rate)` | Set minimum interval (seconds) between publishes per ERD (default 1, range 0-255) |
 | `add_custom_erd(erd)` | Add a custom ERD to poll |
 
 ## Protected Methods

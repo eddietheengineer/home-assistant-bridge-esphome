@@ -428,7 +428,6 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
       break;
 
     case signal_run_loop:
-      svc->run_all_managers();
       {
         subscription_state_t sub_state = svc->get_subscription_state();
         if (sub_state == subscription_state_failed) {

@@ -68,7 +68,6 @@ Define the contract between the startup state machine and the bridge so the HSM 
 | `handle_polling_failed()` | Called when the polling bridge enters the failed state while running alongside a subscription bridge; cleans up the polling bridge. |
 | `maybe_start_custom_erd_polling()` | Start custom-ERD polling bridge if conditions are met (idempotent). |
 | `log_poll_state_transitions()` | Log any pending polling-bridge state-name transitions. |
-| `run_all_managers()` | Run one tick of all managers (autodiscovery, device-ID, feature bits). |
 
 ### ERD Cache MQTT Publisher
 

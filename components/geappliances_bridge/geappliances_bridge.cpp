@@ -45,18 +45,22 @@ static const tiny_gea2_erd_client_configuration_t gea2_client_configuration = {
 //
 // The tick count and last_ms are class members (gea2_tick_count_, gea2_last_ms_)
 // so they reset on re-init (deep sleep wake, ESPHome reconfiguration).
-// The tick source API uses a file-scope pointer to the current bridge instance.
-static GeappliancesBridge* g_gea2_bridge = nullptr;
+struct gea2_tick_source_t {
+  i_tiny_time_source_t base;
+  GeappliancesBridge* bridge;
+};
 
-tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t *)
+tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t* _self)
 {
-  if (g_gea2_bridge) {
-    return g_gea2_bridge->gea2_tick_count_;
+  auto* src = reinterpret_cast<gea2_tick_source_t*>(_self);
+  GeappliancesBridge* br = src->bridge;
+  if (br) {
+    return br->gea2_tick_count_;
   }
   return 0;
 }
 static const i_tiny_time_source_api_t kGea2TickApi = { gea2_tick_ticks };
-static i_tiny_time_source_t g_gea2_tick_source = { &kGea2TickApi };
+static gea2_tick_source_t s_gea2_tick_source = { .base = { &kGea2TickApi }, .bridge = nullptr };
 
 void GeappliancesBridge::setup() {
   // Reset GEA2 state on re-init (deep sleep wake, ESPHome reconfiguration)
@@ -116,12 +120,12 @@ void GeappliancesBridge::setup() {
     // in use — keeping the shared timer_group_ free of a 1 ms periodic timer
     // that would starve GEA3/polling-bridge timers when GEA3 is active.
     tiny_event_init(&this->gea2_msec_interrupt_);
-    g_gea2_bridge = this;
+    s_gea2_tick_source.bridge = this;
 
     tiny_gea2_interface_init(
       &this->gea2_interface_,
       &this->gea2_uart_adapter_.interface,
-      &g_gea2_tick_source,
+      &s_gea2_tick_source.base,
       &this->gea2_msec_interrupt_.interface,
       this->client_address_,
       this->gea2_send_queue_buffer_,
@@ -631,7 +635,7 @@ float GeappliancesBridge::get_setup_priority() const {
 
 bool GeappliancesBridge::teardown() {
   // Reset GEA2 globals so re-init starts fresh
-  g_gea2_bridge = nullptr;
+  s_gea2_tick_source.bridge = nullptr;
   this->gea2_tick_count_ = 0;
   this->gea2_last_ms_ = 0;
   // Clean up feature bit manager (unsubscribe from ERD client events, stop timers).
@@ -819,12 +823,6 @@ void GeappliancesBridge::maybe_start_custom_erd_polling()
 void GeappliancesBridge::log_poll_state_transitions()
 {
   log_poll_state_transitions_();
-}
-
-void GeappliancesBridge::run_all_managers()
-{
-  // FeatureBitManager is self-driving (owns its own timers and event subscriptions).
-  // No polling needed from the bridge loop.
 }
 
 // -- ERD cache MQTT publisher ------------------------------------------------

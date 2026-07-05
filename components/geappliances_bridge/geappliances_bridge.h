@@ -135,7 +135,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void log_poll_state_transitions() override;
   void initialize_erd_cache_publisher() override;
   bool is_erd_cache_publisher_initialized() const override;
-  void run_all_managers() override;
   // ── Internal bridge methods (event callbacks and per-phase helpers) ─────────
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();
@@ -146,6 +145,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
   void start_feature_bit_reading_();
   void init_erd_cache_publisher_();
+  void init_polling_bridge_(bool log_as_info);
   void on_poll_discovery_complete_();
   void trigger_discovery_refresh();
   bool should_route_to_feature_bits_(tiny_erd_t erd);
@@ -166,9 +166,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   BridgeMode mode_{BRIDGE_MODE_AUTO};
   uint32_t polling_interval_ms_{10000};
   bool appliance_api_parsing_{true};
-  bool generate_device_config_{false};
+  bool generate_device_config_{true};
   bool filter_config_topics_{true};
-  uint8_t throttle_rate_seconds_{0};
+  uint8_t throttle_rate_seconds_{1};
   uint32_t last_cooldown_tick_{0};  /* last time erd_cache_tick_cooldowns ran (ms) */
   // User-configured custom ERDs to poll in addition to the standard list.
   // Populated by add_custom_erd() calls generated from the YAML custom_erds option.
