@@ -552,10 +552,12 @@
 {"i":"117a","n":"Home Water Filter 1 Type Information - Location","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Bottom', '01': 'Middle', '02': 'Upper'}.get(value[2:4], 'Unknown') }}","fi":"location"}
 {"i":"117b","n":"Home Water Filter 2 Type Information - Type","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'POE 13 in', '01': 'POE 20 in', '02': 'POE 10 in', '03': 'RO Carbon Filter', '04': 'Reverse Osmosis', '05': 'RO Remineralization', '06': 'RO Pre Filter', '07': 'RO Post Filter', '08': 'POU Bluetooth', '09': 'POU Single Stage', '0a': 'POU Dual Stage', '0b': 'POU High Flow', '0c': 'In Line Filter', '0d': 'Five Year Filter', '0e': 'Shower Filter', '0f': 'Antiscale'}.get(value[0:2], 'Unknown') }}"}
 {"i":"117b","n":"Home Water Filter 2 Type Information - Location","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Bottom', '01': 'Middle', '02': 'Upper'}.get(value[2:4], 'Unknown') }}","fi":"location"}
-{"i":"120c","n":"Turbo Cool","d":"switch","ds":1,"p":"120d","r":"request","vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"120c","n":"Turbo Cool Request","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"120d","n":"Turbo Cool Status","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"120e","n":"Fresh Food Door 1 Status","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"120f","n":"Freezer Door 1 Status","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"121a","n":"Turbo Freeze","d":"switch","ds":1,"p":"121b","r":"request","vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"121a","n":"Turbo Freeze Request","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"121b","n":"Turbo Freeze Status","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"121c","n":"Current Flowmeter Ounces Dispensed","d":"sensor","ds":2,"u":"oz","sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"121d","n":"Last Flowmeter Ounces Dispensed","d":"sensor","ds":2,"u":"oz","sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"121e","n":"Dimmable Lighting 0 Percent Level Request","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}

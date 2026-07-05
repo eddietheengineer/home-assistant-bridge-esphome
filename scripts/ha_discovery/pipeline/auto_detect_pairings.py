@@ -191,10 +191,14 @@ def find_erd_pairs(erd_by_id, erd_ids):
     Returns list of (request_erd_id, status_erd_id) tuples.
     """
     pairs = []
+    paired = set()
     n = len(erd_ids)
 
     for i in range(n):
-        erd = erd_by_id[erd_ids[i]]
+        erd_id_i = erd_ids[i]
+        if erd_id_i in paired:
+            continue
+        erd = erd_by_id[erd_id_i]
         nl = erd['name'].lower()
         has_req = 'request' in nl
         has_stat = 'status' in nl
@@ -205,7 +209,10 @@ def find_erd_pairs(erd_by_id, erd_ids):
         base1 = strip_request_status(erd['name'])
 
         for j in range(i + 1, n):
-            next_erd = erd_by_id[erd_ids[j]]
+            erd_id_j = erd_ids[j]
+            if erd_id_j in paired:
+                continue
+            next_erd = erd_by_id[erd_id_j]
             nxl = next_erd['name'].lower()
             next_req = 'request' in nxl
             next_stat = 'status' in nxl
@@ -217,10 +224,12 @@ def find_erd_pairs(erd_by_id, erd_ids):
             if base1.lower() != base2.lower():
                 continue
 
-            req_id = erd_ids[i] if has_req else erd_ids[j]
-            stat_id = erd_ids[j] if has_req else erd_ids[i]
+            req_id = erd_id_i if has_req else erd_id_j
+            stat_id = erd_id_j if has_req else erd_id_i
 
             pairs.append((req_id, stat_id))
+            paired.add(req_id)
+            paired.add(stat_id)
             break  # each ERD can only be in one pair
 
     return pairs

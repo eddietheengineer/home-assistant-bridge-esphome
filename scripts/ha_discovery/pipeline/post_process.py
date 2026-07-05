@@ -64,7 +64,10 @@ def apply_overrides(entries):
         # --- WAC Ambient: remove incorrect scaling ---
         "0x7a02": {"scaling_factor": None},
         # --- Appliance Cumulative Energy: add scaling ---
+        # --- Appliance Cumulative Energy: add scaling ---
         "0xd030": {"scaling_factor": 1000},
+        # --- Water Softener Daily Usage: water device_class only allows total ---
+        "0x800d": {"state_class": "total"},
     }
 
     applied = 0

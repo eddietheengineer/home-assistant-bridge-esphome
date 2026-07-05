@@ -53,9 +53,9 @@ static const char* json_get_str(const char* json, const char* key,
         if (p > json && *(p - 1) != '{' && *(p - 1) != ',' && *(p - 1) != '[') { p++; continue; }
         if (strncmp(p + 1, key, key_len) == 0 && p[key_len + 1] == '\"') {
             p = p + key_len + 3;
-            while (*p == ' ' || *p == '\t') p++;
+            while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
             if (*p == ':') p++;
-            while (*p == ' ' || *p == '\t') p++;
+            while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
             if (*p == '"') {
                 *out_value = p + 1;
                 const char* end = p + 1;
