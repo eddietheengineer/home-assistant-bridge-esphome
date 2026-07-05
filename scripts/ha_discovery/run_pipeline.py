@@ -13,6 +13,11 @@ Steps:
     6. Post-process (reapply overrides).
     7. Generate JSONL files to ha_discovery/.
     8. Compress JSONL into ha_discovery_data.h.
+
+Idempotency: the pipeline is safe to re-run. Auto-detection scripts may
+clear stale values (e.g. device_class for fields that no longer match),
+and post_process re-applies all overrides at the end. Running the pipeline
+multiple times produces the same result as a single run.
 """
 
 import os

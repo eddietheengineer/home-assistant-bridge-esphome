@@ -927,7 +927,10 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 min_val: float = 0.0, max_val: float = 0.0, step_val: float = 1.0) -> None:
         # Skip availability/allowability metadata — not actionable in HA.
         combined = (name + ' ' + field_id).lower()
-        if 'allowed' in combined or 'available' in combined:
+        # But don't skip real "allowed" values like "Allowed Setpoint".
+        # Skip availability/allowability metadata, but not real data fields.
+        # "Allowed Setpoint", "Minimum Allowed X", "Maximum Allowed X" are real data.
+        if ('allowed' in combined and 'setpoint' not in combined and 'minimum allowed' not in combined and 'maximum allowed' not in combined) or 'available' in combined:
             return
         # Ensure field_id is unique within this ERD to avoid unique_id collisions.
         fid = _make_unique_field_id(erd_id_int, field_id)
@@ -1011,6 +1014,12 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
         else:
             classification = _classify_erd_data(erd_data)
 
+        # Allow overrides to force a specific classification (e.g., merging
+        # multi-field ERDs into a single entity with a custom value template).
+        forced_classification = erd.get('force_classification')
+        if forced_classification:
+            classification = forced_classification
+
         if classification == 'single':
             vt, ct, opts = '', '', ''
             min_val, max_val, step_val = 0.0, 0.0, 1.0
@@ -1078,6 +1087,11 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 min_val, max_val, step_val = _compute_number_range(n_type, n_scale)
             # button: no templates
 
+            # Allow overrides to supply a custom value_template that bypasses
+            # the auto-generated one (e.g., combining multi-field u64 values).
+            custom_vt = erd.get('value_template')
+            if custom_vt:
+                vt = custom_vt
             # For switch/binary_sensor, set payload_on/off and state_on/off to hex
             p_on = ''
             p_off = ''
@@ -1104,8 +1118,12 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 f_type = field.get('type', '')
                 f_dc = field.get('device_class') or ''
                 f_dev_cls = f_dc or ('enum' if f_type == 'enum' else '')
-                f_state_cls = field.get('state_class') or state_class
+                f_state_cls = field.get('state_class') or (state_class if f_type in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32') else '')
                 f_unit = field.get('unit_of_measurement') or _infer_unit_from_field_name(leaf, unit)
+                # Don't inherit ERD-level unit/scaling for non-numeric fields
+                # (e.g., enum status fields shouldn't inherit gal/min from a sibling).
+                if f_type not in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32'):
+                    f_unit = ''
                 # Use per-field pairing/domain if available (mixed-pairing ERDs)
                 f_pair_role = field.get('pair_role') or pair_role
                 f_paired_erd = field.get('paired_erd') or paired_erd_str
@@ -1113,6 +1131,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 f_ha_domain = field.get('ha_domain') or ha_domain
                 # Per-field scaling — used for VT, CT, range, and stored in entry.
                 f_scaling = int(field.get('scaling_factor') or scaling_factor)
+                if f_type not in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32'):
+                    f_scaling = 1
                 if f_ha_domain == 'binary_sensor' and f_type == 'enum':
                     f_dev_cls = ''
                     field_size = field.get('size', 1)
@@ -1172,7 +1192,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 b_s_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_s_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
                 f_scaling = int(field.get('scaling_factor') or scaling_factor)
-                collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
+                f_bf_dc = field.get('device_class') or ''
+                collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', f_bf_dc,
                         '', f_scaling, data_size, f_paired_id, f_pair_role,
                         vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
 
@@ -1256,8 +1277,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 b_p_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_p_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_s_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
-                f_scaling = int(field.get('scaling_factor') or scaling_factor)
-                collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
+                f_bf_dc = field.get('device_class') or ''
+                collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', f_bf_dc,
                         '', f_scaling, data_size, f_paired_id, f_pair_role,
                         vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
 
@@ -1480,6 +1501,8 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
                 field['scaling_factor'] = field_review['scaling_factor']
             if field_review.get('unit_of_measurement'):
                 field['unit_of_measurement'] = field_review['unit_of_measurement']
+            if field_review.get('field_name'):
+                field['name'] = field_review['field_name']
             data_fields.append(field)
 
         erd = {
@@ -1505,6 +1528,10 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
             erd['paired_erd'] = review['paired_erd']
         if review.get('pair_role'):
             erd['pair_role'] = review['pair_role']
+        if review.get('force_classification'):
+            erd['force_classification'] = review['force_classification']
+        if review.get('value_template'):
+            erd['value_template'] = review['value_template']
 
         erds.append(erd)
 

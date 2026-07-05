@@ -4,17 +4,50 @@
 
 - When a PR is updated with a new commit, the PR description and title must be updated to reflect the context of **all changes in the PR**, not just the changes from the latest commit or request.
 
-## Pipeline Overrides
+## HA Discovery Pipeline
 
-If an ERD requires a manual override (wrong domain, missing unit, incorrect scaling), add it to the `OVERRIDES` dict in `scripts/ha_discovery/pipeline/post_process.py`. This is reapplied after auto-detection so overrides survive subsequent pipeline runs.
+**Any change to ERD definitions, overrides, or pipeline scripts requires a full pipeline rerun before committing.**
 
-Format:
+After modifying any of these files, run:
+
+```bash
+python3 scripts/ha_discovery/run_pipeline.py
+```
+
+Then commit **all** generated/changed files together:
+- `scripts/ha_discovery/appliance_api_erd_definitions_processed.json`
+- `ha_discovery/*.jsonl`
+- `components/geappliances_bridge/ha_discovery_data.h`
+
+### Adding Overrides
+
+If an ERD requires a manual override (wrong domain, missing unit, incorrect scaling, forced classification), add it to the `OVERRIDES` dict in `scripts/ha_discovery/pipeline/post_process.py`. Overrides are reapplied after auto-detection so they survive subsequent pipeline runs.
+
+Override keys support two formats:
 
 ```python
 OVERRIDES = {
+    # Bare erd_id — applies to all fields in the ERD (safe for single-field ERDs).
     "0x7130": {"ha_domain": "sensor", "unit_of_measurement": "rpm"},
-    # ...
+
+    # erd_id:offset — applies only to the field at the given byte offset.
+    "0x3015:0": {"unit_of_measurement": "gal/min", "scaling_factor": 10000, "field_name": "Inlet Flow Rate"},
 }
 ```
 
-After adding an override, run `python3 scripts/ha_discovery/run_pipeline.py` and commit all generated files.
+Valid override value keys:
+
+| Key | Description |
+|-----|-------------|
+| `ha_domain` | Override the Home Assistant domain (e.g. `"sensor"`, `"number"`, `"switch"`) |
+| `device_class` | Override the device class (e.g. `"temperature"`, `"current"`, `"weight"`) |
+| `unit_of_measurement` | Override the unit string (e.g. `"rpm"`, `"gal/min"`, `"CFM"`) |
+| `scaling_factor` | Override the scaling factor (use `None` to remove scaling) |
+| `state_class` | Override the state class (`"measurement"`, `"total"`, `"total_increasing"`) |
+| `field_name` | Override the display name |
+| `paired_erd` | Manually pair a request/status ERD (e.g. `"0x7708"`) |
+| `pair_role` | Role in a pair (`"request"` or `"status"`) |
+| `force_classification` | Force a classification strategy (e.g. `"single"`) |
+| `value_template` | Custom Jinja2 template for value processing |
+
+After adding an override, run the pipeline and commit all generated files.

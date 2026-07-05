@@ -8,7 +8,7 @@
 {"i":"3003","n":"Reminder - Add Rinse Aid","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"add_rinse_aid","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3003","n":"Reminder - Sanitized","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"sanitized","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3003","n":"Reminder - Fill Salt Reservoir","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"fill_salt_reservoir","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3006","n":"Door Count","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"3006","n":"Door Count","d":"sensor","ds":2,"sc":"total_increasing","vt":"{{ value | int(base=16) }}"}
 {"i":"3007","n":"User Settings - Delay Start","d":"sensor","ds":3,"vt":"{{ ((value[0:6] | int(base=16)) // 65536) % 16 }}","fi":"delay_start"}
 {"i":"3007","n":"User Settings - Zone Selection","d":"sensor","ds":3,"vt":"{{ ((value[0:6] | int(base=16)) // 1048576) % 4 }}","fi":"zone_selection"}
 {"i":"3007","n":"User Settings - Demo Mode","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 4194304) % 2 else '00' }}","fi":"demo_mode","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -23,121 +23,121 @@
 {"i":"3007","n":"User Settings - Leak Pan Status","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 32) % 2 else '00' }}","fi":"leak_pan_status","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3007","n":"User Settings - Door Wakeup","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 64) % 2 else '00' }}","fi":"door_wakeup","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3007","n":"User Settings - Wifi Enabled","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 128) % 2 else '00' }}","fi":"wifi_enabled","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3008","n":"Error - Error ID","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"3008","n":"Error - Error Active","d":"binary_sensor","ds":2,"vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
-{"i":"3009","n":"Cycle Counts - Started Cycles Counter","d":"sensor","ds":6,"vt":"{{ value[0:4] | int(base=16) }}"}
-{"i":"3009","n":"Cycle Counts - Completed Cycles Counter","d":"sensor","ds":6,"vt":"{{ value[4:8] | int(base=16) }}","fi":"completed_cycles_counter"}
-{"i":"3009","n":"Cycle Counts - Power On Reset Counter","d":"sensor","ds":6,"vt":"{{ value[8:12] | int(base=16) }}","fi":"power_on_reset_counter"}
+{"i":"3008","n":"Error - Error ID","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value[0:2] | int(base=16) }}"}
+{"i":"3008","n":"Error - Error Active","d":"binary_sensor","ds":2,"dc":"problem","vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
+{"i":"3009","n":"Cycle Counts - Started Cycles Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[0:4] | int(base=16) }}"}
+{"i":"3009","n":"Cycle Counts - Completed Cycles Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[4:8] | int(base=16) }}","fi":"completed_cycles_counter"}
+{"i":"3009","n":"Cycle Counts - Power On Reset Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[8:12] | int(base=16) }}","fi":"power_on_reset_counter"}
 {"i":"300c","n":"Dish Personality - Personality","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"300c","n":"Dish Personality - Source","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Boot Loader', '01': 'ADC', '02': 'Entity', '03': 'Undefined'}.get(value[2:4], 'Unknown') }}","fi":"source"}
-{"i":"300d","n":"Delay Start Remaining Time In Minutes","d":"sensor","ds":2,"u":"min","vt":"{{ value | int(base=16) }}"}
+{"i":"300d","n":"Delay Start Remaining Time In Minutes","d":"sensor","ds":2,"u":"min","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"300e","n":"Cycle Indication","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'No Change', '01': 'PreWash', '02': 'Sensing', '03': 'Main Wash', '04': 'Drying', '05': 'Sanitizing', '06': 'Turbidity Cal', '07': 'Diverter Cal', '08': 'Pause', '09': 'Rinsing', '0a': 'PreWash 1', '0b': 'Final Rinse', '0c': 'End PreWash 1', '0d': 'Auto Hot Start 1', '0e': 'Auto Hot Start 2', '0f': 'Auto Hot Start 3', '10': 'Final Rinse Fill', '11': 'Cycle Inactive', '12': 'End of Cycle'}.get(value[:2], 'Unknown') }}"}
 {"i":"300f","n":"Analog Inputs - A2D Turbidity Temp","d":"sensor","ds":12,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value[8:10] | int(base=16) }}"}
 {"i":"300f","n":"Analog Inputs - A2D Turbidity","d":"sensor","ds":12,"vt":"{{ value[10:12] | int(base=16) }}","fi":"a2d_turbidity"}
 {"i":"300f","n":"Analog Inputs - A2D WaterTemperature","d":"sensor","ds":12,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value[12:14] | int(base=16) }}","fi":"a2d_watertemperature"}
 {"i":"300f","n":"Analog Inputs - A2D Personality","d":"sensor","ds":12,"vt":"{{ value[14:16] | int(base=16) }}","fi":"a2d_personality"}
-{"i":"3015","n":"Inlet Flow Rate - Inlet Flow Rate in GPM Multiplied by Ten Thousands","d":"sensor","ds":4,"vt":"{{ value[0:4] | int(base=16) }}"}
+{"i":"3015","n":"Inlet Flow Rate - Inlet Flow Rate","d":"sensor","ds":4,"u":"gal/min","sc":"measurement","sf":10000,"vt":"{{ (value[0:4] | int(base=16)) / 10000 | round(3) }}"}
 {"i":"3015","n":"Inlet Flow Rate - Inlet Flow Rate Calculation Status","d":"sensor","ds":4,"dc":"enum","vt":"{{ {'00': 'NotReady', '01': 'Ready', '02': 'Failed_CycleTerminatedBeforeMeasurementCompleted', '03': 'Failed_CirculationAndFillEndPressureDifferenceExceededThreshold', '04': 'Failed_DoorWasOpened', '05': 'Failed_WaterLevelDiagnosticsFaultOccurred', '06': 'Failed_TimerCounterOverflowed', '07': 'Failed_LookUpTableDataIndexBoundariesAreNotValid'}.get(value[4:6], 'Unknown') }}","fi":"inlet_flow_rate_calculation_status"}
-{"i":"301a","n":"CSM Life Count","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"301b","n":"CSM Fault Data","d":"sensor","ds":44,"vt":"{{ value[0:8] | int(base=16) }}"}
-{"i":"301b","n":"CSM Fault Data - RA Dispense","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 1) % 2 else '00' }}","fi":"ra_dispense","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Secondary Water Valve","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 2) % 2 else '00' }}","fi":"secondary_water_valve","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Service","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 4) % 2 else '00' }}","fi":"service","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Csm Tripped","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 8) % 2 else '00' }}","fi":"csm_tripped","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Power Latch Retract","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 16) % 2 else '00' }}","fi":"power_latch_retract","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Turbidity Error","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 64) % 2 else '00' }}","fi":"turbidity_error","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Diverter Error","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 128) % 2 else '00' }}","fi":"diverter_error","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Water Heater","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 256) % 2 else '00' }}","fi":"water_heater","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Drain Pump","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 512) % 2 else '00' }}","fi":"drain_pump","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Diverter","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 1024) % 2 else '00' }}","fi":"diverter","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Neutral Break","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 2048) % 2 else '00' }}","fi":"neutral_break","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Main Dispense","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 4096) % 2 else '00' }}","fi":"main_dispense","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Circulation Pump","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 8192) % 2 else '00' }}","fi":"circulation_pump","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Water Valve","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[8:12] | int(base=16)) // 32768) % 2 else '00' }}","fi":"water_valve","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - RA Dispense","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 1) % 2 else '00' }}","fi":"ra_dispense_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Secondary Water Valve","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 2) % 2 else '00' }}","fi":"secondary_water_valve_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Service","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 4) % 2 else '00' }}","fi":"service_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Csm Tripped","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 8) % 2 else '00' }}","fi":"csm_tripped_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Power Latch Retract","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 16) % 2 else '00' }}","fi":"power_latch_retract_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Turbidity Error","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 64) % 2 else '00' }}","fi":"turbidity_error_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Diverter Error","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 128) % 2 else '00' }}","fi":"diverter_error_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Water Heater","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 256) % 2 else '00' }}","fi":"water_heater_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Drain Pump","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 512) % 2 else '00' }}","fi":"drain_pump_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Diverter","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 1024) % 2 else '00' }}","fi":"diverter_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Neutral Break","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 2048) % 2 else '00' }}","fi":"neutral_break_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Main Dispense","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 4096) % 2 else '00' }}","fi":"main_dispense_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Circulation Pump","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 8192) % 2 else '00' }}","fi":"circulation_pump_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Water Valve","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[24:28] | int(base=16)) // 32768) % 2 else '00' }}","fi":"water_valve_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - RA Dispense","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 1) % 2 else '00' }}","fi":"ra_dispense_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Secondary Water Valve","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 2) % 2 else '00' }}","fi":"secondary_water_valve_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Service","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 4) % 2 else '00' }}","fi":"service_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Csm Tripped","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 8) % 2 else '00' }}","fi":"csm_tripped_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Power Latch Retract","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 16) % 2 else '00' }}","fi":"power_latch_retract_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Turbidity Error","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 64) % 2 else '00' }}","fi":"turbidity_error_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Diverter Error","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 128) % 2 else '00' }}","fi":"diverter_error_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Water Heater","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 256) % 2 else '00' }}","fi":"water_heater_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Drain Pump","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 512) % 2 else '00' }}","fi":"drain_pump_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Diverter","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 1024) % 2 else '00' }}","fi":"diverter_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Neutral Break","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 2048) % 2 else '00' }}","fi":"neutral_break_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Main Dispense","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 4096) % 2 else '00' }}","fi":"main_dispense_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Circulation Pump","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 8192) % 2 else '00' }}","fi":"circulation_pump_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Water Valve","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[40:44] | int(base=16)) // 32768) % 2 else '00' }}","fi":"water_valve_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - RA Dispense","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 1) % 2 else '00' }}","fi":"ra_dispense_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Secondary Water Valve","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 2) % 2 else '00' }}","fi":"secondary_water_valve_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Service","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 4) % 2 else '00' }}","fi":"service_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Csm Tripped","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 8) % 2 else '00' }}","fi":"csm_tripped_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Power Latch Retract","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 16) % 2 else '00' }}","fi":"power_latch_retract_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Turbidity Error","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 64) % 2 else '00' }}","fi":"turbidity_error_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Diverter Error","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 128) % 2 else '00' }}","fi":"diverter_error_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Water Heater","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 256) % 2 else '00' }}","fi":"water_heater_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Drain Pump","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 512) % 2 else '00' }}","fi":"drain_pump_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Diverter","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 1024) % 2 else '00' }}","fi":"diverter_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Neutral Break","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 2048) % 2 else '00' }}","fi":"neutral_break_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Main Dispense","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 4096) % 2 else '00' }}","fi":"main_dispense_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Circulation Pump","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 8192) % 2 else '00' }}","fi":"circulation_pump_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Water Valve","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[56:60] | int(base=16)) // 32768) % 2 else '00' }}","fi":"water_valve_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - RA Dispense","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 1) % 2 else '00' }}","fi":"ra_dispense_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Secondary Water Valve","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 2) % 2 else '00' }}","fi":"secondary_water_valve_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Service","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 4) % 2 else '00' }}","fi":"service_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Csm Tripped","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 8) % 2 else '00' }}","fi":"csm_tripped_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Power Latch Retract","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 16) % 2 else '00' }}","fi":"power_latch_retract_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Turbidity Error","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 64) % 2 else '00' }}","fi":"turbidity_error_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Diverter Error","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 128) % 2 else '00' }}","fi":"diverter_error_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Water Heater","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 256) % 2 else '00' }}","fi":"water_heater_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Drain Pump","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 512) % 2 else '00' }}","fi":"drain_pump_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Diverter","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 1024) % 2 else '00' }}","fi":"diverter_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Neutral Break","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 2048) % 2 else '00' }}","fi":"neutral_break_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Main Dispense","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 4096) % 2 else '00' }}","fi":"main_dispense_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Circulation Pump","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 8192) % 2 else '00' }}","fi":"circulation_pump_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301b","n":"CSM Fault Data - Water Valve","d":"binary_sensor","ds":44,"vt":"{{ '01' if ((value[72:76] | int(base=16)) // 32768) % 2 else '00' }}","fi":"water_valve_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"301c","n":"Cycle Names - Selected Cycle Name","d":"sensor","ds":20,"vt":"{% set chars = ' !\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~' %}{% set ns = namespace(value='') %}{% set slice = value[0:20] %}{% for i in range(0, slice | length, 2) %}{% set b = slice[i:i+2] | int(base=16) %}{% if b >= 0x20 and b <= 0x7E %}{% set ns.value = ns.value ~ chars[b - 0x20] %}{% endif %}{% endfor %}{{ ns.value.rstrip('_') }}"}
-{"i":"301c","n":"Cycle Names - Active Sub-cycle Name","d":"sensor","ds":20,"vt":"{% set chars = ' !\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~' %}{% set ns = namespace(value='') %}{% set slice = value[20:40] %}{% for i in range(0, slice | length, 2) %}{% set b = slice[i:i+2] | int(base=16) %}{% if b >= 0x20 and b <= 0x7E %}{% set ns.value = ns.value ~ chars[b - 0x20] %}{% endif %}{% endfor %}{{ ns.value.rstrip('_') }}","fi":"active_sub_cycle_name"}
+{"i":"301a","n":"CSM Life Count","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value | int(base=16) }}"}
+{"i":"301b","n":"CSM Fault Data","d":"sensor","ds":44,"sc":"measurement","vt":"{{ value[0:8] | int(base=16) }}"}
+{"i":"301b","n":"CSM Fault Data - RA Dispense","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 1) % 2 else '00' }}","fi":"ra_dispense","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Secondary Water Valve","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 2) % 2 else '00' }}","fi":"secondary_water_valve","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Service","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 4) % 2 else '00' }}","fi":"service","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Csm Tripped","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 8) % 2 else '00' }}","fi":"csm_tripped","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Power Latch Retract","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 16) % 2 else '00' }}","fi":"power_latch_retract","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Turbidity Error","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 64) % 2 else '00' }}","fi":"turbidity_error","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Diverter Error","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 128) % 2 else '00' }}","fi":"diverter_error","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Water Heater","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 256) % 2 else '00' }}","fi":"water_heater","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Drain Pump","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 512) % 2 else '00' }}","fi":"drain_pump","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Diverter","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 1024) % 2 else '00' }}","fi":"diverter","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Neutral Break","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 2048) % 2 else '00' }}","fi":"neutral_break","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Main Dispense","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 4096) % 2 else '00' }}","fi":"main_dispense","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Circulation Pump","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 8192) % 2 else '00' }}","fi":"circulation_pump","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Water Valve","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[8:12] | int(base=16)) // 32768) % 2 else '00' }}","fi":"water_valve","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - RA Dispense","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 1) % 2 else '00' }}","fi":"ra_dispense_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Secondary Water Valve","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 2) % 2 else '00' }}","fi":"secondary_water_valve_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Service","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 4) % 2 else '00' }}","fi":"service_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Csm Tripped","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 8) % 2 else '00' }}","fi":"csm_tripped_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Power Latch Retract","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 16) % 2 else '00' }}","fi":"power_latch_retract_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Turbidity Error","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 64) % 2 else '00' }}","fi":"turbidity_error_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Diverter Error","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 128) % 2 else '00' }}","fi":"diverter_error_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Water Heater","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 256) % 2 else '00' }}","fi":"water_heater_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Drain Pump","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 512) % 2 else '00' }}","fi":"drain_pump_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Diverter","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 1024) % 2 else '00' }}","fi":"diverter_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Neutral Break","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 2048) % 2 else '00' }}","fi":"neutral_break_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Main Dispense","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 4096) % 2 else '00' }}","fi":"main_dispense_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Circulation Pump","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 8192) % 2 else '00' }}","fi":"circulation_pump_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Water Valve","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[24:28] | int(base=16)) // 32768) % 2 else '00' }}","fi":"water_valve_1","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - RA Dispense","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 1) % 2 else '00' }}","fi":"ra_dispense_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Secondary Water Valve","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 2) % 2 else '00' }}","fi":"secondary_water_valve_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Service","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 4) % 2 else '00' }}","fi":"service_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Csm Tripped","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 8) % 2 else '00' }}","fi":"csm_tripped_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Power Latch Retract","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 16) % 2 else '00' }}","fi":"power_latch_retract_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Turbidity Error","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 64) % 2 else '00' }}","fi":"turbidity_error_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Diverter Error","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 128) % 2 else '00' }}","fi":"diverter_error_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Water Heater","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 256) % 2 else '00' }}","fi":"water_heater_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Drain Pump","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 512) % 2 else '00' }}","fi":"drain_pump_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Diverter","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 1024) % 2 else '00' }}","fi":"diverter_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Neutral Break","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 2048) % 2 else '00' }}","fi":"neutral_break_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Main Dispense","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 4096) % 2 else '00' }}","fi":"main_dispense_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Circulation Pump","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 8192) % 2 else '00' }}","fi":"circulation_pump_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Water Valve","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[40:44] | int(base=16)) // 32768) % 2 else '00' }}","fi":"water_valve_2","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - RA Dispense","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 1) % 2 else '00' }}","fi":"ra_dispense_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Secondary Water Valve","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 2) % 2 else '00' }}","fi":"secondary_water_valve_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Service","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 4) % 2 else '00' }}","fi":"service_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Csm Tripped","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 8) % 2 else '00' }}","fi":"csm_tripped_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Power Latch Retract","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 16) % 2 else '00' }}","fi":"power_latch_retract_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Turbidity Error","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 64) % 2 else '00' }}","fi":"turbidity_error_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Diverter Error","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 128) % 2 else '00' }}","fi":"diverter_error_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Water Heater","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 256) % 2 else '00' }}","fi":"water_heater_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Drain Pump","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 512) % 2 else '00' }}","fi":"drain_pump_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Diverter","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 1024) % 2 else '00' }}","fi":"diverter_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Neutral Break","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 2048) % 2 else '00' }}","fi":"neutral_break_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Main Dispense","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 4096) % 2 else '00' }}","fi":"main_dispense_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Circulation Pump","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 8192) % 2 else '00' }}","fi":"circulation_pump_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Water Valve","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[56:60] | int(base=16)) // 32768) % 2 else '00' }}","fi":"water_valve_3","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - RA Dispense","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 1) % 2 else '00' }}","fi":"ra_dispense_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Secondary Water Valve","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 2) % 2 else '00' }}","fi":"secondary_water_valve_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Service","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 4) % 2 else '00' }}","fi":"service_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Csm Tripped","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 8) % 2 else '00' }}","fi":"csm_tripped_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Power Latch Retract","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 16) % 2 else '00' }}","fi":"power_latch_retract_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Turbidity Error","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 64) % 2 else '00' }}","fi":"turbidity_error_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Diverter Error","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 128) % 2 else '00' }}","fi":"diverter_error_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Water Heater","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 256) % 2 else '00' }}","fi":"water_heater_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Drain Pump","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 512) % 2 else '00' }}","fi":"drain_pump_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Diverter","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 1024) % 2 else '00' }}","fi":"diverter_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Neutral Break","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 2048) % 2 else '00' }}","fi":"neutral_break_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Main Dispense","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 4096) % 2 else '00' }}","fi":"main_dispense_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Circulation Pump","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 8192) % 2 else '00' }}","fi":"circulation_pump_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301b","n":"CSM Fault Data - Water Valve","d":"binary_sensor","ds":44,"dc":"problem","vt":"{{ '01' if ((value[72:76] | int(base=16)) // 32768) % 2 else '00' }}","fi":"water_valve_4","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"301c","n":"Cycle Names - Selected Cycle Name","d":"sensor","ds":20,"sc":"measurement","vt":"{% set chars = ' !\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~' %}{% set ns = namespace(value='') %}{% set slice = value[0:20] %}{% for i in range(0, slice | length, 2) %}{% set b = slice[i:i+2] | int(base=16) %}{% if b >= 0x20 and b <= 0x7E %}{% set ns.value = ns.value ~ chars[b - 0x20] %}{% endif %}{% endfor %}{{ ns.value.rstrip('_') }}"}
+{"i":"301c","n":"Cycle Names - Active Sub-cycle Name","d":"sensor","ds":20,"sc":"measurement","vt":"{% set chars = ' !\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~' %}{% set ns = namespace(value='') %}{% set slice = value[20:40] %}{% for i in range(0, slice | length, 2) %}{% set b = slice[i:i+2] | int(base=16) %}{% if b >= 0x20 and b <= 0x7E %}{% set ns.value = ns.value ~ chars[b - 0x20] %}{% endif %}{% endfor %}{{ ns.value.rstrip('_') }}","fi":"active_sub_cycle_name"}
 {"i":"301d","n":"Leak Detected","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Leak Not Detected', '01': 'Leak Detected'}.get(value[:2], 'Unknown') }}"}
-{"i":"301e","n":"Dispense Count","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"301e","n":"Dispense Count","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"301f","n":"PODS Count","d":"number","ds":2,"mn":0.0,"mx":65535.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%04x' % (value | int) }}","m":"box"}
-{"i":"3020","n":"Dishwasher Usage Profile - Wash Pump Run Time in Seconds","d":"sensor","ds":32,"u":"s","vt":"{{ value[0:8] | int(base=16) }}"}
-{"i":"3020","n":"Dishwasher Usage Profile - Drain Pump Run Time in Seconds","d":"sensor","ds":32,"u":"s","vt":"{{ value[8:16] | int(base=16) }}","fi":"drain_pump_run_time_in_seconds"}
-{"i":"3020","n":"Dishwasher Usage Profile - Heater Run Time in Seconds","d":"sensor","ds":32,"u":"s","vt":"{{ value[16:24] | int(base=16) }}","fi":"heater_run_time_in_seconds"}
-{"i":"3020","n":"Dishwasher Usage Profile - Fan Run Time in Seconds","d":"sensor","ds":32,"u":"s","vt":"{{ value[24:32] | int(base=16) }}","fi":"fan_run_time_in_seconds"}
-{"i":"3020","n":"Dishwasher Usage Profile - Water Valve Open Time in Seconds","d":"sensor","ds":32,"u":"s","vt":"{{ value[32:40] | int(base=16) }}","fi":"water_valve_open_time_in_seconds"}
-{"i":"3020","n":"Dishwasher Usage Profile - Power Diverter Run Time in Seconds","d":"sensor","ds":32,"u":"s","vt":"{{ value[40:48] | int(base=16) }}","fi":"power_diverter_run_time_in_seconds"}
-{"i":"3020","n":"Dishwasher Usage Profile - Tub Light On Time in Seconds","d":"sensor","ds":32,"u":"s","vt":"{{ value[48:56] | int(base=16) }}","fi":"tub_light_on_time_in_seconds"}
-{"i":"3020","n":"Dishwasher Usage Profile - Cumulative Power-On Time in Seconds","d":"sensor","ds":32,"u":"s","vt":"{{ value[56:64] | int(base=16) }}","fi":"cumulative_power_on_time_in_seconds"}
+{"i":"3020","n":"Dishwasher Usage Profile - Wash Pump Run Time in Seconds","d":"sensor","ds":32,"u":"s","sc":"measurement","vt":"{{ value[0:8] | int(base=16) }}"}
+{"i":"3020","n":"Dishwasher Usage Profile - Drain Pump Run Time in Seconds","d":"sensor","ds":32,"u":"s","sc":"measurement","vt":"{{ value[8:16] | int(base=16) }}","fi":"drain_pump_run_time_in_seconds"}
+{"i":"3020","n":"Dishwasher Usage Profile - Heater Run Time in Seconds","d":"sensor","ds":32,"u":"s","sc":"measurement","vt":"{{ value[16:24] | int(base=16) }}","fi":"heater_run_time_in_seconds"}
+{"i":"3020","n":"Dishwasher Usage Profile - Fan Run Time in Seconds","d":"sensor","ds":32,"u":"s","sc":"measurement","vt":"{{ value[24:32] | int(base=16) }}","fi":"fan_run_time_in_seconds"}
+{"i":"3020","n":"Dishwasher Usage Profile - Water Valve Open Time in Seconds","d":"sensor","ds":32,"u":"s","sc":"measurement","vt":"{{ value[32:40] | int(base=16) }}","fi":"water_valve_open_time_in_seconds"}
+{"i":"3020","n":"Dishwasher Usage Profile - Power Diverter Run Time in Seconds","d":"sensor","ds":32,"u":"s","sc":"measurement","vt":"{{ value[40:48] | int(base=16) }}","fi":"power_diverter_run_time_in_seconds"}
+{"i":"3020","n":"Dishwasher Usage Profile - Tub Light On Time in Seconds","d":"sensor","ds":32,"u":"s","sc":"measurement","vt":"{{ value[48:56] | int(base=16) }}","fi":"tub_light_on_time_in_seconds"}
+{"i":"3020","n":"Dishwasher Usage Profile - Cumulative Power-On Time in Seconds","d":"sensor","ds":32,"u":"s","sc":"measurement","vt":"{{ value[56:64] | int(base=16) }}","fi":"cumulative_power_on_time_in_seconds"}
 {"i":"3035","n":"Water Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
-{"i":"3036","n":"Average Turbidity","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"3036","n":"Average Turbidity","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"3037","n":"Dishwasher Door Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Open', '01': 'Closed', '02': 'Invalid', '03': 'Init', '04': 'Unknown'}.get(value[:2], 'Unknown') }}"}
 {"i":"3038","n":"Rinse Aid Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not Empty', '01': 'Empty'}.get(value[:2], 'Unknown') }}"}
 {"i":"3039","n":"Water Volume","d":"sensor","ds":1,"u":"gal","sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"303a","n":"Diverter Position","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Lower Primary', '01': 'Mid/Upper', '02': 'Lower Reversing', '03': 'Silverware Blaster', '04': 'Unknown/Transitioning'}.get(value[:2], 'Unknown') }}"}
 {"i":"303d","n":"Drain Pump Relay State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"303e","n":"Drain Pump Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"303e","n":"Drain Pump Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"303f","n":"Water Valve State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3042","n":"Cycles Until Next Turbidity Calibration","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"3043","n":"Turbidity Sensor Calibration Attempts","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"3045","n":"Circ Pump Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"3042","n":"Cycles Until Next Turbidity Calibration","d":"sensor","ds":1,"sc":"measurement","vt":"{{ value | int(base=16) }}"}
+{"i":"3043","n":"Turbidity Sensor Calibration Attempts","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value | int(base=16) }}"}
+{"i":"3045","n":"Circ Pump Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"3046","n":"Heater Relay State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3049","n":"Fan 1 Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"304b","n":"Fan 2 Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"3049","n":"Fan 1 Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
+{"i":"304b","n":"Fan 2 Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"304d","n":"System Software Versions - UI Version","d":"sensor","ds":24,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}","fi":"ui"}
 {"i":"304d","n":"System Software Versions - UI Parametric Version","d":"sensor","ds":24,"vt":"{{ (value[8:10] | int(base=16) | string) + \".\" + (value[10:12] | int(base=16) | string) }}","fi":"ui_parametric"}
 {"i":"304d","n":"System Software Versions - MC Version","d":"sensor","ds":24,"vt":"{{ (value[12:14] | int(base=16) | string) + \".\" + (value[14:16] | int(base=16) | string) + \".\" + (value[16:18] | int(base=16) | string) + \".\" + (value[18:20] | int(base=16) | string) }}","fi":"mc"}
@@ -150,8 +150,8 @@
 {"i":"304f","n":"Dry Heater Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"3074","n":"Dry Heater Fan Speed Feedback","d":"sensor","ds":2,"u":"rpm","vt":"{{ value | int(base=16) }}"}
 {"i":"3075","n":"Dry Heater Relay State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3083","n":"Hue Score","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"3084","n":"Tub Water Level","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
+{"i":"3083","n":"Hue Score","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value | int(base=16) }}"}
+{"i":"3084","n":"Tub Water Level","d":"sensor","ds":2,"u":"mmH₂O","sc":"measurement","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"3085","n":"Flood Detected","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'No Flood Detected', '01': 'Flood Detected'}.get(value[:2], 'Unknown') }}"}
 {"i":"3086","n":"Enable Features - Heated Dry","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"heated_dry","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3086","n":"Enable Features - Boost","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"boost","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -162,9 +162,9 @@
 {"i":"3086","n":"Enable Features - Extra Dry","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 64) % 2 else '00' }}","fi":"extra_dry","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3086","n":"Enable Features - Quiet","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 128) % 2 else '00' }}","fi":"quiet","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3087","n":"Remote Start Enable","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3088","n":"Analog Door Latch AD Counts - Door Open Average ADC","d":"sensor","ds":6,"vt":"{{ value[0:4] | int(base=16) }}"}
-{"i":"3088","n":"Analog Door Latch AD Counts - Door Closed Average ADC","d":"sensor","ds":6,"vt":"{{ value[4:8] | int(base=16) }}","fi":"door_closed_average_adc"}
-{"i":"3088","n":"Analog Door Latch AD Counts - Door Invalid Average ADC","d":"sensor","ds":6,"vt":"{{ value[8:12] | int(base=16) }}","fi":"door_invalid_average_adc"}
+{"i":"3088","n":"Analog Door Latch AD Counts - Door Open Average ADC","d":"sensor","ds":6,"sc":"measurement","vt":"{{ value[0:4] | int(base=16) }}"}
+{"i":"3088","n":"Analog Door Latch AD Counts - Door Closed Average ADC","d":"sensor","ds":6,"sc":"measurement","vt":"{{ value[4:8] | int(base=16) }}","fi":"door_closed_average_adc"}
+{"i":"3088","n":"Analog Door Latch AD Counts - Door Invalid Average ADC","d":"sensor","ds":6,"sc":"measurement","vt":"{{ value[8:12] | int(base=16) }}","fi":"door_invalid_average_adc"}
 {"i":"3100","n":"Turbidity Calibration Value","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"3101","n":"Rinse Aid Option State","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3103","n":"Total AC Current Report","d":"sensor","ds":8,"vt":"{{ value[0:8] | int(base=16) }}"}
@@ -198,10 +198,10 @@
 {"i":"3107","n":"AC Line Voltage","d":"sensor","ds":2,"u":"V","dc":"voltage","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"3108","n":"Door Pocket Light State","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3109","n":"Demo Mode State","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"310a","n":"Critical Fault Status","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"310b","n":"Noncritical Fault Status","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"310a","n":"Critical Fault Status","d":"binary_sensor","ds":1,"dc":"problem","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"310b","n":"Noncritical Fault Status","d":"binary_sensor","ds":1,"dc":"problem","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"310c","n":"Smart Assist Cloud Notification","d":"switch","ds":1,"p":"310d","r":"request","vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3200","n":"Dish Feature Configuration","d":"sensor","ds":15,"vt":"{{ value[0:2] | int(base=16) }}"}
+{"i":"3200","n":"Dish Feature Configuration","d":"sensor","ds":15,"sc":"measurement","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"3200","n":"Dish Feature Configuration - displayInHoursAndMinutes","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 1) % 2 else '00' }}","fi":"displayinhoursandminutes","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3200","n":"Dish Feature Configuration - bottleJets","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 2) % 2 else '00' }}","fi":"bottlejets","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3200","n":"Dish Feature Configuration - washZones","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 4) % 2 else '00' }}","fi":"washzones","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -247,11 +247,11 @@
 {"i":"3207","n":"User Settings Tub 1 - Leak Pan Status","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 32) % 2 else '00' }}","fi":"leak_pan_status","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3207","n":"User Settings Tub 1 - Door Wakeup","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 64) % 2 else '00' }}","fi":"door_wakeup","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3207","n":"User Settings Tub 1 - Wifi Enabled","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 128) % 2 else '00' }}","fi":"wifi_enabled","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3208","n":"Error Tub 1 - Error ID","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"3208","n":"Error Tub 1 - Error Active","d":"binary_sensor","ds":2,"vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
-{"i":"3209","n":"Cycle Counts Tub 1 - Started Cycles Counter","d":"sensor","ds":6,"vt":"{{ value[0:4] | int(base=16) }}"}
-{"i":"3209","n":"Cycle Counts Tub 1 - Completed Cycles Counter","d":"sensor","ds":6,"vt":"{{ value[4:8] | int(base=16) }}","fi":"completed_cycles_counter"}
-{"i":"3209","n":"Cycle Counts Tub 1 - Power On Reset Counter","d":"sensor","ds":6,"vt":"{{ value[8:12] | int(base=16) }}","fi":"power_on_reset_counter"}
+{"i":"3208","n":"Error Tub 1 - Error ID","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value[0:2] | int(base=16) }}"}
+{"i":"3208","n":"Error Tub 1 - Error Active","d":"binary_sensor","ds":2,"dc":"problem","vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
+{"i":"3209","n":"Cycle Counts Tub 1 - Started Cycles Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[0:4] | int(base=16) }}"}
+{"i":"3209","n":"Cycle Counts Tub 1 - Completed Cycles Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[4:8] | int(base=16) }}","fi":"completed_cycles_counter"}
+{"i":"3209","n":"Cycle Counts Tub 1 - Power On Reset Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[8:12] | int(base=16) }}","fi":"power_on_reset_counter"}
 {"i":"320a","n":"Water Softener Setting","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Water softener off', '01': 'Water softener setting 1', '02': 'Water softener setting 2', '03': 'Water softener setting 3', '04': 'Water softener setting 4', '05': 'Water softener setting 5', '06': 'Water softener setting 6', '07': 'Water softener setting 7', '08': 'Water softener setting 8'}.get(value[:2], 'Unknown') }}"}
 {"i":"320b","n":"Water Softener Regeneration Frequency Setting Request","d":"select","ds":1,"vt":"{{ {'00': 'Water softener off', '01': 'Water softener setting 1', '02': 'Water softener setting 2', '03': 'Water softener setting 3', '04': 'Water softener setting 4', '05': 'Water softener setting 5', '06': 'Water softener setting 6', '07': 'Water softener setting 7', '08': 'Water softener setting 8'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Water softener off': '00', 'Water softener setting 1': '01', 'Water softener setting 2': '02', 'Water softener setting 3': '03', 'Water softener setting 4': '04', 'Water softener setting 5': '05', 'Water softener setting 6': '06', 'Water softener setting 7': '07', 'Water softener setting 8': '08'}[value] }}","o":"[\"Water softener off\", \"Water softener setting 1\", \"Water softener setting 2\", \"Water softener setting 3\", \"Water softener setting 4\", \"Water softener setting 5\", \"Water softener setting 6\", \"Water softener setting 7\", \"Water softener setting 8\"]"}
 {"i":"320c","n":"Auto Lid Down Setting","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
@@ -441,7 +441,7 @@
 {"i":"3224","n":"Target Drain Pump Speed","d":"sensor","ds":2,"u":"rpm","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"3225","n":"Actual Circulation Pump Speed","d":"sensor","ds":2,"u":"rpm","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"3226","n":"Actual Drain Pump Speed","d":"sensor","ds":2,"u":"rpm","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
-{"i":"3227","n":"Total AC Current Report","d":"sensor","ds":6,"vt":"{{ value[0:4] | int(base=16) }}"}
+{"i":"3227","n":"Total AC Current Report","d":"sensor","ds":6,"sc":"measurement","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"3227","n":"Total AC Current Report - WaterValve","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 256) % 2 else '00' }}","fi":"watervalve","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3227","n":"Total AC Current Report - dispenseCup","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 512) % 2 else '00' }}","fi":"dispensecup","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3227","n":"Total AC Current Report - rinseAidSensor","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 1024) % 2 else '00' }}","fi":"rinseaidsensor","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -477,8 +477,8 @@
 {"i":"3229","n":"DC Current Repot - drainPump","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 2) % 2 else '00' }}","fi":"drainpump","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3229","n":"DC Current Repot - dryHeater","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 4) % 2 else '00' }}","fi":"dryheater","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3229","n":"DC Current Repot - circPump","d":"binary_sensor","ds":6,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 8) % 2 else '00' }}","fi":"circpump","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"322a","n":"Motor Identification Data - inputA","d":"sensor","ds":4,"vt":"{{ value[0:4] | int(base=16) }}"}
-{"i":"322a","n":"Motor Identification Data - inputB","d":"sensor","ds":4,"vt":"{{ value[4:8] | int(base=16) }}","fi":"inputb"}
+{"i":"322a","n":"Motor Identification Data - inputA","d":"sensor","ds":4,"sc":"measurement","vt":"{{ value[0:4] | int(base=16) }}"}
+{"i":"322a","n":"Motor Identification Data - inputB","d":"sensor","ds":4,"sc":"measurement","vt":"{{ value[4:8] | int(base=16) }}","fi":"inputb"}
 {"i":"322b","n":"Silverware Wash Option State","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"322c","n":"Custom Cycle Index","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"p":"322d","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"322e","n":"Dish Favorite Settings","d":"number","ds":12,"mn":0.0,"mx":255.0,"st":1.0,"p":"322f","r":"request","vt":"{{ value[6:8] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
@@ -529,10 +529,10 @@
 {"i":"3231","n":"Default to Eco Cycle Setting","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3232","n":"Default to Eco Cycle Request","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3235","n":"Tub1 Water Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
-{"i":"3236","n":"Average Turbidity Tub 1","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"3236","n":"Average Turbidity Tub 1","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"3237","n":"Tub 1 Dishwasher Door Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Open', '01': 'Closed', '02': 'Invalid', '03': 'Init', '04': 'Unknown'}.get(value[:2], 'Unknown') }}"}
-{"i":"323e","n":"Tub 1 Drain Pump Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"3245","n":"Tub 1 Circ Pump Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"323e","n":"Tub 1 Drain Pump Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
+{"i":"3245","n":"Tub 1 Circ Pump Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"324d","n":"System Software Versions Tub 1 - UI Version","d":"sensor","ds":24,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}","fi":"ui"}
 {"i":"324d","n":"System Software Versions Tub 1 - UI Parametric Version","d":"sensor","ds":24,"vt":"{{ (value[8:10] | int(base=16) | string) + \".\" + (value[10:12] | int(base=16) | string) }}","fi":"ui_parametric"}
 {"i":"324d","n":"System Software Versions Tub 1 - MC Version","d":"sensor","ds":24,"vt":"{{ (value[12:14] | int(base=16) | string) + \".\" + (value[14:16] | int(base=16) | string) + \".\" + (value[16:18] | int(base=16) | string) + \".\" + (value[18:20] | int(base=16) | string) }}","fi":"mc"}
@@ -576,15 +576,15 @@
 {"i":"3264","n":"Auto Open Door Option State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3300","n":"Turbidity Calibration Value Tub 1","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"3401","n":"Tub 1 Operating Mode","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Low Power', '01': 'Power Up', '02': 'Standby', '03': 'Delay Start', '04': 'Pause', '05': 'Run', '06': 'EOC', '07': 'Download Mode', '08': 'Sensor Check Mode', '09': 'Load Activation Mode', '0b': 'MC Only Mode', '0c': 'User Alert Mode', '0d': 'Lock', '0e': 'CSM', '0f': 'Wifi Binding', '10': 'Rinse Aid Level Selection', '11': 'Sabbath Mode', '12': 'Delay Pause'}.get(value[:2], 'Unknown') }}"}
-{"i":"3406","n":"Tub 1 Door Count","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"340d","n":"Tub 1 Delay Start Remaining Time In Minutes","d":"sensor","ds":2,"u":"min","vt":"{{ value | int(base=16) }}"}
-{"i":"341e","n":"Tub 1 Dispense Count","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"3406","n":"Tub 1 Door Count","d":"sensor","ds":2,"sc":"total_increasing","vt":"{{ value | int(base=16) }}"}
+{"i":"340d","n":"Tub 1 Delay Start Remaining Time In Minutes","d":"sensor","ds":2,"u":"min","sc":"measurement","vt":"{{ value | int(base=16) }}"}
+{"i":"341e","n":"Tub 1 Dispense Count","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"343f","n":"Tub 1 Water Valve State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3446","n":"Tub 1 Heater Relay State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3449","n":"Tub 1 Fan 1 Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"3483","n":"Tub 1 Hue Score","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"3449","n":"Tub 1 Fan 1 Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
+{"i":"3483","n":"Tub 1 Hue Score","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"3487","n":"Tub 1 Remote Start Enable","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3600","n":"Tub 1 Dish Feature Configuration","d":"sensor","ds":15,"vt":"{{ value[0:2] | int(base=16) }}"}
+{"i":"3600","n":"Tub 1 Dish Feature Configuration","d":"sensor","ds":15,"sc":"measurement","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"3600","n":"Tub 1 Dish Feature Configuration - displayInHoursAndMinutes","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 1) % 2 else '00' }}","fi":"displayinhoursandminutes","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3600","n":"Tub 1 Dish Feature Configuration - bottleJets","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 2) % 2 else '00' }}","fi":"bottlejets","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3600","n":"Tub 1 Dish Feature Configuration - washZones","d":"binary_sensor","ds":15,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 4) % 2 else '00' }}","fi":"washzones","pon":"01","poff":"00","son":"01","soff":"00"}

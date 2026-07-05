@@ -5,6 +5,10 @@ Uses keyword matching from ha_constants.py, unit-based inference,
 and exclusion rules to assign device_class. Fields that can't be
 confidently classified are left as None for AI review.
 
+Stale values from previous runs are cleared when the detector no longer
+finds a match (e.g. keyword logic changed), ensuring the processed
+JSON stays in sync with the current detection rules.
+
 Architecture: unit-based detection runs first (highest confidence),
 then keyword-based detection as fallback. This prevents keyword
 false positives from overriding strong unit signals.
@@ -122,7 +126,22 @@ def infer_device_class(entry):
     field_type = entry.get('field_type', '')
     unit = entry.get('review', {}).get('unit_of_measurement')
     field_bits = entry.get('field_bits')
+    ha_domain = entry.get('review', {}).get('ha_domain')
     name_lower = field_name.lower()
+    erd_name = entry.get('erd_name', '')
+    erd_description = entry.get('erd_description', '')
+    combined = name_lower + ' ' + erd_name.lower() + ' ' + erd_description.lower()
+
+    # --- Binary sensors: detect occupancy and problem indicators ---
+    # Skip paired fields (they're controls, not status sensors)
+    if ha_domain == 'binary_sensor' and not entry.get('review', {}).get('pair_role'):
+        # Occupancy: match 'occupied' in field name only (not erd name/description)
+        # to avoid false positives like "Occupancy Present" capability flags.
+        if 'occupied' in name_lower:
+            return 'occupancy', 0.8
+        # Problem: match in combined name+erd_name+description
+        if any(_word_bound(combined, kw) for kw in ['fault', 'issue', 'error', 'alarm', 'limited']):
+            return 'problem', 0.8
 
     # Skip bit-fields (they're boolean indicators)
     if field_bits is not None:
@@ -235,24 +254,24 @@ def apply_detection(entries):
 
     for entry in entries:
         field_type = entry.get('field_type', '')
-        # Process numeric types and enum types (enum needs device_class='enum' detection)
-        if field_type not in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32', 'enum'):
+        # Process numeric types, enum types, and bool (for occupancy/problem detection)
+        if field_type not in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32', 'enum', 'bool'):
             continue
-
         total_checked += 1
         review = entry.setdefault('review', {})
 
         dc, confidence = infer_device_class(entry)
         if dc is None:
+            # Clear stale device_class from previous runs when the detector
+            # no longer finds a match (e.g., keyword logic changed).
+            if review.get('device_class') is not None:
+                review['device_class'] = None
             continue
 
-        # Only write when not already set, preserving manual overrides.
-        if review.get('device_class') is not None:
-            continue
-
-        total_matched += 1
+        # Always write when detected, overwriting stale or incorrect values.
         review['device_class'] = dc
         review['_dc_confidence'] = confidence
+        total_matched += 1
         total_applied += 1
 
     return total_checked, total_matched, total_applied

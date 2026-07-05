@@ -30,6 +30,12 @@ def strip_request_status(name):
     return n
 
 
+def strip_requested_prefix(name):
+    """Strip 'Requested ' prefix from an ERD name."""
+    n = re.sub(r'^requested\s+', '', name, flags=re.IGNORECASE).strip()
+    return n
+
+
 def normalize_field_name(name):
     """Normalize a field name for comparison.
 
@@ -180,7 +186,6 @@ def match_fields(req_fields, stat_fields):
 
     return matches
 
-
 def find_erd_pairs(erd_by_id, erd_ids):
     """Find all Request/Status ERD pairs, including non-adjacent ones.
 
@@ -188,11 +193,23 @@ def find_erd_pairs(erd_by_id, erd_ids):
     relationships. Uses name-based matching: strips 'Request'/'Status'
     suffixes and compares the base names.
 
+    Also detects patterns where the status side has no keyword:
+      - "Requested X" ↔ "X"
+      - "X Request" ↔ "X"
+
     Returns list of (request_erd_id, status_erd_id) tuples.
     """
     pairs = []
     paired = set()
     n = len(erd_ids)
+
+    # Build a base-name -> erd_id index for ERDs without request/status keywords
+    bare_by_base: dict = {}
+    for erd_id in erd_ids:
+        erd = erd_by_id[erd_id]
+        nl = erd['name'].lower()
+        if 'request' not in nl and 'status' not in nl:
+            bare_by_base[erd['name'].lower()] = erd_id
 
     for i in range(n):
         erd_id_i = erd_ids[i]
@@ -231,6 +248,29 @@ def find_erd_pairs(erd_by_id, erd_ids):
             paired.add(req_id)
             paired.add(stat_id)
             break  # each ERD can only be in one pair
+
+    # Second pass: pair unpaired request ERDs with bare counterparts.
+    # Handles "Requested X" ↔ "X" and "X Request" ↔ "X" patterns.
+    for erd_id in erd_ids:
+        if erd_id in paired:
+            continue
+        erd = erd_by_id[erd_id]
+        nl = erd['name'].lower()
+        if 'request' not in nl:
+            continue
+
+        # Compute the base name by stripping request-related keywords
+        base = strip_request_status(erd['name'])
+        base = strip_requested_prefix(base)
+        base_lower = base.lower()
+
+        # Look for an unpaired bare ERD with the same base name
+        if base_lower in bare_by_base:
+            bare_id = bare_by_base[base_lower]
+            if bare_id not in paired:
+                pairs.append((erd_id, bare_id))
+                paired.add(erd_id)
+                paired.add(bare_id)
 
     return pairs
 
