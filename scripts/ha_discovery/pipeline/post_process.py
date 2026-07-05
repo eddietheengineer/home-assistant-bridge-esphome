@@ -100,8 +100,6 @@ OVERRIDES = {
     "0x4105": {"state_class": "measurement"},
     # --- Number of resets: cumulative counter ---
     "0x40c0": {"state_class": "total_increasing"},
-    # --- Cooling setpoint minimum limit request: pair with status ---
-    "0x7711": {"paired_erd": "0x7709", "pair_role": "request"},
     # --- Input Current Limiting: Amps on Min/Max/Step fields ---
     "0x7470:2": {"device_class": "current", "unit_of_measurement": "A"},
     "0x7470:4": {"device_class": "current", "unit_of_measurement": "A"},
