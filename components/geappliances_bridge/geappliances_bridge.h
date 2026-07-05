@@ -258,7 +258,10 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   esphome_mqtt_client_adapter_t mqtt_client_adapter_;
 
   tiny_gea3_interface_t gea3_interface_;
+  // GEA3 receive buffer — one complete on-wire packet.
+  // Max payload is tiny_gea_packet_max_payload_length (248) + 7 bytes overhead = 255.
   uint8_t receive_buffer_[255];
+  // GEA3 send queue — holds up to ~4 pending outbound packets (255 bytes each).
   uint8_t send_queue_buffer_[1000];
 
   tiny_gea3_erd_client_t erd_client_;
@@ -273,12 +276,17 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   // GEA2 components (only used when gea2_uart_ is set)
   esphome_uart_adapter_t gea2_uart_adapter_;
-
   tiny_gea2_interface_t gea2_interface_;
+
+  // GEA2 receive buffer — one complete on-wire packet.
+  // Max payload is tiny_gea_packet_max_payload_length (248) + 7 bytes overhead = 255.
   uint8_t gea2_receive_buffer_[255];
+  // GEA2 send queue — larger than GEA3 to absorb more packets at 19200 baud
+  // where the slower bus means the tight loop processes fewer packets per call.
   uint8_t gea2_send_queue_buffer_[4096];
 
   tiny_gea2_erd_client_t gea2_erd_client_;
+  // GEA2 client queue — same sizing as GEA3 client queue; see comment above.
   uint8_t gea2_client_queue_buffer_[4096];
 
   // Event fired once per millisecond to drive GEA2 interface's internal timers.
