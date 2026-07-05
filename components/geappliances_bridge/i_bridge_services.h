@@ -102,8 +102,6 @@ class IBridgeServices {
   /// Non-const: sets the steady-state flag and logs on first transition.
   /// Returns true only on the first call that detects steady state.
   virtual bool check_steady_state() = 0;
-  /// Run one tick of all managers (autodiscovery, device-ID, feature bits).
-  virtual void run_all_managers() = 0;
 
   // -- ERD cache MQTT publisher ----------------------------------------------
 

@@ -76,7 +76,6 @@ namespace geappliances_bridge {
 class GeappliancesBridge : public Component, public IBridgeServices {
   friend ErdPollListResult build_poll_list_(GeappliancesBridge* bridge);
   friend class DiscoveryRefreshButton;
-  friend tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t*);
 
  public:
   static constexpr unsigned long baud = 230400;
@@ -135,7 +134,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void log_poll_state_transitions() override;
   void initialize_erd_cache_publisher() override;
   bool is_erd_cache_publisher_initialized() const override;
-  void run_all_managers() override;
   // ── Internal bridge methods (event callbacks and per-phase helpers) ─────────
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();
@@ -146,6 +144,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
   void start_feature_bit_reading_();
   void init_erd_cache_publisher_();
+  void init_polling_bridge_(bool log_as_info);
   void on_poll_discovery_complete_();
   void trigger_discovery_refresh();
   bool should_route_to_feature_bits_(tiny_erd_t erd);

@@ -128,9 +128,6 @@ class MockBridgeServices : public IBridgeServices {
     return mock().actualCall("check_steady_state").onObject(this)
                .returnBoolValueOrDefault(false);
   }
-  void run_all_managers() override {
-    mock().actualCall("run_all_managers").onObject(this);
-  }
 };
 
 TEST_GROUP(startup_hsm)
@@ -304,7 +301,6 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   /* Phase 7: running entry checks steady state */
   mock().expectOneCall("check_steady_state").onObject(&svc).andReturnValue(false);
   /* Phase 7: running run_loop */
-  mock().expectOneCall("run_all_managers").onObject(&svc);
   mock().expectOneCall("get_subscription_state").onObject(&svc).andReturnValue(static_cast<subscription_state_t>(subscription_state_none));
   mock().expectOneCall("handle_polling_failed").onObject(&svc);
   mock().expectOneCall("log_poll_state_transitions").onObject(&svc);
