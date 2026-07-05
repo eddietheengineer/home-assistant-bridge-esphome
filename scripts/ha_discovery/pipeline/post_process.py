@@ -24,16 +24,24 @@ from ha_constants import SENSOR_DEVICE_CLASS_STATE_CLASSES, SENSOR_NON_NUMERIC_D
 def apply_overrides(entries):
     """Reapply documented overrides that auto-detection scripts may have reset.
 
-    Each override is a dict keyed by lowercase hex ERD ID, with the review
-    fields to force-set.  Applied after all auto-detection so manual fixes
-    survive the next pipeline run.
+    Override keys use the format ``erd_id`` or ``erd_id:offset`` where
+    ``offset`` is the byte offset of the target field within the ERD.
+    This makes overrides stable against field-name changes.
 
-    Supported override keys:
-      - ha_domain, device_class, unit_of_measurement, scaling_factor,
-        state_class, paired_erd, pair_role: standard metadata overrides
-      - force_classification: override ERD classification (e.g. "single"
-        to merge multi-field ERDs into one entity)
-      - value_template: override the auto-generated Jinja2 value_template
+    * ``"0x7130"`` — applies to all fields of ERD 0x7130 (safe for single-field ERDs).
+    * ``"0x3015:0"`` — applies only to the field at byte offset 0 of ERD 0x3015.
+
+    Values can be a flat dict of review keys, or use ``"fields"`` with
+    ``"field_offset"`` keys for multiple fields in one ERD::
+
+        "0x3015": {
+            "fields": {
+                0: {"unit_of_measurement": "gal/min", "scaling_factor": 10000},
+                2: {"ha_domain": "sensor"},
+            },
+        }
+
+    Returns the number of override values applied.
     """
     OVERRIDES = {
         # --- Read-only: force ha_domain=sensor ---
@@ -104,31 +112,30 @@ def apply_overrides(entries):
         # --- Average Turbidity: add NTU unit and measurement state_class for plotting ---
         "0x3036": {"unit_of_measurement": "NTU", "state_class": "measurement"},
         "0x3236": {"unit_of_measurement": "NTU", "state_class": "measurement"},
-        # --- Inlet Flow Rate: GPM with x10000 scaling (first field only) ---
-        "0x3015": {
-            "fields": {
-                "Inlet Flow Rate in GPM Multiplied by Ten Thousands": {
-                    "unit_of_measurement": "gal/min",
-                    "scaling_factor": 10000,
-                },
-            },
-        },
+        # --- Inlet Flow Rate: GPM with x10000 scaling (first field only, offset 0) ---
+        "0x3015:0": {"unit_of_measurement": "gal/min", "scaling_factor": 10000},
     }
 
     applied = 0
     for entry in entries:
         erd_id = entry.get("erd_id", "").lower()
-        if erd_id not in OVERRIDES:
-            continue
-        override = OVERRIDES[erd_id]
-        field_name = entry.get('field_name', '')
+        field_offset = entry.get("field_offset")
 
-        # Overrides can be field-scoped (with 'fields' key) or ERD-level.
-        # ERD-level overrides apply to all fields of the ERD.
+        # Try exact key match first (erd_id:offset)
+        key = f"{erd_id}:{field_offset}"
+        if key in OVERRIDES:
+            override = OVERRIDES[key]
+        elif erd_id in OVERRIDES:
+            # Fallback: erd_id without offset applies to all fields
+            override = OVERRIDES[erd_id]
+        else:
+            continue
+
+        # Support 'fields' dict keyed by field_offset (int)
         if 'fields' in override:
-            if field_name not in override['fields']:
+            fields_override = override['fields'].get(field_offset)
+            if fields_override is None:
                 continue
-            fields_override = override['fields'][field_name]
         else:
             fields_override = override
 
