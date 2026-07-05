@@ -129,9 +129,13 @@ def infer_device_class(entry):
     combined = name_lower + ' ' + erd_name.lower() + ' ' + erd_description.lower()
 
     # --- Binary sensors: detect occupancy and problem indicators ---
-    if ha_domain == 'binary_sensor':
-        if any(kw in combined for kw in ['occupancy', 'occupied']):
+    # Skip paired fields (they're controls, not status sensors)
+    if ha_domain == 'binary_sensor' and not entry.get('review', {}).get('pair_role'):
+        # Occupancy: match 'occupied' in field name only (not erd name/description)
+        # to avoid false positives like "Occupancy Present" capability flags.
+        if 'occupied' in name_lower:
             return 'occupancy', 0.8
+        # Problem: match in combined name+erd_name+description
         if any(kw in combined for kw in ['fault', 'issue', 'error', 'alarm', 'limited']):
             return 'problem', 0.8
 
