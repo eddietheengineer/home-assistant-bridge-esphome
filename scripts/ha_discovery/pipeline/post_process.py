@@ -90,8 +90,8 @@ OVERRIDES = {
     "0x404d": {"unit_of_measurement": "h", "state_class": "total"},
     # --- Inlet Flow Rate: GPM with x10000 scaling (first field only, offset 0) ---
     "0x3015:0": {"unit_of_measurement": "gal/min", "scaling_factor": 10000},
-    # --- Heating cycle satisfied: cumulative counter ---
-    "0x4102": {"state_class": "total_increasing"},
+    # --- Heating cycle satisfied: signal (0/1), not a counter ---
+    "0x4102": {"state_class": "measurement"},
     # --- Measured current: Amps with x10 scaling ---
     "0x4065": {"device_class": "current", "unit_of_measurement": "A"},
     # --- Missed flow off counter: resets to 0, so measurement ---
@@ -106,11 +106,13 @@ OVERRIDES = {
     "0x7470:2": {"device_class": "current", "unit_of_measurement": "A"},
     "0x7470:4": {"device_class": "current", "unit_of_measurement": "A"},
     "0x7470:6": {"device_class": "current", "unit_of_measurement": "A"},
-    # --- Make-up Air Fan CFM: volumetric flow ---
-    "0x7464:0": {"unit_of_measurement": "m\u00b3/h"},
-    "0x7464:2": {"unit_of_measurement": "m\u00b3/h"},
-    "0x7464:4": {"unit_of_measurement": "m\u00b3/h"},
-    "0x7464:6": {"unit_of_measurement": "m\u00b3/h"},
+    # --- Make-up Air Fan CFM: volumetric flow (API sends CFM, no conversion) ---
+    "0x7464:0": {"unit_of_measurement": "CFM"},
+    "0x7464:2": {"unit_of_measurement": "CFM"},
+    "0x7464:4": {"unit_of_measurement": "CFM"},
+    "0x7464:6": {"unit_of_measurement": "CFM"},
+    # --- Make-up Air Fan CFM Request: paired with 0x7464 status ---
+    "0x7465": {"unit_of_measurement": "CFM"},
     # --- Cycle counts: cumulative counters ---
     "0x3009:0": {"state_class": "total_increasing"},
     "0x3009:2": {"state_class": "total_increasing"},
@@ -133,6 +135,8 @@ OVERRIDES = {
     "0x3084": {"unit_of_measurement": "mmH\u2082O", "state_class": "measurement"},
     # --- 4 Way Valve Position: read-only sensor, not select ---
     "0x7902": {"ha_domain": "sensor"},
+    # --- Compressor Speed Limiting Factors: problem indicators ---
+    "0x7910": {"device_class": "problem"},
 }
 
 

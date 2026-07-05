@@ -39,6 +39,8 @@ def infer_state_class(entry):
     device_class = entry.get('review', {}).get('device_class')
     ha_domain = entry.get('review', {}).get('ha_domain')
     name_lower = field_name.lower()
+    desc_lower = (entry.get('erd_description') or '').lower()
+    combined = name_lower + ' ' + desc_lower
 
     # Only assign state_class for sensor domain
     if ha_domain != 'sensor':
@@ -51,40 +53,58 @@ def infer_state_class(entry):
     if device_class in NON_NUMERIC_DEVICE_CLASSES:
         return None, None
 
-    # Only assign state_class for fields with a device_class
+    # --- Fields WITH device_class ---
+    if device_class is not None:
+        # --- Total: cumulative counters that can go up and down ---
+        total_keywords = [
+            'cumulative', 'total', 'consumption', 'usage', 'since clear',
+        ]
+        if any(kw in name_lower for kw in total_keywords):
+            # Exclude averages (instantaneous derived values)
+            if 'average' in name_lower:
+                return None, None
+            if device_class in ('energy', 'gas', 'water', 'volume'):
+                return 'total', 0.9
 
-    # --- Total: cumulative counters that can go up and down ---
-    total_keywords = [
-        'cumulative', 'total', 'consumption', 'usage', 'since clear',
+        # --- Total_increasing: counters that only increase ---
+        # Use word-boundary matching to avoid 'cycle' matching 'MyCycle'
+        total_increasing_keywords = [
+            'count', 'number of', 'runtime', 'uptime',
+        ]
+        if any(kw in name_lower for kw in total_increasing_keywords):
+            return 'total_increasing', 0.85
+
+        # 'cycle' requires word-boundary match (not substring)
+        if _word_bound(name_lower, 'cycle'):
+            # Only for non-temperature device classes (MyCycle is a product feature)
+            if device_class not in ('temperature',):
+                return 'total_increasing', 0.8
+
+        # --- Measurement: instantaneous values ---
+        # Only assign 'measurement' if the device_class allows it per HA spec.
+        valid_states = SENSOR_DEVICE_CLASS_STATE_CLASSES.get(device_class, set())
+        if 'measurement' in valid_states:
+            # Exclude cumulative/total fields from measurement
+            if not any(kw in name_lower for kw in total_keywords):
+                return 'measurement', 0.9
+
+        return None, None
+
+    # --- Fields WITHOUT device_class: assign measurement for counter/time/level ---
+    # These are sensors where we don't know the unit but the name suggests
+    # a measurable quantity (counter, time, level, position).
+    counter_keywords = [
+        'counter', 'count', 'total', 'cycle', 'reset', 'dispense',
+        'door', 'error', 'fault', 'number of',
     ]
-    if any(kw in name_lower for kw in total_keywords):
-        # Exclude averages (instantaneous derived values)
-        if 'average' in name_lower:
-            return None, None
-        if device_class in ('energy', 'gas', 'water', 'volume'):
-            return 'total', 0.9
-
-    # --- Total_increasing: counters that only increase ---
-    # Use word-boundary matching to avoid 'cycle' matching 'MyCycle'
-    total_increasing_keywords = [
-        'count', 'number of', 'runtime', 'uptime',
+    time_keywords = [
+        'time', 'duration', 'period', 'minute', 'second', 'hour', 'days',
     ]
-    if any(kw in name_lower for kw in total_increasing_keywords):
-        return 'total_increasing', 0.85
-
-    # 'cycle' requires word-boundary match (not substring)
-    if _word_bound(name_lower, 'cycle'):
-        # Only for non-temperature device classes (MyCycle is a product feature)
-        if device_class not in ('temperature',):
-            return 'total_increasing', 0.8
-
-    # --- Measurement: instantaneous values ---
-    # Only assign 'measurement' if the device_class allows it per HA spec.
-    valid_states = SENSOR_DEVICE_CLASS_STATE_CLASSES.get(device_class, set())
-    if 'measurement' in valid_states:
-        # Exclude cumulative/total fields from measurement
-        if not any(kw in name_lower for kw in total_keywords):
-            return 'measurement', 0.9
+    level_keywords = [
+        'level', 'position', 'angle',
+    ]
+    if any(kw in combined for kw in counter_keywords + time_keywords + level_keywords):
+        return 'measurement', 0.7
 
     return None, None
 
@@ -100,8 +120,8 @@ def apply_detection(entries):
     total_applied = 0
 
     for entry in entries:
-        device_class = entry.get('review', {}).get('device_class')
-        if not device_class:
+        ha_domain = entry.get('review', {}).get('ha_domain')
+        if ha_domain != 'sensor':
             continue
 
         total_checked += 1
