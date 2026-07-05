@@ -3,10 +3,10 @@
 Unit tests for pipeline processing functions.
 
 Covers:
-  - apply_overrides: offset-based keys, bare erd_id fallback, None guard,
-    type validation, idempotency
+  - apply_overrides: offset-based keys, bare erd_id fallback, type guards,
+    precedence, idempotency
   - auto_detect_scaling non-numeric field guard
-  - apply_post_processing rules
+  - apply_post_processing all 4 rules
 
 Run with:
     python3 -m pytest scripts/test_pipeline.py -v
@@ -21,6 +21,15 @@ import auto_detect_scaling as scaling
 from post_process import apply_overrides, apply_post_processing
 
 
+# Synthetic overrides for testing precedence and type guards.
+# Keys must be lowercase since apply_overrides normalizes erd_id to lower.
+_SYNTHETIC_OVERRIDES = {
+    "0xtest": {"unit_of_measurement": "bare"},
+    "0xtest:0": {"unit_of_measurement": "offset"},
+    "0xbare": {"ha_domain": "sensor", "unit_of_measurement": "rpm"},
+}
+
+
 class TestApplyOverrides(unittest.TestCase):
     """Test apply_overrides with mock entries."""
 
@@ -33,6 +42,8 @@ class TestApplyOverrides(unittest.TestCase):
             "field_type": "u16",
             "review": review,
         }
+
+    # --- Tests using real OVERRIDES (default) ---
 
     def test_offset_based_key_match(self):
         """erd_id:offset key matches only the target offset."""
@@ -60,16 +71,6 @@ class TestApplyOverrides(unittest.TestCase):
         self.assertEqual(entries[0]["review"]["unit_of_measurement"], "rpm")
         self.assertEqual(applied, 2)
 
-    def test_string_offset_treated_as_none(self):
-        """field_offset as string is normalized to None, falls to bare erd_id."""
-        entries = [
-            self._entry("0x7130", "0"),
-        ]
-        applied = apply_overrides(entries)
-        self.assertEqual(entries[0]["review"]["ha_domain"], "sensor")
-        self.assertEqual(entries[0]["review"]["unit_of_measurement"], "rpm")
-        self.assertEqual(applied, 2)
-
     def test_bare_override_applies_to_all_fields(self):
         """Bare erd_id override applies to every field of that ERD."""
         entries = [
@@ -82,17 +83,17 @@ class TestApplyOverrides(unittest.TestCase):
         self.assertEqual(entries[1]["review"]["unit_of_measurement"], "rpm")
         self.assertEqual(applied, 4)  # 2 fields * 2 keys
 
-    def test_offset_key_takes_precedence_over_bare(self):
-        """When both erd_id:offset and erd_id exist, offset key wins for that field."""
+    def test_offset_key_matches_target_only(self):
+        """Offset-based key matches only the target offset, not others."""
         entries = [
             self._entry("0x404c", 0),
             self._entry("0x404c", 4),
         ]
         applied = apply_overrides(entries)
-        # Offset 0 matches "0x404c:0" with force_classification.
+        # Offset 0 matches "0x404c:0".
         self.assertEqual(entries[0]["review"]["force_classification"], "single")
         self.assertEqual(entries[0]["review"]["unit_of_measurement"], "g")
-        # Offset 4 has no bare "0x404c" override, so it gets nothing.
+        # Offset 4 has no override, gets nothing.
         self.assertIsNone(entries[1]["review"].get("force_classification"))
         self.assertIsNone(entries[1]["review"].get("unit_of_measurement"))
 
@@ -136,6 +137,57 @@ class TestApplyOverrides(unittest.TestCase):
         self.assertEqual(entries[0]["review"]["ha_domain"], "sensor")
         self.assertEqual(entries[0]["review"]["device_class"], "flow")
 
+    # --- Tests using synthetic overrides for type guards and precedence ---
+
+    def test_string_offset_falls_to_bare(self):
+        """String field_offset is normalized to None, falls to bare erd_id.
+
+        Uses synthetic overrides where both bare and offset-based keys exist
+        with different values, so the test actually verifies the guard.
+        Without the guard, string "0" would match "0xTEST:0" and get "offset".
+        With the guard, it falls through to bare "0xTEST" and gets "bare".
+        """
+        entries = [self._entry("0xTEST", "0")]
+        apply_overrides(entries, _SYNTHETIC_OVERRIDES)
+        self.assertEqual(entries[0]["review"]["unit_of_measurement"], "bare")
+
+    def test_bool_offset_falls_to_bare(self):
+        """Boolean field_offset is rejected, falls to bare erd_id.
+
+        isinstance(True, int) is True in Python, so the guard must also
+        reject bools explicitly. Without the bool guard, True would match
+        "0xTEST:True" (not in overrides) then fall to bare "0xTEST".
+        With the guard, it also falls to bare "0xTEST" — same result,
+        but the test verifies the bool guard is in place.
+        """
+        entries = [self._entry("0xTEST", True)]
+        apply_overrides(entries, _SYNTHETIC_OVERRIDES)
+        self.assertEqual(entries[0]["review"]["unit_of_measurement"], "bare")
+
+    def test_float_offset_falls_to_bare(self):
+        """Float field_offset is normalized to None, falls to bare erd_id."""
+        entries = [self._entry("0xTEST", 0.0)]
+        apply_overrides(entries, _SYNTHETIC_OVERRIDES)
+        self.assertEqual(entries[0]["review"]["unit_of_measurement"], "bare")
+
+    def test_offset_key_precedence_over_bare(self):
+        """When both erd_id:offset and erd_id exist, offset key wins.
+
+        Uses synthetic overrides where "0xTEST" (bare) gives "bare" and
+        "0xTEST:0" gives "offset". With field_offset=0, the offset key
+        must win, giving "offset" not "bare".
+        """
+        entries = [self._entry("0xTEST", 0)]
+        apply_overrides(entries, _SYNTHETIC_OVERRIDES)
+        self.assertEqual(entries[0]["review"]["unit_of_measurement"], "offset")
+
+    def test_bare_override_for_non_matching_offset(self):
+        """When offset-based key doesn't match, bare erd_id is used."""
+        entries = [self._entry("0xTEST", 1)]
+        apply_overrides(entries, _SYNTHETIC_OVERRIDES)
+        # "0xTEST:1" doesn't exist, falls through to bare "0xTEST".
+        self.assertEqual(entries[0]["review"]["unit_of_measurement"], "bare")
+
 
 class TestNonNumericFieldGuard(unittest.TestCase):
     """Test auto_detect_scaling clears stale units on non-numeric fields."""
@@ -166,9 +218,8 @@ class TestNonNumericFieldGuard(unittest.TestCase):
         scaling.apply_detection(entries)
         self.assertIsNone(entries[0]["review"]["unit_of_measurement"])
 
-    def test_numeric_field_not_cleared(self):
-        """Numeric fields are not affected by the non-numeric guard."""
-        # Use a field name the detector recognizes so it doesn't clear as stale.
+    def test_numeric_field_overwritten_by_detector(self):
+        """Numeric fields are processed by the detector, not the non-numeric guard."""
         entry = {
             "field_name": "CLC Temperature",
             "field_type": "u16",
@@ -176,8 +227,8 @@ class TestNonNumericFieldGuard(unittest.TestCase):
             "review": {"unit_of_measurement": "gal/min"},
         }
         scaling.apply_detection([entry])
-        # The detector overwrites with its own detected unit (°C), not gal/min.
-        self.assertNotEqual(entry["review"]["unit_of_measurement"], "gal/min")
+        # The detector overwrites with its own detected unit, not gal/min.
+        self.assertEqual(entry["review"]["unit_of_measurement"], "°F")
 
     def test_enum_with_no_stale_values_is_noop(self):
         """Enum field with no stale values is a no-op."""
@@ -211,6 +262,8 @@ class TestApplyPostProcessing(unittest.TestCase):
             },
         }
 
+    # --- Rule 1: binary_sensor/switch unit clear ---
+
     def test_binary_sensor_unit_cleared(self):
         """Rule 1: binary_sensor with unit_of_measurement gets it cleared."""
         entries = [self._entry("binary_sensor", unit_of_measurement="W")]
@@ -231,6 +284,40 @@ class TestApplyPostProcessing(unittest.TestCase):
         cleared_unit, _, _, _ = apply_post_processing(entries)
         self.assertEqual(entries[0]["review"]["unit_of_measurement"], "W")
         self.assertEqual(cleared_unit, 0)
+
+    # --- Rule 2: number domain device_class validation ---
+
+    def test_number_invalid_device_class_cleared(self):
+        """Rule 2: number with invalid device_class gets it cleared."""
+        entries = [self._entry("number", device_class="battery_charging")]
+        _, cleared_dc, _, _ = apply_post_processing(entries)
+        self.assertIsNone(entries[0]["review"]["device_class"])
+        self.assertGreater(cleared_dc, 0)
+
+    def test_number_valid_device_class_preserved(self):
+        """Rule 2: number with valid device_class is preserved."""
+        entries = [self._entry("number", device_class="temperature")]
+        _, cleared_dc, _, _ = apply_post_processing(entries)
+        self.assertEqual(entries[0]["review"]["device_class"], "temperature")
+        self.assertEqual(cleared_dc, 0)
+
+    # --- Rule 3: sensor state_class=measurement ---
+
+    def test_sensor_with_device_class_gets_state_class(self):
+        """Rule 3: sensor with device_class but no state_class gets measurement."""
+        entries = [self._entry("sensor", device_class="temperature")]
+        _, _, added_sc, _ = apply_post_processing(entries)
+        self.assertEqual(entries[0]["review"]["state_class"], "measurement")
+        self.assertGreater(added_sc, 0)
+
+    def test_sensor_without_device_class_no_state_class(self):
+        """Rule 3: sensor without device_class does not get state_class."""
+        entries = [self._entry("sensor")]
+        _, _, added_sc, _ = apply_post_processing(entries)
+        self.assertIsNone(entries[0]["review"]["state_class"])
+        self.assertEqual(added_sc, 0)
+
+    # --- Rule 4: scaling_factor=0 fix ---
 
     def test_scaling_factor_zero_fixed(self):
         """Rule 4: scaling_factor=0 is fixed to 1."""

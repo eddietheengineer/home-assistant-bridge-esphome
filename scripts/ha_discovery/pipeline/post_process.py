@@ -21,7 +21,82 @@ from ha_constants import SENSOR_DEVICE_CLASS_STATE_CLASSES, SENSOR_NON_NUMERIC_D
 
 
 
-def apply_overrides(entries):
+# Module-level overrides — can be overridden by tests for unit testing.
+OVERRIDES = {
+    # --- Read-only: force ha_domain=sensor ---
+    "0x7100": {"ha_domain": "sensor"},
+    "0x7101": {"ha_domain": "sensor"},
+    "0x7102": {"ha_domain": "sensor"},
+    "0x7103": {"ha_domain": "sensor"},
+    "0x7108": {"ha_domain": "sensor"},
+    "0x710a": {"ha_domain": "sensor"},
+    "0x7130": {"ha_domain": "sensor", "unit_of_measurement": "rpm"},
+    "0x7131": {"ha_domain": "sensor", "unit_of_measurement": "rpm"},
+    "0x7132": {"ha_domain": "sensor", "unit_of_measurement": "rpm"},
+    "0x7133": {"ha_domain": "sensor", "unit_of_measurement": "rpm"},
+    "0x7601": {"ha_domain": "sensor"},
+    "0x7512": {"ha_domain": "sensor", "unit_of_measurement": "steps"},
+    "0x7513": {"ha_domain": "sensor", "unit_of_measurement": "steps"},
+    "0x7514": {"ha_domain": "sensor", "unit_of_measurement": "steps"},
+    "0x7515": {"ha_domain": "sensor", "unit_of_measurement": "steps"},
+    "0x7104": {"ha_domain": "sensor"},
+    "0x7114": {"ha_domain": "sensor"},
+    "0x7115": {"ha_domain": "sensor"},
+    "0x4026": {"ha_domain": "sensor"},
+    "0x7907": {"ha_domain": "sensor", "unit_of_measurement": "steps"},
+    "0x7938": {"ha_domain": "sensor"},
+    "0x710b": {"ha_domain": "sensor"},
+    # --- Fan speed: add rpm unit ---
+    "0x7136": {"unit_of_measurement": "rpm"},
+    "0x7137": {"unit_of_measurement": "rpm"},
+    "0x5b13": {"unit_of_measurement": "rpm"},
+    # --- Fan PWM: add % unit and scaling ---
+    "0x7134": {"unit_of_measurement": "%", "scaling_factor": 100},
+    "0x7135": {"unit_of_measurement": "%", "scaling_factor": 100},
+    # --- EEV positions: add steps unit ---
+    "0x7518": {"unit_of_measurement": "steps"},
+    # --- WAC Ambient: remove incorrect scaling ---
+    "0x7a02": {"scaling_factor": None},
+    # --- Appliance Cumulative Energy: add scaling ---
+    "0xd030": {"scaling_factor": 1000},
+    # --- Water Softener Daily Usage: water device_class only allows total ---
+    "0x800d": {"state_class": "total"},
+    # --- Anode depleted mass: combine MSB+LSB u32 fields into single u64,
+    #     scale from micrograms to grams (10^-6) ---
+    "0x404c:0": {
+        "ha_domain": "sensor",
+        "device_class": "weight",
+        "unit_of_measurement": "g",
+        "state_class": "measurement",
+        "force_classification": "single",
+        "value_template": "{{ ((value[0:8] | int(base=16)) * 2**32 + (value[8:16] | int(base=16))) / 1000000 | round(3) }}",
+    },
+    # --- Usage update period pairs: add min unit (pairing is auto-detected) ---
+    "0xd014": {"unit_of_measurement": "min"},
+    "0xd02c": {"unit_of_measurement": "min"},
+    "0xd017": {"unit_of_measurement": "min"},
+    "0xd02d": {"unit_of_measurement": "min"},
+    "0xd01a": {"unit_of_measurement": "min"},
+    "0xd02e": {"unit_of_measurement": "min"},
+    "0xd01d": {"unit_of_measurement": "min"},
+    "0xd02f": {"unit_of_measurement": "min"},
+    "0x5b27": {"unit_of_measurement": "min"},
+    "0x5b28": {"unit_of_measurement": "min"},
+    # --- Mixing valve positions: add steps unit and state_class for plotting ---
+    "0x400a": {"unit_of_measurement": "steps", "state_class": "measurement"},
+    "0x400b": {"unit_of_measurement": "steps", "state_class": "measurement"},
+    "0x400c": {"unit_of_measurement": "steps", "state_class": "measurement"},
+    # --- Anode hours of service: add hours unit ---
+    "0x404d": {"unit_of_measurement": "h", "state_class": "total"},
+    # --- Average Turbidity: add NTU unit and measurement state_class for plotting ---
+    "0x3036": {"unit_of_measurement": "NTU", "state_class": "measurement"},
+    "0x3236": {"unit_of_measurement": "NTU", "state_class": "measurement"},
+    # --- Inlet Flow Rate: GPM with x10000 scaling (first field only, offset 0) ---
+    "0x3015:0": {"unit_of_measurement": "gal/min", "scaling_factor": 10000},
+}
+
+
+def apply_overrides(entries, overrides=None):
     """Reapply documented overrides that auto-detection scripts may have reset.
 
     Override keys use the format ``erd_id`` or ``erd_id:offset`` where
@@ -36,96 +111,30 @@ def apply_overrides(entries):
     non-numeric field, the override must be reapplied in post_process
     (after auto_detect_scaling runs) to survive the cleanup.
 
+    Args:
+        entries: list of entry dicts with erd_id, field_offset, review.
+        overrides: dict of override rules; defaults to module-level OVERRIDES.
+
     Returns the number of override values applied.
     """
-    OVERRIDES = {
-        # --- Read-only: force ha_domain=sensor ---
-        "0x7100": {"ha_domain": "sensor"},
-        "0x7101": {"ha_domain": "sensor"},
-        "0x7102": {"ha_domain": "sensor"},
-        "0x7103": {"ha_domain": "sensor"},
-        "0x7108": {"ha_domain": "sensor"},
-        "0x710a": {"ha_domain": "sensor"},
-        "0x7130": {"ha_domain": "sensor", "unit_of_measurement": "rpm"},
-        "0x7131": {"ha_domain": "sensor", "unit_of_measurement": "rpm"},
-        "0x7132": {"ha_domain": "sensor", "unit_of_measurement": "rpm"},
-        "0x7133": {"ha_domain": "sensor", "unit_of_measurement": "rpm"},
-        "0x7601": {"ha_domain": "sensor"},
-        "0x7512": {"ha_domain": "sensor", "unit_of_measurement": "steps"},
-        "0x7513": {"ha_domain": "sensor", "unit_of_measurement": "steps"},
-        "0x7514": {"ha_domain": "sensor", "unit_of_measurement": "steps"},
-        "0x7515": {"ha_domain": "sensor", "unit_of_measurement": "steps"},
-        "0x7104": {"ha_domain": "sensor"},
-        "0x7114": {"ha_domain": "sensor"},
-        "0x7115": {"ha_domain": "sensor"},
-        "0x4026": {"ha_domain": "sensor"},
-        "0x7907": {"ha_domain": "sensor", "unit_of_measurement": "steps"},
-        "0x7938": {"ha_domain": "sensor"},
-        "0x710b": {"ha_domain": "sensor"},
-        # --- Fan speed: add rpm unit ---
-        "0x7136": {"unit_of_measurement": "rpm"},
-        "0x7137": {"unit_of_measurement": "rpm"},
-        "0x5b13": {"unit_of_measurement": "rpm"},
-        # --- Fan PWM: add % unit and scaling ---
-        "0x7134": {"unit_of_measurement": "%", "scaling_factor": 100},
-        "0x7135": {"unit_of_measurement": "%", "scaling_factor": 100},
-        # --- EEV positions: add steps unit ---
-        "0x7518": {"unit_of_measurement": "steps"},
-        # --- WAC Ambient: remove incorrect scaling ---
-        "0x7a02": {"scaling_factor": None},
-        # --- Appliance Cumulative Energy: add scaling ---
-        "0xd030": {"scaling_factor": 1000},
-        # --- Water Softener Daily Usage: water device_class only allows total ---
-        "0x800d": {"state_class": "total"},
-        # --- Anode depleted mass: combine MSB+LSB u32 fields into single u64,
-        #     scale from micrograms to grams (10^-6) ---
-        "0x404c:0": {
-            "ha_domain": "sensor",
-            "device_class": "weight",
-            "unit_of_measurement": "g",
-            "state_class": "measurement",
-            "force_classification": "single",
-            "value_template": "{{ ((value[0:8] | int(base=16)) * 2**32 + (value[8:16] | int(base=16))) / 1000000 | round(3) }}",
-        },
-        # --- Usage update period pairs: add min unit (pairing is auto-detected) ---
-        "0xd014": {"unit_of_measurement": "min"},
-        "0xd02c": {"unit_of_measurement": "min"},
-        "0xd017": {"unit_of_measurement": "min"},
-        "0xd02d": {"unit_of_measurement": "min"},
-        "0xd01a": {"unit_of_measurement": "min"},
-        "0xd02e": {"unit_of_measurement": "min"},
-        "0xd01d": {"unit_of_measurement": "min"},
-        "0xd02f": {"unit_of_measurement": "min"},
-        "0x5b27": {"unit_of_measurement": "min"},
-        "0x5b28": {"unit_of_measurement": "min"},
-        # --- Mixing valve positions: add steps unit and state_class for plotting ---
-        "0x400a": {"unit_of_measurement": "steps", "state_class": "measurement"},
-        "0x400b": {"unit_of_measurement": "steps", "state_class": "measurement"},
-        "0x400c": {"unit_of_measurement": "steps", "state_class": "measurement"},
-        # --- Anode hours of service: add hours unit ---
-        "0x404d": {"unit_of_measurement": "h", "state_class": "total"},
-        # --- Average Turbidity: add NTU unit and measurement state_class for plotting ---
-        "0x3036": {"unit_of_measurement": "NTU", "state_class": "measurement"},
-        "0x3236": {"unit_of_measurement": "NTU", "state_class": "measurement"},
-        # --- Inlet Flow Rate: GPM with x10000 scaling (first field only, offset 0) ---
-        "0x3015:0": {"unit_of_measurement": "gal/min", "scaling_factor": 10000},
-    }
+    if overrides is None:
+        overrides = OVERRIDES
 
     applied = 0
     for entry in entries:
         erd_id = entry.get("erd_id", "").lower()
         field_offset = entry.get("field_offset")
 
-        # Guard: field_offset must be int for offset-based matching.
-        # Non-int values (string, None) fall through to bare erd_id only.
-        if not isinstance(field_offset, int):
+        # Guard: field_offset must be int (not bool) for offset-based matching.
+        # Non-int values (string, None, bool, float) fall through to bare erd_id only.
+        if not isinstance(field_offset, int) or isinstance(field_offset, bool):
             field_offset = None
 
         # Try exact key match first (erd_id:offset).
         if field_offset is not None:
             key = f"{erd_id}:{field_offset}"
-            if key in OVERRIDES:
-                override = OVERRIDES[key]
+            if key in overrides:
+                override = overrides[key]
                 review = entry.setdefault("review", {})
                 for k, val in override.items():
                     if review.get(k) != val:
@@ -134,9 +143,9 @@ def apply_overrides(entries):
                 continue
 
         # Fallback: bare erd_id applies to all fields (safe for single-field ERDs).
-        if erd_id not in OVERRIDES:
+        if erd_id not in overrides:
             continue
-        override = OVERRIDES[erd_id]
+        override = overrides[erd_id]
         review = entry.setdefault("review", {})
         for k, val in override.items():
             if review.get(k) != val:
