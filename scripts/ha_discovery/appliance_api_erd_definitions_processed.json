@@ -279847,7 +279847,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": "weight",
-      "unit_of_measurement": null,
+      "unit_of_measurement": "g",
       "scaling_factor": null,
       "state_class": "measurement",
       "paired_erd": null,
@@ -279857,7 +279857,9 @@
       "reasoning": "",
       "_domain_confidence": 0.9,
       "_dc_confidence": 0.8,
-      "_sc_confidence": 0.9
+      "_sc_confidence": 0.9,
+      "force_classification": "single",
+      "value_template": "{{ ((value[0:8] | int(base=16)) * 2**32 + (value[8:16] | int(base=16))) / 1000000 | round(3) }}"
     }
   },
   {
@@ -279882,7 +279884,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": "weight",
-      "unit_of_measurement": null,
+      "unit_of_measurement": "g",
       "scaling_factor": null,
       "state_class": "measurement",
       "paired_erd": null,
@@ -279892,7 +279894,9 @@
       "reasoning": "",
       "_domain_confidence": 0.9,
       "_dc_confidence": 0.8,
-      "_sc_confidence": 0.9
+      "_sc_confidence": 0.9,
+      "force_classification": "single",
+      "value_template": "{{ ((value[0:8] | int(base=16)) * 2**32 + (value[8:16] | int(base=16))) / 1000000 | round(3) }}"
     }
   },
   {

@@ -1011,6 +1011,12 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
         else:
             classification = _classify_erd_data(erd_data)
 
+        # Allow overrides to force a specific classification (e.g., merging
+        # multi-field ERDs into a single entity with a custom value template).
+        forced_classification = erd.get('force_classification')
+        if forced_classification:
+            classification = forced_classification
+
         if classification == 'single':
             vt, ct, opts = '', '', ''
             min_val, max_val, step_val = 0.0, 0.0, 1.0
@@ -1078,6 +1084,11 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 min_val, max_val, step_val = _compute_number_range(n_type, n_scale)
             # button: no templates
 
+            # Allow overrides to supply a custom value_template that bypasses
+            # the auto-generated one (e.g., combining multi-field u64 values).
+            custom_vt = erd.get('value_template')
+            if custom_vt:
+                vt = custom_vt
             # For switch/binary_sensor, set payload_on/off and state_on/off to hex
             p_on = ''
             p_off = ''
@@ -1505,6 +1516,10 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
             erd['paired_erd'] = review['paired_erd']
         if review.get('pair_role'):
             erd['pair_role'] = review['pair_role']
+        if review.get('force_classification'):
+            erd['force_classification'] = review['force_classification']
+        if review.get('value_template'):
+            erd['value_template'] = review['value_template']
 
         erds.append(erd)
 

@@ -27,6 +27,13 @@ def apply_overrides(entries):
     Each override is a dict keyed by lowercase hex ERD ID, with the review
     fields to force-set.  Applied after all auto-detection so manual fixes
     survive the next pipeline run.
+
+    Supported override keys:
+      - ha_domain, device_class, unit_of_measurement, scaling_factor,
+        state_class, paired_erd, pair_role: standard metadata overrides
+      - force_classification: override ERD classification (e.g. "single"
+        to merge multi-field ERDs into one entity)
+      - value_template: override the auto-generated Jinja2 value_template
     """
     OVERRIDES = {
         # --- Read-only: force ha_domain=sensor ---
@@ -67,6 +74,16 @@ def apply_overrides(entries):
         "0xd030": {"scaling_factor": 1000},
         # --- Water Softener Daily Usage: water device_class only allows total ---
         "0x800d": {"state_class": "total"},
+        # --- Anode depleted mass: combine MSB+LSB u32 fields into single u64,
+        #     scale from micrograms to grams (10^-6) ---
+        "0x404c": {
+            "ha_domain": "sensor",
+            "device_class": "weight",
+            "unit_of_measurement": "g",
+            "state_class": "measurement",
+            "force_classification": "single",
+            "value_template": "{{ ((value[0:8] | int(base=16)) * 2**32 + (value[8:16] | int(base=16))) / 1000000 | round(3) }}",
+        },
     }
 
     applied = 0
