@@ -68,10 +68,8 @@
 {"i":"5025","n":"Accent Lighting Supported Settings - Color Temperature Max","d":"sensor","ds":16,"u":"°F","vt":"{{ value[8:12] | int(base=16) }}","fi":"color_temperature_max"}
 {"i":"5027","n":"Air Fry Oven Minimum and Maximum Temperatures - Maximum","d":"sensor","ds":4,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"5027","n":"Air Fry Oven Minimum and Maximum Temperatures - Minimum","d":"sensor","ds":4,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value[4:8] | int(base=16) }}","fi":"minimum"}
-{"i":"5028","n":"Articulating Display Mode","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Auto', '01': 'Manual'}.get(value[:2], 'Unknown') }}"}
-{"i":"5029","n":"Articulating Display Mode Request","d":"select","ds":1,"vt":"{{ {'00': 'Don\\'t Care', '01': 'Auto', '02': 'Manual'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Don\\'t Care': '00', 'Auto': '01', 'Manual': '02'}[value] }}","o":"[\"Don't Care\", \"Auto\", \"Manual\"]"}
-{"i":"502a","n":"Articulating Display Position","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'Extended', '02': 'Retracted', '03': 'Extending', '04': 'Retracting'}.get(value[:2], 'Unknown') }}"}
-{"i":"502b","n":"Articulating Display Position Request","d":"select","ds":1,"vt":"{{ {'00': 'Don\\'t Care', '01': 'Extend', '02': 'Retract'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Don\\'t Care': '00', 'Extend': '01', 'Retract': '02'}[value] }}","o":"[\"Don't Care\", \"Extend\", \"Retract\"]"}
+{"i":"5029","n":"Articulating Display Mode","d":"select","ds":1,"p":"5028","r":"request","vt":"{{ {'00': 'Auto', '01': 'Manual'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Auto': '00', 'Manual': '01'}[value] }}","o":"[\"Auto\", \"Manual\"]"}
+{"i":"502b","n":"Articulating Display Position","d":"select","ds":1,"p":"502a","r":"request","vt":"{{ {'00': 'Unknown', '01': 'Extended', '02': 'Retracted', '03': 'Extending', '04': 'Retracting'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Unknown': '00', 'Extended': '01', 'Retracted': '02', 'Extending': '03', 'Retracting': '04'}[value] }}","o":"[\"Unknown\", \"Extended\", \"Retracted\", \"Extending\", \"Retracting\"]"}
 {"i":"502c","n":"Automatic Door Opener Local Public Enable","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"502d","n":"Oven Light Auto On Off State","d":"select","ds":1,"vt":"{{ {'00': 'Manual', '01': 'Haier Knob Auto On', '02': 'Auto Off', '03': 'Auto On', 'ff': 'Unset'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Manual': '00', 'Haier Knob Auto On': '01', 'Auto Off': '02', 'Auto On': '03', 'Unset': 'ff'}[value] }}","o":"[\"Manual\", \"Haier Knob Auto On\", \"Auto Off\", \"Auto On\", \"Unset\"]"}
 {"i":"502e","n":"Enhanced Sabbath State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Inactive', '01': 'Prompt Sabbath', '02': 'Prompt Holiday', '03': 'Cooking Accepted, Sabbath Pending', '04': 'Cooking Accepted, Holiday Pending', '05': 'Sabbath Active, No Cooking', '06': 'Holiday Active, No Cooking', '07': 'Sabbath Active, Warm', '08': 'Holiday Active, Warm', '09': 'Holiday Active, Bake'}.get(value[:2], 'Unknown') }}"}
@@ -2330,7 +2328,6 @@
 {"i":"5b03","n":"Hood Light Level Availability - High","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"high","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b03","n":"Hood Light Level Availability - Infinite","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"infinite","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b03","n":"Hood Light Level Availability - Med","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 16) % 2 else '00' }}","fi":"med","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5b04","n":"Hood Delay Off","d":"select","ds":1,"vt":"{{ {'00': 'Cancel', '01': 'Activate'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Cancel': '00', 'Activate': '01'}[value] }}","o":"[\"Cancel\", \"Activate\"]"}
 {"i":"5b05","n":"Hood Delay On","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Cancel', '01': 'Activate'}.get(value[:2], 'Unknown') }}"}
 {"i":"5b06","n":"Hood Heat Sensor Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"5b07","n":"Hood Heat Sensor State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Normal', '01': 'Heat Alarm', 'ff': 'Invalid'}.get(value[:2], 'Unknown') }}"}
@@ -2361,7 +2358,7 @@
 {"i":"5b17","n":"Hood Actual Light Level","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b18","n":"Hood Requested Light Level","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"5b1a","n":"Hood Actual Delay Off Mode","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Disabled', '01': 'Enabled', 'ff': 'Not Available'}.get(value[:2], 'Unknown') }}"}
-{"i":"5b1b","n":"Hood Delay Off Request","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
+{"i":"5b1b","n":"Hood Delay Off","d":"switch","ds":1,"p":"5b04","r":"request","vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5b1c","n":"Hood Actual Delay Off Duration","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"5b1d","n":"Hood Requested Delay Off Duration","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"5b1e","n":"Hood to Cooktop Connection Status (Hood-Side)","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not Paired And Not Connected', '01': 'Paired But Not Connected', '02': 'Paired And Connected', 'ff': 'Hood-To-Cooktop Not Available'}.get(value[:2], 'Unknown') }}"}

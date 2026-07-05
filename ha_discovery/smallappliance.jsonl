@@ -1,14 +1,11 @@
 {"i":"9000","n":"Coffee Brewer Brewing","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"9001","n":"Coffee Brewer Brew Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"9002","n":"Coffee Brewer Brew Temperature Limits - Minimum Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"9002","n":"Coffee Brewer Brew Temperature Limits - Maximum Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value[2:4] | int(base=16) }}","fi":"maximum_temperature"}
 {"i":"9003","n":"Coffee Brewer Bloom Pump Run Time","d":"sensor","ds":2,"u":"s","vt":"{{ value | int(base=16) }}"}
 {"i":"9004","n":"Coffee Brewer Bloom Dwell Time","d":"sensor","ds":2,"u":"s","vt":"{{ value | int(base=16) }}"}
 {"i":"9005","n":"Coffee Brewer Brew Duration","d":"sensor","ds":2,"u":"s","vt":"{{ value | int(base=16) }}"}
-{"i":"9006","n":"Coffee Brewer Brew Cups","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"9007","n":"Coffee Brewer Brew Cups Limits - Minimum Cups","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"9007","n":"Coffee Brewer Brew Cups Limits - Maximum Cups","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"maximum_cups"}
-{"i":"9008","n":"Coffee Brewer Brew Strength","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Custom', '01': 'Light', '02': 'Medium', '03': 'Dark', '04': 'Gold', '05': 'Iced Coffee'}.get(value[:2], 'Unknown') }}"}
 {"i":"9009","n":"Coffee Brewer Supported Brew Strengths - Light","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"light","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9009","n":"Coffee Brewer Supported Brew Strengths - Medium","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"medium","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"9009","n":"Coffee Brewer Supported Brew Strengths - Dark","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"dark","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -34,9 +31,9 @@
 {"i":"9013","n":"Coffee Brewer Out of Water","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not out of water', '01': 'Out of water'}.get(value[:2], 'Unknown') }}"}
 {"i":"9014","n":"Coffee Brewer Brew Current Outlet Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"9015","n":"Coffee Brewer Descale Remaining Cycles","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"9016","n":"Coffee Brewer Brew Strength Request","d":"select","ds":1,"vt":"{{ {'00': 'Reserved', '01': 'Light', '02': 'Medium', '03': 'Dark', '04': 'Gold', '05': 'Iced Coffee'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Reserved': '00', 'Light': '01', 'Medium': '02', 'Dark': '03', 'Gold': '04', 'Iced Coffee': '05'}[value] }}","o":"[\"Reserved\", \"Light\", \"Medium\", \"Dark\", \"Gold\", \"Iced Coffee\"]"}
-{"i":"9017","n":"Coffee Brewer Brew Temperature Request","d":"number","ds":1,"u":"°F","dc":"temperature","mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
-{"i":"9018","n":"Coffee Brewer Brew Cups Request","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"9016","n":"Coffee Brewer Brew Strength","d":"select","ds":1,"p":"9008","r":"request","vt":"{{ {'00': 'Custom', '01': 'Light', '02': 'Medium', '03': 'Dark', '04': 'Gold', '05': 'Iced Coffee'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Custom': '00', 'Light': '01', 'Medium': '02', 'Dark': '03', 'Gold': '04', 'Iced Coffee': '05'}[value] }}","o":"[\"Custom\", \"Light\", \"Medium\", \"Dark\", \"Gold\", \"Iced Coffee\"]"}
+{"i":"9017","n":"Coffee Brewer Brew Temperature","d":"number","ds":1,"u":"°F","dc":"temperature","mn":0.0,"mx":255.0,"st":1.0,"p":"9001","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"9018","n":"Coffee Brewer Brew Cups","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"p":"9006","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"9019","n":"Coffee Brewer Descaling","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"901a","n":"Coffee Brewer Start Descale","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"901b","n":"Coffee Brewer Cancel Descale","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
