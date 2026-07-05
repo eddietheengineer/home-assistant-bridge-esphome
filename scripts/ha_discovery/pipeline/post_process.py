@@ -31,15 +31,10 @@ def apply_overrides(entries):
     * ``"0x7130"`` — applies to all fields of ERD 0x7130 (safe for single-field ERDs).
     * ``"0x3015:0"`` — applies only to the field at byte offset 0 of ERD 0x3015.
 
-    Values can be a flat dict of review keys, or use ``"fields"`` with
-    ``"field_offset"`` keys for multiple fields in one ERD::
-
-        "0x3015": {
-            "fields": {
-                0: {"unit_of_measurement": "gal/min", "scaling_factor": 10000},
-                2: {"ha_domain": "sensor"},
-            },
-        }
+    Note: auto_detect_scaling clears unit_of_measurement and scaling_factor
+    on non-numeric fields (enum, string). If you ever need to override a
+    non-numeric field, the override must be reapplied in post_process
+    (after auto_detect_scaling runs) to survive the cleanup.
 
     Returns the number of override values applied.
     """
@@ -121,22 +116,20 @@ def apply_overrides(entries):
         erd_id = entry.get("erd_id", "").lower()
         field_offset = entry.get("field_offset")
 
+        # Guard: field_offset must be int for offset-based matching.
+        # Non-int values (string, None) fall through to bare erd_id only.
+        if not isinstance(field_offset, int):
+            field_offset = None
+
         # Try exact key match first (erd_id:offset).
-        # Skip if offset is None to avoid constructing "0x3015:None" keys.
         if field_offset is not None:
             key = f"{erd_id}:{field_offset}"
             if key in OVERRIDES:
                 override = OVERRIDES[key]
-                if 'fields' in override:
-                    fields_override = override['fields'].get(field_offset)
-                    if fields_override is None:
-                        continue
-                else:
-                    fields_override = override
                 review = entry.setdefault("review", {})
-                for key, val in fields_override.items():
-                    if review.get(key) != val:
-                        review[key] = val
+                for k, val in override.items():
+                    if review.get(k) != val:
+                        review[k] = val
                         applied += 1
                 continue
 
@@ -144,19 +137,10 @@ def apply_overrides(entries):
         if erd_id not in OVERRIDES:
             continue
         override = OVERRIDES[erd_id]
-
-        # Support 'fields' dict keyed by field_offset (int)
-        if 'fields' in override:
-            fields_override = override['fields'].get(field_offset)
-            if fields_override is None:
-                continue
-        else:
-            fields_override = override
-
         review = entry.setdefault("review", {})
-        for key, val in fields_override.items():
-            if review.get(key) != val:
-                review[key] = val
+        for k, val in override.items():
+            if review.get(k) != val:
+                review[k] = val
                 applied += 1
 
     return applied
