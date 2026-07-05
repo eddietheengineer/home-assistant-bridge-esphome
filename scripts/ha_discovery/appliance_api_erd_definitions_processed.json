@@ -279921,9 +279921,9 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "h",
       "scaling_factor": null,
-      "state_class": null,
+      "state_class": "total",
       "paired_erd": null,
       "pair_role": null,
       "filtered": false,

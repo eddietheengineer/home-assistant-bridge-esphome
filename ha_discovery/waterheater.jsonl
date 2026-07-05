@@ -11,7 +11,7 @@
 {"i":"402a","n":"Water Heater Mixing Valve Tank Capacity","d":"select","ds":1,"vt":"{{ {'00': 'Normal', '01': 'High', '02': 'X-High'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Normal': '00', 'High': '01', 'X-High': '02'}[value] }}","o":"[\"Normal\", \"High\", \"X-High\"]"}
 {"i":"4041","n":"Tank size","d":"sensor","ds":1,"u":"gal","vt":"{{ value | int(base=16) }}"}
 {"i":"404c","n":"Anode depleted mass","d":"sensor","ds":8,"u":"g","dc":"weight","sc":"measurement","vt":"{{ ((value[0:8] | int(base=16)) * 2**32 + (value[8:16] | int(base=16))) / 1000000 | round(3) }}"}
-{"i":"404d","n":"Anode hours of service","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
+{"i":"404d","n":"Anode hours of service","d":"sensor","ds":4,"u":"h","sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"4056","n":"Diagnostic Failure counts - inverterFault","d":"sensor","ds":32,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"4056","n":"Diagnostic Failure counts - inverterHeartbeat","d":"sensor","ds":32,"vt":"{{ value[2:4] | int(base=16) }}","fi":"inverterheartbeat"}
 {"i":"4056","n":"Diagnostic Failure counts - fanSpeed","d":"sensor","ds":32,"vt":"{{ value[4:6] | int(base=16) }}","fi":"fanspeed"}

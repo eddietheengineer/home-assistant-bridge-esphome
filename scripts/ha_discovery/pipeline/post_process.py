@@ -99,6 +99,8 @@ def apply_overrides(entries):
         "0x400a": {"unit_of_measurement": "steps", "state_class": "measurement"},
         "0x400b": {"unit_of_measurement": "steps", "state_class": "measurement"},
         "0x400c": {"unit_of_measurement": "steps", "state_class": "measurement"},
+        # --- Anode hours of service: add hours unit ---
+        "0x404d": {"unit_of_measurement": "h", "state_class": "total"},
     }
 
     applied = 0
