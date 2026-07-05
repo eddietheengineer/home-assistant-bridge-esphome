@@ -11,7 +11,7 @@ Fixed-size ERD cache with inline/heap data storage. Stores the latest data for u
 | `erd_cache_init(self)` | Initialize the cache (zero all entries, reset counters, free any heap data). |
 | `erd_cache_destroy(self)` | Free any heap-allocated data, reset the cache. |
 | `erd_cache_update(self, erd, data, data_size)` | Update or insert ERD data. Returns `true` if `update_required` was set (or entry was new). Returns `false` if cache is full, data is unchanged, or ERD size changed (appliance lost). |
-| `erd_cache_set_throttle_rate_seconds(self, rate)` | Set minimum interval (seconds) between publishes per ERD. 0 = disabled. Range: 0–255. |
+| `erd_cache_set_throttle_rate_seconds(self, rate)` | Set minimum interval (seconds) between publishes per ERD. 1 = default. Range: 0–255 (0=disabled). |
 | `erd_cache_mark_published(self, entry)` | Mark an ERD entry as published; reloads the publish_cooldown timer. Static inline, zero overhead when rate limiting is disabled. |
 | `erd_cache_tick_cooldowns(self)` | Decrement publish_cooldown for all entries with `update_required = true`. Call once per second. Static inline, no-op when rate limiting is disabled. |
 | `erd_cache_get_next_updated(self, iterator)` | Returns the next entry with `update_required = true` and `publish_cooldown = 0`, then clears `update_required`. Skips entries still in cooldown, keeping `update_required = true` for retry. Caller provides an iterator (`uint16_t`) initialized to 0. Returns `NULL` when no more updated entries remain. |

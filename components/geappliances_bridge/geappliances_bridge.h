@@ -166,9 +166,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   BridgeMode mode_{BRIDGE_MODE_AUTO};
   uint32_t polling_interval_ms_{10000};
   bool appliance_api_parsing_{true};
-  bool generate_device_config_{false};
+  bool generate_device_config_{true};
   bool filter_config_topics_{true};
-  uint8_t throttle_rate_seconds_{0};
+  uint8_t throttle_rate_seconds_{1};
   uint32_t last_cooldown_tick_{0};  /* last time erd_cache_tick_cooldowns ran (ms) */
   // User-configured custom ERDs to poll in addition to the standard list.
   // Populated by add_custom_erd() calls generated from the YAML custom_erds option.
