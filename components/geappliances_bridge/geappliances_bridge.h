@@ -64,8 +64,7 @@ extern "C" {
 #include "geappliances_bridge_startup_hsm.h"
 #include "erd_poll_list_builder.h"
 
-// Forward declaration of the generated function
-std::string appliance_type_to_string(uint8_t appliance_type);
+#include "appliance_type_map.h"
 
 namespace esphome {
 namespace geappliances_bridge {

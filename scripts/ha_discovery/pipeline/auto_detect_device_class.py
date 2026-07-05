@@ -1,0 +1,297 @@
+#!/usr/bin/env python3
+"""Auto-detect device_class from field names and units.
+
+Uses keyword matching from ha_constants.py, unit-based inference,
+and exclusion rules to assign device_class. Fields that can't be
+confidently classified are left as None for AI review.
+
+Architecture: unit-based detection runs first (highest confidence),
+then keyword-based detection as fallback. This prevents keyword
+false positives from overriding strong unit signals.
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pipeline_utils import SCRIPT_DIR, REPO_ROOT, load_json
+# Import from ha_constants
+from ha_constants import (
+    DEVICE_CLASS_KEYWORDS,
+    DEVICE_CLASS_EXCLUSIONS,
+    UNIT_KEYWORD_MAP,
+    VALID_DEVICE_CLASSES,
+    SENSOR_NON_NUMERIC_DEVICE_CLASSES,
+)
+from auto_detect_ha_domain import PROTOCOL_MARKERS, BINARY_LABELS
+
+
+def _word_bound(name_lower, kw):
+    """Check if kw appears as a whole word (or at word boundary) in name_lower.
+
+    Treats underscores as word separators (replaces them with spaces) so that
+    'current_mA' matches 'current' and 'mA'.
+    """
+    normalized = name_lower.replace('_', ' ')
+    return bool(re.search(r'\b' + re.escape(kw) + r'\b', normalized))
+
+
+def _has_any(name_lower, kws):
+    """Check if any keyword appears as substring in name_lower."""
+    return any(kw in name_lower for kw in kws)
+
+
+def _check_exclusions(name_lower, dc):
+    """Check if name should be excluded for this device class.
+
+    Returns True if the field should be excluded (not matched).
+    Uses both standard exclusions from ha_constants and extra exclusions.
+    All exclusions use word-boundary matching where possible.
+    """
+    # Standard exclusions from ha_constants
+    standard = DEVICE_CLASS_EXCLUSIONS.get(dc, [])
+    for exc in standard:
+        if exc in name_lower:
+            return True
+
+    # Extra exclusions per device class
+    extra = {
+        'power': [
+            'power outage', 'powered', 'power/care', 'power consumption',
+            'power saving', 'power mode', 'power button',
+            'power-on', 'power diverter', 'power too high', 'power too low',
+            'run time', 'cumulative', 'output power',
+        ],
+        'energy': [
+            'save energy', 'energy usage update', 'energy usage minimum',
+            'energy mode', 'energy saving',
+        ],
+        'temperature': [
+            'version', 'revision', 'update period', 'step size',
+            'color temperature', 'two-temp cook time',
+        ],
+        'frequency': [
+            'feeding frequency', 'update frequency', 'polling frequency',
+        ],
+        'duration': [
+            'command count', 'command counts', 'count', 'number of',
+            'inter-byte', 'timeouts',
+        ],
+        'humidity': [
+            'update period',
+        ],
+        'speed': [
+            'run time',
+        ],
+        'volume': [
+            'audio volume', 'flow rate',
+        ],
+        'gas': [
+            'gas usage update', 'gas usage minimum',
+        ],
+        'water': [
+            'water usage update', 'water usage minimum',
+        ],
+        'pm25': [
+            'pm 1', 'pm 4', 'pm 10',
+        ],
+        'pressure': [
+            'water level',
+        ],
+    }
+
+    for exc in extra.get(dc, []):
+        if exc in name_lower:
+            return True
+
+    return False
+
+
+def infer_device_class(entry):
+    """Infer device_class from field name, type, and unit.
+
+    Returns (device_class, confidence) or (None, None).
+
+    Order: unit-based first (highest confidence), then keyword-based.
+    This prevents keyword false positives from overriding strong unit signals.
+    """
+    field_name = entry.get('field_name', '')
+    field_type = entry.get('field_type', '')
+    unit = entry.get('review', {}).get('unit_of_measurement')
+    field_bits = entry.get('field_bits')
+    name_lower = field_name.lower()
+
+    # Skip bit-fields (they're boolean indicators)
+    if field_bits is not None:
+        return None, None
+
+    # --- Enum detection (before type check, as enum fields have field_type='enum') ---
+    if entry.get('field_values') is not None:
+        # Multi-value enums (3+ functional values) -> enum
+        # Descriptive 2-value enums (not on/off) -> enum
+        # Binary enums (on/off) -> no device_class (handled by binary_sensor/switch)
+        values = entry.get('field_values', {})
+        functional = {v for v in values.values() if v not in PROTOCOL_MARKERS}
+        if len(functional) >= 3:
+            return 'enum', 0.9
+        if len(functional) == 2:
+            labels = {v.lower() for v in functional}
+            if not labels.issubset(BINARY_LABELS):
+                return 'enum', 0.85
+
+    # Skip non-numeric types (enum, string, bool, raw)
+    if field_type not in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32'):
+        return None, None
+
+    # --- Unit-based detection (highest confidence, runs first) ---
+    if unit:
+        unit_to_dc = {
+            '°F': 'temperature',
+            '°C': 'temperature',
+            'K': 'temperature',
+            'deg F': 'temperature',
+            'deg C': 'temperature',
+            'V': 'voltage',
+            'A': 'current',
+            'mA': 'current',
+            'W': 'power',
+            'kWh': 'energy',
+            'Wh': 'energy',
+            'lb': 'weight',
+            'g': 'weight',
+            'Hz': 'frequency',
+            'Pa': 'pressure',
+            'inH₂O': 'pressure',
+            'ft³': 'gas',
+        }
+        dc = unit_to_dc.get(unit)
+        if dc:
+            # Unit-based detection still checks exclusions
+            if _check_exclusions(name_lower, dc):
+                return None, None
+            return dc, 0.95
+
+    # --- Keyword-based detection ---
+    for dc, keywords in DEVICE_CLASS_KEYWORDS.items():
+        # Never assign device_class='duration' (AGENTS.md rule)
+        if dc == 'duration':
+            continue
+        for kw in keywords:
+            # Skip very short keywords that match inside unrelated words
+            if len(kw) <= 2:
+                continue
+
+            # Use word-boundary matching for short-ish keywords (3-7 chars)
+            # to avoid 'temp' in 'attempts', 'timeout' in 'timeouts', etc.
+            if len(kw) <= 7:
+                if not _word_bound(name_lower, kw):
+                    continue
+            else:
+                # Longer keywords use substring matching
+                if kw not in name_lower:
+                    continue
+
+            # Check exclusions
+            if _check_exclusions(name_lower, dc):
+                continue
+
+            return dc, 0.8
+    # --- Extra keyword categories not in ha_constants ---
+    extra_keywords = {
+        'gas': ['gas'],
+        'water': ['water usage'],
+    }
+    for dc, keywords in extra_keywords.items():
+        if dc == 'duration':
+            continue
+        for kw in keywords:
+            if len(kw) <= 2:
+                continue
+            if len(kw) <= 7:
+                if not _word_bound(name_lower, kw):
+                    continue
+            else:
+                if kw not in name_lower:
+                    continue
+            if _check_exclusions(name_lower, dc):
+                continue
+            return dc, 0.8
+
+    return None, None
+
+
+def apply_detection(entries):
+    """Walk all entries, detect device_class, and overwrite review field.
+
+    Only overwrites device_class when a new value is detected, preserving
+    manually assigned device_class values not inferred by the detector.
+    """
+    total_checked = 0
+    total_matched = 0
+    total_applied = 0
+
+    for entry in entries:
+        field_type = entry.get('field_type', '')
+        # Process numeric types and enum types (enum needs device_class='enum' detection)
+        if field_type not in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32', 'enum'):
+            continue
+
+        total_checked += 1
+        review = entry.setdefault('review', {})
+
+        dc, confidence = infer_device_class(entry)
+        if dc is None:
+            continue
+
+        # Only write when not already set, preserving manual overrides.
+        if review.get('device_class') is not None:
+            continue
+
+        total_matched += 1
+        review['device_class'] = dc
+        review['_dc_confidence'] = confidence
+        total_applied += 1
+
+    return total_checked, total_matched, total_applied
+
+
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Auto-detect device_class from field names and units.'
+    )
+    parser.add_argument(
+        '--input',
+        default=os.path.join(SCRIPT_DIR, '..', 'appliance_api_erd_definitions_processed.json'),
+        help='Input processed JSON file',
+    )
+    parser.add_argument(
+        '--output',
+        default=None,
+        help='Output processed JSON file (default: overwrite input)',
+    )
+    args = parser.parse_args()
+
+    entries = load_json(args.input)
+    checked, matched, applied = apply_detection(entries)
+
+    print(f"Checked {checked} numeric fields")
+    print(f"Matched {matched} fields with detectable device_class")
+    print(f"Applied {applied} fields")
+
+    if args.output:
+        with open(args.output, 'w', encoding='utf-8') as f:
+            json.dump(entries, f, indent=2, ensure_ascii=False)
+        print(f"Output: {args.output}")
+    else:
+        with open(args.input, 'w', encoding='utf-8') as f:
+            json.dump(entries, f, indent=2, ensure_ascii=False)
+        print(f"Output: {args.input}")
+
+
+if __name__ == '__main__':
+    main()

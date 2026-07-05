@@ -11,8 +11,8 @@
  * Cleanup is handled by the embedded ha_discovery_cleanup_t module.
  *
  * All buffers are pre-allocated — no heap allocation during processing.
- * Peak memory: payload buffer (~8 KB) + decompress buffer (~14 KB) +
- * line buffer (~14 KB) + sorted ERD array (~1.3 KB).
+ * Peak memory: payload buffer (~8 KB) + decompress buffer (18 KB) +
+ * line buffer (18 KB) + sorted ERD array (~1.3 KB).
  */
 
 #ifndef ha_discovery_manager_h
@@ -50,11 +50,12 @@ typedef enum {
 #define HA_DISCOVERY_MAX_ERDS 645
 
 
-/* Decompression buffer size per chunk (max single line is ~7.4KB). */
-#define HA_DISCOVERY_DECOMP_BUF_SIZE 8192
+/* Decompression buffer size per chunk. Must be >= max decompressed chunk
+   size (range category has 17770 bytes). */
+#define HA_DISCOVERY_DECOMP_BUF_SIZE 18432
 
-/* Line buffer size for JSONL parsing (matches decomp buffer). */
-#define HA_DISCOVERY_LINE_BUF_SIZE 8192
+/* Line parsing buffer size (matches decomp buffer). */
+#define HA_DISCOVERY_LINE_BUF_SIZE 18432
 
 /* Topic buffer size for HA discovery topics (must fit worst-case topic + null). */
 #define HA_DISCOVERY_TOPIC_BUF_SIZE 192
@@ -86,9 +87,8 @@ static inline int ha_domain_to_index(const char* str, size_t len) {
 /*!
  * @brief Home Assistant MQTT Discovery manager.
  *
- * All buffers are pre-allocated — no heap allocation during processing.
- * Peak memory: payload buffer (~16 KB) + decompress buffer (~16 KB) +
- * line buffer (~16 KB) + sorted ERD array (~1.3 KB).
+ * Peak memory: payload buffer (~8 KB) + decompress buffer (~18 KB) +
+ * line buffer (~18 KB) + sorted ERD array (~1.3 KB).
  */
 typedef struct {
   erd_cache_t* cache;              // Shared ERD cache (owned by GeappliancesBridge)
@@ -112,9 +112,8 @@ typedef struct {
   uint16_t sorted_erds[HA_DISCOVERY_MAX_ERDS];
   uint16_t sorted_erds_count;
 
-  /* Decompression state. */
   tinfl_decompressor decomp_state;
-  /* Decompression buffer for JSONL chunks (14KB). */
+  /* Decompression buffer for JSONL chunks (18KB). */
   uint8_t decomp_buf[HA_DISCOVERY_DECOMP_BUF_SIZE];
 
   /* Line parsing buffer. */

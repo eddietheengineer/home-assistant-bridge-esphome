@@ -12,8 +12,7 @@
 #include <cstring>
 #include <inttypes.h>
 
-// Forward declaration (generated from appliance API data)
-std::string appliance_type_to_string(uint8_t appliance_type);
+#include "appliance_type_map.h"
 
 namespace esphome {
 namespace geappliances_bridge {

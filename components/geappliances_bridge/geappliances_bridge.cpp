@@ -8,6 +8,8 @@
 #ifdef USE_ESP32
 #include "esp_system.h"
 #include "esp_task_wdt.h"
+#elif defined(USE_ESP_IDF_STUBS)
+#include "esp-idf/esp_task_wdt.h"
 #endif
 
 GEA_TAG(TAG) = "geappliances_bridge";
@@ -294,14 +296,24 @@ void GeappliancesBridge::loop() {
     ha_discovery_manager_run(&this->ha_discovery_manager_);
   }
 
-  /* If cleanup-only finished, restart the device so normal boot republishes. */
+  /* If cleanup-only finished, restart the device so normal discovery republishes. */
   if (this->discovery_refresh_in_progress_) {
 #ifdef USE_ESP_IDF
     ha_discovery_cleanup_run(&this->ha_discovery_manager_.cleanup);
     if (ha_discovery_cleanup_is_done(&this->ha_discovery_manager_.cleanup)) {
       this->discovery_refresh_in_progress_ = false;
       ESP_LOGI(TAG, "HA discovery cleanup complete, restarting device...");
-      // Allow final retained-clear publishes to transmit before reboot (fixes C5).
+
+      /* Destroy the cleanup module before reboot to unsubscribe the wildcard
+       * topic and zero the callback arg. The ESP-IDF MQTT event queue may have
+       * dropped the unsubscribe ack (seen as 'Dropped N inbound MQTT events'),
+       * leaving the subscription active. If the callback fires after teardown
+       * zeroes the struct, it corrupts heap metadata and crashes the idle task. */
+      ha_discovery_cleanup_destroy(&this->ha_discovery_manager_.cleanup);
+
+      // Feed the watchdog before blocking — the 500 ms delay exceeds the
+      // default TWDT timeout (30 ms) and would trigger a reset.
+      esp_task_wdt_reset();
       vTaskDelay(pdMS_TO_TICKS(500));
       esphome::App.reboot();
     }

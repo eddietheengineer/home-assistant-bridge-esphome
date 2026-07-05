@@ -37,11 +37,18 @@ The script:
 3. Generates C arrays for each category with sorted ERD values
 4. Creates the appliance type to ERD list translation table
 5. Writes the complete header file to `components/geappliances_bridge/erd_lists.h`
-6. Calculates the maximum possible polling list size (common ERDs + energy ERDs + largest appliance-specific ERD list) and writes `#define POLLING_LIST_MAX_SIZE` into `components/geappliances_bridge/erd_lists.h`
+6. Calculates the maximum possible polling list size and writes `#define POLLING_LIST_MAX_SIZE`
 
 ### Note
 
-The generated `erd_lists.h` file should not be manually edited. It is regenerated automatically during the build process when:
-- The ERD definitions JSON file changes
-- The generation script changes
-- The file doesn't exist
+The generated `erd_lists.h` file should not be manually edited. It is regenerated automatically during the build process.
+
+## ha_discovery/
+
+Pipeline for generating Home Assistant MQTT Discovery JSONL files and compressing them into `ha_discovery_data.h`. See [scripts/ha_discovery/README.md](ha_discovery/README.md) for details.
+
+Run the full pipeline manually:
+
+```bash
+python3 scripts/ha_discovery/run_pipeline.py
+```

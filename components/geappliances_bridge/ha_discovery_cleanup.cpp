@@ -64,6 +64,13 @@ GEA_TAG(TAG) = "ha_cleanup";
  * remaining in the queue (0 means all flushed). */
 CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
 {
+    if (self == NULL) return 0;
+    if (self->mqtt_client == NULL) return self->queue_count;
+
+    /* topic[] is 256 bytes. Topics from the wildcard subscription are bounded
+     * by HA_CLEANUP_TOPIC_BUF_SIZE entries in topic_buf. Each topic is at most
+     * ~200 bytes (homeassistant/{domain}/{device_id}/{entity_id}/config).
+     * strncpy truncates safely. Long-term: validate topic length before copy. */
     char topic[256];
     uint16_t consumed;
     uint16_t remaining;
@@ -79,6 +86,23 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
      * pointer into the buffer. */
     strncpy(topic, self->topic_buf, sizeof(topic) - 1);
     topic[sizeof(topic) - 1] = '\0';
+
+    /* Detect truncation: if the topic was longer than our stack buffer,
+     * skip it to avoid publishing to a malformed topic. */
+    if (strlen(topic) != strlen(self->topic_buf)) {
+        ESP_LOGW(TAG, "Topic truncated during flush, skipping");
+        consumed = (uint16_t)(strlen(self->topic_buf) + 1);
+        if (consumed > self->queue_write_pos) {
+            consumed = self->queue_write_pos;
+        }
+        memmove(self->topic_buf, self->topic_buf + consumed,
+                self->queue_write_pos - consumed);
+        self->queue_write_pos -= consumed;
+        self->queue_count--;
+        remaining = self->queue_count;
+        vPortExitCritical();
+        return remaining;
+    }
     consumed = (uint16_t)(strlen(self->topic_buf) + 1);
 
     /* Safety clamp: prevent underflow if buffer is corrupted. */
@@ -109,11 +133,20 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
 /* Callback for homeassistant/+/{device_id}/# wildcard subscription during cleanup.
  * Stores the full topic string in the buffer for republishing from the main loop.
  * Keeps the callback short — no outbound publish call — so the MQTT task's
- * inbound queue drains fast and retained message bursts don't overflow. */
+ * inbound queue drains fast and retained message bursts don't overflow.
+ *
+ * THREAD SAFETY: This callback runs in the ESP-IDF MQTT task context (a separate
+ * FreeRTOS task). Shared state (topic_buf, queue_write_pos, queue_count) is
+ * protected by vPortEnterCritical()/vPortExitCritical(). This is safe on
+ * single-core ESP32-C3 where critical sections disable interrupts. On dual-core
+ * ESP32, a mutex would be needed instead. The code assumes single-core. */
 CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     (void)payload;
     ha_discovery_cleanup_t* self = (ha_discovery_cleanup_t*)arg;
+
+    /* Guard against callback firing after destroy (memset zeroes struct). */
+    if (self == NULL || self->get_time_ms == NULL) return;
 
     /* Only remove config topics. */
     size_t topic_len = strlen(topic);
@@ -123,7 +156,12 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     /* If the payload is empty, it's our own echo from a previous clear — skip. */
     if (payload_len == 0) return;
 
-    /* Store the full topic string: [topic:variable][null:1] */
+    /* Guard against oversized topics: if topic_len >= HA_CLEANUP_TOPIC_BUF_SIZE,
+     * the uint16_t cast of (topic_len + 1) could overflow to 0. */
+    if (topic_len >= HA_CLEANUP_TOPIC_BUF_SIZE) {
+        self->dropped_count++;
+        return;
+    }
     uint16_t needed = (uint16_t)(topic_len + 1);
 
     vPortEnterCritical();
@@ -198,6 +236,7 @@ void ha_discovery_cleanup_start(ha_discovery_cleanup_t* self)
 
 void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
 {
+    if (self == NULL) return;
     if (self->mqtt_client == NULL) {
         /* No MQTT client — skip cleanup, mark done. */
         self->state = ha_cleanup_state_done;
@@ -208,6 +247,12 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
         /* No device_id — can't build subscription topic, mark done. */
         self->state = ha_cleanup_state_done;
         ESP_LOGW(TAG, "Skipping cleanup (no device_id)");
+        return;
+    }
+    if (self->get_time_ms == NULL) {
+        /* No time function — can't track drain timers, mark done. */
+        self->state = ha_cleanup_state_done;
+        ESP_LOGW(TAG, "Skipping cleanup (no get_time_ms)");
         return;
     }
 
@@ -328,26 +373,37 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
 
 void ha_discovery_cleanup_destroy(ha_discovery_cleanup_t* self)
 {
-    if (self->device_id == NULL) {
-        memset(self, 0, sizeof(*self));
-        return;
-    }
+    if (self == NULL) return;
+
+    /* Null get_time_ms first to poison the callback, preventing it from
+     * firing on a partially-destroyed struct. */
+    self->get_time_ms = NULL;
+
+    /* Unsubscribe if we ever subscribed, regardless of whether device_id
+     * is set. device_id == NULL only means "never configured", but a
+     * double-destroy could have already zeroed it. */
     if (self->subscribed && self->mqtt_client != NULL) {
-        char sub_topic[128];
-        snprintf(sub_topic, sizeof(sub_topic),
-            "homeassistant/+/%s/#", self->device_id);
-        mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
+        i_mqtt_client_t* client = self->mqtt_client;
+        self->mqtt_client = NULL;
+        if (self->device_id != NULL) {
+            char sub_topic[128];
+            snprintf(sub_topic, sizeof(sub_topic),
+                "homeassistant/+/%s/#", self->device_id);
+            mqtt_client_unsubscribe(client, sub_topic);
+        }
         self->subscribed = false;
     }
     memset(self, 0, sizeof(*self));
 }
 ha_cleanup_state_t ha_discovery_cleanup_get_state(ha_discovery_cleanup_t* self)
 {
+    if (self == NULL) return ha_cleanup_state_done;
     return self->state;
 }
 
 bool ha_discovery_cleanup_is_done(ha_discovery_cleanup_t* self)
 {
+    if (self == NULL) return true;
     return self->state == ha_cleanup_state_done;
 }
 

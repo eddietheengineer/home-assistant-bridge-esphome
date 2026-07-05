@@ -1,0 +1,84 @@
+name: Regenerate Discovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      submodule_commit:
+        description: 'Commit hash for lib/public-appliance-api-documentation submodule'
+        required: true
+        type: string
+      base_branch:
+        description: 'Base branch for the PR'
+        required: true
+        default: 'develop'
+        type: string
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Validate submodule commit input
+      run: |
+        if ! [[ "${{ github.event.inputs.submodule_commit }}" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "ERROR: submodule_commit must be a 40-character hexadecimal SHA"
+          exit 1
+        fi
+
+    - name: Update submodule to specified commit
+      run: |
+        cd lib/public-appliance-api-documentation
+        git fetch origin
+        git checkout ${{ github.event.inputs.submodule_commit }}
+        cd ../..
+
+    - name: Run pipeline
+      run: |
+        python3 scripts/ha_discovery/run_pipeline.py
+
+    - name: Commit changes to feature branch
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        BRANCH="regenerate-discovery/${{ github.event.inputs.submodule_commit }}"
+        git checkout -b "$BRANCH"
+        git add -A
+        git commit -m "regenerate: update discovery from public-appliance-api-documentation ${{ github.event.inputs.submodule_commit }}" || echo "No changes to commit"
+        git push origin "$BRANCH"
+
+    - name: Create or update pull request
+      run: |
+        BRANCH="regenerate-discovery/${{ github.event.inputs.submodule_commit }}"
+        BODY="Auto-generated PR updating HA discovery files from \`lib/public-appliance-api-documentation\` commit \`${{ github.event.inputs.submodule_commit }}\`."
+
+        # Check if a PR already exists for this branch
+        EXISTING_PR=$(gh pr list --head "$BRANCH" --base "${{ github.event.inputs.base_branch }}" --json number --jq '.[0].number')
+
+        if [ -n "$EXISTING_PR" ]; then
+          gh pr edit "$EXISTING_PR" --body "$BODY"
+          echo "Updated existing PR #$EXISTING_PR"
+        else
+          gh pr create \
+            --base "${{ github.event.inputs.base_branch }}" \
+            --head "$BRANCH" \
+            --title "regenerate: update discovery from public-appliance-api-documentation" \
+            --body "$BODY"
+          echo "Created new PR"
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

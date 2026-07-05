@@ -13,7 +13,7 @@ import zlib
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent / "ha_discovery" / "generators"))
 import compress_ha_discovery as compress
 
 
@@ -260,9 +260,9 @@ class TestCompressEdgeCases(unittest.TestCase):
         self.assertEqual(jsonl, result)
 
     def test_all_real_chunks_fit_in_decomp_buffer(self):
-        """Verify all actual JSONL chunks decompress to <= HA_DISCOVERY_DECOMP_BUF_SIZE (8192)."""
+        """Verify all actual JSONL chunks decompress to <= HA_DISCOVERY_DECOMP_BUF_SIZE (18432)."""
         import glob as glob_mod
-        DECOMP_BUF_SIZE = 8192
+        DECOMP_BUF_SIZE = 18432
         jsonl_dir = Path(__file__).parent.parent / "ha_discovery"
         for jsonl_path in sorted(jsonl_dir.glob("*.jsonl")):
             raw = jsonl_path.read_bytes()
