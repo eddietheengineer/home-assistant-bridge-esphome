@@ -11,8 +11,8 @@
  * Cleanup is handled by the embedded ha_discovery_cleanup_t module.
  *
  * All buffers are pre-allocated — no heap allocation during processing.
- * Peak memory: payload buffer (~8 KB) + decompress buffer (~14 KB) +
- * line buffer (~14 KB) + sorted ERD array (~1.3 KB).
+ * Peak memory: payload buffer (~8 KB) + decompress buffer (18 KB) +
+ * line buffer (18 KB) + sorted ERD array (~1.3 KB).
  */
 
 #ifndef ha_discovery_manager_h

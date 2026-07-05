@@ -134,10 +134,6 @@ UNIT_MAP = {
     'fahrenheit x 10': ('°F', 10),
     'celsius x 10': ('°C', 10),
 
-    # Scaling-only parentheticals — unit must be inferred from field name context
-    'x10': (None, 10),
-    'x100': (None, 100),
-    'speed * 10': (None, 10),
 }
 PAREN_GROUPS = re.compile(r'\(([^()]+(?:\([^()]*\)[^()]*)*)\)')
 

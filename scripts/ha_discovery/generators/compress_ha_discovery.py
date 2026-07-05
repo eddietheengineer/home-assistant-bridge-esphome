@@ -28,7 +28,7 @@ CATEGORIES = [
     "energy",
 ]
 
-# Target decompressed chunk size (must fit in decompress_buf: 8KB).
+# Target decompressed chunk size (must fit in decompress_buf: 18KB).
 CHUNK_TARGET_DECOMPRESSED = 4000
 
 
