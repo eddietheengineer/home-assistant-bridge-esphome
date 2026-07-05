@@ -333,6 +333,314 @@ class TestApplyPostProcessing(unittest.TestCase):
         self.assertEqual(entries[0]["review"]["scaling_factor"], 1)
         self.assertEqual(fixed, 0)
 
+    def test_scaling_factor_none_not_touched(self):
+        """Rule 4: scaling_factor=None is not changed to 1."""
+        entries = [self._entry("sensor", scaling_factor=None)]
+        _, _, _, fixed = apply_post_processing(entries)
+        self.assertIsNone(entries[0]["review"]["scaling_factor"])
+        self.assertEqual(fixed, 0)
+
+
+class TestFieldNameOverride(unittest.TestCase):
+    """Test field_name override application in apply_overrides and _build_erds_from_flat_list."""
+
+    def test_field_name_override_in_apply_overrides(self):
+        """apply_overrides correctly applies field_name to the review dict."""
+        overrides = {
+            "0x3015:0": {"field_name": "Inlet Flow Rate"},
+        }
+        entries = [
+            {
+                "erd_id": "0x3015",
+                "field_offset": 0,
+                "field_name": "Original Name",
+                "review": {},
+            }
+        ]
+        applied = apply_overrides(entries, overrides)
+        self.assertEqual(entries[0]["review"]["field_name"], "Inlet Flow Rate")
+        self.assertEqual(applied, 1)
+
+    def test_field_name_propagated_in_build_erds(self):
+        """_build_erds_from_flat_list propagates field_name override to field['name']."""
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent / "ha_discovery" / "generators"))
+        from generate_ha_discovery import _build_erds_from_flat_list
+
+        flat = [
+            {
+                "erd_id": "0x3015",
+                "erd_name": "Inlet Flow",
+                "erd_description": "",
+                "erd_operations": ["read"],
+                "field_name": "Original Name",
+                "field_type": "u16",
+                "field_offset": 0,
+                "field_size": 2,
+                "review": {"field_name": "Inlet Flow Rate"},
+            }
+        ]
+        erds = _build_erds_from_flat_list(flat)
+        self.assertEqual(erds[0]["data"][0]["name"], "Inlet Flow Rate")
+
+    def test_field_name_override_not_present_uses_original(self):
+        """When no field_name override, field keeps its original name."""
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent / "ha_discovery" / "generators"))
+        from generate_ha_discovery import _build_erds_from_flat_list
+
+        flat = [
+            {
+                "erd_id": "0x3015",
+                "erd_name": "Inlet Flow",
+                "erd_description": "",
+                "erd_operations": ["read"],
+                "field_name": "Original Name",
+                "field_type": "u16",
+                "field_offset": 0,
+                "field_size": 2,
+                "review": {},
+            }
+        ]
+        erds = _build_erds_from_flat_list(flat)
+        self.assertEqual(erds[0]["data"][0]["name"], "Original Name")
+
+
+class TestWordBound(unittest.TestCase):
+    """Test _word_bound edge cases for problem keyword detection."""
+
+    def _import_word_bound(self):
+        """Import _word_bound from auto_detect_device_class."""
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent / "ha_discovery" / "pipeline"))
+        from auto_detect_device_class import _word_bound
+        return _word_bound
+
+    def test_underscore_matches_as_word_boundary(self):
+        """'fault_clogged' matches 'fault' (underscore → space)."""
+        wb = self._import_word_bound()
+        self.assertTrue(wb('fault_clogged', 'fault'))
+
+    def test_underscore_no_false_match(self):
+        """'default_temperature' does NOT match 'fault'."""
+        wb = self._import_word_bound()
+        self.assertFalse(wb('default_temperature', 'fault'))
+
+    def test_hyphen_matches_as_word_boundary(self):
+        """'fault-code' matches 'fault' (hyphen is word boundary)."""
+        wb = self._import_word_bound()
+        self.assertTrue(wb('fault-code', 'fault'))
+
+    def test_hyphen_no_false_match(self):
+        """'default-theme' does NOT match 'fault'."""
+        wb = self._import_word_bound()
+        self.assertFalse(wb('default-theme', 'fault'))
+
+    def test_camel_case_no_match(self):
+        """'FaultClogged' does NOT match 'fault' (camelCase — no word boundary)."""
+        wb = self._import_word_bound()
+        # 'FaultClogged' → normalized 'faultclogged' (already lowered)
+        # \bfault\b does not match 'faultclogged' because 'c' is not a word boundary
+        self.assertFalse(wb('FaultClogged', 'fault'))
+
+    def test_exact_match(self):
+        """Exact keyword match works."""
+        wb = self._import_word_bound()
+        self.assertTrue(wb('fault', 'fault'))
+
+    def test_word_at_end(self):
+        """Keyword at the end of the string matches."""
+        wb = self._import_word_bound()
+        self.assertTrue(wb('clogged_fault', 'fault'))
+
+    def test_word_at_start(self):
+        """Keyword at the start of the string matches."""
+        wb = self._import_word_bound()
+        self.assertTrue(wb('fault_code', 'fault'))
+
+    def test_partial_word_no_match(self):
+        """Partial word embedded in another word does not match."""
+        wb = self._import_word_bound()
+        self.assertFalse(wb('default_faulty', 'fault'))
+
+
+class TestStaleDeviceClassClearing(unittest.TestCase):
+    """Test stale device_class clearing in apply_detection."""
+
+    def _import_apply_detection(self):
+        """Import apply_detection from auto_detect_device_class."""
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent / "ha_discovery" / "pipeline"))
+        from auto_detect_device_class import apply_detection
+        return apply_detection
+
+    def test_stale_device_class_cleared_when_no_match(self):
+        """apply_detection clears device_class=None when infer_device_class returns None
+        for an entry that previously had a value."""
+        ad = self._import_apply_detection()
+        entries = [
+            {
+                "field_name": "Some Random Field",
+                "field_type": "u16",
+                "field_bits": None,
+                "review": {"device_class": "temperature"},
+            }
+        ]
+        ad(entries)
+        # infer_device_class returns None for this generic name,
+        # so the stale device_class should be cleared to None.
+        self.assertIsNone(entries[0]["review"]["device_class"])
+
+    def test_stale_device_class_cleared_for_bool_field(self):
+        """Stale device_class is cleared for bool fields too."""
+        ad = self._import_apply_detection()
+        entries = [
+            {
+                "field_name": "Random Bool",
+                "field_type": "bool",
+                "field_bits": None,
+                "review": {"device_class": "problem"},
+            }
+        ]
+        ad(entries)
+        self.assertIsNone(entries[0]["review"]["device_class"])
+
+    def test_device_class_not_cleared_when_already_none(self):
+        """No-op when device_class is already None and infer returns None."""
+        ad = self._import_apply_detection()
+        entries = [
+            {
+                "field_name": "Some Random Field",
+                "field_type": "u16",
+                "field_bits": None,
+                "review": {"device_class": None},
+            }
+        ]
+        ad(entries)
+        self.assertIsNone(entries[0]["review"]["device_class"])
+
+    def test_device_class_set_when_matched(self):
+        """device_class is set when infer_device_class detects a match."""
+        ad = self._import_apply_detection()
+        entries = [
+            {
+                "field_name": "CLC Temperature",
+                "field_type": "u16",
+                "field_bits": None,
+                "review": {},
+            }
+        ]
+        ad(entries)
+        self.assertEqual(entries[0]["review"]["device_class"], "temperature")
+
+    def test_non_eligible_field_type_skipped(self):
+        """String field type is skipped by apply_detection."""
+        ad = self._import_apply_detection()
+        entries = [
+            {
+                "field_name": "Fault Status",
+                "field_type": "string",
+                "field_bits": None,
+                "review": {"device_class": "problem"},
+            }
+        ]
+        ad(entries)
+        # String fields are skipped; stale value is preserved.
+        self.assertEqual(entries[0]["review"]["device_class"], "problem")
+
+
+class TestPerFieldPairingOverrides(unittest.TestCase):
+    """Test per-field pairing overrides (paired_erd, pair_role) in apply_overrides."""
+
+    def test_paired_erd_override_applied(self):
+        """apply_overrides correctly applies paired_erd to field-level review dicts."""
+        overrides = {
+            "0x770d": {"paired_erd": "0x7708", "pair_role": "request"},
+        }
+        entries = [
+            {
+                "erd_id": "0x770d",
+                "field_offset": 0,
+                "field_name": "Setpoint Request",
+                "field_type": "u16",
+                "review": {},
+            }
+        ]
+        applied = apply_overrides(entries, overrides)
+        self.assertEqual(entries[0]["review"]["paired_erd"], "0x7708")
+        self.assertEqual(entries[0]["review"]["pair_role"], "request")
+        self.assertEqual(applied, 2)
+
+    def test_per_field_pair_role_override_with_offset_key(self):
+        """Per-field pairing override using erd_id:offset key."""
+        overrides = {
+            "0x7708:0": {"paired_erd": "0x770d", "pair_role": "status"},
+            "0x7708:2": {"paired_erd": "0x770f", "pair_role": "status"},
+        }
+        entries = [
+            {
+                "erd_id": "0x7708",
+                "field_offset": 0,
+                "field_name": "Setpoint 1",
+                "field_type": "u16",
+                "review": {},
+            },
+            {
+                "erd_id": "0x7708",
+                "field_offset": 2,
+                "field_name": "Setpoint 2",
+                "field_type": "u16",
+                "review": {},
+            },
+        ]
+        applied = apply_overrides(entries, overrides)
+        self.assertEqual(entries[0]["review"]["paired_erd"], "0x770d")
+        self.assertEqual(entries[0]["review"]["pair_role"], "status")
+        self.assertEqual(entries[1]["review"]["paired_erd"], "0x770f")
+        self.assertEqual(entries[1]["review"]["pair_role"], "status")
+        self.assertEqual(applied, 4)
+
+    def test_per_field_pairing_propagated_in_build_erds(self):
+        """_build_erds_from_flat_list propagates paired_erd and pair_role to field dicts."""
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent / "ha_discovery" / "generators"))
+        from generate_ha_discovery import _build_erds_from_flat_list
+
+        flat = [
+            {
+                "erd_id": "0x7708",
+                "erd_name": "Allowed Setpoint",
+                "erd_description": "",
+                "erd_operations": ["read"],
+                "field_name": "Setpoint 1",
+                "field_type": "u16",
+                "field_offset": 0,
+                "field_size": 2,
+                "review": {"paired_erd": "0x770d", "pair_role": "status"},
+            },
+            {
+                "erd_id": "0x7708",
+                "erd_name": "Allowed Setpoint",
+                "erd_description": "",
+                "erd_operations": ["read"],
+                "field_name": "Setpoint 2",
+                "field_type": "u16",
+                "field_offset": 2,
+                "field_size": 2,
+                "review": {"paired_erd": "0x770f", "pair_role": "status"},
+            },
+        ]
+        erds = _build_erds_from_flat_list(flat)
+        self.assertEqual(erds[0]["data"][0]["paired_erd"], "0x770d")
+        self.assertEqual(erds[0]["data"][0]["pair_role"], "status")
+        self.assertEqual(erds[0]["data"][1]["paired_erd"], "0x770f")
+        self.assertEqual(erds[0]["data"][1]["pair_role"], "status")
+
 
 if __name__ == "__main__":
     unittest.main()

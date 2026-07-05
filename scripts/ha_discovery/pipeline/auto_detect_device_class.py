@@ -5,6 +5,10 @@ Uses keyword matching from ha_constants.py, unit-based inference,
 and exclusion rules to assign device_class. Fields that can't be
 confidently classified are left as None for AI review.
 
+Stale values from previous runs are cleared when the detector no longer
+finds a match (e.g. keyword logic changed), ensuring the processed
+JSON stays in sync with the current detection rules.
+
 Architecture: unit-based detection runs first (highest confidence),
 then keyword-based detection as fallback. This prevents keyword
 false positives from overriding strong unit signals.

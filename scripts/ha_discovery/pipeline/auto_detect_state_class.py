@@ -6,7 +6,10 @@ state_class is only meaningful for sensor domain entities.
 - 'total': cumulative counters that can go up and down (energy, water, gas)
 - 'total_increasing': counters that only increase (cycle counts, runtime)
 
-This script only assigns state_class for fields that already have a device_class.
+This script assigns state_class for fields with a device_class (using
+keyword and device_class-based inference) and also for fields without
+a device_class when the field name suggests a measurable quantity
+(counter, time, level, position).
 """
 
 import argparse

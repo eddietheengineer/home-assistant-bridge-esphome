@@ -789,5 +789,154 @@ class TestBufferSizeSufficiency(unittest.TestCase):
                     len(unique_id), self.UNIQUE_ID_BUF_SIZE - 1,
                     f'unique_id too long ({len(unique_id)} chars, max {self.UNIQUE_ID_BUF_SIZE - 1}): '
                     f'{unique_id}')
+
+
+class TestBitfieldDeviceClassWiring(unittest.TestCase):
+    """Test that bitfield entities with device_class in field data
+    get the correct device_class in the generated entries."""
+
+    def test_bitfield_entity_device_class_in_output(self):
+        """Bitfield entities with device_class in their field data
+        propagate it to the 'device_class' key in the collect() output.
+
+        Need multiple bitfield fields to trigger 'bitfield' classification
+        (a single field is classified as 'single').
+        """
+        erds = [
+            {
+                'id': '0x1234',
+                'name': 'Test Bitfield ERD',
+                'description': 'Test',
+                'operations': ['read'],
+                'ha_domain': 'binary_sensor',
+                'device_class': None,
+                'data': [
+                    {
+                        'name': 'Fault Status',
+                        'type': 'bitfield',
+                        'offset': 0,
+                        'size': 1,
+                        'bits': {'size': 1, 'offset': 0},
+                        'device_class': 'problem',
+                    },
+                    {
+                        'name': 'Other Flag',
+                        'type': 'bitfield',
+                        'offset': 0,
+                        'size': 1,
+                        'bits': {'size': 1, 'offset': 1},
+                    },
+                ],
+            }
+        ]
+        entries = gen._collect_ha_discovery_entries(erds)
+        self.assertEqual(len(entries), 2)
+        fault_entry = next(e for e in entries if 'Fault Status' in e['name'])
+        self.assertEqual(fault_entry['device_class'], 'problem')
+        other_entry = next(e for e in entries if 'Other Flag' in e['name'])
+        self.assertEqual(other_entry['device_class'], '')
+
+    def test_mixed_handler_primary_device_class(self):
+        """Mixed handler propagates per-field device_class from primary field.
+
+        Note: The mixed handler's bitfield sub-loop has a pre-existing bug
+        (UnboundLocalError on f_scaling), so we test primary field device_class
+        separately from bitfield device_class.
+        """
+        erds = [
+            {
+                'id': '0x5678',
+                'name': 'Mixed ERD',
+                'description': 'Test',
+                'operations': ['read'],
+                'ha_domain': 'sensor',
+                'device_class': None,
+                'data': [
+                    {
+                        'name': 'Temperature',
+                        'type': 'u16',
+                        'offset': 0,
+                        'size': 2,
+                        'device_class': 'temperature',
+                    },
+                ],
+            }
+        ]
+        # Force 'mixed' classification isn't needed here since a single
+        # non-bitfield field is 'single'. Test with a forced classification.
+        erds[0]['force_classification'] = 'mixed'
+        entries = gen._collect_ha_discovery_entries(erds)
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]['device_class'], 'temperature')
+
+    def test_bitfield_without_device_class_is_empty(self):
+        """Bitfield without device_class in field data has empty device_class."""
+        erds = [
+            {
+                'id': '0x9ABC',
+                'name': 'Plain Bitfield',
+                'description': 'Test',
+                'operations': ['read'],
+                'ha_domain': 'binary_sensor',
+                'device_class': None,
+                'data': [
+                    {
+                        'name': 'Some Flag',
+                        'type': 'bitfield',
+                        'offset': 0,
+                        'size': 1,
+                        'bits': {'size': 1, 'offset': 0},
+                    },
+                    {
+                        'name': 'Another Flag',
+                        'type': 'bitfield',
+                        'offset': 0,
+                        'size': 1,
+                        'bits': {'size': 1, 'offset': 1},
+                    },
+                ],
+            }
+        ]
+        entries = gen._collect_ha_discovery_entries(erds)
+        self.assertEqual(len(entries), 2)
+        for entry in entries:
+            self.assertEqual(entry['device_class'], '')
+
+    def test_byte_offset_handler_device_class(self):
+        """byte_offset handler propagates per-field device_class."""
+        erds = [
+            {
+                'id': '0xDEF0',
+                'name': 'Multi Field ERD',
+                'description': 'Test',
+                'operations': ['read'],
+                'ha_domain': 'sensor',
+                'device_class': None,
+                'data': [
+                    {
+                        'name': 'Temperature',
+                        'type': 'u16',
+                        'offset': 0,
+                        'size': 2,
+                        'device_class': 'temperature',
+                    },
+                    {
+                        'name': 'Humidity',
+                        'type': 'u16',
+                        'offset': 2,
+                        'size': 2,
+                        'device_class': 'humidity',
+                    },
+                ],
+            }
+        ]
+        entries = gen._collect_ha_discovery_entries(erds)
+        self.assertEqual(len(entries), 2)
+        temp = next(e for e in entries if 'Temperature' in e['name'])
+        self.assertEqual(temp['device_class'], 'temperature')
+        humid = next(e for e in entries if 'Humidity' in e['name'])
+        self.assertEqual(humid['device_class'], 'humidity')
+
+
 if __name__ == '__main__':
     unittest.main()

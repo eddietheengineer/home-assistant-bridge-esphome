@@ -23,13 +23,31 @@ Then commit **all** generated/changed files together:
 
 If an ERD requires a manual override (wrong domain, missing unit, incorrect scaling, forced classification), add it to the `OVERRIDES` dict in `scripts/ha_discovery/pipeline/post_process.py`. Overrides are reapplied after auto-detection so they survive subsequent pipeline runs.
 
-Format:
+Override keys support two formats:
 
 ```python
 OVERRIDES = {
+    # Bare erd_id — applies to all fields in the ERD (safe for single-field ERDs).
     "0x7130": {"ha_domain": "sensor", "unit_of_measurement": "rpm"},
-    # ...
+
+    # erd_id:offset — applies only to the field at the given byte offset.
+    "0x3015:0": {"unit_of_measurement": "gal/min", "scaling_factor": 10000, "field_name": "Inlet Flow Rate"},
 }
 ```
+
+Valid override value keys:
+
+| Key | Description |
+|-----|-------------|
+| `ha_domain` | Override the Home Assistant domain (e.g. `"sensor"`, `"number"`, `"switch"`) |
+| `device_class` | Override the device class (e.g. `"temperature"`, `"current"`, `"weight"`) |
+| `unit_of_measurement` | Override the unit string (e.g. `"rpm"`, `"gal/min"`, `"CFM"`) |
+| `scaling_factor` | Override the scaling factor (use `None` to remove scaling) |
+| `state_class` | Override the state class (`"measurement"`, `"total"`, `"total_increasing"`) |
+| `field_name` | Override the display name |
+| `paired_erd` | Manually pair a request/status ERD (e.g. `"0x7708"`) |
+| `pair_role` | Role in a pair (`"request"` or `"status"`) |
+| `force_classification` | Force a classification strategy (e.g. `"single"`) |
+| `value_template` | Custom Jinja2 template for value processing |
 
 After adding an override, run the pipeline and commit all generated files.

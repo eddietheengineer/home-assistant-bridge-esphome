@@ -158,6 +158,19 @@ def apply_overrides(entries, overrides=None):
     * ``"0x7130"`` — applies to all fields of ERD 0x7130 (safe for single-field ERDs).
     * ``"0x3015:0"`` — applies only to the field at byte offset 0 of ERD 0x3015.
 
+    Valid override value keys:
+
+    * ``ha_domain`` — override the Home Assistant domain.
+    * ``device_class`` — override the device class.
+    * ``unit_of_measurement`` — override the unit string.
+    * ``scaling_factor`` — override the scaling factor (``None`` to remove).
+    * ``state_class`` — override the state class (``measurement``, ``total``, ``total_increasing``).
+    * ``field_name`` — override the display name.
+    * ``paired_erd`` — manually pair a request/status ERD.
+    * ``pair_role`` — role in a pair (``request`` or ``status``).
+    * ``force_classification`` — force a classification strategy.
+    * ``value_template`` — custom Jinja2 template for value processing.
+
     Note: auto_detect_scaling clears unit_of_measurement and scaling_factor
     on non-numeric fields (enum, string). If you ever need to override a
     non-numeric field, the override must be reapplied in post_process
