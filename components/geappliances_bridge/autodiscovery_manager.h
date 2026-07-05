@@ -70,6 +70,9 @@ class AutodiscoveryManager {
             bool has_gea2_uart,
             std::function<void()> on_complete_cb);
 
+  /// Unsubscribe from events and stop timers. Safe to call multiple times.
+  void cleanup();
+
   /// Start the autodiscovery process.  Idempotent if already past IDLE.
   void start();
   uint8_t  get_host_address()       const { return host_address_; }

@@ -177,6 +177,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
                erd);
       slot->valid = false;
       slot->update_required = false;
+      return false;
     }
   }
 

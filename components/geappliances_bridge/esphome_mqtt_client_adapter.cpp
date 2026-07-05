@@ -205,6 +205,16 @@ extern "C" void esphome_mqtt_client_adapter_notify_connected(
 extern "C" void esphome_mqtt_client_adapter_destroy(
   esphome_mqtt_client_adapter_t* self)
 {
+  // Unregister connect/disconnect callbacks from the global MQTT client to
+  // prevent dangling lambda captures from firing after the adapter is gone.
+  // The lambdas capture 'self' by value; without unregistering, a reconnect
+  // after teardown would dereference a dangling pointer.
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client != nullptr) {
+    mqtt_client->set_on_connect(nullptr);
+    mqtt_client->set_on_disconnect(nullptr);
+  }
+
   self->device_id = nullptr;
 }
 

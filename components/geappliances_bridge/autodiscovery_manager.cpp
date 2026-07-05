@@ -67,6 +67,40 @@ void AutodiscoveryManager::init(tiny_timer_group_t* timer_group,
   }
 }
 
+void AutodiscoveryManager::cleanup()
+{
+  // Unsubscribe from GEA3 ERD client activity events.
+  if (this->gea3_erd_client_ != nullptr) {
+    tiny_event_unsubscribe(
+      tiny_gea3_erd_client_on_activity(this->gea3_erd_client_),
+      &this->gea3_activity_subscription_);
+  }
+
+  // Unsubscribe from GEA2 adapter ERD client activity events.
+  if (this->gea2_adapter_client_ != nullptr) {
+    tiny_event_unsubscribe(
+      tiny_gea3_erd_client_on_activity(this->gea2_adapter_client_),
+      &this->gea2_activity_subscription_);
+  }
+
+  // Stop the broadcast window timer.
+  if (this->timer_group_ != nullptr) {
+    tiny_timer_stop(this->timer_group_, &this->broadcast_window_timer_);
+  }
+
+  // Reset state so a subsequent init() starts fresh.
+  this->timer_group_ = nullptr;
+  this->gea3_erd_client_ = nullptr;
+  this->gea2_erd_client_ = nullptr;
+  this->gea2_adapter_client_ = nullptr;
+  this->has_gea3_uart_ = false;
+  this->has_gea2_uart_ = false;
+  this->on_complete_cb_ = std::function<void()>();
+  this->state_ = AUTODISCOVERY_IDLE;
+  this->host_address_ = 0;
+  this->active_erd_client_ = nullptr;
+  this->gea2_protocol_active_ = false;
+}
 void AutodiscoveryManager::start()
 {
   if (this->state_ != AUTODISCOVERY_IDLE) {
