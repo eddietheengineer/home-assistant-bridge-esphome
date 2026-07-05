@@ -34,13 +34,14 @@
 #include <string>
 
 #include "tiny_erd.h"
+#include "erd_lists.h"
 #include "bridge_mode.h"
 
 namespace esphome {
 namespace geappliances_bridge {
 
-/* Maximum number of ERDs in a poll list.  Matches POLLING_LIST_MAX_SIZE. */
-#define ERD_POLL_LIST_MAX_SIZE 645
+/* Maximum number of ERDs in a poll list.  Uses POLLING_LIST_MAX_SIZE from erd_lists.h. */
+#define ERD_POLL_LIST_MAX_SIZE POLLING_LIST_MAX_SIZE
 
 /*
  * Configuration for building the ERD poll list.

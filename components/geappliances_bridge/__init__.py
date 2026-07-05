@@ -92,7 +92,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_GEA3_UART_ID): cv.use_id(uart.UARTComponent),
         cv.Optional(CONF_GEA2_UART_ID): cv.use_id(uart.UARTComponent),
         cv.Optional(CONF_ADAPTER_ADDRESS, default=0xE4): cv.int_range(min=0x00, max=0xFF),
-        cv.Optional(CONF_DEVICE_ID): cv.string,
+        cv.Optional(CONF_DEVICE_ID): cv.All(cv.string, cv.Length(max=91)),
         cv.Optional(CONF_MODE, default=MODE_AUTO): cv.enum(
             {
                 MODE_POLL: MODE_POLL_VALUE,
@@ -105,9 +105,9 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_POLLING_ONLY_PUBLISH_ON_CHANGE, default=True): cv.boolean,
         cv.Optional(CONF_APPLIANCE_API_PARSING, default=True): cv.boolean,
         cv.Optional(CONF_GENERATE_DEVICE_CONFIG, default=False): cv.boolean,
-        cv.Optional(CONF_CUSTOM_ERDS, default=[]): cv.ensure_list(
+        cv.Optional(CONF_CUSTOM_ERDS, default=[]): cv.All(cv.ensure_list(
             cv.int_range(min=0, max=0xFFFF)
-        ),
+        ), cv.Length(max=64)),
         cv.Optional(CONF_THROTTLE_RATE_SECONDS, default=0): cv.int_range(min=0, max=255),
         cv.Optional(CONF_ERD_PUBLISH_RATE_SENSOR, default=True): cv.Any(
             cv.boolean,

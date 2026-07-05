@@ -636,6 +636,10 @@ bool GeappliancesBridge::teardown() {
   this->gea2_last_ms_ = 0;
   // Clean up feature bit manager (unsubscribe from ERD client events, stop timers).
   this->feature_bit_manager_.cleanup();
+  // Clean up autodiscovery manager (unsubscribe from ERD client events, stop timer).
+  this->autodiscovery_manager_.cleanup();
+  // Clean up device identity manager (reset state, clear pending reads).
+  this->device_identity_manager_.cleanup();
   // Destroy whichever bridge(s) were actually initialized.
   // Using explicit ownership flags makes this unambiguous and prevents
   // double-free or missed cleanup.

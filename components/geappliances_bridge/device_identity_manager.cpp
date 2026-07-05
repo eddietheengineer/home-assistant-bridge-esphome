@@ -45,6 +45,20 @@ void DeviceIdentityManager::init(const char* configured_id,
   // Immediately queue the first ERD read
   this->try_queue_read_(ERD_APPLIANCE_TYPE);
 }
+void DeviceIdentityManager::cleanup()
+{
+  this->state_ = DEVICE_ID_STATE_READING_APPLIANCE_TYPE;
+  this->has_configured_device_id_ = false;
+  this->configured_device_id_[0] = '\0';
+  this->generated_device_id_[0] = '\0';
+  this->appliance_type_ = 0;
+  this->model_number_[0] = '\0';
+  this->serial_number_[0] = '\0';
+  this->pending_request_id_ = 0;
+  this->erd_client_ = nullptr;
+  this->host_address_ = 0;
+}
+
 
 void DeviceIdentityManager::on_erd_read_completed(tiny_erd_t erd, const uint8_t* data, uint8_t size)
 {

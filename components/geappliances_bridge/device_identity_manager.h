@@ -89,6 +89,10 @@ class DeviceIdentityManager {
    * Get the current state.
    */
   DeviceIdState get_state() const { return state_; }
+  /*
+   * Resets all state to initial values. Safe to call multiple times.
+   */
+  void cleanup();
 
   /*
    * Get the final device ID string. Returns the preconfigured ID if one was
@@ -117,8 +121,8 @@ class DeviceIdentityManager {
 
   DeviceIdState state_{DEVICE_ID_STATE_READING_APPLIANCE_TYPE};
   bool has_configured_device_id_{false};
-  char configured_device_id_[64];
-  char generated_device_id_[64];
+  char configured_device_id_[92];
+  char generated_device_id_[92];
   uint8_t appliance_type_{0};
   char model_number_[64];
   char serial_number_[64];

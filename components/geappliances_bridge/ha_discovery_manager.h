@@ -22,6 +22,7 @@
 #include <stdbool.h>
 
 #include "erd_cache.h"
+#include "erd_lists.h"
 #include "i_mqtt_client.h"
 #include "ha_discovery_cleanup.h"
 
@@ -46,8 +47,9 @@ typedef enum {
   ha_discovery_state_failed
 } ha_discovery_state_t;
 
-/* Maximum number of registered/seen ERDs for HA discovery binary search. */
-#define HA_DISCOVERY_MAX_ERDS 645
+/* Maximum number of registered/seen ERDs for HA discovery binary search.
+   Uses POLLING_LIST_MAX_SIZE from erd_lists.h as the single source of truth. */
+#define HA_DISCOVERY_MAX_ERDS POLLING_LIST_MAX_SIZE
 
 
 /* Decompression buffer size per chunk. Must be >= max decompressed chunk

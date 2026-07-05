@@ -141,7 +141,6 @@ static tiny_hsm_result_t state_subscribed(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
 {
   erd_bridge_subscribe_t* self = container_of(erd_bridge_subscribe_t, hsm, hsm);
   (void)data;
-  (void)self;
 
   switch(signal) {
     case tiny_hsm_signal_entry:
