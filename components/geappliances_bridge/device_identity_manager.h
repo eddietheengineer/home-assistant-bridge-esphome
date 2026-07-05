@@ -90,7 +90,7 @@ class DeviceIdentityManager {
    */
   DeviceIdState get_state() const { return state_; }
   /*
-   * Reset state. Safe to call multiple times. No-op if never initialized.
+   * Resets all state to initial values. Safe to call multiple times.
    */
   void cleanup();
 

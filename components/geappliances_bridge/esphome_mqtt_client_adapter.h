@@ -45,6 +45,8 @@ typedef struct {
   // Max ERD write payload is 32 bytes (64 hex chars).
   uint8_t write_payload_buffer_[32];
   uint8_t write_payload_size_;
+  // Tracked write topic for unsubscribe on destroy.
+  char write_topic_[128];
 } esphome_mqtt_client_adapter_t;
 
 #ifdef __cplusplus

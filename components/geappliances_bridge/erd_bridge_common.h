@@ -39,6 +39,7 @@ extern "C" {
 #include "tiny_timer.h"
 #include "tiny_utils.h"
 #include "tiny_gea_constants.h"
+#include "erd_lists.h"
 }
 
 // ============================================================================
@@ -105,7 +106,7 @@ enum {
 // inserts (n is small: bounded by probe list or subscription ERDs).
 // ============================================================================
 
-#define ERD_SET_CAPACITY 649  // matches POLLING_LIST_MAX_SIZE
+#define ERD_SET_CAPACITY POLLING_LIST_MAX_SIZE
 
 typedef struct {
   tiny_erd_t data[ERD_SET_CAPACITY];
