@@ -97,6 +97,9 @@ def apply_overrides(entries):
         # Gas
         "0xd01d": {"unit_of_measurement": "min", "paired_erd": "0xd02f", "pair_role": "status"},
         "0xd02f": {"unit_of_measurement": "min", "paired_erd": "0xd01d", "pair_role": "request"},
+        # --- Relative Humidity Sensor Idle Update Period ---
+        "0x5b27": {"unit_of_measurement": "min", "paired_erd": "0x5b28", "pair_role": "status"},
+        "0x5b28": {"unit_of_measurement": "min", "paired_erd": "0x5b27", "pair_role": "request"},
     }
 
     applied = 0

@@ -2373,8 +2373,7 @@
 {"i":"5b24","n":"Hood to Hob Actual Auto Control","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Off', '01': 'Auto'}.get(value[:2], 'Unknown') }}"}
 {"i":"5b25","n":"Hood to Hob Request Auto Control","d":"select","ds":1,"vt":"{{ {'00': 'Off', '01': 'Auto'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Off': '00', 'Auto': '01'}[value] }}","o":"[\"Off\", \"Auto\"]"}
 {"i":"5b26","n":"Hood Requested Auto Fan Speed","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
-{"i":"5b27","n":"Relative Humidity Sensor Idle Update Period in Minutes","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"5b28","n":"Requested Relative Humidity Sensor Idle Update Period in Minutes","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"5b28","n":"Requested Relative Humidity Sensor Idle Update Period in Minutes","d":"number","ds":1,"u":"min","mn":0.0,"mx":255.0,"st":1.0,"p":"5b27","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"5b29","n":"Request Update of Relative Humidity (%)","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
 {"i":"5b2a","n":"Relative Humidity (%) - Relative Humidity","d":"sensor","ds":4,"u":"%","dc":"humidity","sc":"measurement","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"5b2a","n":"Relative Humidity (%) - Humidity Air Quality","d":"sensor","ds":4,"u":"%","dc":"enum","sc":"measurement","vt":"{{ {'00': 'Good', '01': 'Air Quality 1', '02': 'Air Quality 2', '03': 'Air Quality 3', '04': 'Air Quality 4', '05': 'Moderate', '06': 'Air Quality 6', '07': 'Air Quality 7', '08': 'Air Quality 8', '09': 'Air Quality 9', '0a': 'Poor', 'ff': 'Invalid'}.get(value[2:4], 'Unknown') }}","fi":"humidity_air_quality"}
