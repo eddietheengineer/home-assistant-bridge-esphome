@@ -84,7 +84,7 @@ def apply_overrides(entries):
         "0x800d": {"state_class": "total"},
         # --- Anode depleted mass: combine MSB+LSB u32 fields into single u64,
         #     scale from micrograms to grams (10^-6) ---
-        "0x404c": {
+        "0x404c:0": {
             "ha_domain": "sensor",
             "device_class": "weight",
             "unit_of_measurement": "g",
@@ -121,15 +121,29 @@ def apply_overrides(entries):
         erd_id = entry.get("erd_id", "").lower()
         field_offset = entry.get("field_offset")
 
-        # Try exact key match first (erd_id:offset)
-        key = f"{erd_id}:{field_offset}"
-        if key in OVERRIDES:
-            override = OVERRIDES[key]
-        elif erd_id in OVERRIDES:
-            # Fallback: erd_id without offset applies to all fields
-            override = OVERRIDES[erd_id]
-        else:
+        # Try exact key match first (erd_id:offset).
+        # Skip if offset is None to avoid constructing "0x3015:None" keys.
+        if field_offset is not None:
+            key = f"{erd_id}:{field_offset}"
+            if key in OVERRIDES:
+                override = OVERRIDES[key]
+                if 'fields' in override:
+                    fields_override = override['fields'].get(field_offset)
+                    if fields_override is None:
+                        continue
+                else:
+                    fields_override = override
+                review = entry.setdefault("review", {})
+                for key, val in fields_override.items():
+                    if review.get(key) != val:
+                        review[key] = val
+                        applied += 1
+                continue
+
+        # Fallback: bare erd_id applies to all fields (safe for single-field ERDs).
+        if erd_id not in OVERRIDES:
             continue
+        override = OVERRIDES[erd_id]
 
         # Support 'fields' dict keyed by field_offset (int)
         if 'fields' in override:

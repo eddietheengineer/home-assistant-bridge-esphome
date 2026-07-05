@@ -279884,7 +279884,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": "weight",
-      "unit_of_measurement": "g",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": "measurement",
       "paired_erd": null,
