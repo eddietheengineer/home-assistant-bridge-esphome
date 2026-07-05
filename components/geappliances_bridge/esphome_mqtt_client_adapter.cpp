@@ -149,11 +149,11 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client == nullptr) return;
 
-    char topic[128];
-    snprintf(topic, sizeof(topic), "geappliances/%s/erd/+/write",
-            self->device_id);
-    strncpy(self->write_topic_, topic, sizeof(self->write_topic_) - 1);
-    self->write_topic_[sizeof(self->write_topic_) - 1] = '\0';
+  char topic[128];
+  snprintf(topic, sizeof(topic), "geappliances/%s/erd/+/write",
+          self->device_id);
+  strncpy(self->write_topic_, topic, sizeof(self->write_topic_) - 1);
+  self->write_topic_[sizeof(self->write_topic_) - 1] = '\0';
 
   mqtt_client->subscribe(topic, [self](const std::string& topic, const std::string& payload) {
     // Parse ERD from topic: geappliances/{device_id}/erd/0x{ERD}/write
