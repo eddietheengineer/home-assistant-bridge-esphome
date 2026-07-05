@@ -121,8 +121,8 @@ class DeviceIdentityManager {
 
   DeviceIdState state_{DEVICE_ID_STATE_READING_APPLIANCE_TYPE};
   bool has_configured_device_id_{false};
-  char configured_device_id_[64];
-  char generated_device_id_[64];
+  char configured_device_id_[92];
+  char generated_device_id_[92];
   uint8_t appliance_type_{0};
   char model_number_[64];
   char serial_number_[64];
