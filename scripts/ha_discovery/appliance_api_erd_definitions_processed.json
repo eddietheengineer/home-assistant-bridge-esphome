@@ -242721,7 +242721,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "NTU",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": "measurement",
       "paired_erd": null,
@@ -265905,7 +265905,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "NTU",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": "measurement",
       "paired_erd": null,
@@ -283634,13 +283634,14 @@
       "device_class": "current",
       "unit_of_measurement": "A",
       "scaling_factor": 10,
-      "state_class": null,
+      "state_class": "measurement",
       "paired_erd": null,
       "pair_role": null,
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_sc_confidence": 0.9
     }
   },
   {
@@ -512433,13 +512434,14 @@
       "device_class": "current",
       "unit_of_measurement": "A",
       "scaling_factor": null,
-      "state_class": null,
+      "state_class": "measurement",
       "paired_erd": null,
       "pair_role": null,
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_sc_confidence": 0.9
     }
   },
   {
@@ -512472,13 +512474,14 @@
       "device_class": "current",
       "unit_of_measurement": "A",
       "scaling_factor": null,
-      "state_class": null,
+      "state_class": "measurement",
       "paired_erd": null,
       "pair_role": null,
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_sc_confidence": 0.9
     }
   },
   {
@@ -512511,13 +512514,14 @@
       "device_class": "current",
       "unit_of_measurement": "A",
       "scaling_factor": null,
-      "state_class": null,
+      "state_class": "measurement",
       "paired_erd": null,
       "pair_role": null,
       "filtered": false,
       "filter_reason": null,
       "reasoning": "",
-      "_domain_confidence": 0.9
+      "_domain_confidence": 0.9,
+      "_sc_confidence": 0.9
     }
   },
   {

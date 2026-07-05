@@ -124,7 +124,7 @@
 {"i":"3020","n":"Dishwasher Usage Profile - Tub Light On Time in Seconds","d":"sensor","ds":32,"u":"s","vt":"{{ value[48:56] | int(base=16) }}","fi":"tub_light_on_time_in_seconds"}
 {"i":"3020","n":"Dishwasher Usage Profile - Cumulative Power-On Time in Seconds","d":"sensor","ds":32,"u":"s","vt":"{{ value[56:64] | int(base=16) }}","fi":"cumulative_power_on_time_in_seconds"}
 {"i":"3035","n":"Water Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
-{"i":"3036","n":"Average Turbidity","d":"sensor","ds":2,"u":"NTU","sc":"measurement","vt":"{{ value | int(base=16) }}"}
+{"i":"3036","n":"Average Turbidity","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"3037","n":"Dishwasher Door Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Open', '01': 'Closed', '02': 'Invalid', '03': 'Init', '04': 'Unknown'}.get(value[:2], 'Unknown') }}"}
 {"i":"3038","n":"Rinse Aid Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not Empty', '01': 'Empty'}.get(value[:2], 'Unknown') }}"}
 {"i":"3039","n":"Water Volume","d":"sensor","ds":1,"u":"gal","sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
@@ -529,7 +529,7 @@
 {"i":"3231","n":"Default to Eco Cycle Setting","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3232","n":"Default to Eco Cycle Request","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3235","n":"Tub1 Water Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
-{"i":"3236","n":"Average Turbidity Tub 1","d":"sensor","ds":2,"u":"NTU","sc":"measurement","vt":"{{ value | int(base=16) }}"}
+{"i":"3236","n":"Average Turbidity Tub 1","d":"sensor","ds":2,"sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"3237","n":"Tub 1 Dishwasher Door Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Open', '01': 'Closed', '02': 'Invalid', '03': 'Init', '04': 'Unknown'}.get(value[:2], 'Unknown') }}"}
 {"i":"323e","n":"Tub 1 Drain Pump Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"3245","n":"Tub 1 Circ Pump Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}

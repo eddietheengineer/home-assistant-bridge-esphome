@@ -88,9 +88,6 @@ OVERRIDES = {
     "0x400c": {"unit_of_measurement": "steps", "state_class": "measurement"},
     # --- Anode hours of service: add hours unit ---
     "0x404d": {"unit_of_measurement": "h", "state_class": "total"},
-    # --- Average Turbidity: add NTU unit and measurement state_class for plotting ---
-    "0x3036": {"unit_of_measurement": "NTU", "state_class": "measurement"},
-    "0x3236": {"unit_of_measurement": "NTU", "state_class": "measurement"},
     # --- Inlet Flow Rate: GPM with x10000 scaling (first field only, offset 0) ---
     "0x3015:0": {"unit_of_measurement": "gal/min", "scaling_factor": 10000},
     # --- Heating cycle satisfied: cumulative counter ---

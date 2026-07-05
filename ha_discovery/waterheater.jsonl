@@ -100,7 +100,7 @@
 {"i":"4062","n":"T3b Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"4063","n":"T4 Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"4064","n":"T5 Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
-{"i":"4065","n":"Measured current","d":"sensor","ds":2,"u":"A","dc":"current","sf":10,"vt":"{{ (value | int(base=16)) / 10 | round(1) }}"}
+{"i":"4065","n":"Measured current","d":"sensor","ds":2,"u":"A","dc":"current","sc":"measurement","sf":10,"vt":"{{ (value | int(base=16)) / 10 | round(1) }}"}
 {"i":"4066","n":"Measured voltage","d":"sensor","ds":2,"u":"V","dc":"voltage","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"4068","n":"Relay status - DLB","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 1) % 2 else '00' }}","fi":"dlb","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"4068","n":"Relay status - Compressor","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[0:4] | int(base=16)) // 2) % 2 else '00' }}","fi":"compressor","pon":"01","poff":"00","son":"01","soff":"00"}
