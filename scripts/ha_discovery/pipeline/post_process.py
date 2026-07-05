@@ -89,7 +89,7 @@ OVERRIDES = {
     # --- Anode hours of service: add hours unit ---
     "0x404d": {"unit_of_measurement": "h", "state_class": "total"},
     # --- Inlet Flow Rate: GPM with x10000 scaling (first field only, offset 0) ---
-    "0x3015:0": {"unit_of_measurement": "gal/min", "scaling_factor": 10000},
+    "0x3015:0": {"unit_of_measurement": "gal/min", "scaling_factor": 10000, "field_name": "Inlet Flow Rate"},
     # --- Heating cycle satisfied: signal (0/1), not a counter ---
     "0x4102": {"state_class": "measurement"},
     # --- Measured current: Amps with x10 scaling ---
@@ -133,8 +133,18 @@ OVERRIDES = {
     "0x3084": {"unit_of_measurement": "mmH\u2082O", "state_class": "measurement"},
     # --- 4 Way Valve Position: read-only sensor, not select ---
     "0x7902": {"ha_domain": "sensor"},
-    # --- Compressor Speed Limiting Factors: problem indicators ---
-    "0x7910": {"device_class": "problem"},
+    # --- Setpoint limit requests: pair request ERD with allowed setpoint ERD ---
+    # Each request ERD (single field) pairs with the matching field in the
+    # allowed setpoint ERD (multi-field). Per-field overrides handle the
+    # status side since one ERD can't have two different ERD-level pairs.
+    "0x770d": {"paired_erd": "0x7708", "pair_role": "request"},
+    "0x7708:0": {"paired_erd": "0x770d", "pair_role": "status"},
+    "0x770f": {"paired_erd": "0x7708", "pair_role": "request"},
+    "0x7708:2": {"paired_erd": "0x770f", "pair_role": "status"},
+    "0x7711": {"paired_erd": "0x770b", "pair_role": "request"},
+    "0x770b:0": {"paired_erd": "0x7711", "pair_role": "status"},
+    "0x7713": {"paired_erd": "0x770b", "pair_role": "request"},
+    "0x770b:2": {"paired_erd": "0x7713", "pair_role": "status"},
 }
 
 

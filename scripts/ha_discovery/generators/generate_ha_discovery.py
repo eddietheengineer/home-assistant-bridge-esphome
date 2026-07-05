@@ -927,7 +927,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 min_val: float = 0.0, max_val: float = 0.0, step_val: float = 1.0) -> None:
         # Skip availability/allowability metadata — not actionable in HA.
         combined = (name + ' ' + field_id).lower()
-        if 'allowed' in combined or 'available' in combined:
+        # But don't skip real "allowed" values like "Allowed Setpoint".
+        if ('allowed' in combined and 'setpoint' not in combined) or 'available' in combined:
             return
         # Ensure field_id is unique within this ERD to avoid unique_id collisions.
         fid = _make_unique_field_id(erd_id_int, field_id)
@@ -1115,7 +1116,7 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 f_type = field.get('type', '')
                 f_dc = field.get('device_class') or ''
                 f_dev_cls = f_dc or ('enum' if f_type == 'enum' else '')
-                f_state_cls = field.get('state_class') or state_class
+                f_state_cls = field.get('state_class') or (state_class if f_type in ('u8', 'u16', 'u32', 'i8', 'i16', 'i32') else '')
                 f_unit = field.get('unit_of_measurement') or _infer_unit_from_field_name(leaf, unit)
                 # Don't inherit ERD-level unit/scaling for non-numeric fields
                 # (e.g., enum status fields shouldn't inherit gal/min from a sibling).
@@ -1189,7 +1190,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 b_s_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_s_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
                 f_scaling = int(field.get('scaling_factor') or scaling_factor)
-                collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
+                f_bf_dc = field.get('device_class') or ''
+                collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', f_bf_dc,
                         '', f_scaling, data_size, f_paired_id, f_pair_role,
                         vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
 
@@ -1273,8 +1275,8 @@ def _collect_ha_discovery_entries(erds: List[Dict]) -> List[Dict]:
                 b_p_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_p_off = '00' if sub_domain in ('binary_sensor', 'switch') else ''
                 b_s_on = '01' if sub_domain in ('binary_sensor', 'switch') else ''
-                f_scaling = int(field.get('scaling_factor') or scaling_factor)
-                collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', '',
+                f_bf_dc = field.get('device_class') or ''
+                collect(erd_id_int, f'{display_name} - {leaf}', sub_domain, '', f_bf_dc,
                         '', f_scaling, data_size, f_paired_id, f_pair_role,
                         vt, '', '', fid, '', b_p_on, b_p_off, b_s_on, b_s_off)
 
@@ -1497,6 +1499,8 @@ def _build_erds_from_flat_list(flat_entries: List[Dict]) -> List[Dict]:
                 field['scaling_factor'] = field_review['scaling_factor']
             if field_review.get('unit_of_measurement'):
                 field['unit_of_measurement'] = field_review['unit_of_measurement']
+            if field_review.get('field_name'):
+                field['name'] = field_review['field_name']
             data_fields.append(field)
 
         erd = {

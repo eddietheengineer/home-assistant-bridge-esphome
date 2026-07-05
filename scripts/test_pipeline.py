@@ -59,7 +59,7 @@ class TestApplyOverrides(unittest.TestCase):
         # Offset 2 and 3 should not get the override.
         self.assertIsNone(entries[1]["review"].get("unit_of_measurement"))
         self.assertIsNone(entries[2]["review"].get("unit_of_measurement"))
-        self.assertEqual(applied, 2)  # unit + scaling_factor
+        self.assertEqual(applied, 3)  # unit + scaling_factor + field_name
 
     def test_none_offset_falls_through_to_bare(self):
         """field_offset=None skips offset-based key, falls to bare erd_id."""

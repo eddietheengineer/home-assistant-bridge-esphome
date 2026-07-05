@@ -136,7 +136,7 @@ def infer_device_class(entry):
         if 'occupied' in name_lower:
             return 'occupancy', 0.8
         # Problem: match in combined name+erd_name+description
-        if any(kw in combined for kw in ['fault', 'issue', 'error', 'alarm', 'limited']):
+        if any(_word_bound(combined, kw) for kw in ['fault', 'issue', 'error', 'alarm', 'limited']):
             return 'problem', 0.8
 
     # Skip bit-fields (they're boolean indicators)
