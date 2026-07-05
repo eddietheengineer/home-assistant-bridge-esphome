@@ -99222,7 +99222,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -107983,7 +107983,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -109246,7 +109246,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -126426,7 +126426,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -171480,7 +171480,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -171552,7 +171552,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -171626,7 +171626,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -181921,7 +181921,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -192944,7 +192944,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -192989,7 +192989,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -193023,7 +193023,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -284717,7 +284717,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -284756,7 +284756,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -290343,7 +290343,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -323057,7 +323057,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -353410,7 +353410,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -364152,7 +364152,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -364191,7 +364191,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -367993,7 +367993,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -368032,7 +368032,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": "dBm",
+      "unit_of_measurement": null,
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464450,7 +464450,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464489,7 +464489,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464528,7 +464528,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464567,7 +464567,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464606,7 +464606,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464645,7 +464645,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464684,7 +464684,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464723,7 +464723,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464803,7 +464803,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464842,7 +464842,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464881,7 +464881,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464920,7 +464920,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464959,7 +464959,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -464998,7 +464998,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465037,7 +465037,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465076,7 +465076,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465115,7 +465115,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465154,7 +465154,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465193,7 +465193,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465232,7 +465232,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465271,7 +465271,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465310,7 +465310,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465349,7 +465349,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465388,7 +465388,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465427,7 +465427,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465466,7 +465466,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465505,7 +465505,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465544,7 +465544,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465583,7 +465583,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465622,7 +465622,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465661,7 +465661,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465700,7 +465700,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465739,7 +465739,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465778,7 +465778,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465817,7 +465817,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465856,7 +465856,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465895,7 +465895,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465934,7 +465934,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -465973,7 +465973,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466012,7 +466012,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466051,7 +466051,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466090,7 +466090,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466129,7 +466129,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466168,7 +466168,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466207,7 +466207,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466246,7 +466246,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466285,7 +466285,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466324,7 +466324,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466363,7 +466363,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466402,7 +466402,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466441,7 +466441,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466480,7 +466480,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466519,7 +466519,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466558,7 +466558,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466597,7 +466597,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466636,7 +466636,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466675,7 +466675,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466714,7 +466714,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466753,7 +466753,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466792,7 +466792,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466831,7 +466831,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466870,7 +466870,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466909,7 +466909,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466948,7 +466948,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -466987,7 +466987,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467026,7 +467026,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467065,7 +467065,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467104,7 +467104,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467143,7 +467143,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467182,7 +467182,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467221,7 +467221,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467260,7 +467260,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467299,7 +467299,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467338,7 +467338,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467377,7 +467377,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467416,7 +467416,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467455,7 +467455,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467494,7 +467494,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467533,7 +467533,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467572,7 +467572,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467652,7 +467652,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467691,7 +467691,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467730,7 +467730,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467769,7 +467769,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467808,7 +467808,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467847,7 +467847,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467886,7 +467886,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467925,7 +467925,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -467964,7 +467964,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468003,7 +468003,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468042,7 +468042,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468081,7 +468081,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468120,7 +468120,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468159,7 +468159,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468198,7 +468198,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468237,7 +468237,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468276,7 +468276,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468315,7 +468315,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468354,7 +468354,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468393,7 +468393,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468432,7 +468432,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468471,7 +468471,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468510,7 +468510,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468549,7 +468549,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468588,7 +468588,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468627,7 +468627,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468666,7 +468666,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468705,7 +468705,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468744,7 +468744,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468783,7 +468783,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468822,7 +468822,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468861,7 +468861,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468900,7 +468900,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468939,7 +468939,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -468978,7 +468978,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469017,7 +469017,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469056,7 +469056,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469095,7 +469095,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469134,7 +469134,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469173,7 +469173,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469212,7 +469212,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469251,7 +469251,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469290,7 +469290,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469329,7 +469329,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469368,7 +469368,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469407,7 +469407,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469446,7 +469446,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469485,7 +469485,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469524,7 +469524,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469563,7 +469563,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469602,7 +469602,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469641,7 +469641,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469680,7 +469680,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469719,7 +469719,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469758,7 +469758,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469797,7 +469797,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469836,7 +469836,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469875,7 +469875,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469914,7 +469914,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469953,7 +469953,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -469992,7 +469992,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470031,7 +470031,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470070,7 +470070,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470109,7 +470109,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470148,7 +470148,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470187,7 +470187,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470226,7 +470226,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470265,7 +470265,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470304,7 +470304,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470343,7 +470343,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470382,7 +470382,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470421,7 +470421,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470501,7 +470501,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470540,7 +470540,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470579,7 +470579,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470618,7 +470618,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470657,7 +470657,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470696,7 +470696,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470735,7 +470735,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470774,7 +470774,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470813,7 +470813,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470852,7 +470852,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470891,7 +470891,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470930,7 +470930,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -470969,7 +470969,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471008,7 +471008,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471047,7 +471047,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471086,7 +471086,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471125,7 +471125,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471164,7 +471164,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471203,7 +471203,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471242,7 +471242,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471281,7 +471281,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471320,7 +471320,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471359,7 +471359,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471398,7 +471398,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471437,7 +471437,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471476,7 +471476,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471515,7 +471515,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471554,7 +471554,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471593,7 +471593,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471632,7 +471632,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471671,7 +471671,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471710,7 +471710,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471749,7 +471749,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471788,7 +471788,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471827,7 +471827,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471866,7 +471866,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471905,7 +471905,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471944,7 +471944,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -471983,7 +471983,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472022,7 +472022,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472061,7 +472061,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472100,7 +472100,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472139,7 +472139,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472178,7 +472178,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472217,7 +472217,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472256,7 +472256,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472295,7 +472295,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472334,7 +472334,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472373,7 +472373,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472412,7 +472412,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472451,7 +472451,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472490,7 +472490,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472529,7 +472529,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472568,7 +472568,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472607,7 +472607,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472646,7 +472646,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472685,7 +472685,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472724,7 +472724,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472763,7 +472763,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472802,7 +472802,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472841,7 +472841,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472880,7 +472880,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472919,7 +472919,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472958,7 +472958,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -472997,7 +472997,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473036,7 +473036,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473075,7 +473075,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473114,7 +473114,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473153,7 +473153,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473192,7 +473192,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473231,7 +473231,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473270,7 +473270,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473350,7 +473350,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473389,7 +473389,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473428,7 +473428,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473467,7 +473467,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473506,7 +473506,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473545,7 +473545,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473584,7 +473584,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473623,7 +473623,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473662,7 +473662,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473701,7 +473701,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473740,7 +473740,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473779,7 +473779,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473818,7 +473818,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473857,7 +473857,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473896,7 +473896,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473935,7 +473935,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -473974,7 +473974,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474013,7 +474013,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474052,7 +474052,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474091,7 +474091,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474130,7 +474130,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474169,7 +474169,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474208,7 +474208,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474247,7 +474247,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474286,7 +474286,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474325,7 +474325,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474364,7 +474364,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474403,7 +474403,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474442,7 +474442,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474481,7 +474481,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474520,7 +474520,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474559,7 +474559,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474598,7 +474598,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474637,7 +474637,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474676,7 +474676,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474715,7 +474715,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474754,7 +474754,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474793,7 +474793,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474832,7 +474832,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474871,7 +474871,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474910,7 +474910,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474949,7 +474949,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -474988,7 +474988,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475027,7 +475027,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475066,7 +475066,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475105,7 +475105,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475144,7 +475144,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475183,7 +475183,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475222,7 +475222,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475261,7 +475261,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475300,7 +475300,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475339,7 +475339,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475378,7 +475378,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475417,7 +475417,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475456,7 +475456,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475495,7 +475495,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475534,7 +475534,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475573,7 +475573,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475612,7 +475612,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475651,7 +475651,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475690,7 +475690,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475729,7 +475729,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475768,7 +475768,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475807,7 +475807,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475846,7 +475846,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475885,7 +475885,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475924,7 +475924,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -475963,7 +475963,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476002,7 +476002,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476041,7 +476041,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476080,7 +476080,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476119,7 +476119,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476199,7 +476199,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476238,7 +476238,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476277,7 +476277,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476316,7 +476316,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476355,7 +476355,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476394,7 +476394,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476433,7 +476433,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476472,7 +476472,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476511,7 +476511,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476550,7 +476550,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476589,7 +476589,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476628,7 +476628,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476667,7 +476667,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476706,7 +476706,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476745,7 +476745,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476784,7 +476784,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476823,7 +476823,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476862,7 +476862,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476901,7 +476901,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476940,7 +476940,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -476979,7 +476979,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477018,7 +477018,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477057,7 +477057,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477096,7 +477096,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477135,7 +477135,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477174,7 +477174,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477213,7 +477213,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477252,7 +477252,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477291,7 +477291,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477330,7 +477330,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477369,7 +477369,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477408,7 +477408,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477447,7 +477447,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477486,7 +477486,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477525,7 +477525,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477564,7 +477564,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477603,7 +477603,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477642,7 +477642,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477681,7 +477681,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477720,7 +477720,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477759,7 +477759,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477798,7 +477798,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477837,7 +477837,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477876,7 +477876,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477915,7 +477915,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477954,7 +477954,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -477993,7 +477993,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478032,7 +478032,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478071,7 +478071,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478110,7 +478110,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478149,7 +478149,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478188,7 +478188,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478227,7 +478227,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478266,7 +478266,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478305,7 +478305,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478344,7 +478344,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478383,7 +478383,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478422,7 +478422,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478461,7 +478461,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478500,7 +478500,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478539,7 +478539,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478578,7 +478578,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478617,7 +478617,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478656,7 +478656,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478695,7 +478695,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478734,7 +478734,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478773,7 +478773,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478812,7 +478812,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478851,7 +478851,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478890,7 +478890,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478929,7 +478929,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -478968,7 +478968,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479048,7 +479048,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479087,7 +479087,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479126,7 +479126,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479165,7 +479165,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479204,7 +479204,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479243,7 +479243,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479282,7 +479282,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479321,7 +479321,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479360,7 +479360,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479399,7 +479399,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479438,7 +479438,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479477,7 +479477,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479516,7 +479516,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479555,7 +479555,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479594,7 +479594,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479633,7 +479633,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479672,7 +479672,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479711,7 +479711,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479750,7 +479750,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479789,7 +479789,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479828,7 +479828,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479867,7 +479867,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479906,7 +479906,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479945,7 +479945,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -479984,7 +479984,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480023,7 +480023,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480062,7 +480062,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480101,7 +480101,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480140,7 +480140,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480179,7 +480179,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480218,7 +480218,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480257,7 +480257,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480296,7 +480296,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480335,7 +480335,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480374,7 +480374,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480413,7 +480413,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480452,7 +480452,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480491,7 +480491,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480530,7 +480530,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480569,7 +480569,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480608,7 +480608,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480647,7 +480647,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480686,7 +480686,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480725,7 +480725,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480764,7 +480764,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480803,7 +480803,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480842,7 +480842,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480881,7 +480881,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480920,7 +480920,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480959,7 +480959,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -480998,7 +480998,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481037,7 +481037,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481076,7 +481076,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481115,7 +481115,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481154,7 +481154,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481193,7 +481193,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481232,7 +481232,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481271,7 +481271,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481310,7 +481310,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481349,7 +481349,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481388,7 +481388,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481427,7 +481427,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481466,7 +481466,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481505,7 +481505,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481544,7 +481544,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481583,7 +481583,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481622,7 +481622,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481661,7 +481661,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481700,7 +481700,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481739,7 +481739,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481778,7 +481778,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481817,7 +481817,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481897,7 +481897,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481936,7 +481936,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -481975,7 +481975,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482014,7 +482014,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482053,7 +482053,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482092,7 +482092,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482131,7 +482131,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482170,7 +482170,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482209,7 +482209,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482248,7 +482248,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482287,7 +482287,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482326,7 +482326,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482365,7 +482365,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482404,7 +482404,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482443,7 +482443,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482482,7 +482482,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482521,7 +482521,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482560,7 +482560,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482599,7 +482599,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482638,7 +482638,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482677,7 +482677,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482716,7 +482716,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482755,7 +482755,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482794,7 +482794,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482833,7 +482833,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482872,7 +482872,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482911,7 +482911,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482950,7 +482950,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -482989,7 +482989,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483028,7 +483028,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483067,7 +483067,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483106,7 +483106,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483145,7 +483145,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483184,7 +483184,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483223,7 +483223,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483262,7 +483262,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483301,7 +483301,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483340,7 +483340,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483379,7 +483379,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483418,7 +483418,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483457,7 +483457,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483496,7 +483496,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483535,7 +483535,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483574,7 +483574,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483613,7 +483613,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483652,7 +483652,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483691,7 +483691,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483730,7 +483730,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483769,7 +483769,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483808,7 +483808,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483847,7 +483847,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483886,7 +483886,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483925,7 +483925,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -483964,7 +483964,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484003,7 +484003,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484042,7 +484042,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484081,7 +484081,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484120,7 +484120,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484159,7 +484159,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484198,7 +484198,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484237,7 +484237,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484276,7 +484276,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484315,7 +484315,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484354,7 +484354,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484393,7 +484393,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484432,7 +484432,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484471,7 +484471,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484510,7 +484510,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484549,7 +484549,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484588,7 +484588,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484627,7 +484627,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484666,7 +484666,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484746,7 +484746,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484785,7 +484785,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484824,7 +484824,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484863,7 +484863,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484902,7 +484902,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484941,7 +484941,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -484980,7 +484980,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485019,7 +485019,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485058,7 +485058,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485097,7 +485097,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485136,7 +485136,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485175,7 +485175,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485214,7 +485214,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485253,7 +485253,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485292,7 +485292,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485331,7 +485331,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485370,7 +485370,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485409,7 +485409,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485448,7 +485448,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485487,7 +485487,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485526,7 +485526,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485565,7 +485565,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485604,7 +485604,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485643,7 +485643,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485682,7 +485682,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485721,7 +485721,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485760,7 +485760,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485799,7 +485799,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485838,7 +485838,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485877,7 +485877,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485916,7 +485916,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485955,7 +485955,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -485994,7 +485994,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486033,7 +486033,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486072,7 +486072,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486111,7 +486111,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486150,7 +486150,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486189,7 +486189,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486228,7 +486228,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486267,7 +486267,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486306,7 +486306,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486345,7 +486345,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486384,7 +486384,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486423,7 +486423,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486462,7 +486462,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486501,7 +486501,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486540,7 +486540,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486579,7 +486579,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486618,7 +486618,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486657,7 +486657,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486696,7 +486696,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486735,7 +486735,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486774,7 +486774,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486813,7 +486813,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486852,7 +486852,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486891,7 +486891,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486930,7 +486930,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -486969,7 +486969,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487008,7 +487008,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487047,7 +487047,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487086,7 +487086,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487125,7 +487125,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487164,7 +487164,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487203,7 +487203,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487242,7 +487242,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487281,7 +487281,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487320,7 +487320,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487359,7 +487359,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487398,7 +487398,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487437,7 +487437,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487476,7 +487476,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487515,7 +487515,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487595,7 +487595,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487634,7 +487634,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487673,7 +487673,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487712,7 +487712,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487751,7 +487751,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487790,7 +487790,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487829,7 +487829,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487868,7 +487868,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487907,7 +487907,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487946,7 +487946,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -487985,7 +487985,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488024,7 +488024,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488063,7 +488063,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488102,7 +488102,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488141,7 +488141,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488180,7 +488180,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488219,7 +488219,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488258,7 +488258,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488297,7 +488297,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488336,7 +488336,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488375,7 +488375,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488414,7 +488414,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488453,7 +488453,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488492,7 +488492,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488531,7 +488531,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488570,7 +488570,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488609,7 +488609,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488648,7 +488648,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488687,7 +488687,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488726,7 +488726,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488765,7 +488765,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488804,7 +488804,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488843,7 +488843,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488882,7 +488882,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488921,7 +488921,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488960,7 +488960,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -488999,7 +488999,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489038,7 +489038,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489077,7 +489077,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489116,7 +489116,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489155,7 +489155,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489194,7 +489194,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489233,7 +489233,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489272,7 +489272,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489311,7 +489311,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489350,7 +489350,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489389,7 +489389,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489428,7 +489428,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489467,7 +489467,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489506,7 +489506,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489545,7 +489545,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489584,7 +489584,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489623,7 +489623,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489662,7 +489662,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489701,7 +489701,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489740,7 +489740,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489779,7 +489779,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489818,7 +489818,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489857,7 +489857,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489896,7 +489896,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489935,7 +489935,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -489974,7 +489974,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490013,7 +490013,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490052,7 +490052,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490091,7 +490091,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490130,7 +490130,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490169,7 +490169,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490208,7 +490208,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490247,7 +490247,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490286,7 +490286,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490325,7 +490325,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490364,7 +490364,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490444,7 +490444,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490483,7 +490483,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490522,7 +490522,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490561,7 +490561,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490600,7 +490600,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490639,7 +490639,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490678,7 +490678,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490717,7 +490717,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490756,7 +490756,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490795,7 +490795,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490834,7 +490834,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490873,7 +490873,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490912,7 +490912,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490951,7 +490951,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -490990,7 +490990,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491029,7 +491029,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491068,7 +491068,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491107,7 +491107,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491146,7 +491146,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491185,7 +491185,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491224,7 +491224,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491263,7 +491263,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491302,7 +491302,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491341,7 +491341,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491380,7 +491380,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491419,7 +491419,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491458,7 +491458,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491497,7 +491497,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491536,7 +491536,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491575,7 +491575,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491614,7 +491614,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491653,7 +491653,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491692,7 +491692,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491731,7 +491731,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491770,7 +491770,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491809,7 +491809,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491848,7 +491848,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491887,7 +491887,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491926,7 +491926,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -491965,7 +491965,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492004,7 +492004,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492043,7 +492043,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492082,7 +492082,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492121,7 +492121,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492160,7 +492160,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492199,7 +492199,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492238,7 +492238,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492277,7 +492277,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492316,7 +492316,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492355,7 +492355,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492394,7 +492394,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492433,7 +492433,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492472,7 +492472,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492511,7 +492511,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492550,7 +492550,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492589,7 +492589,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492628,7 +492628,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492667,7 +492667,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492706,7 +492706,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492745,7 +492745,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492784,7 +492784,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492823,7 +492823,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492862,7 +492862,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -492901,7 +492901,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "dBm",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,

@@ -52,7 +52,7 @@
 {"i":"203b","n":"Smart Dispense Usage Profile Record More","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"203c","n":"Bulk Detergent Tank Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'Low', '02': 'Filled', '03': 'Sensor Not Connected', '04': 'Sensor Error'}.get(value[:2], 'Unknown') }}"}
 {"i":"203d","n":"Smart Dispense Estimated Loads Remaining - Smart Dispense Estimated Loads Remaining","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
-{"i":"203d","n":"Smart Dispense Estimated Loads Remaining - Signal","d":"sensor","ds":2,"u":"dBm","vt":"{{ value[2:4] | int(base=16) }}","fi":"signal"}
+{"i":"203d","n":"Smart Dispense Estimated Loads Remaining - Signal","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"signal"}
 {"i":"203e","n":"Bulk Tank Size","d":"sensor","ds":2,"u":"oz","sf":10,"vt":"{{ (value | int(base=16)) / 10 | round(1) }}"}
 {"i":"2040","n":"Remote Stop Cycle Request","d":"select","ds":1,"vt":"{{ {'00': 'Stop command', 'ff': 'Request Processed'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Stop command': '00', 'Request Processed': 'ff'}[value] }}","o":"[\"Stop command\", \"Request Processed\"]"}
 {"i":"2041","n":"Remote Start Extended Tumble","d":"select","ds":1,"vt":"{{ {'00': 'Start Extended Tumble command', 'ff': 'Request Processed'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Start Extended Tumble command': '00', 'Request Processed': 'ff'}[value] }}","o":"[\"Start Extended Tumble command\", \"Request Processed\"]"}
@@ -1215,7 +1215,7 @@
 {"i":"2150","n":"Dryer BLE Control - Washer API Feature Bitmap - CycleSelection","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 8) % 2 else '00' }}","fi":"cycleselection","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"2150","n":"Dryer BLE Control - Washer API Feature Bitmap - TimeLevelOption","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 16) % 2 else '00' }}","fi":"timeleveloption","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"2151","n":"BLE Dryer Requested ERD Stream State","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'No Request', '01': 'Start', '02': 'Run'}.get(value[:2], 'Unknown') }}"}
-{"i":"2152","n":"BLE Event Sequence Sender Reset Signal Washer To Dryer","d":"sensor","ds":1,"u":"dBm","vt":"{{ value | int(base=16) }}"}
+{"i":"2152","n":"BLE Event Sequence Sender Reset Signal Washer To Dryer","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"2153","n":"BLE ERD Stream Dryer To Washer - Sequence Number","d":"sensor","ds":220,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"2153","n":"BLE ERD Stream Dryer To Washer - Max Number Of Entries In Buffer","d":"sensor","ds":220,"vt":"{{ value[2:4] | int(base=16) }}","fi":"max_number_of_entries_in_buffer"}
 {"i":"2153","n":"BLE ERD Stream Dryer To Washer - Number Of Bytes In Largest ERD In Buffer","d":"sensor","ds":220,"vt":"{{ value[4:6] | int(base=16) }}","fi":"number_of_bytes_in_largest_erd_in_buffer"}
@@ -1465,9 +1465,9 @@
 {"i":"2155","n":"Local wash complete notification option Actual","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"2156","n":"Wash complete cycle notification option Request","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"2157","n":"BLE washer requested ERD stream state","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'No Request', '01': 'Start', '02': 'Run'}.get(value[:2], 'Unknown') }}"}
-{"i":"2158","n":"BLE Event Sequence Sender Reset Signal Dryer to Washer","d":"sensor","ds":1,"u":"dBm","vt":"{{ value | int(base=16) }}"}
-{"i":"2159","n":"BLE heartbeat sign of life dryer to washer","d":"sensor","ds":1,"u":"dBm","vt":"{{ value | int(base=16) }}"}
-{"i":"215a","n":"BLE heartbeat sign of life washer to dryer","d":"sensor","ds":1,"u":"dBm","vt":"{{ value | int(base=16) }}"}
+{"i":"2158","n":"BLE Event Sequence Sender Reset Signal Dryer to Washer","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"2159","n":"BLE heartbeat sign of life dryer to washer","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"215a","n":"BLE heartbeat sign of life washer to dryer","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"215b","n":"Load Item Count","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'01': '1 Item', '02': '2 Items', '03': '3 Items', '04': '4 Items', '05': '5 Items', '64': '2 - 4 Items', '65': '6 - 12 Items', 'ff': 'Request processed'}.get(value[:2], 'Unknown') }}"}
 {"i":"215c","n":"Load Item Count Set Request","d":"select","ds":1,"vt":"{{ {'01': '1 Item', '02': '2 Items', '03': '3 Items', '04': '4 Items', '05': '5 Items', '64': '2 - 4 Items', '65': '6 - 12 Items', 'ff': 'Request processed'}.get(value[:2], 'Unknown') }}","ct":"{{ {'1 Item': '01', '2 Items': '02', '3 Items': '03', '4 Items': '04', '5 Items': '05', '2 - 4 Items': '64', '6 - 12 Items': '65', 'Request processed': 'ff'}[value] }}","o":"[\"1 Item\", \"2 Items\", \"3 Items\", \"4 Items\", \"5 Items\", \"2 - 4 Items\", \"6 - 12 Items\", \"Request processed\"]"}
 {"i":"215d","n":"Dryer BLE Control - Dryer API Feature Bitmap - Foundation","d":"binary_sensor","ds":2,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 1) % 2 else '00' }}","fi":"foundation","pon":"01","poff":"00","son":"01","soff":"00"}

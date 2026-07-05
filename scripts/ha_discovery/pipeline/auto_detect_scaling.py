@@ -237,7 +237,7 @@ def infer_unit_from_name(field_name):
         return '%', None
     if 'battery' in name_lower and ('level' in name_lower or 'health' in name_lower):
         return '%', None
-    if 'rssi' in name_lower or 'signal' in name_lower:
+    if 'rssi' in name_lower or 'ble' in name_lower and 'scan result' in name_lower:
         return 'dBm', None
     if 'energy' in name_lower and ('cumulative' in name_lower or 'consumption' in name_lower or 'watt second' in name_lower):
         return 'kWh', None
@@ -350,13 +350,18 @@ def apply_detection(entries):
             if m:
                 scale = int(m.group(1))
         if unit is None and scale is None:
+            # Clear stale units from previous runs when the detector
+            # no longer finds any signal for this field.
+            if review.get('unit_of_measurement'):
+                review['unit_of_measurement'] = None
+                total_applied += 1
             continue
 
         total_matched += 1
         applied = False
 
-        # Only write when not already set, preserving manual overrides.
-        if unit is not None and not review.get('unit_of_measurement'):
+        # Always write when detected, overwriting stale or incorrect values.
+        if unit is not None:
             review['unit_of_measurement'] = unit
             applied = True
 
