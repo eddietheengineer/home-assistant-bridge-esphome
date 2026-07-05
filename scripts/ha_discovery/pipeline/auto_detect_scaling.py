@@ -235,6 +235,8 @@ def infer_unit_from_name(field_name):
         return 'rpm', None
     if 'humidity' in name_lower and 'update period' not in name_lower:
         return '%', None
+    if 'percentage' in name_lower or 'percent' in name_lower:
+        return '%', None
     if 'battery' in name_lower and ('level' in name_lower or 'health' in name_lower):
         return '%', None
     if 'rssi' in name_lower or 'ble' in name_lower and 'scan result' in name_lower:

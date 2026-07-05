@@ -118,7 +118,7 @@
 {"i":"40bb","n":"MC Circuit Board Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"40bc","n":"MC Power Connector Temperature","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":10,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 10 | round(1) }}"}
 {"i":"40c0","n":"Number of resets","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"40c2","n":"Percentage of anode remaining","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"40c2","n":"Percentage of anode remaining","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"40c3","n":"Missed flow off state","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Missed flow off not active', '01': 'Missed flow off active'}.get(value[:2], 'Unknown') }}"}
 {"i":"40c6","n":"Service requested","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Service not required', '01': 'Service soon'}.get(value[:2], 'Unknown') }}"}
 {"i":"40cb","n":"Depletion state","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Undepleted', '01': 'Mild depletion', '02': 'Severe depletion', '03': 'Critical depletion'}.get(value[:2], 'Unknown') }}"}

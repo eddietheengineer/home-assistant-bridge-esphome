@@ -454,9 +454,9 @@
 {"i":"1161","n":"Water Usage","d":"sensor","ds":4,"u":"gal","dc":"water","sc":"total","vt":"{{ value | int(base=16) }}"}
 {"i":"1162","n":"Daily Water Usage Update Alert","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1163","n":"Water Filter Expiration Alert","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Good', '01': 'Expired'}.get(value[:2], 'Unknown') }}"}
-{"i":"1164","n":"Water Filter Status Details - Percentage Remaining","d":"sensor","ds":12,"vt":"{{ value[0:8] | int(base=16) }}"}
+{"i":"1164","n":"Water Filter Status Details - Percentage Remaining","d":"sensor","ds":12,"u":"%","vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"1164","n":"Water Filter Status Details - Gallons to Expiration","d":"sensor","ds":12,"u":"gal","vt":"{{ (value[8:16] | int(base=16)) - 4294967296 if (value[8:16] | int(base=16)) >= 2147483648 else (value[8:16] | int(base=16)) }}","fi":"gallons_to_expiration"}
-{"i":"1164","n":"Water Filter Status Details - Days to Expiration","d":"sensor","ds":12,"vt":"{{ (value[16:24] | int(base=16)) - 4294967296 if (value[16:24] | int(base=16)) >= 2147483648 else (value[16:24] | int(base=16)) }}","fi":"days_to_expiration"}
+{"i":"1164","n":"Water Filter Status Details - Days to Expiration","d":"sensor","ds":12,"u":"%","vt":"{{ (value[16:24] | int(base=16)) - 4294967296 if (value[16:24] | int(base=16)) >= 2147483648 else (value[16:24] | int(base=16)) }}","fi":"days_to_expiration"}
 {"i":"1165","n":"Water Filter Expiration Limits - Initial Gallons to Expiration","d":"number","ds":8,"u":"gal","mn":0.0,"mx":4294967295.0,"st":1.0,"vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"1165","n":"Water Filter Expiration Limits - Initial Days to Expiration","d":"number","ds":8,"u":"gal","mn":0.0,"mx":4294967295.0,"st":1.0,"vt":"{{ value[8:16] | int(base=16) }}","fi":"initial_days_to_expiration"}
 {"i":"1166","n":"Water Filter Reset Request","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -539,12 +539,12 @@
 {"i":"1175","n":"Home Water Filter Notification - Water Filter 2 Expiration Alert","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[32:64] | int(base=16)) // 41538374868278621028243970633760768) % 2 else '00' }}","fi":"water_filter_2_expiration_alert_1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1175","n":"Home Water Filter Notification - Leak Detected Alert","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[32:64] | int(base=16)) // 83076749736557242056487941267521536) % 2 else '00' }}","fi":"leak_detected_alert_1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1175","n":"Home Water Filter Notification - CapTouch Alert","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[32:64] | int(base=16)) // 166153499473114484112975882535043072) % 2 else '00' }}","fi":"captouch_alert_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"1176","n":"Water Filter 1 Status Details - Percentage Remaining","d":"sensor","ds":12,"vt":"{{ value[0:8] | int(base=16) }}"}
+{"i":"1176","n":"Water Filter 1 Status Details - Percentage Remaining","d":"sensor","ds":12,"u":"%","vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"1176","n":"Water Filter 1 Status Details - Gallons to Expiration","d":"sensor","ds":12,"u":"gal","vt":"{{ (value[8:16] | int(base=16)) - 4294967296 if (value[8:16] | int(base=16)) >= 2147483648 else (value[8:16] | int(base=16)) }}","fi":"gallons_to_expiration"}
-{"i":"1176","n":"Water Filter 1 Status Details - Days to Expiration","d":"sensor","ds":12,"vt":"{{ (value[16:24] | int(base=16)) - 4294967296 if (value[16:24] | int(base=16)) >= 2147483648 else (value[16:24] | int(base=16)) }}","fi":"days_to_expiration"}
-{"i":"1177","n":"Water Filter 2 Status Details - Percentage Remaining","d":"sensor","ds":12,"vt":"{{ value[0:8] | int(base=16) }}"}
+{"i":"1176","n":"Water Filter 1 Status Details - Days to Expiration","d":"sensor","ds":12,"u":"%","vt":"{{ (value[16:24] | int(base=16)) - 4294967296 if (value[16:24] | int(base=16)) >= 2147483648 else (value[16:24] | int(base=16)) }}","fi":"days_to_expiration"}
+{"i":"1177","n":"Water Filter 2 Status Details - Percentage Remaining","d":"sensor","ds":12,"u":"%","vt":"{{ value[0:8] | int(base=16) }}"}
 {"i":"1177","n":"Water Filter 2 Status Details - Gallons to Expiration","d":"sensor","ds":12,"u":"gal","vt":"{{ (value[8:16] | int(base=16)) - 4294967296 if (value[8:16] | int(base=16)) >= 2147483648 else (value[8:16] | int(base=16)) }}","fi":"gallons_to_expiration"}
-{"i":"1177","n":"Water Filter 2 Status Details - Days to Expiration","d":"sensor","ds":12,"vt":"{{ (value[16:24] | int(base=16)) - 4294967296 if (value[16:24] | int(base=16)) >= 2147483648 else (value[16:24] | int(base=16)) }}","fi":"days_to_expiration"}
+{"i":"1177","n":"Water Filter 2 Status Details - Days to Expiration","d":"sensor","ds":12,"u":"%","vt":"{{ (value[16:24] | int(base=16)) - 4294967296 if (value[16:24] | int(base=16)) >= 2147483648 else (value[16:24] | int(base=16)) }}","fi":"days_to_expiration"}
 {"i":"1178","n":"Home Water Filter Platform","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'POE', '01': 'POU', '02': 'RO'}.get(value[:2], 'Unknown') }}"}
 {"i":"1179","n":"Home Water Filter 0 Type Information - Type","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'POE 13 in', '01': 'POE 20 in', '02': 'POE 10 in', '03': 'RO Carbon Filter', '04': 'Reverse Osmosis', '05': 'RO Remineralization', '06': 'RO Pre Filter', '07': 'RO Post Filter', '08': 'POU Bluetooth', '09': 'POU Single Stage', '0a': 'POU Dual Stage', '0b': 'POU High Flow', '0c': 'In Line Filter', '0d': 'Five Year Filter', '0e': 'Shower Filter', '0f': 'Antiscale'}.get(value[0:2], 'Unknown') }}"}
 {"i":"1179","n":"Home Water Filter 0 Type Information - Location","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Bottom', '01': 'Middle', '02': 'Upper'}.get(value[2:4], 'Unknown') }}","fi":"location"}
@@ -560,8 +560,8 @@
 {"i":"121b","n":"Turbo Freeze Status","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"121c","n":"Current Flowmeter Ounces Dispensed","d":"sensor","ds":2,"u":"oz","sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"121d","n":"Last Flowmeter Ounces Dispensed","d":"sensor","ds":2,"u":"oz","sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
-{"i":"121e","n":"Dimmable Lighting 0 Percent Level Request","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
-{"i":"121f","n":"Dimmable Lighting 0 Percent Level Setting","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"121e","n":"Dimmable Lighting 0 Percent Level Request","d":"number","ds":1,"u":"%","mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"121f","n":"Dimmable Lighting 0 Percent Level Setting","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"1220","n":"Dimmable Lighting 0 Configuration - Fresh Food Back Light","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"fresh_food_back_light","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1220","n":"Dimmable Lighting 0 Configuration - Fresh Food Top Light","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"fresh_food_top_light","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"1220","n":"Dimmable Lighting 0 Configuration - Freezer Back Light","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"freezer_back_light","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -668,8 +668,8 @@
 {"i":"1306","n":"Grow State - Request ID","d":"number","ds":12,"mn":0.0,"mx":4294967295.0,"st":1.0,"p":"1307","r":"request","vt":"{{ value[8:16] | int(base=16) }}","ct":"{{ '%08x' % (value | int) }}","fi":"request_id"}
 {"i":"1306","n":"Grow State - Data ID","d":"number","ds":12,"mn":0.0,"mx":4294967295.0,"st":1.0,"p":"1307","r":"request","vt":"{{ value[16:24] | int(base=16) }}","ct":"{{ '%08x' % (value | int) }}","fi":"data_id"}
 {"i":"1308","n":"Displayed Grow Chamber","d":"select","ds":1,"p":"1309","r":"request","vt":"{{ {'00': 'Stopped Unknown Section', '01': 'Section 1', '02': 'Section 2', '03': 'Section 3', '04': 'Stopped between Section 1 and 2', '05': 'Stopped between Section 2 and 3', '06': 'Stopped between Section 3 and 1', '07': 'Moving'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Stopped Unknown Section': '00', 'Section 1': '01', 'Section 2': '02', 'Section 3': '03', 'Stopped between Section 1 and 2': '04', 'Stopped between Section 2 and 3': '05', 'Stopped between Section 3 and 1': '06', 'Moving': '07'}[value] }}","o":"[\"Stopped Unknown Section\", \"Section 1\", \"Section 2\", \"Section 3\", \"Stopped between Section 1 and 2\", \"Stopped between Section 2 and 3\", \"Stopped between Section 3 and 1\", \"Moving\"]"}
-{"i":"130a","n":"Display Light Intensity Setting Request","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
-{"i":"130b","n":"Actual Display Light Intensity","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"130a","n":"Display Light Intensity Setting Request","d":"number","ds":1,"u":"%","mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"130b","n":"Actual Display Light Intensity","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"130c","n":"In Home Grower Door Status - Top Right Door status","d":"binary_sensor","ds":4,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}"}
 {"i":"130c","n":"In Home Grower Door Status - Top Left Door status","d":"binary_sensor","ds":4,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","fi":"top_left_door_status"}
 {"i":"130c","n":"In Home Grower Door Status - Bottom Right Door status","d":"binary_sensor","ds":4,"vt":"{{ 'ON' if value | int(base=16) != 0 else 'OFF' }}","fi":"bottom_right_door_status"}
@@ -1994,8 +1994,8 @@
 {"i":"14c0","n":"Variable Cube Size Setting Data 2 - Number of Cube Size Settings","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"14c0","n":"Variable Cube Size Setting Data 2 - Cube Size Default Setting","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"cube_size_default_setting"}
 {"i":"14c1","n":"Variable Cube Size 2","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"p":"14c2","r":"request","vt":"{{ value[0:2] | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
-{"i":"14c3","n":"Dimmable Lighting 0 Warmth Percentage Request","d":"number","ds":1,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
-{"i":"14c4","n":"Dimmable Lighting 0 Warmth Percentage Setting","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"14c3","n":"Dimmable Lighting 0 Warmth Percentage Request","d":"number","ds":1,"u":"%","mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value | int(base=16) }}","ct":"{{ '%02x' % (value | int) }}","m":"box"}
+{"i":"14c4","n":"Dimmable Lighting 0 Warmth Percentage Setting","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"14c5","n":"Secondary Feature Pan Filtered Temperature Resolved","d":"sensor","ds":2,"u":"°F","dc":"temperature","sc":"measurement","sf":100,"vt":"{{ ((value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16))) / 100 | round(2) }}"}
 {"i":"14c6","n":"System Power Off","d":"switch","ds":1,"p":"14c7","r":"request","vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"14c8","n":"Scanned Barcode Result - Barcode","d":"sensor","ds":86,"vt":"{% set chars = ' !\"#$%&\\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~' %}{% set ns = namespace(value='') %}{% set slice = value[0:32] %}{% for i in range(0, slice | length, 2) %}{% set b = slice[i:i+2] | int(base=16) %}{% if b >= 0x20 and b <= 0x7E %}{% set ns.value = ns.value ~ chars[b - 0x20] %}{% endif %}{% endfor %}{{ ns.value.rstrip('_') }}"}

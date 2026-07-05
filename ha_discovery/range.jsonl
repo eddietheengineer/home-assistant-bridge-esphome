@@ -2294,7 +2294,7 @@
 {"i":"5996","n":"Device 0x82 - Status - Health","d":"sensor","ds":4,"u":"°F","dc":"enum","sc":"measurement","vt":"{{ {'00': 'Undefined', '01': 'Healthy', '02': 'Unwell'}.get(value[4:6], 'Unknown') }}","fi":"health"}
 {"i":"5997","n":"Device 0x83 - Status - Maximum Selectable Element Temperature","d":"sensor","ds":4,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"5997","n":"Device 0x83 - Status - Health","d":"sensor","ds":4,"u":"°F","dc":"enum","sc":"measurement","vt":"{{ {'00': 'Undefined', '01': 'Healthy', '02': 'Unwell'}.get(value[4:6], 'Unknown') }}","fi":"health"}
-{"i":"5999","n":"MCT User Settings Request","d":"number","ds":8,"mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value[0:2] | int(base=16) }}","m":"box"}
+{"i":"5999","n":"MCT User Settings Request","d":"number","ds":8,"u":"%","mn":0.0,"mx":255.0,"st":1.0,"vt":"{{ value[0:2] | int(base=16) }}","m":"box"}
 {"i":"5999","n":"MCT User Settings Request - Clock Format","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 1) % 2 else '00' }}","fi":"clock_format","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5999","n":"MCT User Settings Request - Temperature Display Unit","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 2) % 2 else '00' }}","fi":"temperature_display_unit","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5999","n":"MCT User Settings Request - Audio Alarms","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 4) % 2 else '00' }}","fi":"audio_alarms","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -2302,7 +2302,7 @@
 {"i":"5999","n":"MCT User Settings Request - Child Lock","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 16) % 2 else '00' }}","fi":"child_lock","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5999","n":"MCT User Settings Request - Low Power Mode","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 32) % 2 else '00' }}","fi":"low_power_mode","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5999","n":"MCT User Settings Request - Demo Mode","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 64) % 2 else '00' }}","fi":"demo_mode","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"599a","n":"MCT Settings Actual","d":"sensor","ds":8,"vt":"{{ value[0:2] | int(base=16) }}"}
+{"i":"599a","n":"MCT Settings Actual","d":"sensor","ds":8,"u":"%","vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"599a","n":"MCT Settings Actual - Clock Format","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 1) % 2 else '00' }}","fi":"clock_format","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"599a","n":"MCT Settings Actual - Temperature Display Unit","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 2) % 2 else '00' }}","fi":"temperature_display_unit","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"599a","n":"MCT Settings Actual - Audio Alarms","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 4) % 2 else '00' }}","fi":"audio_alarms","pon":"01","poff":"00","son":"01","soff":"00"}

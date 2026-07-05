@@ -32624,7 +32624,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -37639,7 +37639,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -37756,7 +37756,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -38457,7 +38457,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -38490,7 +38490,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -44096,7 +44096,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -44129,7 +44129,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -95553,7 +95553,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -95586,7 +95586,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -233722,7 +233722,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -242721,9 +242721,9 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "NTU",
       "scaling_factor": null,
-      "state_class": null,
+      "state_class": "measurement",
       "paired_erd": null,
       "pair_role": null,
       "filtered": false,
@@ -242970,7 +242970,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -243130,7 +243130,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -243218,7 +243218,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -243251,7 +243251,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -265905,9 +265905,9 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "NTU",
       "scaling_factor": null,
-      "state_class": null,
+      "state_class": "measurement",
       "paired_erd": null,
       "pair_role": null,
       "filtered": false,
@@ -265989,7 +265989,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -266033,7 +266033,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -268963,7 +268963,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -284421,7 +284421,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -425399,7 +425399,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -425439,7 +425439,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -426043,7 +426043,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -426076,7 +426076,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -535056,7 +535056,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -535089,7 +535089,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -535122,7 +535122,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -551832,7 +551832,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": null,
@@ -552922,7 +552922,7 @@
     "review": {
       "ha_domain": "sensor",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": "0x913f",
@@ -553055,7 +553055,7 @@
     "review": {
       "ha_domain": "number",
       "device_class": null,
-      "unit_of_measurement": null,
+      "unit_of_measurement": "%",
       "scaling_factor": null,
       "state_class": null,
       "paired_erd": "0x913e",

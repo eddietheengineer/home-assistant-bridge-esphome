@@ -124,20 +124,20 @@
 {"i":"3020","n":"Dishwasher Usage Profile - Tub Light On Time in Seconds","d":"sensor","ds":32,"u":"s","vt":"{{ value[48:56] | int(base=16) }}","fi":"tub_light_on_time_in_seconds"}
 {"i":"3020","n":"Dishwasher Usage Profile - Cumulative Power-On Time in Seconds","d":"sensor","ds":32,"u":"s","vt":"{{ value[56:64] | int(base=16) }}","fi":"cumulative_power_on_time_in_seconds"}
 {"i":"3035","n":"Water Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
-{"i":"3036","n":"Average Turbidity","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"3036","n":"Average Turbidity","d":"sensor","ds":2,"u":"NTU","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"3037","n":"Dishwasher Door Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Open', '01': 'Closed', '02': 'Invalid', '03': 'Init', '04': 'Unknown'}.get(value[:2], 'Unknown') }}"}
 {"i":"3038","n":"Rinse Aid Level","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Not Empty', '01': 'Empty'}.get(value[:2], 'Unknown') }}"}
 {"i":"3039","n":"Water Volume","d":"sensor","ds":1,"u":"gal","sf":100,"vt":"{{ (value | int(base=16)) / 100 | round(2) }}"}
 {"i":"303a","n":"Diverter Position","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Lower Primary', '01': 'Mid/Upper', '02': 'Lower Reversing', '03': 'Silverware Blaster', '04': 'Unknown/Transitioning'}.get(value[:2], 'Unknown') }}"}
 {"i":"303d","n":"Drain Pump Relay State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"303e","n":"Drain Pump Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"303e","n":"Drain Pump Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"303f","n":"Water Valve State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3042","n":"Cycles Until Next Turbidity Calibration","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
 {"i":"3043","n":"Turbidity Sensor Calibration Attempts","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"3045","n":"Circ Pump Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"3045","n":"Circ Pump Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"3046","n":"Heater Relay State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3049","n":"Fan 1 Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"304b","n":"Fan 2 Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"3049","n":"Fan 1 Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
+{"i":"304b","n":"Fan 2 Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"304d","n":"System Software Versions - UI Version","d":"sensor","ds":24,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}","fi":"ui"}
 {"i":"304d","n":"System Software Versions - UI Parametric Version","d":"sensor","ds":24,"vt":"{{ (value[8:10] | int(base=16) | string) + \".\" + (value[10:12] | int(base=16) | string) }}","fi":"ui_parametric"}
 {"i":"304d","n":"System Software Versions - MC Version","d":"sensor","ds":24,"vt":"{{ (value[12:14] | int(base=16) | string) + \".\" + (value[14:16] | int(base=16) | string) + \".\" + (value[16:18] | int(base=16) | string) + \".\" + (value[18:20] | int(base=16) | string) }}","fi":"mc"}
@@ -529,10 +529,10 @@
 {"i":"3231","n":"Default to Eco Cycle Setting","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3232","n":"Default to Eco Cycle Request","d":"switch","ds":1,"vt":"{{ value[0:2] }}","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3235","n":"Tub1 Water Temperature","d":"sensor","ds":1,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value | int(base=16) }}"}
-{"i":"3236","n":"Average Turbidity Tub 1","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"3236","n":"Average Turbidity Tub 1","d":"sensor","ds":2,"u":"NTU","sc":"measurement","vt":"{{ value | int(base=16) }}"}
 {"i":"3237","n":"Tub 1 Dishwasher Door Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Open', '01': 'Closed', '02': 'Invalid', '03': 'Init', '04': 'Unknown'}.get(value[:2], 'Unknown') }}"}
-{"i":"323e","n":"Tub 1 Drain Pump Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
-{"i":"3245","n":"Tub 1 Circ Pump Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"323e","n":"Tub 1 Drain Pump Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
+{"i":"3245","n":"Tub 1 Circ Pump Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"324d","n":"System Software Versions Tub 1 - UI Version","d":"sensor","ds":24,"vt":"{{ (value[0:2] | int(base=16) | string) + \".\" + (value[2:4] | int(base=16) | string) + \".\" + (value[4:6] | int(base=16) | string) + \".\" + (value[6:8] | int(base=16) | string) }}","fi":"ui"}
 {"i":"324d","n":"System Software Versions Tub 1 - UI Parametric Version","d":"sensor","ds":24,"vt":"{{ (value[8:10] | int(base=16) | string) + \".\" + (value[10:12] | int(base=16) | string) }}","fi":"ui_parametric"}
 {"i":"324d","n":"System Software Versions Tub 1 - MC Version","d":"sensor","ds":24,"vt":"{{ (value[12:14] | int(base=16) | string) + \".\" + (value[14:16] | int(base=16) | string) + \".\" + (value[16:18] | int(base=16) | string) + \".\" + (value[18:20] | int(base=16) | string) }}","fi":"mc"}
@@ -581,7 +581,7 @@
 {"i":"341e","n":"Tub 1 Dispense Count","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"343f","n":"Tub 1 Water Valve State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3446","n":"Tub 1 Heater Relay State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3449","n":"Tub 1 Fan 1 Speed Percentage","d":"sensor","ds":1,"vt":"{{ value | int(base=16) }}"}
+{"i":"3449","n":"Tub 1 Fan 1 Speed Percentage","d":"sensor","ds":1,"u":"%","vt":"{{ value | int(base=16) }}"}
 {"i":"3483","n":"Tub 1 Hue Score","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"3487","n":"Tub 1 Remote Start Enable","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3600","n":"Tub 1 Dish Feature Configuration","d":"sensor","ds":15,"vt":"{{ value[0:2] | int(base=16) }}"}
