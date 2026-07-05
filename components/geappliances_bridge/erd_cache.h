@@ -112,6 +112,9 @@ uint32_t erd_cache_get_update_rate(erd_cache_t* self);
 
 /* Returns the number of updates that set update_required=true since the last call, then resets the window counter. */
 uint32_t erd_cache_get_required_update_rate(erd_cache_t* self);
+/* Mark all valid entries as needing republish. Used after a long MQTT
+ * disconnect to force a full drain of retained values to the broker. */
+void erd_cache_mark_all_updated(erd_cache_t* self);
 
 #ifdef __cplusplus
 }

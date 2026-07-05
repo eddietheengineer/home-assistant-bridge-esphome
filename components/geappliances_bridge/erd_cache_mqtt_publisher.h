@@ -55,6 +55,7 @@ typedef struct {
   uint32_t missed_loops;           // Loop iterations skipped while MQTT disconnected
   uint32_t publish_count_window;   // Publishes in the last 60s window
   uint32_t (*get_time_ms)(void);
+  uint32_t disconnect_start_ms;  /* millis() when MQTT disconnected; 0 if connected */
 #ifndef USE_ESP_IDF
   // Pre-allocated buffers for non-IDF path to avoid stack allocation.
   char loop_topic[128];
