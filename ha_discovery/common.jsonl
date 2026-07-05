@@ -104,7 +104,7 @@
 {"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 13 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 16) % 2 else '00' }}","fi":"digital_feature_13_enabled","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 14 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 32) % 2 else '00' }}","fi":"digital_feature_14_enabled","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"0602","n":"Current Enabled Enhanced Features - Digital Feature 15 Enabled","d":"binary_sensor","ds":8,"vt":"{{ '01' if ((value[4:8] | int(base=16)) // 64) % 2 else '00' }}","fi":"digital_feature_15_enabled","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"0700","n":"Reset Count","d":"sensor","ds":4,"vt":"{{ value | int(base=16) }}"}
+{"i":"0700","n":"Reset Count","d":"sensor","ds":4,"sc":"total_increasing","vt":"{{ value | int(base=16) }}"}
 {"i":"0701","n":"Reset Reason - Reset Source","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Software', '01': 'Watchdog', '02': 'PowerOn', '03': 'Unknown'}.get(value[0:2], 'Unknown') }}"}
 {"i":"0701","n":"Reset Reason - Application-specific Metadata","d":"sensor","ds":2,"vt":"{{ value[2:4] | int(base=16) }}","fi":"application_specific_metadata"}
 {"i":"0702","n":"Seconds Since Last Reset","d":"sensor","ds":4,"u":"s","vt":"{{ value | int(base=16) }}"}

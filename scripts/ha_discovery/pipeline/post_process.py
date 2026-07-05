@@ -93,6 +93,49 @@ OVERRIDES = {
     "0x3236": {"unit_of_measurement": "NTU", "state_class": "measurement"},
     # --- Inlet Flow Rate: GPM with x10000 scaling (first field only, offset 0) ---
     "0x3015:0": {"unit_of_measurement": "gal/min", "scaling_factor": 10000},
+    # --- Heating cycle satisfied: cumulative counter ---
+    "0x4102": {"state_class": "total_increasing"},
+    # --- Measured current: Amps with x10 scaling ---
+    "0x4065": {"device_class": "current", "unit_of_measurement": "A"},
+    # --- Missed flow off counter: resets to 0, so measurement ---
+    "0x4101": {"state_class": "measurement"},
+    # --- Missed flow off fault counter: resets to 0, so measurement ---
+    "0x4105": {"state_class": "measurement"},
+    # --- Number of resets: cumulative counter ---
+    "0x40c0": {"state_class": "total_increasing"},
+    # --- Cooling setpoint minimum limit request: pair with status ---
+    "0x7711": {"paired_erd": "0x7709", "pair_role": "request"},
+    # --- Input Current Limiting: Amps on Min/Max/Step fields ---
+    "0x7470:2": {"device_class": "current", "unit_of_measurement": "A"},
+    "0x7470:4": {"device_class": "current", "unit_of_measurement": "A"},
+    "0x7470:6": {"device_class": "current", "unit_of_measurement": "A"},
+    # --- Make-up Air Fan CFM: volumetric flow ---
+    "0x7464:0": {"unit_of_measurement": "m\u00b3/h"},
+    "0x7464:2": {"unit_of_measurement": "m\u00b3/h"},
+    "0x7464:4": {"unit_of_measurement": "m\u00b3/h"},
+    "0x7464:6": {"unit_of_measurement": "m\u00b3/h"},
+    # --- Cycle counts: cumulative counters ---
+    "0x3009:0": {"state_class": "total_increasing"},
+    "0x3009:2": {"state_class": "total_increasing"},
+    "0x3009:4": {"state_class": "total_increasing"},
+    "0x3209:0": {"state_class": "total_increasing"},
+    "0x3209:2": {"state_class": "total_increasing"},
+    "0x3209:4": {"state_class": "total_increasing"},
+    # --- Dispense counts: cumulative counters ---
+    "0x2033": {"state_class": "total_increasing"},
+    "0x2034": {"state_class": "total_increasing"},
+    "0x2035": {"state_class": "total_increasing"},
+    "0x2036": {"state_class": "total_increasing"},
+    "0x203a": {"state_class": "total_increasing"},
+    # --- Door counts: cumulative counters ---
+    "0x3006": {"state_class": "total_increasing"},
+    "0x3406": {"state_class": "total_increasing"},
+    # --- Reset count: cumulative counter ---
+    "0x0700": {"state_class": "total_increasing"},
+    # --- Tub Water Level: mmH2O measurement ---
+    "0x3084": {"unit_of_measurement": "mmH\u2082O", "state_class": "measurement"},
+    # --- 4 Way Valve Position: read-only sensor, not select ---
+    "0x7902": {"ha_domain": "sensor"},
 }
 
 

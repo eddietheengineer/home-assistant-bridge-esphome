@@ -8,7 +8,7 @@
 {"i":"3003","n":"Reminder - Add Rinse Aid","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"add_rinse_aid","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3003","n":"Reminder - Sanitized","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 4) % 2 else '00' }}","fi":"sanitized","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3003","n":"Reminder - Fill Salt Reservoir","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 8) % 2 else '00' }}","fi":"fill_salt_reservoir","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"3006","n":"Door Count","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"3006","n":"Door Count","d":"sensor","ds":2,"sc":"total_increasing","vt":"{{ value | int(base=16) }}"}
 {"i":"3007","n":"User Settings - Delay Start","d":"sensor","ds":3,"vt":"{{ ((value[0:6] | int(base=16)) // 65536) % 16 }}","fi":"delay_start"}
 {"i":"3007","n":"User Settings - Zone Selection","d":"sensor","ds":3,"vt":"{{ ((value[0:6] | int(base=16)) // 1048576) % 4 }}","fi":"zone_selection"}
 {"i":"3007","n":"User Settings - Demo Mode","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 4194304) % 2 else '00' }}","fi":"demo_mode","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -25,9 +25,9 @@
 {"i":"3007","n":"User Settings - Wifi Enabled","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 128) % 2 else '00' }}","fi":"wifi_enabled","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3008","n":"Error - Error ID","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"3008","n":"Error - Error Active","d":"binary_sensor","ds":2,"vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
-{"i":"3009","n":"Cycle Counts - Started Cycles Counter","d":"sensor","ds":6,"vt":"{{ value[0:4] | int(base=16) }}"}
-{"i":"3009","n":"Cycle Counts - Completed Cycles Counter","d":"sensor","ds":6,"vt":"{{ value[4:8] | int(base=16) }}","fi":"completed_cycles_counter"}
-{"i":"3009","n":"Cycle Counts - Power On Reset Counter","d":"sensor","ds":6,"vt":"{{ value[8:12] | int(base=16) }}","fi":"power_on_reset_counter"}
+{"i":"3009","n":"Cycle Counts - Started Cycles Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[0:4] | int(base=16) }}"}
+{"i":"3009","n":"Cycle Counts - Completed Cycles Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[4:8] | int(base=16) }}","fi":"completed_cycles_counter"}
+{"i":"3009","n":"Cycle Counts - Power On Reset Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[8:12] | int(base=16) }}","fi":"power_on_reset_counter"}
 {"i":"300c","n":"Dish Personality - Personality","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"300c","n":"Dish Personality - Source","d":"sensor","ds":2,"dc":"enum","vt":"{{ {'00': 'Boot Loader', '01': 'ADC', '02': 'Entity', '03': 'Undefined'}.get(value[2:4], 'Unknown') }}","fi":"source"}
 {"i":"300d","n":"Delay Start Remaining Time In Minutes","d":"sensor","ds":2,"u":"min","vt":"{{ value | int(base=16) }}"}
@@ -151,7 +151,7 @@
 {"i":"3074","n":"Dry Heater Fan Speed Feedback","d":"sensor","ds":2,"u":"rpm","vt":"{{ value | int(base=16) }}"}
 {"i":"3075","n":"Dry Heater Relay State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3083","n":"Hue Score","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
-{"i":"3084","n":"Tub Water Level","d":"sensor","ds":2,"vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
+{"i":"3084","n":"Tub Water Level","d":"sensor","ds":2,"u":"mmH₂O","sc":"measurement","vt":"{{ (value | int(base=16)) - 65536 if (value | int(base=16)) >= 32768 else (value | int(base=16)) }}"}
 {"i":"3085","n":"Flood Detected","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'No Flood Detected', '01': 'Flood Detected'}.get(value[:2], 'Unknown') }}"}
 {"i":"3086","n":"Enable Features - Heated Dry","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 1) % 2 else '00' }}","fi":"heated_dry","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3086","n":"Enable Features - Boost","d":"binary_sensor","ds":1,"vt":"{{ '01' if ((value[0:2] | int(base=16)) // 2) % 2 else '00' }}","fi":"boost","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -249,9 +249,9 @@
 {"i":"3207","n":"User Settings Tub 1 - Wifi Enabled","d":"binary_sensor","ds":3,"vt":"{{ '01' if ((value[0:6] | int(base=16)) // 128) % 2 else '00' }}","fi":"wifi_enabled","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3208","n":"Error Tub 1 - Error ID","d":"sensor","ds":2,"vt":"{{ value[0:2] | int(base=16) }}"}
 {"i":"3208","n":"Error Tub 1 - Error Active","d":"binary_sensor","ds":2,"vt":"{{ '01' if value[2:4] != '00' else '00' }}","fi":"error_active"}
-{"i":"3209","n":"Cycle Counts Tub 1 - Started Cycles Counter","d":"sensor","ds":6,"vt":"{{ value[0:4] | int(base=16) }}"}
-{"i":"3209","n":"Cycle Counts Tub 1 - Completed Cycles Counter","d":"sensor","ds":6,"vt":"{{ value[4:8] | int(base=16) }}","fi":"completed_cycles_counter"}
-{"i":"3209","n":"Cycle Counts Tub 1 - Power On Reset Counter","d":"sensor","ds":6,"vt":"{{ value[8:12] | int(base=16) }}","fi":"power_on_reset_counter"}
+{"i":"3209","n":"Cycle Counts Tub 1 - Started Cycles Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[0:4] | int(base=16) }}"}
+{"i":"3209","n":"Cycle Counts Tub 1 - Completed Cycles Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[4:8] | int(base=16) }}","fi":"completed_cycles_counter"}
+{"i":"3209","n":"Cycle Counts Tub 1 - Power On Reset Counter","d":"sensor","ds":6,"sc":"total_increasing","vt":"{{ value[8:12] | int(base=16) }}","fi":"power_on_reset_counter"}
 {"i":"320a","n":"Water Softener Setting","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Water softener off', '01': 'Water softener setting 1', '02': 'Water softener setting 2', '03': 'Water softener setting 3', '04': 'Water softener setting 4', '05': 'Water softener setting 5', '06': 'Water softener setting 6', '07': 'Water softener setting 7', '08': 'Water softener setting 8'}.get(value[:2], 'Unknown') }}"}
 {"i":"320b","n":"Water Softener Regeneration Frequency Setting Request","d":"select","ds":1,"vt":"{{ {'00': 'Water softener off', '01': 'Water softener setting 1', '02': 'Water softener setting 2', '03': 'Water softener setting 3', '04': 'Water softener setting 4', '05': 'Water softener setting 5', '06': 'Water softener setting 6', '07': 'Water softener setting 7', '08': 'Water softener setting 8'}.get(value[:2], 'Unknown') }}","ct":"{{ {'Water softener off': '00', 'Water softener setting 1': '01', 'Water softener setting 2': '02', 'Water softener setting 3': '03', 'Water softener setting 4': '04', 'Water softener setting 5': '05', 'Water softener setting 6': '06', 'Water softener setting 7': '07', 'Water softener setting 8': '08'}[value] }}","o":"[\"Water softener off\", \"Water softener setting 1\", \"Water softener setting 2\", \"Water softener setting 3\", \"Water softener setting 4\", \"Water softener setting 5\", \"Water softener setting 6\", \"Water softener setting 7\", \"Water softener setting 8\"]"}
 {"i":"320c","n":"Auto Lid Down Setting","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
@@ -576,7 +576,7 @@
 {"i":"3264","n":"Auto Open Door Option State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"3300","n":"Turbidity Calibration Value Tub 1","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"3401","n":"Tub 1 Operating Mode","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Low Power', '01': 'Power Up', '02': 'Standby', '03': 'Delay Start', '04': 'Pause', '05': 'Run', '06': 'EOC', '07': 'Download Mode', '08': 'Sensor Check Mode', '09': 'Load Activation Mode', '0b': 'MC Only Mode', '0c': 'User Alert Mode', '0d': 'Lock', '0e': 'CSM', '0f': 'Wifi Binding', '10': 'Rinse Aid Level Selection', '11': 'Sabbath Mode', '12': 'Delay Pause'}.get(value[:2], 'Unknown') }}"}
-{"i":"3406","n":"Tub 1 Door Count","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
+{"i":"3406","n":"Tub 1 Door Count","d":"sensor","ds":2,"sc":"total_increasing","vt":"{{ value | int(base=16) }}"}
 {"i":"340d","n":"Tub 1 Delay Start Remaining Time In Minutes","d":"sensor","ds":2,"u":"min","vt":"{{ value | int(base=16) }}"}
 {"i":"341e","n":"Tub 1 Dispense Count","d":"sensor","ds":2,"vt":"{{ value | int(base=16) }}"}
 {"i":"343f","n":"Tub 1 Water Valve State","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}
