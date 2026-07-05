@@ -25,7 +25,6 @@ CONF_ADAPTER_ADDRESS = "adapter_address"
 CONF_DEVICE_ID = "device_id"
 CONF_MODE = "mode"
 CONF_POLLING_INTERVAL = "polling_interval"
-CONF_POLLING_ONLY_PUBLISH_ON_CHANGE = "polling_onlypublish_onchange"
 CONF_APPLIANCE_API_PARSING = "appliance_api_parsing"
 CONF_CUSTOM_ERDS = "custom_erds"
 CONF_GENERATE_DEVICE_CONFIG = "generate_device_config"
@@ -102,7 +101,6 @@ CONFIG_SCHEMA = cv.Schema(
             upper=False
         ),
         cv.Optional(CONF_POLLING_INTERVAL, default=10000): cv.positive_int,
-        cv.Optional(CONF_POLLING_ONLY_PUBLISH_ON_CHANGE, default=True): cv.boolean,
         cv.Optional(CONF_APPLIANCE_API_PARSING, default=True): cv.boolean,
         cv.Optional(CONF_GENERATE_DEVICE_CONFIG, default=False): cv.boolean,
         cv.Optional(CONF_CUSTOM_ERDS, default=[]): cv.All(cv.ensure_list(
@@ -157,12 +155,6 @@ async def to_code(config: dict[str, Any]) -> None:
     cg.add_library("https://github.com/geappliances/tiny-gea-api#4fa8fee8297e24baa91bfe4a464088a73e7c6a5a", None)
     
     var = cg.new_Pvariable(config[CONF_ID])
-    # Deprecation warning for polling_onlypublish_onchange
-    if CONF_POLLING_ONLY_PUBLISH_ON_CHANGE in config:
-        _LOGGER.warning(
-            "polling_onlypublish_onchange is deprecated and will be removed in a future release. "
-            "The component now always publishes only on change."
-)
     await cg.register_component(var, config)
     # Ensure USE_ESP_IDF is defined for ESP-IDF builds so that
     # platform-specific code in our component compiles correctly.

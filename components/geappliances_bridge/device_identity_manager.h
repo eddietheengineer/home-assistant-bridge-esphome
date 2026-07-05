@@ -89,6 +89,10 @@ class DeviceIdentityManager {
    * Get the current state.
    */
   DeviceIdState get_state() const { return state_; }
+  /*
+   * Reset state. Safe to call multiple times. No-op if never initialized.
+   */
+  void cleanup();
 
   /*
    * Get the final device ID string. Returns the preconfigured ID if one was
