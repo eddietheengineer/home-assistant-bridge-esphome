@@ -24,7 +24,7 @@ namespace geappliances_bridge {
 // so rapid reboots during config-hash OTA don't trigger safe mode.
 static constexpr uint32_t SAFE_MODE_RTC_KEY = 233825507UL;
 
-#ifdef USE_ESP_IDF
+#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
 static void mark_boot_successful_for_reboot()
 {
   // Clear the safe mode boot loop counter in preferences and persist immediately.
@@ -213,7 +213,7 @@ void GeappliancesBridge::setup() {
   // ESPHome's debug component stores the component's log string before
   // App.reboot() — OTA stores "esphome.ota", bridge stores "geappliances_bridge".
   // Only trigger cleanup for OTA, not for our own reboot or other software resets.
-#ifdef USE_ESP_IDF
+#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
   {
     esp_reset_reason_t reset = esp_reset_reason();
     if (reset == ESP_RST_SW) {
@@ -287,7 +287,7 @@ void GeappliancesBridge::loop() {
 
 
   // ── OTA-triggered cleanup + republish + reboot ───────────────────────────
-#ifdef USE_ESP_IDF
+#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
   // Start cleanup once steady state is reached (only on OTA reboot).
   if (this->generate_device_config_ &&
       this->ota_cleanup_needed_ && !this->ota_cleanup_in_progress_ &&
@@ -365,7 +365,7 @@ void GeappliancesBridge::loop() {
     if (this->steady_state_reached_ &&
         this->mqtt_client_adapter_initialized_ &&
         this->device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE) {
-#ifdef USE_ESP_IDF
+#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
       ha_discovery_cleanup_configure(&this->ha_discovery_manager_.cleanup,
           this->device_identity_manager_.get_device_id(),
           &this->mqtt_client_adapter_.interface, esphome::millis);
