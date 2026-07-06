@@ -28,26 +28,6 @@ docs/
     └── interfaces.md          # Key C interface documentation
 ```
 
-### Migration from `doc/`
-
-Existing `doc/` directory contents will be migrated to the new `docs/` structure
-in a follow-up PR. Until then, cross-references in `docs/` point to `../doc/`
-for files that haven't been moved yet.
-
-| Current Location | New Location | Status |
-|---|---|---|
-| `doc/architecture.md` | `docs/architecture/overview.md` | ✅ Done |
-| `doc/spec/*.md` | `docs/spec/*.md` | Planned |
-| `doc/module_descriptions/*.md` | `docs/architecture/module-descriptions/*.md` | Planned |
-| `doc/ha-mqtt-discovery-embedded-compressed-jsonl.md` | `docs/guides/pipeline.md` | ✅ Done |
-| `doc/heap-optimization-plan.md` | Archived | ✅ Done |
-| `doc/pipeline-improvements.md` | Archived | ✅ Done |
-| `doc/dual_appliance_plan.md` | `docs/architecture/roadmap.md` | ✅ Done |
-| `doc/investigations/*.md` | `docs/investigations/*.md` | Planned |
-| `doc/example.yaml` | `docs/guides/deployment.md` | ✅ Done |
-| `doc/test-compile.yaml` | Kept in `doc/` | N/A |
-| `doc/secrets.yaml` | Kept in `doc/` | N/A |
-
 ## Document Types
 
 ### Specifications (`docs/spec/`)
