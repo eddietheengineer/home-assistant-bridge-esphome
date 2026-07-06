@@ -299,7 +299,7 @@ void GeappliancesBridge::loop() {
       // default TWDT timeout (30 ms) and would trigger a reset.
       esp_task_wdt_reset();
       vTaskDelay(pdMS_TO_TICKS(500));
-      esphome::App.reboot();
+      esphome::App.safe_reboot();
     }
   }
 #endif
@@ -345,7 +345,7 @@ void GeappliancesBridge::loop() {
       // default TWDT timeout (30 ms) and would trigger a reset.
       esp_task_wdt_reset();
       vTaskDelay(pdMS_TO_TICKS(500));
-      esphome::App.reboot();
+      esphome::App.safe_reboot();
     }
 #endif
   }
