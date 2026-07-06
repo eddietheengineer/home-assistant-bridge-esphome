@@ -33,12 +33,8 @@ import jinja2
 
 JINJA2_ENV = jinja2.Environment()
 
-# All category files
-CATEGORIES = [
-    'common', 'airconditioning', 'refrigeration', 'laundry',
-    'dishwasher', 'waterheater', 'range', 'waterfilter',
-    'smallappliance', 'energy',
-]
+# All category names
+from scripts.ha_discovery.pipeline.ha_constants import CATEGORIES_LIST as CATEGORIES
 
 
 def load_all_entities() -> List[Dict[str, Any]]:

@@ -286,3 +286,22 @@ BINARY_SENSOR_DEVICE_CLASSES = {
     "problem", "running", "safety", "smoke", "sound",
     "tamper", "update", "vibration", "window",
 }
+# ERD category ranges (authoritative form for categorization)
+CATEGORIES = {
+    "common": (0x0000, 0x0FFF),
+    "refrigeration": (0x1000, 0x1FFF),
+    "laundry": (0x2000, 0x2FFF),
+    "dishwasher": (0x3000, 0x3FFF),
+    "waterheater": (0x4000, 0x4FFF),
+    "range": (0x5000, 0x5FFF),
+    "airconditioning": (0x7000, 0x7FFF),
+    "waterfilter": (0x8000, 0x8FFF),
+    "smallappliance": (0x9000, 0x9FFF),
+    "energy": (0xD000, 0xDFFF),
+}
+
+# Category names as a list (for scripts that just need the names)
+CATEGORIES_LIST = list(CATEGORIES.keys())
+
+# Protocol marker labels to exclude from enum value counts
+PROTOCOL_MARKERS = {"Request Consumed", "Request processed", "Consumed"}

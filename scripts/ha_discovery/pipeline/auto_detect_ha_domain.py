@@ -30,6 +30,7 @@ from ha_constants import (
     VALID_DEVICE_CLASSES,
     SENSOR_NON_NUMERIC_DEVICE_CLASSES,
     BINARY_SENSOR_DEVICE_CLASSES,
+    PROTOCOL_MARKERS,
 )
 
 
@@ -42,10 +43,6 @@ def _is_writable(entry):
 def _is_enum(entry):
     """Check if field has enum values."""
     return entry.get('field_values') is not None
-
-
-PROTOCOL_MARKERS = {'Request Consumed', 'Request processed', 'Consumed'}
-
 
 def _enum_value_count(entry):
     """Count enum values, excluding protocol markers."""
