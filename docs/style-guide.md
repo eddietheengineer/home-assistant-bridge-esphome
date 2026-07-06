@@ -41,7 +41,7 @@ Detailed behavioral contracts for each module. Follow the spec template exactly.
 3. **Behavior** — Numbered requirements with Rationale, Implementation, Verification
 4. **Notes** — Design decisions, tradeoffs, known limitations
 
-### Module Descriptions (`docs/architecture/module-descriptions/`)
+### Module Descriptions (`doc/module_descriptions/`)
 
 Lightweight summaries for architecture overview. One paragraph of purpose, bullet list of responsibilities, bullet list of dependencies.
 
