@@ -13,7 +13,6 @@ timeout guards.
 sequenceDiagram
     autonumber
     participant HSM as Startup HSM
-    participant UART as UART Adapters
     participant AD as AutodiscoveryManager
     participant DI as DeviceIdentityManager
     participant MQTT as MQTT Client Adapter
@@ -22,8 +21,7 @@ sequenceDiagram
     participant SW as Subscription Watch
     participant RUN as Running State
 
-    HSM->>UART: Initialize GEA2/GEA3 interfaces
-    HSM->>HSM: protocol_stack (entry)
+    HSM->>HSM: protocol_stack (init UART adapters)
     HSM->>HSM: startup_delay (5s wait)
     Note over HSM: Wait for appliance to stabilize
 
