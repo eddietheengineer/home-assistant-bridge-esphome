@@ -441,10 +441,6 @@ TEST_GROUP_BASE(erd_bridge_subscribe_dual, simulation_test_base)
     tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
   }
 
-  void after(tiny_timer_ticks_t ticks)
-  {
-    tiny_timer_group_double_elapse_time(&timer_group, ticks);
-  }
 };
 
 
