@@ -24,7 +24,7 @@ namespace geappliances_bridge {
 // so rapid reboots during config-hash OTA don't trigger safe mode.
 static constexpr uint32_t SAFE_MODE_RTC_KEY = 233825507UL;
 
-#ifdef USE_ESP32
+#ifdef USE_ESP_IDF
 static void mark_boot_successful_for_reboot()
 {
   // Clear the safe mode boot loop counter in preferences and persist immediately.
@@ -213,7 +213,7 @@ void GeappliancesBridge::setup() {
   // ESPHome's debug component stores the component's log string before
   // App.reboot() — OTA stores "esphome.ota", bridge stores "geappliances_bridge".
   // Only trigger cleanup for OTA, not for our own reboot or other software resets.
-#ifdef USE_ESP32
+#ifdef USE_ESP_IDF
   {
     esp_reset_reason_t reset = esp_reset_reason();
     if (reset == ESP_RST_SW) {

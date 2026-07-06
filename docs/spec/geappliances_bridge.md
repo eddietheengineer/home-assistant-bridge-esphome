@@ -195,7 +195,7 @@ Two boolean configuration flags control discovery behavior. Both are set via the
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `generate_device_config_` | `true` | When `true`, the bridge runs HA discovery on OTA reboot or Discovery Refresh. When `false`, both paths are skipped entirely. Normal boots skip discovery regardless (topics retained by MQTT broker). |
+| `generate_device_config_` | `true` | When `true`, the bridge runs HA discovery on OTA reboot. When `false`, the OTA path is skipped entirely. The Discovery Refresh button always works regardless of this flag (it's a user-initiated manual action). Normal boots skip discovery regardless (topics retained by MQTT broker). |
 | `filter_config_topics_` | `true` | When `true`, the discovery manager filters out non-config topics during cleanup (only `/config` discovery payloads are removed). Passed to `ha_discovery_manager_configure()`. |
 
 **Configuration setters:**
