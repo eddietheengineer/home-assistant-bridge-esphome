@@ -19,7 +19,7 @@
 static constexpr uint32_t SAFE_MODE_RTC_KEY = 233825507UL;
 
 #ifdef USE_ESP32
-static void mark_boot_successful_for_reboot_()
+static void mark_boot_successful_for_reboot()
 {
   // Clear the safe mode boot loop counter in preferences and persist immediately.
   uint32_t val = 0;
@@ -319,7 +319,7 @@ void GeappliancesBridge::loop() {
 
       // Clear safe mode boot counter and cancel OTA rollback so rapid reboots
       // during config-hash OTA don't trigger safe mode or partition rollback.
-      mark_boot_successful_for_reboot_();
+      mark_boot_successful_for_reboot();
 
       // Brief delay for ESPHome to notice the disconnect, then reboot.
       this->ota_cleanup_waiting_for_config_ = true;
@@ -378,7 +378,7 @@ void GeappliancesBridge::loop() {
 
 #ifdef USE_ESP32
       // Clear safe mode boot counter and cancel OTA rollback.
-      mark_boot_successful_for_reboot_();
+      mark_boot_successful_for_reboot();
 #endif
 
       // Brief delay for ESPHome to notice the disconnect, then reboot.
