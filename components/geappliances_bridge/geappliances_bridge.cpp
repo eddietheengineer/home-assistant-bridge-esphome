@@ -8,8 +8,30 @@
 #ifdef USE_ESP32
 #include "esp_system.h"
 #include "esp_task_wdt.h"
+#include "esp_ota_ops.h"
+#include "esphome/core/preferences.h"
 #elif defined(USE_ESP_IDF_STUBS)
 #include "esp-idf/esp_task_wdt.h"
+#endif
+// Safe mode RTC key (matches esphome::safe_mode::RTC_KEY).
+// Used to manually clear the boot loop counter before rebooting after cleanup,
+// so rapid reboots during config-hash OTA don't trigger safe mode.
+static constexpr uint32_t SAFE_MODE_RTC_KEY = 233825507UL;
+
+#ifdef USE_ESP32
+static void mark_boot_successful_for_reboot_()
+{
+  // Clear the safe mode boot loop counter in preferences and persist immediately.
+  uint32_t val = 0;
+  ESPPreferenceObject rtc_pref = global_preferences->make_preference<uint32_t>(SAFE_MODE_RTC_KEY, false);
+  rtc_pref.save(&val);
+  global_preferences->sync();
+
+  // Mark OTA partition as valid to prevent bootloader rollback on next boot.
+  esp_ota_mark_app_valid_cancel_rollback();
+
+  ESP_LOGI(TAG, "Safe mode counter cleared, OTA rollback cancelled");
+}
 #endif
 
 GEA_TAG(TAG) = "geappliances_bridge";
@@ -286,7 +308,7 @@ void GeappliancesBridge::loop() {
     if (ha_discovery_cleanup_is_done(&this->ha_discovery_manager_.cleanup)) {
       this->ota_cleanup_in_progress_ = false;
       this->ota_cleanup_needed_ = false;
-      ESP_LOGI(TAG, "OTA-triggered HA discovery cleanup complete, waiting for config update...");
+      ESP_LOGI(TAG, "OTA-triggered HA discovery cleanup complete, preparing reboot...");
 
       /* Destroy the cleanup module before reboot to unsubscribe the wildcard
        * topic and zero the callback arg. The ESP-IDF MQTT event queue may have
@@ -295,18 +317,22 @@ void GeappliancesBridge::loop() {
        * zeroes the struct, it corrupts heap metadata and crashes the idle task. */
       ha_discovery_cleanup_destroy(&this->ha_discovery_manager_.cleanup);
 
-      // Wait 60 s for ESPHome to detect config hash mismatch and flash new firmware.
+      // Clear safe mode boot counter and cancel OTA rollback so rapid reboots
+      // during config-hash OTA don't trigger safe mode or partition rollback.
+      mark_boot_successful_for_reboot_();
+
+      // Brief delay for ESPHome to notice the disconnect, then reboot.
       this->ota_cleanup_waiting_for_config_ = true;
       this->ota_cleanup_wait_start_ms_ = esphome::millis();
     }
   }
 
-  // After cleanup, wait for config update window before rebooting.
+  // After cleanup, short wait then reboot.
   if (this->ota_cleanup_waiting_for_config_) {
     esp_task_wdt_reset();
     uint32_t elapsed = esphome::millis() - this->ota_cleanup_wait_start_ms_;
-    if (elapsed >= 60000) {
-      ESP_LOGI(TAG, "Config update wait complete, restarting device...");
+    if (elapsed >= 5000) {
+      ESP_LOGI(TAG, "Rebooting after cleanup...");
       this->ota_cleanup_waiting_for_config_ = false;
       esphome::App.safe_reboot();
     }
@@ -341,7 +367,7 @@ void GeappliancesBridge::loop() {
     ha_discovery_cleanup_run(&this->ha_discovery_manager_.cleanup);
     if (ha_discovery_cleanup_is_done(&this->ha_discovery_manager_.cleanup)) {
       this->discovery_refresh_in_progress_ = false;
-      ESP_LOGI(TAG, "HA discovery cleanup complete, waiting for config update...");
+      ESP_LOGI(TAG, "HA discovery cleanup complete, preparing reboot...");
 
       /* Destroy the cleanup module before reboot to unsubscribe the wildcard
        * topic and zero the callback arg. The ESP-IDF MQTT event queue may have
@@ -350,7 +376,12 @@ void GeappliancesBridge::loop() {
        * zeroes the struct, it corrupts heap metadata and crashes the idle task. */
       ha_discovery_cleanup_destroy(&this->ha_discovery_manager_.cleanup);
 
-      // Wait 60 s for ESPHome to detect config hash mismatch and flash new firmware.
+#ifdef USE_ESP32
+      // Clear safe mode boot counter and cancel OTA rollback.
+      mark_boot_successful_for_reboot_();
+#endif
+
+      // Brief delay for ESPHome to notice the disconnect, then reboot.
       this->ota_cleanup_waiting_for_config_ = true;
       this->ota_cleanup_wait_start_ms_ = esphome::millis();
     }
