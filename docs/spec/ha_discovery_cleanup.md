@@ -46,7 +46,6 @@ typedef enum {
   ha_cleanup_state_idle,
   ha_cleanup_state_cleaning,
   ha_cleanup_state_done,
-  ha_cleanup_state_failed,
 } ha_cleanup_state_t;
 ```
 
@@ -55,7 +54,6 @@ typedef enum {
 | `ha_cleanup_state_idle` | Initial state after `init()`. No cleanup in progress. |
 | `ha_cleanup_state_cleaning` | Active cleanup in progress. Set by `start()`. |
 | `ha_cleanup_state_done` | Cleanup completed successfully. Two consecutive clean passes with no topics found. |
-| `ha_cleanup_state_failed` | Cleanup failed (reserved; not currently used by the implementation). |
 
 ### 3.2 Context Struct
 
