@@ -47,7 +47,7 @@ HA discovery topics are published by the bridge and retained on the MQTT broker.
 On normal boots, discovery is skipped — the broker retains the topics from the
 previous session. Discovery runs in two scenarios:
 
-- **After OTA update:** The bridge detects an OTA reboot, cleans old discovery
+- **After OTA reboot:** The bridge detects an OTA reboot, cleans old discovery
   topics, publishes fresh ones, and reboots to defragment the heap.
 - **Discovery Refresh button:** Manually triggers cleanup of stale topics,
   republishes fresh discovery, and reboots.

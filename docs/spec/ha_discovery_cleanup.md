@@ -414,7 +414,7 @@ typedef struct {
 1. `ha_discovery_cleanup_configure()` — pass device ID, MQTT client, and time source
 2. `ha_discovery_cleanup_start()` — begin cleanup process
 3. Each loop iteration: `ha_discovery_cleanup_run()` — advance the state machine
-4. When `ha_discovery_cleanup_is_done()` returns true: set `discovery_refresh_in_progress_ = false` and restart the device
+4. When `ha_discovery_cleanup_is_done()` returns true: destroy cleanup module, configure and start discovery manager for fresh publishing, drive publishing until complete, call mark_boot_successful_for_reboot(), wait 5 seconds, then call safe_reboot()
 
 ### 10.4 Independence
 

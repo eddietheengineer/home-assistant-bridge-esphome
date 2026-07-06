@@ -96,6 +96,8 @@ The bridge's main loop checks `discovery_refresh_in_progress_` and, when the bri
 4. **Drive discovery publishing:** `ha_discovery_manager_run()` publishes discovery payloads. When done, `mark_boot_successful_for_reboot()` is called.
 5. **Wait then reboot:** After a 5-second delay, `esphome::App.safe_reboot()` performs a graceful reboot.
 
+**Note:** The guard also checks `!ota_cleanup_in_progress_` to prevent interfering with an in-progress OTA cleanup cycle.
+
 ---
 
 ## 5. State Transitions

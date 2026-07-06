@@ -251,7 +251,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // after steady state is reached.
   ha_discovery_manager_t ha_discovery_manager_;
   bool discovery_refresh_in_progress_{false};
-  bool ha_discovery_started_{false};
   bool erd_cache_publisher_paused_{false};
   bool discovery_just_resumed_{false};
 

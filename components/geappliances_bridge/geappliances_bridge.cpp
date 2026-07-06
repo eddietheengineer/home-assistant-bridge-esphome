@@ -285,13 +285,12 @@ void GeappliancesBridge::loop() {
 
   this->update_publisher_state_();
 
-  // If we booted after OTA, clean old discovery topics after reaching steady
-  // state but before republishing discovery. Once cleanup finishes, reboot
-  // (same as DiscoveryRefresh) so the next boot republishes cleanly.
+
   // ── OTA-triggered cleanup + republish + reboot ───────────────────────────
-#ifdef USE_ESP32
+#ifdef USE_ESP_IDF
   // Start cleanup once steady state is reached (only on OTA reboot).
-  if (this->ota_cleanup_needed_ && !this->ota_cleanup_in_progress_ &&
+  if (this->generate_device_config_ &&
+      this->ota_cleanup_needed_ && !this->ota_cleanup_in_progress_ &&
       !this->ota_discovery_publishing_ && !this->ota_reboot_pending_) {
     if (this->steady_state_reached_ &&
         this->mqtt_client_adapter_initialized_ &&
@@ -359,6 +358,7 @@ void GeappliancesBridge::loop() {
   // Same path as OTA: cleanup → publish fresh discovery → reboot.
   // Queued until the appliance is ready (steady state, MQTT, device ID).
   if (this->discovery_refresh_in_progress_ &&
+      !this->ota_cleanup_in_progress_ &&
       !this->ota_discovery_publishing_ && !this->ota_reboot_pending_) {
     // Wait until ready before starting cleanup.
     if (this->steady_state_reached_ &&
@@ -470,9 +470,9 @@ void GeappliancesBridge::update_publisher_state_()
 
 void GeappliancesBridge::run_protocol_stack_()
 {
-  // When GEA2 is active (or during GEA2 autodiscovery), run a 200 ms
-  // wall-clock busy loop so the full TX→RX cycle at 19200 baud completes
-  // within a single loop() call.  See doc/geappliances_bridge.md §13.
+  // When GEA2 is active (or during GEA2 autodiscovery), run a 100 ms
+  // wall-clock busy loop (with a 200 ms hard cap) so the full TX→RX cycle
+  // at 19200 baud completes within a single loop() call.
   bool need_gea2_loop = this->gea2_uart_ != nullptr && (
     this->autodiscovery_manager_.is_gea2_protocol() ||
     this->gea2_protocol_active_ ||

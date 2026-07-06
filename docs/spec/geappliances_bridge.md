@@ -195,7 +195,7 @@ Two boolean configuration flags control discovery behavior. Both are set via the
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `generate_device_config_` | `true` | When `true`, the bridge runs HA discovery on OTA reboot or Discovery Refresh. Normal boots skip discovery (topics retained by MQTT broker). |
+| `generate_device_config_` | `true` | When `true`, the bridge runs HA discovery on OTA reboot or Discovery Refresh. When `false`, both paths are skipped entirely. Normal boots skip discovery regardless (topics retained by MQTT broker). |
 | `filter_config_topics_` | `true` | When `true`, the discovery manager filters out non-config topics during cleanup (only `/config` discovery payloads are removed). Passed to `ha_discovery_manager_configure()`. |
 
 **Configuration setters:**
@@ -211,7 +211,6 @@ Both setters store their value directly into the corresponding member variable. 
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `ha_discovery_started_` | `bool` | Set to `true` once discovery has been initiated during an OTA or Discovery Refresh flow. Initialized to `false`. |
 | `discovery_refresh_in_progress_` | `bool` | Set to `true` when `trigger_discovery_refresh()` is called. Acts as a queued request — the actual cleanup starts in `loop()` once the bridge is ready (steady state, MQTT, device ID). Cleared when cleanup begins. Initialized to `false`. |
 | `erd_cache_publisher_paused_` | `bool` | Tracks whether the ERD cache publisher was paused during discovery activity. Set to `true` when `pause()` is called, and `false` when `resume()` is called. Used to avoid redundant pause/resume calls across `loop()` iterations. Initialized to `false`. |
 | `discovery_just_resumed_` | `bool` | Set to `true` when the publisher is resumed after discovery activity ends. Cleared to `false` once `erd_cache_mqtt_publisher_first_round_done()` returns `true`, indicating the publisher has completed a full cache round after resuming. Initialized to `false`. |
@@ -233,18 +232,18 @@ Each `loop()` iteration performs the following discovery-related work in order:
 
 1. **Update publisher state:** Call `update_publisher_state_()` to manage the publisher pause/resume state machine and signal or run the publisher.
 
-2. **OTA-triggered cleanup + republish + reboot (ESP32 only):**
-   - **Start cleanup:** If `ota_cleanup_needed_` is `true`, `ota_cleanup_in_progress_` is `false`, `ota_discovery_publishing_` is `false`, `ota_reboot_pending_` is `false`, and the bridge is ready (`steady_state_reached_`, `mqtt_client_adapter_initialized_`, device ID complete), configure and start the cleanup module, then set `ota_cleanup_in_progress_` to `true`.
+2. **OTA-triggered cleanup + republish + reboot (ESP-IDF only):**
+   - **Start cleanup:** If `generate_device_config_` is `true`, `ota_cleanup_needed_` is `true`, `ota_cleanup_in_progress_` is `false`, `ota_discovery_publishing_` is `false`, `ota_reboot_pending_` is `false`, and the bridge is ready (`steady_state_reached_`, `mqtt_client_adapter_initialized_`, device ID complete), configure and start the cleanup module, then set `ota_cleanup_in_progress_` to `true`.
    - **Drive cleanup:** If `ota_cleanup_in_progress_` is `true`, call `ha_discovery_cleanup_run()` each iteration. When done, clear `ota_cleanup_in_progress_` and `ota_cleanup_needed_`, destroy the cleanup module, configure and start the discovery manager for fresh publishing, and set `ota_discovery_publishing_` to `true`.
    - **Drive discovery publishing:** If `ota_discovery_publishing_` is `true`, call `ha_discovery_manager_run()` while the manager is processing. When done, clear `ota_discovery_publishing_`, call `mark_boot_successful_for_reboot()`, and set `ota_reboot_pending_` to `true` with `ota_reboot_start_ms_` set to the current time.
    - **Wait then reboot:** If `ota_reboot_pending_` is `true`, feed the watchdog each iteration. After 5 seconds elapsed, call `esphome::App.safe_reboot()`.
 
-3. **DiscoveryRefresh button (queued):** If `discovery_refresh_in_progress_` is `true` and the bridge is ready, configure and start the cleanup module, clear `discovery_refresh_in_progress_`, and set `ota_cleanup_in_progress_` to `true`. This hands off to the same cleanup → publish → reboot path as OTA.
+3. **DiscoveryRefresh button (queued):** If `discovery_refresh_in_progress_` is `true`, `ota_cleanup_in_progress_` is `false`, `ota_discovery_publishing_` is `false`, `ota_reboot_pending_` is `false`, and the bridge is ready, configure and start the cleanup module, clear `discovery_refresh_in_progress_`, and set `ota_cleanup_in_progress_` to `true`. This hands off to the same cleanup → publish → reboot path as OTA.
 
 ```mermaid
 flowchart TD
     A[loop() entry] --> B[update_publisher_state_()]
-    B --> C{OTA cleanup needed & ready?}
+    B --> C{OTA cleanup needed, generate_device_config_, & ready?}
     C -->|yes| D[start cleanup]
     C -->|no| E{OTA cleanup in progress?}
     D --> E
