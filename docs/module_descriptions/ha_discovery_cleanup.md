@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Discovers and removes old Home Assistant MQTT discovery topics for a device. Independent of the discovery manager — no knowledge of discovery state or buffers. Uses a wildcard subscription to catch all retained discovery topics across all domains, then republishes each with an empty payload to clear the retained message on the broker.
+Discovers and removes old Home Assistant MQTT discovery topics for a device. Used by both the OTA reboot flow and the Discovery Refresh button. Independent of the discovery manager — no knowledge of discovery state or buffers. Uses a wildcard subscription to catch all retained discovery topics across all domains, then republishes each with an empty payload to clear the retained message on the broker.
 
 ## Public API
 

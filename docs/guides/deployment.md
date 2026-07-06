@@ -164,3 +164,4 @@ geappliances_bridge:
 - [ ] Check ESPHome logs for any errors during startup.
 - [ ] Verify the device appears in Home Assistant **Devices** panel.
 - [ ] Spot-check a few entities (cycle state, temperature) for correct values.
+- [ ] **After OTA update:** Entities may briefly disappear during the cleanup → publish → reboot cycle. Wait for the cycle to complete (1–2 minutes) before checking entities.

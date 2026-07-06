@@ -184,13 +184,18 @@ Key member variables:
 
 The bridge integrates Home Assistant MQTT discovery via the `ha_discovery_manager_` and coordinates with the `erd_cache_publisher_` to avoid MQTT queue contention during discovery payload generation and cleanup.
 
+**Discovery does not run on normal boots.** HA discovery topics are retained on the MQTT broker, so the bridge skips discovery on regular reboots. Discovery runs in two scenarios:
+
+1. **OTA reboot:** Detected in `setup()` by reading the reboot source from NVS. If the source is `"esphome.ota"`, the bridge schedules cleanup + republish + reboot after reaching steady state.
+2. **Discovery Refresh button:** When pressed, the request is queued and executes once the bridge is ready (steady state, MQTT connected, device ID complete).
+
 ### 11.1 Configuration Flags
 
 Two boolean configuration flags control discovery behavior. Both are set via the ESPHome code generator during `setup()` and read by `loop()` to gate discovery actions.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `generate_device_config_` | `true` | When `true`, the bridge starts HA discovery once steady state is reached. Discovery runs once per boot cycle. |
+| `generate_device_config_` | `true` | When `true`, the bridge runs HA discovery on OTA reboot or Discovery Refresh. Normal boots skip discovery (topics retained by MQTT broker). |
 | `filter_config_topics_` | `true` | When `true`, the discovery manager filters out non-config topics during cleanup (only `/config` discovery payloads are removed). Passed to `ha_discovery_manager_configure()`. |
 
 **Configuration setters:**
@@ -206,90 +211,110 @@ Both setters store their value directly into the corresponding member variable. 
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `ha_discovery_started_` | `bool` | Set to `true` once discovery has been initiated. Acts as a one-shot guard — discovery is started at most once per boot. Initialized to `false`. |
-| `discovery_refresh_in_progress_` | `bool` | Set to `true` while a discovery cleanup refresh is running (triggered by `DiscoveryRefreshButton`). Cleared to `false` when cleanup completes and before reboot. Initialized to `false`. |
+| `ha_discovery_started_` | `bool` | Set to `true` once discovery has been initiated during an OTA or Discovery Refresh flow. Initialized to `false`. |
+| `discovery_refresh_in_progress_` | `bool` | Set to `true` when `trigger_discovery_refresh()` is called. Acts as a queued request — the actual cleanup starts in `loop()` once the bridge is ready (steady state, MQTT, device ID). Cleared when cleanup begins. Initialized to `false`. |
 | `erd_cache_publisher_paused_` | `bool` | Tracks whether the ERD cache publisher was paused during discovery activity. Set to `true` when `pause()` is called, and `false` when `resume()` is called. Used to avoid redundant pause/resume calls across `loop()` iterations. Initialized to `false`. |
 | `discovery_just_resumed_` | `bool` | Set to `true` when the publisher is resumed after discovery activity ends. Cleared to `false` once `erd_cache_mqtt_publisher_first_round_done()` returns `true`, indicating the publisher has completed a full cache round after resuming. Initialized to `false`. |
+| `ota_cleanup_needed_` | `bool` | Set to `true` in `setup()` if the reboot source is `"esphome.ota"`. Driven in `loop()` after steady state. Cleared after cleanup completes. Initialized to `false`. |
+| `ota_cleanup_in_progress_` | `bool` | Set to `true` while the cleanup module is actively running (shared by OTA and Discovery Refresh paths). Cleared when cleanup completes. Initialized to `false`. |
+| `ota_discovery_publishing_` | `bool` | Set to `true` while fresh discovery topics are being published after cleanup. Cleared when publishing completes. Initialized to `false`. |
+| `ota_reboot_pending_` | `bool` | Set to `true` after discovery publishing completes, before the 5-second pre-reboot delay. Cleared when `safe_reboot()` is called. Initialized to `false`. |
+| `ota_reboot_start_ms_` | `uint32_t` | Timestamp when the pre-reboot delay started. Initialized to `0`. |
 
-### 11.3 Discovery Lifecycle in loop()
+### 11.3 OTA Reboot Detection (setup())
+
+In `setup()`, on ESP32 platforms, the bridge reads the reboot reason via `esp_reset_reason()`. If the reset is a software reset (`ESP_RST_SW`), it loads a stored reboot source string from NVS preferences. If the source is `"esphome.ota"`, `ota_cleanup_needed_` is set to `true`.
+
+This ensures cleanup only runs for OTA updates, not for the bridge's own reboots (which store `"geappliances_bridge"` as the reboot source) or other software resets.
+
+### 11.4 Discovery Lifecycle in loop()
 
 Each `loop()` iteration performs the following discovery-related work in order:
 
-1. **Update publisher state:** Call `update_publisher_state_()` to manage the publisher pause/resume state machine and signal or run the publisher. This method implements an explicit state machine:
-   - **IDLE** (`erd_cache_publisher_paused_` = `false`): Publisher running normally.
-   - **PAUSED** (`erd_cache_publisher_paused_` = `true`): Publisher paused during active discovery to avoid MQTT queue contention.
-   - **RESUMING** (`discovery_just_resumed_` = `true`): Publisher just resumed, waiting for first full cache drain.
-   - **Transitions:** IDLE → PAUSED when `ha_discovery_manager_is_processing()` returns `true`; PAUSED → RESUMING when it returns `false`; RESUMING → IDLE when `erd_cache_mqtt_publisher_first_round_done()` returns `true`.
-   - **Steady state signal:** Within `update_publisher_state_()`, when `discovery_just_resumed_` is `true` and `erd_cache_mqtt_publisher_first_round_done()` returns `true`, the publisher has completed a full cache drain after resuming. This signals that the cache is in a stable state for discovery. The actual `steady_state_reached_` flag is set by `check_steady_state()` (called from the startup HSM's subscription_watch and running states), which checks bridge states directly.
+1. **Update publisher state:** Call `update_publisher_state_()` to manage the publisher pause/resume state machine and signal or run the publisher.
 
-2. **Start HA discovery (one-shot):** If `steady_state_reached_` is `true`, `ha_discovery_started_` is `false`, and `generate_device_config_` is `true`:
-   - Set `ha_discovery_started_` to `true`.
-   - Call `ha_discovery_manager_configure()` with device ID, model number, serial number, appliance type, `filter_config_topics_`, ERD cache pointer, and MQTT client interface.
-   - Call `ha_discovery_manager_start()`.
+2. **OTA-triggered cleanup + republish + reboot (ESP32 only):**
+   - **Start cleanup:** If `ota_cleanup_needed_` is `true`, `ota_cleanup_in_progress_` is `false`, `ota_discovery_publishing_` is `false`, `ota_reboot_pending_` is `false`, and the bridge is ready (`steady_state_reached_`, `mqtt_client_adapter_initialized_`, device ID complete), configure and start the cleanup module, then set `ota_cleanup_in_progress_` to `true`.
+   - **Drive cleanup:** If `ota_cleanup_in_progress_` is `true`, call `ha_discovery_cleanup_run()` each iteration. When done, clear `ota_cleanup_in_progress_` and `ota_cleanup_needed_`, destroy the cleanup module, configure and start the discovery manager for fresh publishing, and set `ota_discovery_publishing_` to `true`.
+   - **Drive discovery publishing:** If `ota_discovery_publishing_` is `true`, call `ha_discovery_manager_run()` while the manager is processing. When done, clear `ota_discovery_publishing_`, call `mark_boot_successful_for_reboot()`, and set `ota_reboot_pending_` to `true` with `ota_reboot_start_ms_` set to the current time.
+   - **Wait then reboot:** If `ota_reboot_pending_` is `true`, feed the watchdog each iteration. After 5 seconds elapsed, call `esphome::App.safe_reboot()`.
 
-3. **Drive discovery manager:** If `ha_discovery_manager_is_processing()` returns `true`, call `ha_discovery_manager_run()` to advance the discovery state machine.
-
-4. **Handle cleanup completion:** If `discovery_refresh_in_progress_` is `true` (ESP-IDF only):
-   - Call `ha_discovery_cleanup_run()` to advance the cleanup module.
-   - When `ha_discovery_cleanup_is_done()` returns `true`: clear `discovery_refresh_in_progress_`, log "HA discovery cleanup complete, restarting device...", call `ha_discovery_cleanup_destroy()` to unsubscribe the wildcard topic and zero the callback, call `esp_task_wdt_reset()` to feed the watchdog before the blocking delay, delay 500 ms via `vTaskDelay`, and call `esphome::App.reboot()`.
+3. **DiscoveryRefresh button (queued):** If `discovery_refresh_in_progress_` is `true` and the bridge is ready, configure and start the cleanup module, clear `discovery_refresh_in_progress_`, and set `ota_cleanup_in_progress_` to `true`. This hands off to the same cleanup → publish → reboot path as OTA.
 
 ```mermaid
 flowchart TD
     A[loop() entry] --> B[update_publisher_state_()]
-    B --> C{steady & !started & generate?}
-    C -->|yes| D[start discovery]
-    C -->|no| E{manager processing?}
+    B --> C{OTA cleanup needed & ready?}
+    C -->|yes| D[start cleanup]
+    C -->|no| E{OTA cleanup in progress?}
     D --> E
-    E -->|yes| F[run manager]
-    E -->|no| G{cleanup in progress?}
-    F --> G
-    G -->|yes| H[run cleanup]
-    G -->|no| I[continue loop]
-    H --> J{cleanup done?}
-    J -->|yes| K[reboot]
-    J -->|no| I
+    E -->|yes| F[run cleanup]
+    E -->|no| G{OTA discovery publishing?}
+    F --> H{cleanup done?}
+    H -->|yes| I[destroy cleanup, start discovery publish]
+    H -->|no| G
+    I --> G
+    G -->|yes| J[run discovery manager]
+    G -->|no| K{OTA reboot pending?}
+    J --> L{discovery done?}
+    L -->|yes| M[mark boot successful, set reboot pending]
+    L -->|no| K
+    M --> K
+    K -->|yes| N{5s elapsed?}
+    K -->|no| O{DiscoveryRefresh queued & ready?}
+    N -->|yes| P[safe_reboot()]
+    N -->|no| O
+    P --> Q[device restarts]
+    O -->|yes| R[start cleanup, hand off to OTA path]
+    O -->|no| S[continue loop]
+    R --> S
 ```
 
-### 11.4 trigger_discovery_refresh() Flow
+### 11.5 trigger_discovery_refresh() Flow
 
-`trigger_discovery_refresh()` is called by `DiscoveryRefreshButton::press_action()` to initiate a discovery cleanup and device restart.
+`trigger_discovery_refresh()` is called by `DiscoveryRefreshButton::press_action()` to queue a discovery cleanup and device restart.
 
-**Guard checks (in order):**
+**Behavior:**
 
 1. **Idempotency guard:** If `discovery_refresh_in_progress_` is `true`, log a warning ("Discovery refresh already in progress, ignoring") and return.
-2. **Steady-state guard:** If `steady_state_reached_` is `false`, log a warning ("Cannot refresh discovery: appliance bridge not in steady state") and return.
-3. **Processing guard:** If `ha_discovery_manager_is_processing()` returns `true`, log a warning ("Cannot refresh discovery: manager still processing") and return.
+2. **Queue the request:** Set `discovery_refresh_in_progress_` to `true` and log "Discovery refresh queued, will execute when appliance is ready".
 
-**On ESP-IDF, after guards pass:**
+No guard checks for steady state, MQTT readiness, or device ID are performed at press time. The request is queued and will execute in `loop()` once all prerequisites are met. This allows the user to press the button at any time, even during startup.
 
-1. Log info: "Starting HA discovery cleanup..."
-2. Call `ha_discovery_cleanup_configure()` with the device ID, MQTT client interface, and `esphome::millis` as the time source.
-3. Call `ha_discovery_cleanup_start()`.
-4. Set `discovery_refresh_in_progress_` to `true`.
+### 11.6 mark_boot_successful_for_reboot()
 
-On non-ESP-IDF platforms, the cleanup configure/start calls are omitted (dependency pointers are suppressed with `(void)` casts), but the guard checks still execute and `discovery_refresh_in_progress_` is set to `true`.
+Before rebooting after cleanup + republish, `mark_boot_successful_for_reboot()` is called to:
 
-### 11.5 Integration with ha_discovery_manager
+1. **Clear the safe mode boot loop counter:** Writes `0` to the ESPHome preferences key matching `SAFE_MODE_RTC_KEY` (233825507UL) and syncs immediately. This prevents the device from entering safe mode due to rapid reboots during the cleanup → publish → reboot cycle.
+2. **Cancel OTA rollback:** Calls `esp_ota_mark_app_valid_cancel_rollback()` to mark the current OTA partition as valid, preventing the bootloader from rolling back to the previous partition on the next boot.
+
+This is critical because the cleanup → publish → reboot cycle involves two rapid reboots in succession, which would otherwise trigger ESPHome's safe mode protection.
+
+### 11.7 Integration with ha_discovery_manager
 
 The bridge owns a `ha_discovery_manager_t` instance (`ha_discovery_manager_`) and drives it from `loop()`:
 
-- **Configuration:** `ha_discovery_manager_configure()` is called once when discovery starts, passing the device identity (ID, model, serial, appliance type), the `filter_config_topics_` flag, the ERD cache, and the MQTT client interface.
+- **Configuration:** `ha_discovery_manager_configure()` is called when discovery starts (during OTA or Discovery Refresh flow), passing the device identity (ID, model, serial, appliance type), the `filter_config_topics_` flag, the ERD cache, and the MQTT client interface.
 - **Start:** `ha_discovery_manager_start()` transitions the manager from `IDLE` to `BUILDING` (on ESP-IDF) or directly to `COMPLETE` (on non-ESP-IDF).
 - **Drive:** `ha_discovery_manager_run()` is called each `loop()` iteration while `ha_discovery_manager_is_processing()` returns `true`. This advances the manager through its state machine, decompressing JSONL chunks and publishing discovery payloads at a rate-limited interval (50 ms).
-- **Completion:** When the manager reaches `COMPLETE` or `FAILED` state, `ha_discovery_manager_is_processing()` returns `false`, causing `loop()` to stop calling `run()` and resume normal ERD cache publishing.
+- **Completion:** When the manager reaches `COMPLETE` or `FAILED` state, `ha_discovery_manager_is_processing()` returns `false`, signaling that discovery publishing is done.
 
-### 11.6 Integration with ha_discovery_cleanup
+### 11.8 Integration with ha_discovery_cleanup
 
-The bridge accesses the embedded cleanup module via `ha_discovery_manager_.cleanup`:
+The bridge accesses the embedded cleanup module via `ha_discovery_manager_.cleanup`. Both OTA and Discovery Refresh paths use the same cleanup module and share the `ota_cleanup_in_progress_` flag:
 
-- **Configuration:** `ha_discovery_cleanup_configure()` is called with the device ID, MQTT client interface, and time source. This sets up the wildcard subscription and internal buffers.
+- **Configuration:** `ha_discovery_cleanup_configure()` is called with the device ID, MQTT client interface, and time source.
 - **Start:** `ha_discovery_cleanup_start()` begins the cleanup process.
-- **Drive:** `ha_discovery_cleanup_run()` is called each `loop()` iteration while `discovery_refresh_in_progress_` is `true`. This advances the cleanup through its phases (subscribe, discover, drain).
-- **Completion:** `ha_discovery_cleanup_is_done()` returns `true` when all phases are complete. The bridge then clears `discovery_refresh_in_progress_`, calls `ha_discovery_cleanup_destroy()` to unsubscribe the wildcard topic, calls `esp_task_wdt_reset()` to feed the watchdog, delays 500 ms for final messages to transmit, and calls `esphome::App.reboot()`.
+- **Drive:** `ha_discovery_cleanup_run()` is called each `loop()` iteration while `ota_cleanup_in_progress_` is `true`.
+- **Completion:** `ha_discovery_cleanup_is_done()` returns `true` when all phases are complete. The bridge then clears `ota_cleanup_in_progress_`, destroys the cleanup module, and proceeds to publish fresh discovery topics.
 
-The cleanup module is embedded within the `ha_discovery_manager_t` struct, so the bridge does not maintain a separate cleanup instance.
+### 11.9 Reboot with safe_reboot()
 
-### 11.7 Publisher Pause/Resume Rationale
+After cleanup and discovery publishing complete, the bridge reboots using `esphome::App.safe_reboot()` instead of `esphome::App.reboot()`. `safe_reboot()` performs a graceful MQTT disconnect before resetting, ensuring a clean session end on the broker. This prevents the broker from thinking the device is still connected, which could cause stale availability topics or delayed reconnection events.
+
+A 5-second delay precedes the reboot to allow final discovery messages to transmit and the heap to stabilize. The reboot also defragments the heap after the memory-intensive cleanup and publish cycle.
+
+### 11.10 Publisher Pause/Resume Rationale
 
 The ERD cache publisher is paused during discovery activity to avoid competing for the ESP-IDF MQTT task's inbound/outbound queues. Without pausing, the background publisher task would continue draining cache updates while the discovery manager publishes config payloads, potentially causing:
 

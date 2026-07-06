@@ -4,7 +4,7 @@
 
 ### 1.1 Purpose
 
-The HA Discovery Cleanup module discovers and removes stale Home Assistant MQTT discovery topics for a device. When the discovery configuration changes (e.g., entities are removed or renamed), old retained discovery messages remain on the MQTT broker, causing Home Assistant to show orphaned entities. The cleanup module uses a single wildcard subscription (`homeassistant/+/{device_id}/#`) to discover all existing discovery topics across all domains, then republishes each with an empty retained payload to clear them from the broker.
+The HA Discovery Cleanup module discovers and removes stale Home Assistant MQTT discovery topics for a device. It is used by both the OTA reboot flow and the Discovery Refresh button. When the discovery configuration changes (e.g., entities are removed or renamed), old retained discovery messages remain on the MQTT broker, causing Home Assistant to show orphaned entities. The cleanup module uses a single wildcard subscription (`homeassistant/+/{device_id}/#`) to discover all existing discovery topics across all domains, then republishes each with an empty retained payload to clear them from the broker.
 
 ### 1.2 Responsibilities
 

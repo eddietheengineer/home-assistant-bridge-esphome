@@ -2,7 +2,7 @@
 
 ## Purpose
 
-ESPHome button component that triggers a Home Assistant discovery cleanup and device restart. When pressed, it cleans up stale discovery messages from the MQTT broker and restarts the device so that normal discovery republishes a fresh set of entities. This is useful when entities become stale or out of sync with the appliance's actual capabilities.
+ESPHome button component that triggers a Home Assistant discovery cleanup, republishes fresh discovery topics, and restarts the device. When pressed, the request is queued — if the bridge is not yet ready (steady state, MQTT connected, device ID complete), it waits until ready before starting cleanup. After cleanup, fresh discovery topics are published, then the device reboots to defragment the heap.
 
 ## Public API
 
@@ -31,22 +31,19 @@ class DiscoveryRefreshButton : public button::Button {
 
 ## Trigger Flow
 
-`GeappliancesBridge::trigger_discovery_refresh()` performs three guard checks before starting cleanup:
+`GeappliancesBridge::trigger_discovery_refresh()` sets `discovery_refresh_in_progress_` to `true` and logs that the request is queued. It does **not** perform guard checks or start cleanup immediately — the request is queued and will execute once the bridge is ready.
 
-1. **Already in progress**: If `discovery_refresh_in_progress_` is `true`, the request is ignored with a warning.
-2. **Not in steady state**: If `steady_state_reached_` is `false`, the request is rejected — discovery refresh requires the bridge to be fully initialized.
-3. **Discovery manager busy**: If `ha_discovery_manager_is_processing()` returns `true`, the request is rejected — a previous run must finish first.
+In the bridge's `loop()`, the queued request is checked:
 
-If all guards pass, the cleanup module is configured and started:
-- `ha_discovery_cleanup_configure()` sets up the cleanup module with the device ID, MQTT client, and `esphome::millis` as the time source
-- `ha_discovery_cleanup_start()` begins the cleanup process
-- `discovery_refresh_in_progress_` is set to `true`
+1. **Wait for readiness:** The bridge waits until `steady_state_reached_` is `true`, `mqtt_client_adapter_initialized_` is `true`, and `device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE`.
+2. **Start cleanup:** Once ready, `ha_discovery_cleanup_configure()` and `ha_discovery_cleanup_start()` are called, `discovery_refresh_in_progress_` is cleared, and `ota_cleanup_in_progress_` is set to `true`.
+3. **Drive cleanup:** `ha_discovery_cleanup_run()` processes cleanup work each loop iteration.
+4. **On cleanup complete:** The cleanup module is destroyed, fresh discovery topics are published via `ha_discovery_manager_configure()` and `ha_discovery_manager_start()`, and `ota_discovery_publishing_` is set.
+5. **Drive discovery publishing:** `ha_discovery_manager_run()` publishes discovery payloads each loop iteration.
+6. **On discovery complete:** `mark_boot_successful_for_reboot()` clears the safe mode counter and cancels OTA rollback, then `ota_reboot_pending_` is set.
+7. **Wait then reboot:** After a 5-second delay, `esphome::App.safe_reboot()` performs a graceful reboot (disconnects from MQTT before resetting).
 
-The cleanup runs incrementally in the bridge's `update()` loop:
-- `ha_discovery_cleanup_run()` processes cleanup work
-- When `ha_discovery_cleanup_is_done()` returns `true`:
-  - The cleanup module is destroyed (to unsubscribe the wildcard topic and prevent use-after-free)
-  - The watchdog is fed, then a 500 ms delay precedes `esphome::App.reboot()`
+The OTA reboot flow follows the same path (cleanup → publish → reboot), triggered automatically when the bridge detects an OTA reboot source in `setup()`.
 
 ## ESPHome Configuration
 
@@ -75,9 +72,11 @@ geappliances_bridge:
 
 ## Key Design Decisions
 
-- **Thin wrapper**: The class is a minimal adapter between ESPHome's button component and the bridge's `trigger_discovery_refresh()` method. All logic (guards, cleanup, restart) lives in `GeappliancesBridge`.
+- **Thin wrapper**: The class is a minimal adapter between ESPHome's button component and the bridge's `trigger_discovery_refresh()` method. All logic (queuing, cleanup, republish, restart) lives in `GeappliancesBridge`.
 - **Null-safe**: The `press_action()` method checks `bridge_ != nullptr` before calling through, protecting against use-after-free if the bridge is destroyed before the button.
 - **Auto-created**: The button is created by default (`discovery_refresh_button: true`) so users get the functionality without explicit configuration. It can be disabled by setting `discovery_refresh_button: false`.
-- **Reboot on completion**: After cleanup finishes, the device restarts to republish all discovery messages cleanly. This is simpler than trying to selectively republish and ensures a consistent state.
-- **Watchdog protection**: The 500 ms delay before reboot exceeds the default TWDT timeout (30 ms). The watchdog is explicitly reset before the delay to prevent an unintended reset.
-- **Cleanup destroy before reboot**: The cleanup module is destroyed before reboot to unsubscribe the wildcard MQTT topic. If the callback fires after teardown zeroes the struct, it could corrupt heap metadata.
+- **Queued execution**: The request is queued if pressed before the bridge is ready. This eliminates guard checks and allows the user to press the button at any time.
+- **Shared cleanup path with OTA**: Both OTA reboot and Discovery Refresh use the same cleanup → publish → reboot flow (`ota_cleanup_in_progress_`, `ota_discovery_publishing_`, `ota_reboot_pending_`).
+- **`safe_reboot()` instead of `App.reboot()`**: Uses `App.safe_reboot()` to gracefully disconnect from MQTT before resetting, ensuring a clean session end.
+- **`mark_boot_successful_for_reboot()`**: Clears the safe mode boot loop counter and cancels OTA rollback before rebooting, preventing the device from entering safe mode due to rapid reboots.
+- **5-second pre-reboot delay**: Allows final discovery messages to transmit and the heap to stabilize before rebooting. The reboot also defragments the heap after the memory-intensive cleanup and publish cycle.

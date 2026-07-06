@@ -24,8 +24,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `set_mode(mode)` | Set bridge mode: POLL (0), SUBSCRIBE (1), or AUTO (2) |
 | `set_polling_interval(ms)` | Set polling interval (default 10000 ms) |
 | `set_appliance_api_parsing(bool)` | Enable feature bit-based ERD filtering (default true) |
-| `set_generate_device_config(bool)` | Enable/disable HA device config generation (default true). When enabled, HA discovery is started once steady state is reached. |
-| `set_filter_config_topics(bool)` | Enable/disable filtering of config topics (default true) |
+| `set_generate_device_config(bool)` | Enable/disable HA device config generation (default true). When enabled, HA discovery runs on OTA reboot or Discovery Refresh button press. Normal boots skip discovery (topics retained by MQTT broker). |
 | `set_erd_publish_rate_sensor(sensor)` | Set sensor for ERD publish rate monitoring |
 | `set_erd_cache_entries_sensor(sensor)` | Set sensor for ERD cache entries count |
 | `set_erd_cache_updates_sensor(sensor)` | Set sensor for ERD cache updates count |
@@ -49,8 +48,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `maybe_start_custom_erd_polling_()` | Guarded entry point for custom ERD polling (prevents re-initialization) |
 | `log_poll_state_transitions_()` | Debug: log polling HSM state changes |
 | `on_poll_discovery_complete_()` | Callback from polling bridge when probe phase completes |
-| `trigger_discovery_refresh()` | Start HA discovery cleanup and device restart |
-## Startup Sequence
+| `trigger_discovery_refresh()` | Queue a discovery cleanup + republish + reboot. If pressed before steady state/MQTT/device ID are ready, the request is queued and executes once the bridge is ready. |
 
 The bridge progresses through a linear sequence of phases via the `startup_hsm_`:
 
