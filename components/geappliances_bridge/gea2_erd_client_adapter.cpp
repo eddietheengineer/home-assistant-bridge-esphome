@@ -79,3 +79,17 @@ extern "C" void gea2_erd_client_adapter_init(
   tiny_event_subscription_init(&self->gea2_sub, self, on_gea2_activity);
   tiny_event_subscribe(tiny_gea2_erd_client_on_activity(gea2_client), &self->gea2_sub);
 }
+
+extern "C" void gea2_erd_client_adapter_destroy(
+  gea2_erd_client_adapter_t* self,
+  i_tiny_gea2_erd_client_t* gea2_client)
+{
+  if (!self || !self->gea2_client) return;
+  /* Idempotent: skip if the stored client differs from the one passed in,
+   * or if init() was never called (gea2_client is null). */
+  if (self->gea2_client != gea2_client) return;
+  tiny_event_unsubscribe(
+    tiny_gea2_erd_client_on_activity(gea2_client),
+    &self->gea2_sub);
+  self->gea2_client = nullptr;
+}

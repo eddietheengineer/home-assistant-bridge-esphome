@@ -3,18 +3,13 @@
  * @brief
  */
 
-extern "C" {
-#include "erd_cache.h"
-}
-
 #include "erd_bridge_subscribe.h"
 
 #include "CppUTest/TestHarness.h"
 #include "CppUTestExt/MockSupport.h"
-#include "double/tiny_gea3_erd_client_double.hpp"
-#include "double/tiny_timer_group_double.hpp"
+#include "simulation_test_base.h"
 
-TEST_GROUP(erd_bridge_subscribe)
+TEST_GROUP_BASE(erd_bridge_subscribe, simulation_test_base)
 {
   enum {
     resubscribe_delay = 1000,
@@ -23,23 +18,16 @@ TEST_GROUP(erd_bridge_subscribe)
   };
 
   erd_bridge_subscribe_t self;
-  erd_cache_t test_cache;
-
-  tiny_timer_group_double_t timer_group;
-  tiny_gea3_erd_client_double_t erd_client;
 
   void setup()
   {
-    mock().strictOrder();
-
-    tiny_timer_group_double_init(&timer_group);
-    tiny_gea3_erd_client_double_init(&erd_client);
+    simulation_test_base_setup();
   }
 
   void teardown()
   {
     erd_bridge_subscribe_destroy(&self);
-    erd_cache_destroy(&test_cache);
+    simulation_test_base_teardown();
   }
 
   void when_the_bridge_is_initialized(uint8_t address = 0xC0)
@@ -154,11 +142,6 @@ TEST_GROUP(erd_bridge_subscribe)
     tiny_gea3_erd_client_double_trigger_activity_event(
       &erd_client,
       &args);
-  }
-
-  void after(tiny_timer_ticks_t ticks)
-  {
-    tiny_timer_group_double_elapse_time(&timer_group, ticks);
   }
 
 };
@@ -375,7 +358,7 @@ TEST(erd_bridge_subscribe, should_resubscribe_on_host_came_online_from_steady)
 // different appliance address and publishing to its own MQTT client.
 // ---------------------------------------------------------------------------
 
-TEST_GROUP(erd_bridge_subscribe_dual)
+TEST_GROUP_BASE(erd_bridge_subscribe_dual, simulation_test_base)
 {
   enum {
     address_a = 0xC0,
@@ -386,25 +369,17 @@ TEST_GROUP(erd_bridge_subscribe_dual)
 
   erd_bridge_subscribe_t bridge_a;
   erd_bridge_subscribe_t bridge_b;
-  erd_cache_t test_cache;
-
-  tiny_timer_group_double_t timer_group;
-  tiny_gea3_erd_client_double_t erd_client;
 
   void setup()
   {
-    mock().strictOrder();
-
-    tiny_timer_group_double_init(&timer_group);
-    tiny_gea3_erd_client_double_init(&erd_client);
-    erd_cache_init(&test_cache);
+    simulation_test_base_setup();
   }
 
   void teardown()
   {
     erd_bridge_subscribe_destroy(&bridge_a);
     erd_bridge_subscribe_destroy(&bridge_b);
-    erd_cache_destroy(&test_cache);
+    simulation_test_base_teardown();
   }
 
   void given_both_bridges_are_initialized()
@@ -462,10 +437,6 @@ TEST_GROUP(erd_bridge_subscribe_dual)
     tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
   }
 
-  void after(tiny_timer_ticks_t ticks)
-  {
-    tiny_timer_group_double_elapse_time(&timer_group, ticks);
-  }
 };
 
 

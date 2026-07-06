@@ -147,7 +147,7 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
     const char* erd_str = topic.c_str() + pos + 5; // skip "erd/"
 
     unsigned erd = 0;
-    sscanf(erd_str, "%x", &erd);
+    if (sscanf(erd_str, "%x", &erd) != 1) return;
 
     // Decode hex payload to a local stack buffer to avoid race condition:
     // if a new MQTT message arrives before tiny_event_publish() delivers

@@ -58,6 +58,10 @@ void gea2_erd_client_adapter_init(
   gea2_erd_client_adapter_t* self,
   i_tiny_gea2_erd_client_t* gea2_client);
 
+void gea2_erd_client_adapter_destroy(
+  gea2_erd_client_adapter_t* self,
+  i_tiny_gea2_erd_client_t* gea2_client);
+
 #ifdef __cplusplus
 }
 #endif
