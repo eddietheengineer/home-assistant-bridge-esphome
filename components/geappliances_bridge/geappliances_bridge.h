@@ -260,6 +260,8 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // After cleanup, reboots (same as DiscoveryRefresh) for fresh republish.
   bool ota_cleanup_needed_{false};
   bool ota_cleanup_in_progress_{false};
+  bool ota_cleanup_waiting_for_config_{false};
+  uint32_t ota_cleanup_wait_start_ms_{0};
 
   // Autodiscovery manager (extracted from god class)
   AutodiscoveryManager autodiscovery_manager_;

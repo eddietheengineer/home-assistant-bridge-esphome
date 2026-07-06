@@ -286,7 +286,7 @@ void GeappliancesBridge::loop() {
     if (ha_discovery_cleanup_is_done(&this->ha_discovery_manager_.cleanup)) {
       this->ota_cleanup_in_progress_ = false;
       this->ota_cleanup_needed_ = false;
-      ESP_LOGI(TAG, "OTA-triggered HA discovery cleanup complete, restarting device...");
+      ESP_LOGI(TAG, "OTA-triggered HA discovery cleanup complete, waiting for config update...");
 
       /* Destroy the cleanup module before reboot to unsubscribe the wildcard
        * topic and zero the callback arg. The ESP-IDF MQTT event queue may have
@@ -295,19 +295,28 @@ void GeappliancesBridge::loop() {
        * zeroes the struct, it corrupts heap metadata and crashes the idle task. */
       ha_discovery_cleanup_destroy(&this->ha_discovery_manager_.cleanup);
 
-      // Feed the watchdog before blocking — the 500 ms delay exceeds the
-      // default TWDT timeout (30 ms) and would trigger a reset.
-      esp_task_wdt_reset();
-      vTaskDelay(pdMS_TO_TICKS(500));
+      // Wait 60 s for ESPHome to detect config hash mismatch and flash new firmware.
+      this->ota_cleanup_waiting_for_config_ = true;
+      this->ota_cleanup_wait_start_ms_ = esphome::millis();
+    }
+  }
+
+  // After cleanup, wait for config update window before rebooting.
+  if (this->ota_cleanup_waiting_for_config_) {
+    esp_task_wdt_reset();
+    uint32_t elapsed = esphome::millis() - this->ota_cleanup_wait_start_ms_;
+    if (elapsed >= 60000) {
+      ESP_LOGI(TAG, "Config update wait complete, restarting device...");
+      this->ota_cleanup_waiting_for_config_ = false;
       esphome::App.safe_reboot();
     }
   }
 #endif
 
   // Start HA discovery once steady state is reached and generate_device_config is enabled.
-  // Skip if OTA cleanup is in progress — the device will reboot after cleanup.
+  // Skip if OTA cleanup is in progress or waiting for config update — the device will reboot.
   if (this->steady_state_reached_ && !this->ha_discovery_started_ && this->generate_device_config_ &&
-      !this->ota_cleanup_in_progress_) {
+      !this->ota_cleanup_in_progress_ && !this->ota_cleanup_waiting_for_config_) {
     this->ha_discovery_started_ = true;
     ha_discovery_manager_configure(
       &this->ha_discovery_manager_,
@@ -332,7 +341,7 @@ void GeappliancesBridge::loop() {
     ha_discovery_cleanup_run(&this->ha_discovery_manager_.cleanup);
     if (ha_discovery_cleanup_is_done(&this->ha_discovery_manager_.cleanup)) {
       this->discovery_refresh_in_progress_ = false;
-      ESP_LOGI(TAG, "HA discovery cleanup complete, restarting device...");
+      ESP_LOGI(TAG, "HA discovery cleanup complete, waiting for config update...");
 
       /* Destroy the cleanup module before reboot to unsubscribe the wildcard
        * topic and zero the callback arg. The ESP-IDF MQTT event queue may have
@@ -341,11 +350,9 @@ void GeappliancesBridge::loop() {
        * zeroes the struct, it corrupts heap metadata and crashes the idle task. */
       ha_discovery_cleanup_destroy(&this->ha_discovery_manager_.cleanup);
 
-      // Feed the watchdog before blocking — the 500 ms delay exceeds the
-      // default TWDT timeout (30 ms) and would trigger a reset.
-      esp_task_wdt_reset();
-      vTaskDelay(pdMS_TO_TICKS(500));
-      esphome::App.safe_reboot();
+      // Wait 60 s for ESPHome to detect config hash mismatch and flash new firmware.
+      this->ota_cleanup_waiting_for_config_ = true;
+      this->ota_cleanup_wait_start_ms_ = esphome::millis();
     }
 #endif
   }
