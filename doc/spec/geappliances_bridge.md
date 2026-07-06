@@ -218,54 +218,38 @@ Both setters store their value directly into the corresponding member variable. 
 
 Each `loop()` iteration performs the following discovery-related work in order:
 
-1. **Check discovery activity:** Call `ha_discovery_manager_is_processing(&ha_discovery_manager_)` to determine if the discovery manager is in an active state (`building` or `discovering`).
+1. **Update publisher state:** Call `update_publisher_state_()` to manage the publisher pause/resume state machine and signal or run the publisher. This method implements an explicit state machine:
+   - **IDLE** (`erd_cache_publisher_paused_` = `false`): Publisher running normally.
+   - **PAUSED** (`erd_cache_publisher_paused_` = `true`): Publisher paused during active discovery to avoid MQTT queue contention.
+   - **RESUMING** (`discovery_just_resumed_` = `true`): Publisher just resumed, waiting for first full cache drain.
+   - **Transitions:** IDLE → PAUSED when `ha_discovery_manager_is_processing()` returns `true`; PAUSED → RESUMING when it returns `false`; RESUMING → IDLE when `erd_cache_mqtt_publisher_first_round_done()` returns `true`.
 
-2. **Pause/resume ERD cache publisher:**
-   - **If discovery is active** and `erd_cache_publisher_.cache` is non-null: call `erd_cache_mqtt_publisher_pause()`. If `erd_cache_publisher_paused_` is `false`, log a debug message and set it to `true`.
-   - **If discovery is not active** and `erd_cache_publisher_.cache` is non-null: call `erd_cache_mqtt_publisher_resume()`. If `erd_cache_publisher_paused_` is `true`, log a debug message, set it to `false`, and set `discovery_just_resumed_` to `true`.
-
-3. **Check steady state after resume:** If `discovery_just_resumed_` is `true` and `erd_cache_mqtt_publisher_first_round_done()` returns `true`, log "Device is in steady state" and clear `discovery_just_resumed_`.
-
-4. **Signal or run publisher:** If `erd_cache_publisher_.cache` is non-null and discovery is not active:
-   - **On ESP-IDF:** call `erd_cache_mqtt_publisher_signal_work()` to wake the background task.
-   - **On non-ESP-IDF:** call `erd_cache_mqtt_publisher_loop()` with `max_publishes=5` and `max_ms=20`.
-
-5. **Start HA discovery (one-shot):** If `steady_state_reached_` is `true`, `ha_discovery_started_` is `false`, and `generate_device_config_` is `true`:
+2. **Start HA discovery (one-shot):** If `steady_state_reached_` is `true`, `ha_discovery_started_` is `false`, and `generate_device_config_` is `true`:
    - Set `ha_discovery_started_` to `true`.
    - Call `ha_discovery_manager_configure()` with device ID, model number, serial number, appliance type, `filter_config_topics_`, ERD cache pointer, and MQTT client interface.
    - Call `ha_discovery_manager_start()`.
 
-6. **Drive discovery manager:** If `ha_discovery_manager_is_processing()` returns `true`, call `ha_discovery_manager_run()` to advance the discovery state machine.
+3. **Drive discovery manager:** If `ha_discovery_manager_is_processing()` returns `true`, call `ha_discovery_manager_run()` to advance the discovery state machine.
 
-7. **Handle cleanup completion:** If `discovery_refresh_in_progress_` is `true` (ESP-IDF only):
+4. **Handle cleanup completion:** If `discovery_refresh_in_progress_` is `true` (ESP-IDF only):
    - Call `ha_discovery_cleanup_run()` to advance the cleanup module.
    - When `ha_discovery_cleanup_is_done()` returns `true`: clear `discovery_refresh_in_progress_`, log "HA discovery cleanup complete, restarting device...", delay 500 ms via `vTaskDelay`, and call `esphome::App.reboot()`.
 
 ```mermaid
 flowchart TD
-    A[loop() entry] --> B{discovery active?}
-    B -->|yes| C[pause publisher]
-    B -->|no| D{publisher was paused?}
-    C --> E[skip publisher work]
-    D -->|yes| F[resume publisher]
-    D -->|no| G[signal/run publisher]
-    F --> H{first round done?}
-    H -->|yes| I[log steady state]
-    H -->|no| G
-    I --> J{steady & !started & generate?}
-    G --> J
-    E --> K{manager processing?}
-    J -->|yes| L[start discovery]
-    J -->|no| K
-    L --> K
-    K -->|yes| M[run manager]
-    K -->|no| N{cleanup in progress?}
-    M --> N
-    N -->|yes| O[run cleanup]
-    N -->|no| P[continue loop]
-    O --> Q{cleanup done?}
-    Q -->|yes| R[reboot]
-    Q -->|no| P
+    A[loop() entry] --> B[update_publisher_state_()]
+    B --> C{steady & !started & generate?}
+    C -->|yes| D[start discovery]
+    C -->|no| E{manager processing?}
+    D --> E
+    E -->|yes| F[run manager]
+    E -->|no| G{cleanup in progress?}
+    F --> G
+    G -->|yes| H[run cleanup]
+    G -->|no| I[continue loop]
+    H --> J{cleanup done?}
+    J -->|yes| K[reboot]
+    J -->|no| I
 ```
 
 ### 11.4 trigger_discovery_refresh() Flow
