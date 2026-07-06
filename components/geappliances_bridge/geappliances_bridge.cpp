@@ -13,6 +13,12 @@
 #elif defined(USE_ESP_IDF_STUBS)
 #include "esp-idf/esp_task_wdt.h"
 #endif
+
+GEA_TAG(TAG) = "geappliances_bridge";
+
+namespace esphome {
+namespace geappliances_bridge {
+
 // Safe mode RTC key (matches esphome::safe_mode::RTC_KEY).
 // Used to manually clear the boot loop counter before rebooting after cleanup,
 // so rapid reboots during config-hash OTA don't trigger safe mode.
@@ -33,12 +39,6 @@ static void mark_boot_successful_for_reboot()
   ESP_LOGI(TAG, "Safe mode counter cleared, OTA rollback cancelled");
 }
 #endif
-
-GEA_TAG(TAG) = "geappliances_bridge";
-
-namespace esphome {
-namespace geappliances_bridge {
-
 void GeappliancesBridge::add_custom_erd(tiny_erd_t erd)
 {
   if (this->custom_erds_count_ >= CUSTOM_ERDS_MAX) return;
