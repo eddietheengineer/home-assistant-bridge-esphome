@@ -25,7 +25,6 @@ typedef enum {
   ha_cleanup_state_idle,
   ha_cleanup_state_cleaning,
   ha_cleanup_state_done,
-  ha_cleanup_state_failed,
 } ha_cleanup_state_t;
 
 /* Constants */

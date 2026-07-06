@@ -4,7 +4,7 @@
 
 ### 1.1 Purpose
 
-The HA Discovery Cleanup module discovers and removes stale Home Assistant MQTT discovery topics for a device. When the discovery configuration changes (e.g., entities are removed or renamed), old retained discovery messages remain on the MQTT broker, causing Home Assistant to show orphaned entities. The cleanup module uses a single wildcard subscription (`homeassistant/+/{device_id}/#`) to discover all existing discovery topics across all domains, then republishes each with an empty retained payload to clear them from the broker.
+The HA Discovery Cleanup module discovers and removes stale Home Assistant MQTT discovery topics for a device. It is used by both the OTA reboot flow and the Discovery Refresh button. When the discovery configuration changes (e.g., entities are removed or renamed), old retained discovery messages remain on the MQTT broker, causing Home Assistant to show orphaned entities. The cleanup module uses a single wildcard subscription (`homeassistant/+/{device_id}/#`) to discover all existing discovery topics across all domains, then republishes each with an empty retained payload to clear them from the broker.
 
 ### 1.2 Responsibilities
 
@@ -46,7 +46,6 @@ typedef enum {
   ha_cleanup_state_idle,
   ha_cleanup_state_cleaning,
   ha_cleanup_state_done,
-  ha_cleanup_state_failed,
 } ha_cleanup_state_t;
 ```
 
@@ -55,7 +54,6 @@ typedef enum {
 | `ha_cleanup_state_idle` | Initial state after `init()`. No cleanup in progress. |
 | `ha_cleanup_state_cleaning` | Active cleanup in progress. Set by `start()`. |
 | `ha_cleanup_state_done` | Cleanup completed successfully. Two consecutive clean passes with no topics found. |
-| `ha_cleanup_state_failed` | Cleanup failed (reserved; not currently used by the implementation). |
 
 ### 3.2 Context Struct
 
@@ -414,7 +412,7 @@ typedef struct {
 1. `ha_discovery_cleanup_configure()` — pass device ID, MQTT client, and time source
 2. `ha_discovery_cleanup_start()` — begin cleanup process
 3. Each loop iteration: `ha_discovery_cleanup_run()` — advance the state machine
-4. When `ha_discovery_cleanup_is_done()` returns true: set `discovery_refresh_in_progress_ = false` and restart the device
+4. When `ha_discovery_cleanup_is_done()` returns true: destroy cleanup module, configure and start discovery manager for fresh publishing, drive publishing until complete, call mark_boot_successful_for_reboot(), wait 5 seconds, then call safe_reboot()
 
 ### 10.4 Independence
 
@@ -424,7 +422,7 @@ The cleanup module is independent of the discovery manager's own state and buffe
 
 ## 11. Invariants
 
-1. **ESP-IDF only:** The entire module is guarded by `#ifdef USE_ESP_IDF`. On non-ESP-IDF platforms, the module is not compiled.
+1. **ESP-IDF only:** The entire module is guarded by `#ifdef USE_ESP_IDF`.
 2. **No discovery state knowledge:** The cleanup module has no awareness of the discovery manager's internal state, buffers, or entity list. It operates purely on what the broker returns via the wildcard subscription.
 3. **Two-pass verification:** Cleanup is not considered complete until two consecutive passes find no topics. This handles the race condition where topics discovered in one pass may not have been fully flushed before the next subscription fires.
 4. **Drain between passes:** After unsubscribing, the module waits for the inbound MQTT event queue to drain before re-subscribing. This prevents stale callbacks from a previous pass contaminating the next pass's results.

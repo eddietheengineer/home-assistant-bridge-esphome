@@ -8,6 +8,8 @@
 #ifdef USE_ESP32
 #include "esp_system.h"
 #include "esp_task_wdt.h"
+#include "esp_ota_ops.h"
+#include "esphome/core/preferences.h"
 #elif defined(USE_ESP_IDF_STUBS)
 #include "esp-idf/esp_task_wdt.h"
 #endif
@@ -17,6 +19,26 @@ GEA_TAG(TAG) = "geappliances_bridge";
 namespace esphome {
 namespace geappliances_bridge {
 
+// Safe mode RTC key (matches esphome::safe_mode::RTC_KEY).
+// Used to manually clear the boot loop counter before rebooting after cleanup,
+// so rapid reboots during config-hash OTA don't trigger safe mode.
+static constexpr uint32_t SAFE_MODE_RTC_KEY = 233825507UL;
+
+#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
+static void mark_boot_successful_for_reboot()
+{
+  // Clear the safe mode boot loop counter in preferences and persist immediately.
+  uint32_t val = 0;
+  ESPPreferenceObject rtc_pref = global_preferences->make_preference<uint32_t>(SAFE_MODE_RTC_KEY, false);
+  rtc_pref.save(&val);
+  global_preferences->sync();
+
+  // Mark OTA partition as valid to prevent bootloader rollback on next boot.
+  esp_ota_mark_app_valid_cancel_rollback();
+
+  ESP_LOGI(TAG, "Safe mode counter cleared, OTA rollback cancelled");
+}
+#endif
 void GeappliancesBridge::add_custom_erd(tiny_erd_t erd)
 {
   if (this->custom_erds_count_ >= CUSTOM_ERDS_MAX) return;
@@ -187,6 +209,31 @@ void GeappliancesBridge::setup() {
   ESP_LOGI(TAG, "Waiting %u seconds before starting autodiscovery...",
            AUTODISCOVERY_STARTUP_DELAY_MS / 1000);
 
+  // Detect OTA reboot by reading the reboot source from NVS.
+  // ESPHome's debug component stores the component's log string before
+  // App.reboot() — OTA stores "esphome.ota", bridge stores "geappliances_bridge".
+  // Only trigger cleanup for OTA, not for our own reboot or other software resets.
+#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
+  {
+    esp_reset_reason_t reset = esp_reset_reason();
+    if (reset == ESP_RST_SW) {
+      static const char* REBOOT_KEY = "reboot_source";
+      static const size_t REBOOT_MAX_LEN = 24;
+      auto pref = global_preferences->make_preference(
+          REBOOT_MAX_LEN,
+          fnv1_hash_extend(fnv1_hash(REBOOT_KEY), App.get_name().c_str()));
+      char reboot_source[REBOOT_MAX_LEN]{};
+      if (pref.load(&reboot_source)) {
+        reboot_source[REBOOT_MAX_LEN - 1] = '\0';
+        if (strcmp(reboot_source, "esphome.ota") == 0) {
+          this->ota_cleanup_needed_ = true;
+          ESP_LOGI(TAG, "Detected OTA reboot, will clean old discovery topics on startup");
+        }
+      }
+    }
+  }
+#endif
+
   ESP_LOGCONFIG(TAG, "GE Appliances Bridge setup complete");
 }
 
@@ -238,48 +285,95 @@ void GeappliancesBridge::loop() {
 
   this->update_publisher_state_();
 
-  // Start HA discovery once steady state is reached and generate_device_config is enabled.
-  if (this->steady_state_reached_ && !this->ha_discovery_started_ && this->generate_device_config_) {
-    this->ha_discovery_started_ = true;
-    ha_discovery_manager_configure(
-      &this->ha_discovery_manager_,
-      this->device_identity_manager_.get_device_id(),
-      this->device_identity_manager_.get_model_number(),
-      this->device_identity_manager_.get_serial_number(),
-      this->device_identity_manager_.get_appliance_type(),
-      this->filter_config_topics_,
-      &this->erd_cache_,
-      &this->mqtt_client_adapter_.interface);
-    ha_discovery_manager_start(&this->ha_discovery_manager_);
+
+  // ── OTA-triggered cleanup + republish + reboot ───────────────────────────
+#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
+  // Start cleanup once steady state is reached (only on OTA reboot).
+  if (this->generate_device_config_ &&
+      this->ota_cleanup_needed_ && !this->ota_cleanup_in_progress_ &&
+      !this->ota_discovery_publishing_ && !this->ota_reboot_pending_) {
+    if (this->steady_state_reached_ &&
+        this->mqtt_client_adapter_initialized_ &&
+        this->device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE) {
+      ESP_LOGI(TAG, "Starting OTA-triggered HA discovery cleanup...");
+      ha_discovery_cleanup_configure(&this->ha_discovery_manager_.cleanup,
+          this->device_identity_manager_.get_device_id(),
+          &this->mqtt_client_adapter_.interface, esphome::millis);
+      ha_discovery_cleanup_start(&this->ha_discovery_manager_.cleanup);
+      this->ota_cleanup_in_progress_ = true;
+    }
   }
 
-  /* Drive the HA discovery consumer (publishes at rate-limited intervals). */
-  if (ha_discovery_manager_is_processing(&this->ha_discovery_manager_)) {
-    ha_discovery_manager_run(&this->ha_discovery_manager_);
-  }
-
-  /* If cleanup-only finished, restart the device so normal discovery republishes. */
-  if (this->discovery_refresh_in_progress_) {
-#ifdef USE_ESP_IDF
+  // Drive cleanup (shared by OTA and DiscoveryRefresh paths).
+  if (this->ota_cleanup_in_progress_) {
     ha_discovery_cleanup_run(&this->ha_discovery_manager_.cleanup);
     if (ha_discovery_cleanup_is_done(&this->ha_discovery_manager_.cleanup)) {
-      this->discovery_refresh_in_progress_ = false;
-      ESP_LOGI(TAG, "HA discovery cleanup complete, restarting device...");
-
-      /* Destroy the cleanup module before reboot to unsubscribe the wildcard
-       * topic and zero the callback arg. The ESP-IDF MQTT event queue may have
-       * dropped the unsubscribe ack (seen as 'Dropped N inbound MQTT events'),
-       * leaving the subscription active. If the callback fires after teardown
-       * zeroes the struct, it corrupts heap metadata and crashes the idle task. */
+      this->ota_cleanup_in_progress_ = false;
+      this->ota_cleanup_needed_ = false;
+      ESP_LOGI(TAG, "HA discovery cleanup complete, publishing fresh discovery...");
       ha_discovery_cleanup_destroy(&this->ha_discovery_manager_.cleanup);
+      ha_discovery_manager_init(&this->ha_discovery_manager_);
 
-      // Feed the watchdog before blocking — the 500 ms delay exceeds the
-      // default TWDT timeout (30 ms) and would trigger a reset.
-      esp_task_wdt_reset();
-      vTaskDelay(pdMS_TO_TICKS(500));
-      esphome::App.reboot();
+      // Publish fresh HA discovery payloads.
+      ha_discovery_manager_configure(
+        &this->ha_discovery_manager_,
+        this->device_identity_manager_.get_device_id(),
+        this->device_identity_manager_.get_model_number(),
+        this->device_identity_manager_.get_serial_number(),
+        this->device_identity_manager_.get_appliance_type(),
+        this->filter_config_topics_,
+        &this->erd_cache_,
+        &this->mqtt_client_adapter_.interface);
+      ha_discovery_manager_start(&this->ha_discovery_manager_);
+      this->ota_discovery_publishing_ = true;
     }
+  }
+
+  // Drive OTA discovery publishing.
+  if (this->ota_discovery_publishing_) {
+    if (ha_discovery_manager_is_processing(&this->ha_discovery_manager_)) {
+      ha_discovery_manager_run(&this->ha_discovery_manager_);
+    } else {
+      // Discovery publish complete — prepare reboot.
+      this->ota_discovery_publishing_ = false;
+      ESP_LOGI(TAG, "OTA HA discovery publish complete, preparing reboot...");
+      mark_boot_successful_for_reboot();
+      this->ota_reboot_pending_ = true;
+      this->ota_reboot_start_ms_ = esphome::millis();
+    }
+  }
+
+  // Wait then reboot.
+  if (this->ota_reboot_pending_) {
+    esp_task_wdt_reset();
+    uint32_t elapsed = esphome::millis() - this->ota_reboot_start_ms_;
+    if (elapsed >= 5000) {
+      ESP_LOGI(TAG, "Rebooting after OTA cleanup + republish...");
+      this->ota_reboot_pending_ = false;
+      esphome::App.safe_reboot();
+    }
+  }
 #endif
+
+  // ── DiscoveryRefresh button (manual, not OTA) ────────────────────────────
+  // Same path as OTA: cleanup → publish fresh discovery → reboot.
+  // Queued until the appliance is ready (steady state, MQTT, device ID).
+  if (this->discovery_refresh_in_progress_ &&
+      !this->ota_cleanup_in_progress_ &&
+      !this->ota_discovery_publishing_ && !this->ota_reboot_pending_) {
+    // Wait until ready before starting cleanup.
+    if (this->steady_state_reached_ &&
+        this->mqtt_client_adapter_initialized_ &&
+        this->device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE) {
+#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
+      ha_discovery_cleanup_configure(&this->ha_discovery_manager_.cleanup,
+          this->device_identity_manager_.get_device_id(),
+          &this->mqtt_client_adapter_.interface, esphome::millis);
+      ha_discovery_cleanup_start(&this->ha_discovery_manager_.cleanup);
+      this->discovery_refresh_in_progress_ = false;
+      this->ota_cleanup_in_progress_ = true;
+#endif
+    }
   }
 
   // Publish ERD/MQTT publish rate + cache stats sensors every ~60 seconds.
@@ -377,9 +471,9 @@ void GeappliancesBridge::update_publisher_state_()
 
 void GeappliancesBridge::run_protocol_stack_()
 {
-  // When GEA2 is active (or during GEA2 autodiscovery), run a 200 ms
-  // wall-clock busy loop so the full TX→RX cycle at 19200 baud completes
-  // within a single loop() call.  See doc/geappliances_bridge.md §13.
+  // When GEA2 is active (or during GEA2 autodiscovery), run a 100 ms
+  // wall-clock busy loop (with a 200 ms hard cap) so the full TX→RX cycle
+  // at 19200 baud completes within a single loop() call.
   bool need_gea2_loop = this->gea2_uart_ != nullptr && (
     this->autodiscovery_manager_.is_gea2_protocol() ||
     this->gea2_protocol_active_ ||
@@ -882,31 +976,10 @@ void GeappliancesBridge::trigger_discovery_refresh()
     return;
   }
 
-  if (!this->steady_state_reached_) {
-    ESP_LOGW(TAG, "Cannot refresh discovery: appliance bridge not in steady state");
-    return;
-  }
-
-  // If the discovery manager is still processing from a previous run,
-  // wait for it to finish before starting cleanup.
-  if (ha_discovery_manager_is_processing(&this->ha_discovery_manager_)) {
-    ESP_LOGW(TAG, "Cannot refresh discovery: manager still processing");
-    return;
-  }
-
-  ESP_LOGI(TAG, "Starting HA discovery cleanup...");
-
-  // Use the embedded cleanup module directly for cleanup-only mode.
-#ifdef USE_ESP_IDF
-  ha_discovery_cleanup_configure(&this->ha_discovery_manager_.cleanup,
-      this->device_identity_manager_.get_device_id(),
-      &this->mqtt_client_adapter_.interface, esphome::millis);
-  ha_discovery_cleanup_start(&this->ha_discovery_manager_.cleanup);
-#else
-  (void)this->device_identity_manager_.get_device_id();
-  (void)this->mqtt_client_adapter_.interface;
-#endif
+  // Queue the request — it will execute once the appliance is ready
+  // (steady state, MQTT connected, device ID complete).
   this->discovery_refresh_in_progress_ = true;
+  ESP_LOGI(TAG, "Discovery refresh queued, will execute when appliance is ready");
 }
 
 }  // namespace geappliances_bridge

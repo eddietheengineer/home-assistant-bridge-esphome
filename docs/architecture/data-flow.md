@@ -2,7 +2,7 @@
 
 This document describes the three primary data paths through the bridge: reading
 appliance state to Home Assistant, writing commands from Home Assistant to the
-appliance, and publishing Home Assistant MQTT discovery entities at startup.
+appliance, and publishing Home Assistant MQTT discovery entities on OTA reboot or Discovery Refresh.
 
 ## Read Path (Appliance → Home Assistant)
 
@@ -86,11 +86,45 @@ graph LR
 4. The **Protocol Stack** packages the write into a GEA3/GEA2 message and
    transmits it over UART to the appliance.
 
-## Discovery Path (Embedded JSONL → Home Assistant)
 
-At startup, the bridge publishes Home Assistant MQTT discovery topics so that
-entities auto-register. Entity definitions are embedded as compressed JSONL
-chunks in `ha_discovery_data.h` and streamed through a main-loop pipeline.
+## Discovery Path (OTA Reboot / Discovery Refresh → Home Assistant)
+
+Home Assistant MQTT discovery topics are retained on the MQTT broker, so normal
+boots skip discovery entirely. Discovery runs in two scenarios:
+
+1. **OTA reboot:** After an OTA update, the bridge detects the reboot source,
+   cleans old discovery topics, publishes fresh ones, and reboots to defragment
+   the heap.
+2. **Discovery Refresh button:** When pressed, the button queues a cleanup +
+   republish + reboot cycle. If pressed before the bridge is ready (steady state,
+   MQTT connected, device ID complete), the request is queued and executes once
+   the bridge is ready.
+
+### OTA Reboot Flow
+
+```
+OTA reboot → detect "esphome.ota" → wait for steady state
+  → cleanup old discovery topics
+  → publish fresh discovery topics
+  → mark boot successful (clear safe mode counter, cancel OTA rollback)
+  → wait 5 s → safe_reboot()
+```
+
+### Discovery Refresh Flow
+
+```
+Button press → queue request (set discovery_refresh_in_progress_)
+  → wait for steady state, MQTT, device ID
+  → cleanup old discovery topics
+  → publish fresh discovery topics
+  → mark boot successful
+  → wait 5 s → safe_reboot()
+```
+
+### Entity Definition Pipeline
+
+Entity definitions are embedded as compressed JSONL chunks in `ha_discovery_data.h`
+and streamed through a main-loop pipeline:
 
 ```mermaid
 graph LR

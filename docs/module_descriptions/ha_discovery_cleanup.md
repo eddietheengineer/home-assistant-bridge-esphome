@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Discovers and removes old Home Assistant MQTT discovery topics for a device. Independent of the discovery manager — no knowledge of discovery state or buffers. Uses a wildcard subscription to catch all retained discovery topics across all domains, then republishes each with an empty payload to clear the retained message on the broker.
+Discovers and removes old Home Assistant MQTT discovery topics for a device. Used by both the OTA reboot flow and the Discovery Refresh button. Independent of the discovery manager — no knowledge of discovery state or buffers. Uses a wildcard subscription to catch all retained discovery topics across all domains, then republishes each with an empty payload to clear the retained message on the broker.
 
 ## Public API
 
@@ -29,7 +29,6 @@ IDLE
       ├─ pass found topics → retry (increment pass_number)
       ├─ pass clean → increment clean_passes
       └─ two consecutive clean passes → DONE
-    FAILED (terminal — set on unrecoverable error)
     DONE (terminal — all old discovery topics removed)
 ```
 
@@ -45,7 +44,7 @@ Constants:
 `ha_discovery_cleanup_t`:
 - `mqtt_client` — `i_mqtt_client_t*` for subscribe/unsubscribe/publish
 - `device_id` — `const char*` used to build the wildcard subscription topic
-- `state` — `ha_cleanup_state_t` (`idle`, `cleaning`, `done`, `failed`)
+- `state` — `ha_cleanup_state_t` (`idle`, `cleaning`, `done`)
 - `get_time_ms` — `uint32_t (*)(void)` time function for timeout tracking
 - `topic_buf` — `char[HA_CLEANUP_TOPIC_BUF_SIZE]` ring buffer for queued topic strings
 - `queue_write_pos` — `uint16_t` offset within `topic_buf` for next append

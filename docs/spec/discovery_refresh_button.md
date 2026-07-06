@@ -4,7 +4,7 @@
 
 ### 1.1 Purpose
 
-The Discovery Refresh Button is an ESPHome `button::Button` component that triggers a Home Assistant discovery cleanup and device restart when pressed. It provides a user-accessible mechanism to force the bridge to clear all retained discovery messages from the MQTT broker and reboot, causing Home Assistant to rediscover the device from scratch on the next boot.
+The Discovery Refresh Button is an ESPHome `button::Button` component that triggers a Home Assistant discovery cleanup, republishes fresh discovery topics, and reboots the device when pressed. It provides a user-accessible mechanism to force the bridge to clear all retained discovery messages from the MQTT broker, publish fresh ones, and reboot — causing Home Assistant to rediscover the device from scratch on the next boot.
 
 ### 1.2 Responsibilities
 
@@ -14,7 +14,7 @@ The Discovery Refresh Button is an ESPHome `button::Button` component that trigg
 
 ### 1.3 Not Responsible For
 
-- Discovery cleanup execution (delegated to `GeappliancesBridge::trigger_discovery_refresh()`)
+- Discovery cleanup execution (delegated to `GeappliancesBridge`)
 - MQTT message publishing (delegated to `ha_discovery_cleanup` module)
 - Device reboot scheduling (delegated to `GeappliancesBridge` loop)
 - Button lifecycle management (owned by ESPHome's component framework)
@@ -79,42 +79,36 @@ The bridge is expected to outlive the button in normal operation, as both are ma
 
 ### 4.2 trigger_discovery_refresh() Flow
 
-When `press_action()` delegates to `bridge_->trigger_discovery_refresh()`, the bridge performs the following:
+When `press_action()` delegates to `bridge_->trigger_discovery_refresh()`, the bridge performs:
 
-1. **Idempotency guard**: If `discovery_refresh_in_progress_` is `true`, log a warning and return immediately. Prevents concurrent cleanup sessions.
-2. **Steady-state guard**: If `steady_state_reached_` is `false`, log a warning and return. Discovery refresh is only valid after the bridge has completed its initial startup and reached steady-state operation.
-3. **Processing guard**: If `ha_discovery_manager_is_processing()` returns `true` (manager is in `building` or `discovering` state), log a warning and return. Cleanup must not start while the discovery manager is actively processing.
-4. **Configure cleanup**: On ESP-IDF platforms, call `ha_discovery_cleanup_configure()` with the device ID, MQTT client interface, and time source, then `ha_discovery_cleanup_start()`. The cleanup module is embedded within `ha_discovery_manager_t` and accessed as `this->ha_discovery_manager_.cleanup`.
-5. **Set in-progress flag**: Set `discovery_refresh_in_progress_` to `true`. This runs on ALL platforms (the assignment is outside the `#ifdef USE_ESP_IDF` block).
+1. **Idempotency guard:** If `discovery_refresh_in_progress_` is `true`, log a warning ("Discovery refresh already in progress, ignoring") and return. Prevents concurrent requests.
+2. **Queue the request:** Set `discovery_refresh_in_progress_` to `true` and log "Discovery refresh queued, will execute when appliance is ready".
 
-On non-ESP-IDF platforms, step 4 is a no-op (dependency pointers are cast away with `(void)` suppressions), but step 5 still executes — the flag is set to `true`.
+No guard checks for steady state, MQTT readiness, or device ID are performed at press time. The request is queued and will execute in `loop()` once all prerequisites are met. This allows the user to press the button at any time, even during startup.
 
-### 4.3 Cleanup Completion and Reboot
+### 4.3 Queued Execution in loop()
 
-The bridge's main loop checks `discovery_refresh_in_progress_` and, if `true`, enters the cleanup completion path. **The entire completion loop (lines 262-282) is wrapped in `#ifdef USE_ESP_IDF`**:
+The bridge's main loop checks `discovery_refresh_in_progress_` and, when the bridge is ready, starts the cleanup:
 
-1. Call `ha_discovery_cleanup_run()` each loop iteration
-2. When `ha_discovery_cleanup_is_done()` returns `true`:
-   - Set `discovery_refresh_in_progress_` to `false`
-   - Log info: "HA discovery cleanup complete, restarting device..."
-   - Call `ha_discovery_cleanup_destroy()` to destroy the cleanup module, unsubscribing the wildcard topic and zeroing the callback arg
-   - Call `esp_task_wdt_reset()` to feed the watchdog before the blocking delay
-   - Delay 500 ms via `vTaskDelay` to allow final retained-clear messages to transmit
-   - Call `esphome::App.reboot()` to restart the device
+1. **Wait for readiness:** The loop checks `steady_state_reached_`, `mqtt_client_adapter_initialized_`, and `device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE`.
+2. **Start cleanup:** Once ready, `ha_discovery_cleanup_configure()` and `ha_discovery_cleanup_start()` are called, `discovery_refresh_in_progress_` is cleared, and `ota_cleanup_in_progress_` is set to `true`. This hands off to the shared cleanup → publish → reboot path.
+3. **Drive cleanup:** `ha_discovery_cleanup_run()` is called each loop iteration. When done, the cleanup module is destroyed and fresh discovery topics are published.
+4. **Drive discovery publishing:** `ha_discovery_manager_run()` publishes discovery payloads. When done, `mark_boot_successful_for_reboot()` is called.
+5. **Wait then reboot:** After a 5-second delay, `esphome::App.safe_reboot()` performs a graceful reboot.
 
-On non-ESP-IDF platforms, the cleanup completion loop is dead code: `discovery_refresh_in_progress_` is set to `true` in `trigger_discovery_refresh()` but is never cleared, since the `#ifdef USE_ESP_IDF` block containing the cleanup logic is not compiled.
+**Note:** The guard also checks `!ota_cleanup_in_progress_` to prevent interfering with an in-progress OTA cleanup cycle.
+
+---
 
 ## 5. State Transitions
 
-### 5.1 Press When Bridge Is Idle (Steady State, No Processing)
+### 5.1 Press When Bridge Is Idle (Steady State)
 
 | Condition | Result |
 |-----------|--------|
 | `bridge_ != nullptr` | Delegates to `trigger_discovery_refresh()` |
-| `steady_state_reached_ == true` | Passes steady-state guard |
 | `discovery_refresh_in_progress_ == false` | Passes idempotency guard |
-| `ha_discovery_manager_is_processing() == false` | Passes processing guard |
-| **Outcome** | Cleanup configured, started, and `discovery_refresh_in_progress_` set to `true`. The main loop will drive cleanup to completion and reboot the device. |
+| **Outcome** | `discovery_refresh_in_progress_` set to `true`. The main loop will start cleanup immediately (bridge is already ready), then proceed through cleanup → publish → reboot. |
 
 ### 5.2 Press While Refresh Already In Progress
 
@@ -126,15 +120,9 @@ On non-ESP-IDF platforms, the cleanup completion loop is dead code: `discovery_r
 
 | Condition | Result |
 |-----------|--------|
-| `steady_state_reached_ == false` | **Blocked** — warning logged: "Cannot refresh discovery: appliance bridge not in steady state". No state change. |
+| `steady_state_reached_ == false` (or MQTT not ready, or device ID not complete) | **Queued** — `discovery_refresh_in_progress_` set to `true`. The request waits in `loop()` until all prerequisites are met, then executes. |
 
-### 5.4 Press While Discovery Manager Is Processing
-
-| Condition | Result |
-|-----------|--------|
-| `ha_discovery_manager_is_processing() == true` (state is `building` or `discovering`) | **Blocked** — warning logged: "Cannot refresh discovery: manager still processing". No state change. |
-
-### 5.5 Press With Null Bridge
+### 5.4 Press With Null Bridge
 
 | Condition | Result |
 |-----------|--------|
@@ -156,15 +144,15 @@ The guard is silent — no log message is emitted when `bridge_` is null.
 
 ### 6.2 Idempotency
 
-`trigger_discovery_refresh()` guards against concurrent execution via `discovery_refresh_in_progress_`. Multiple rapid presses of the button are safely ignored after the first press initiates cleanup. The flag is cleared only after cleanup completes and before the device reboots.
+`trigger_discovery_refresh()` guards against concurrent execution via `discovery_refresh_in_progress_`. Multiple rapid presses of the button are safely ignored after the first press queues the request.
 
-### 6.3 Steady-State Requirement
+### 6.3 Queued Execution
 
-The button refuses to trigger cleanup until `steady_state_reached_` is `true`. This flag is set once during the bridge's startup sequence and never cleared. It ensures the appliance bridge has completed its initial connection and data polling before allowing a disruptive cleanup operation.
+The request is queued rather than rejected if the bridge is not ready. This eliminates the need for guard checks at press time and allows the user to press the button at any time. The actual cleanup starts in `loop()` once `steady_state_reached_`, `mqtt_client_adapter_initialized_`, and device ID completion are all true.
 
-### 6.4 Processing Guard
+### 6.4 Shared Path with OTA
 
-The button refuses to start cleanup while the discovery manager is in an active processing state (`building` or `discovering`). This prevents interference with ongoing discovery operations and avoids corrupting the discovery state.
+The Discovery Refresh button uses the same cleanup → publish → reboot path as OTA-triggered discovery. Both paths share `ota_cleanup_in_progress_`, `ota_discovery_publishing_`, and `ota_reboot_pending_`. This means a Discovery Refresh request and an OTA-triggered cleanup cannot run concurrently — the first one to start owns the path.
 
 ---
 
@@ -184,8 +172,8 @@ The button refuses to start cleanup while the discovery manager is in an active 
 1. **Single bridge reference:** `bridge_` is set once at construction and never modified.
 2. **No ownership:** The button does not own or manage the lifecycle of the bridge.
 3. **Delegation-only behavior:** The button performs no cleanup logic itself — all work is delegated to `GeappliancesBridge::trigger_discovery_refresh()`.
-4. **Guard chain is ordered:** `trigger_discovery_refresh()` checks guards in a fixed order: idempotency, steady-state, then processing. The order matters because the idempotency guard is the cheapest check and prevents re-entry during an active cleanup.
-5. **Non-ESP-IDF sets the flag but has no cleanup loop:** On non-ESP-IDF platforms, `trigger_discovery_refresh()` performs the guard checks and sets `discovery_refresh_in_progress_` to `true`, but does not configure or start the cleanup module. The cleanup completion loop is wrapped in `#ifdef USE_ESP_IDF`, so the flag is never cleared — it remains `true` until the process exits.
+4. **Queued execution:** The request is queued at press time and executes in `loop()` when the bridge is ready. No guard checks for steady state, MQTT, or device ID are performed at press time.
+5. **Shared cleanup path with OTA:** Both OTA reboot and Discovery Refresh use the same `ota_cleanup_in_progress_` → `ota_discovery_publishing_` → `ota_reboot_pending_` flow.
 
 ---
 
@@ -193,6 +181,6 @@ The button refuses to start cleanup while the discovery manager is in an active 
 
 1. **No visual feedback:** The button provides no indication of whether the press was accepted or rejected. The user must check logs to determine the outcome.
 2. **Device reboot is mandatory:** After cleanup completes, the device always reboots. There is no option to complete cleanup without rebooting.
-3. **500 ms pre-reboot delay is fixed:** The delay between cleanup completion and reboot is hardcoded to 500 ms. If the MQTT broker is slow to acknowledge retained-clear messages, some messages may be lost.
-4. **Non-ESP-IDF platforms set the flag but have no cleanup loop:** The cleanup and reboot flow is only implemented for ESP-IDF. On other platforms, pressing the button performs guard checks and sets `discovery_refresh_in_progress_` to `true`, but the cleanup completion loop is dead code (wrapped in `#ifdef USE_ESP_IDF`), so the flag is never cleared and no reboot occurs.
-5. **No cancellation:** Once cleanup has started, there is no way to cancel it. The device will proceed through cleanup and reboot.
+3. **5-second pre-reboot delay is fixed:** The delay between discovery publishing completion and reboot is hardcoded to 5 seconds. If the MQTT broker is slow to acknowledge messages, some messages may be lost.
+4. **No cancellation:** Once cleanup has started, there is no way to cancel it. The device will proceed through cleanup, publish, and reboot.
+5. **`safe_reboot()` for graceful disconnect:** The reboot uses `App.safe_reboot()` to gracefully disconnect from MQTT before resetting, ensuring a clean session end on the broker.
