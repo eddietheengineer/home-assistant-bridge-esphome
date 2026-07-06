@@ -162,7 +162,7 @@ static erd_set_t& erd_set(T* self);
 
 | Template | Description |
 |----------|-------------|
-| `arm_timer(self, ticks)` | Starts a timer on `self->timer_group` / `self->timer` that fires `signal_timer_expired` after `ticks` milliseconds. |
+| `arm_timer(self, ticks)` | Starts a timer on `self->timer_group` / `self->timer` that fires `signal_timer_expired` after `ticks` timer ticks. Tick resolution is not guaranteed but is generally 1 millisecond; actual durations may be longer than specified but not shorter. |
 | `disarm_timer(self)` | Stops the timer on `self->timer_group` / `self->timer`. |
 | `erd_set(self)` | Returns a reference to `self->erd_set`. |
 

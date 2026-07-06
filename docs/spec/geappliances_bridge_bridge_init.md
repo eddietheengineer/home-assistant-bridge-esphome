@@ -43,6 +43,7 @@ All methods are members of `GeappliancesBridge` (defined in `geappliances_bridge
 | `handle_polling_failed()` | `handle_polling_failed()` |
 | `maybe_start_custom_erd_polling()` | `maybe_start_custom_erd_polling_()` |
 
+**Note:** Most `IBridgeServices` methods delegate to `_`-suffixed private implementations (e.g., `initialize_mqtt_client` → `initialize_mqtt_client_`). The two failure handlers (`handle_subscription_failed`, `handle_polling_failed`) share the same name in both the interface and implementation, as they are called directly by the startup HSM without an intermediate private wrapper.
 ### 2.3 Internal Methods
 
 | Method | Description |
@@ -192,9 +193,9 @@ The method MUST determine the operating mode as follows:
 
 When `use_polling` is `true`, the method MUST:
 1. Call `init_polling_bridge_(false)`.
-2. Set `erd_bridge_initialized_` to `true` *before* the probe phase starts, so that if the probe completes synchronously and fires `signal_bridge_ready`, the `check_steady_state()` call in the startup HSM's entry function can see the flag.
+2. Set `erd_bridge_initialized_` to `true` after `init_polling_bridge_()` returns.
 
-**Rationale:** The synchronous completion race is real — if the probe list is small and the appliance responds immediately, the discovery-complete callback fires during `erd_bridge_poll_init()`. The flag must be visible before that callback runs.
+**Rationale:** The synchronous completion race is real — if the probe list is small and the appliance responds immediately, the discovery-complete callback fires during `erd_bridge_poll_init()`. The flag is set after the init call completes; the startup HSM checks it via `check_steady_state()` on the next loop iteration after the signal is processed.
 
 **Implementation:** `geappliances_bridge_bridge_init.cpp` lines 229–234.
 
@@ -240,8 +241,10 @@ Regardless of mode, the method MUST:
 #### Requirement 3.7.1: Polling Bridge Failure
 
 `handle_polling_failed()` MUST:
-- If the polling bridge is running alongside a subscription bridge (custom ERD polling): destroy the polling bridge, reset its flags, and continue with subscription only.
+- Return immediately if the polling state is not `polling_state_failed`.
+- If the polling bridge is running alongside a subscription bridge (custom ERD polling): destroy the polling bridge, reset `polling_bridge_initialized_` and `custom_erd_polling_started_`, and continue with subscription only.
 - If the polling bridge is the primary data path (POLL mode or GEA2): log an error and leave the bridge in a failed state. The appliance-lost handler in the startup HSM's `state_failed` state will re-probe if the appliance comes back.
+- In both cases, reset `last_logged_poll_state_` to `polling_state_none`.
 
 **Implementation:** `geappliances_bridge_bridge_init.cpp` lines 320–341.
 
@@ -249,8 +252,9 @@ Regardless of mode, the method MUST:
 
 `handle_subscription_failed()` MUST:
 - Return immediately if the mode is not `BRIDGE_MODE_AUTO` (POLL and SUBSCRIBE modes have no fallback).
-- Destroy the subscription bridge and reset its flag.
-- Destroy any existing polling bridge (e.g., from custom ERD polling) to avoid leaking heap allocations.
+- Destroy the subscription bridge and reset `subscription_bridge_initialized_`.
+- Reset `last_logged_poll_state_` to `polling_state_none` and `last_logged_subscribe_state_` to `subscription_state_none`.
+- Destroy any existing polling bridge (e.g., from custom ERD polling) to avoid leaking heap allocations, resetting `custom_erd_polling_started_` and `polling_bridge_initialized_`.
 - Call `init_polling_bridge_(true)` to re-initialize the polling bridge as the full data path.
 - Send `signal_subscription_fallback` to the startup HSM.
 
@@ -265,8 +269,7 @@ Regardless of mode, the method MUST:
 1. **Phase ordering.** The startup HSM drives the sequence: protocol stack → autodiscovery → device ID → MQTT client init (Phase 4) → feature bits → bridge init (Phase 6) → subscription watch → running. This file implements the Phase 4 and Phase 6 actions, plus the feature-bit kick-off that occurs between them.
 
 2. **Three polling bridge init paths.** `init_polling_bridge_()` is called from three contexts: (a) primary polling mode (POLL or GEA2), (b) custom ERD polling alongside subscription (AUTO mode), and (c) full fallback from subscription failure (AUTO mode). The `log_as_info` parameter controls log level — `true` for fallback (user-visible), `false` for normal polling init.
-
-3. **Synchronous discovery race.** The polling bridge's discovery phase can complete synchronously during `erd_bridge_poll_init()` if the probe list is small. The discovery-complete callback is wired before init, and `erd_bridge_initialized_` is set before init, so the startup HSM sees a consistent state when it processes the `signal_bridge_ready` signal.
+3. **Synchronous discovery race.** The polling bridge's discovery phase can complete synchronously during `erd_bridge_poll_init()` if the probe list is small. The discovery-complete callback is wired before init. `erd_bridge_initialized_` is set after `init_polling_bridge_()` returns; the startup HSM checks it via `check_steady_state()` on the next loop iteration after the signal is processed.
 
 4. **Write bridge is always initialized.** Unlike the data-path bridges (poll/subscribe), the write bridge is initialized regardless of mode. It is needed to relay Home Assistant write commands to the appliance, and it depends on the MQTT adapter's interface being available.
 
