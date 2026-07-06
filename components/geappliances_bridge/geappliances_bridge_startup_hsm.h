@@ -5,7 +5,7 @@
  * Replaces the manual switch-based phase progression with a proper
  * tiny_hsm-based hierarchical state machine.  The startup sequence is:
  *
- *   protocol_stack → autodiscovery → device_id → mqtt_client_init
+ *   startup_delay → autodiscovery → device_id → mqtt_client_init
  *                 → feature_bits → bridge_init → subscription_watch
  *                 → running
  *

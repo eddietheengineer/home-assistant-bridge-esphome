@@ -21,7 +21,6 @@ sequenceDiagram
     participant SW as Subscription Watch
     participant RUN as Running State
 
-    HSM->>HSM: protocol_stack (init UART adapters)
     HSM->>HSM: startup_delay (10s wait)
     Note over HSM: Wait for appliance to stabilize
 
@@ -55,7 +54,7 @@ sequenceDiagram
 
 ## Phase-by-Phase Breakdown
 
-### Phase 1: Protocol Stack + Startup Delay
+### Phase 1: Startup Delay
 
 Initializes UART adapters and GEA2/GEA3 protocol interfaces, then waits
 `AUTODISCOVERY_STARTUP_DELAY_MS` (10 seconds) for the appliance board to
@@ -64,7 +63,7 @@ stabilize before beginning broadcast discovery. The HSM polls
 
 | Detail | Value |
 |---|---|
-| **Source** | `geappliances_bridge_startup_hsm.cpp` `startup_state_protocol_stack`, `startup_state_startup_delay` |
+| **Source** | `geappliances_bridge_startup_hsm.cpp` `startup_state_startup_delay` |
 | **Duration** | ~10 seconds (`AUTODISCOVERY_STARTUP_DELAY_MS`) |
 | **Failure behavior** | None (unconditional delay) |
 | **Transition** | `autodiscovery` |
@@ -180,13 +179,11 @@ steady-state check fires once on first detection and logs the transition.
 ## HSM Structure
 
 The state hierarchy is flat — all states have `startup_state_top` as their
-parent. Unhandled signals bubble up to the top state, which defers them
-(ignores them).
+parent. Unhandled signals bubble up to the top state, which consumes them.
 
 ```mermaid
 graph TB
     TOP["startup_state_top<br/>(root)"]
-    PS["startup_state_protocol_stack"]
     SD["startup_state_startup_delay"]
     AD["startup_state_autodiscovery"]
     DI["startup_state_device_id"]
@@ -196,7 +193,6 @@ graph TB
     SW["startup_state_subscription_watch"]
     RN["startup_state_running"]
 
-    TOP --> PS
     TOP --> SD
     TOP --> AD
     TOP --> DI

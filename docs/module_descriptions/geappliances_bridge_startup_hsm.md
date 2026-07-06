@@ -26,13 +26,10 @@ Hierarchical state machine that drives the linear startup sequence of the GE App
 
 ## State Machine
 
-Flat hierarchy — all states defer unhandled signals to `startup_state_top`.
+Flat hierarchy — all states defer unhandled signals to `startup_state_top`, which consumes them.
 
 ```
 startup_state_top (root — handles entry/exit, defers all other signals)
-  │
-  ├─ startup_state_protocol_stack
-  │    └─ entry → immediately transition to startup_delay
   │
   ├─ startup_state_startup_delay
   │    ├─ entry: record_startup_delay_start()

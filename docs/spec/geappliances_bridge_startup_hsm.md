@@ -78,16 +78,9 @@ Flat hierarchy — all states are children of `startup_state_top`. Any signal no
 
 ### 4.1 Parent State: `startup_state_top`
 
-Handles `entry` and `exit` signals with no action. All other signals return `tiny_hsm_result_signal_deferred`, effectively ignoring them. This is the root of the hierarchy — unhandled signals from any child state end here.
+Handles `entry` and `exit` signals with no action. All other signals return `tiny_hsm_result_signal_consumed`. This is the root of the hierarchy — unhandled signals from any child state end here and are consumed.
 
 ### 4.2 Phase States
-
-#### `startup_state_protocol_stack` (initial)
-
-Entry point of the HSM. The protocol stack (GEA2/GEA3 hardware driver) is already running by the time this state is entered.
-
-- **On entry:** Immediately transitions to `startup_state_startup_delay`.
-- **On exit:** No action.
 
 #### `startup_state_startup_delay`
 
@@ -175,10 +168,7 @@ Steady-state operation. All recurring tasks run every loop iteration.
 ### 4.3 State Diagram
 
 ```
-startup_state_top (root — defers all unhandled signals)
-  │
-  ├─ startup_state_protocol_stack (initial)
-  │    └─ entry → startup_state_startup_delay
+startup_state_top (root — consumes all unhandled signals)
   │
   ├─ startup_state_startup_delay
   │    ├─ entry: record_startup_delay_start()

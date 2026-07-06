@@ -53,7 +53,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 The bridge progresses through a linear sequence of phases via the `startup_hsm_`:
 
 ```
-protocol_stack → autodiscovery → device_id → mqtt_client_init
+startup_delay → autodiscovery → device_id → mqtt_client_init
              → feature_bits → bridge_init → subscription_watch
              → running
 ```

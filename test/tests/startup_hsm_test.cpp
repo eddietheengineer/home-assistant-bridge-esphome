@@ -271,13 +271,13 @@ TEST(startup_hsm, feature_bits_signal_complete_transitions_to_bridge_init)
   mock().checkExpectations();
 }
 // =============================================================================
-// Full startup flow — protocol_stack through running
+// Full startup flow — startup_delay through running
 // =============================================================================
 
 TEST(startup_hsm, full_startup_flow_reaches_running)
 {
   /* Set up all mock expectations upfront in the order they will be called. */
-  /* Phase 1: protocol_stack → startup_delay entry */
+  /* Phase 1: startup_delay entry */
   mock().expectOneCall("record_startup_delay_start").onObject(&svc);
   /* Phase 2: startup_delay run_loop → autodiscovery entry */
   mock().expectOneCall("is_startup_delay_elapsed").onObject(&svc).andReturnValue(true);
@@ -340,7 +340,7 @@ TEST(startup_hsm, services_from_hsm_returns_correct_pointer)
 {
   mock().expectOneCall("record_startup_delay_start").onObject(&svc);
   startup_hsm_wrapper_init(&wrapper, &svc, startup_state_startup_delay);
-  // protocol_stack entry transitions to startup_delay which calls record_startup_delay_start.
+  // startup_delay is the initial state and calls record_startup_delay_start on entry.
 
   IBridgeServices* recovered = services_from_hsm(&wrapper.hsm);
 
