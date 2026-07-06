@@ -703,6 +703,145 @@ TEST(erd_cache_mqtt_publisher, loop_no_publish_after_reconnect_when_no_changes)
   CHECK_EQUAL(0u, published);
 }
 
+/* Long disconnect republish: short disconnect (<60s) does not republish */
+TEST(erd_cache_mqtt_publisher, short_disconnect_no_republish)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+  erd_cache_mqtt_publisher_set_time_fn(&publisher, esphome_hal_double_get_millis);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  uint8_t data = 0x42;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
+
+  /* Publish to clear update_required */
+  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(1u, published);
+
+  /* Disconnect at t=1000 (non-zero so disconnect_start_ms != 0) */
+  esphome_hal_double_set_millis(1000);
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+
+  /* Reconnect at t=31000 (30s gap, short disconnect) */
+  esphome_hal_double_set_millis(31000);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  /* Should NOT republish — disconnect was too short */
+  published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(0u, published);
+}
+
+/* Long disconnect republish: disconnect >=60s triggers full republish */
+TEST(erd_cache_mqtt_publisher, long_disconnect_republish_all)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+  erd_cache_mqtt_publisher_set_time_fn(&publisher, esphome_hal_double_get_millis);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  /* Insert 3 ERDs and publish them to clear update_required */
+  uint8_t data1 = 0x01, data2 = 0x02, data3 = 0x03;
+  erd_cache_update(&cache, 0x1001, &data1, sizeof(data1));
+  erd_cache_update(&cache, 0x1002, &data2, sizeof(data2));
+  erd_cache_update(&cache, 0x1003, &data3, sizeof(data3));
+  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(3u, published);
+
+  /* Disconnect at t=1000 (non-zero so disconnect_start_ms != 0) */
+  esphome_hal_double_set_millis(1000);
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+
+  /* Reconnect at t=71000 (70s gap, exceeds 60s threshold) */
+  esphome_hal_double_set_millis(71000);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  /* All 3 entries should be republished */
+  published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(3u, published);
+}
+
+/* Long disconnect republish: empty cache is safe (no crash) */
+TEST(erd_cache_mqtt_publisher, long_disconnect_empty_cache_safe)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+  erd_cache_mqtt_publisher_set_time_fn(&publisher, esphome_hal_double_get_millis);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  /* Disconnect at t=1000, reconnect at t=71000 with empty cache */
+  esphome_hal_double_set_millis(1000);
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+  esphome_hal_double_set_millis(71000);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  /* Should publish nothing, no crash */
+  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(0u, published);
+}
+
+/* Long disconnect republish: exactly 60s threshold triggers republish */
+TEST(erd_cache_mqtt_publisher, exact_threshold_republish)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+  erd_cache_mqtt_publisher_set_time_fn(&publisher, esphome_hal_double_get_millis);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  uint8_t data = 0x42;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
+  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(1u, published);
+
+  /* Disconnect at t=1000, reconnect at exactly t=61000 (60s gap) */
+  esphome_hal_double_set_millis(1000);
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+  esphome_hal_double_set_millis(61000);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  /* Exactly 60s should trigger republish (>= threshold) */
+  published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(1u, published);
+}
+
+/* Long disconnect republish: 59999ms (just under 60s) should NOT republish */
+TEST(erd_cache_mqtt_publisher, just_under_threshold_no_republish)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+  erd_cache_mqtt_publisher_set_time_fn(&publisher, esphome_hal_double_get_millis);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  uint8_t data = 0x42;
+  erd_cache_update(&cache, 0x1001, &data, sizeof(data));
+  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(1u, published);
+
+  /* Disconnect at t=1000, reconnect at t=59999 (58999ms gap, under threshold) */
+  esphome_hal_double_set_millis(1000);
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+  esphome_hal_double_set_millis(60999);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  /* Just under threshold — should NOT republish */
+  published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
+  CHECK_EQUAL(0u, published);
+}
+
 /* Rate limiting: publisher reloads cooldown after successful publish */
 TEST(erd_cache_mqtt_publisher, loop_reloads_cooldown_after_publish)
 {

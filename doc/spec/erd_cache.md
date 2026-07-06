@@ -197,6 +197,7 @@ typedef struct erd_cache_t {
 | `erd_cache_get_next_updated` | `erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* iterator)` | Returns the next entry with `update_required = true`, then clears the flag. Caller provides an iterator (`uint16_t`) initialized to 0. Returns `NULL` when no more updated entries remain; resets iterator to 0. |
 | `erd_cache_get_count` | `uint16_t erd_cache_get_count(erd_cache_t* self)` | Returns the number of valid entries currently in the cache. |
 | `erd_cache_get_next_entry` | `erd_cache_entry_t* erd_cache_get_next_entry(erd_cache_t* self, uint16_t* iterator)` | Returns the next valid entry in the cache, iterating all entries. Does NOT require `update_required = true` and does NOT clear any flags — it is a read-only iteration. Resets iterator to 0 when exhausted. |
+| `erd_cache_mark_all_updated` | `void erd_cache_mark_all_updated(erd_cache_t* self)` | Marks all valid entries as `update_required = true`. Used after a long MQTT disconnect to force a full drain of retained values to the broker. |
 
 ### 7.4 Rate Counters
 

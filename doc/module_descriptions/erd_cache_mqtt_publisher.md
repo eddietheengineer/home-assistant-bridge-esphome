@@ -14,8 +14,8 @@ Scans the shared ERD cache and publishes updated ERDs to MQTT topics with `retai
 | `erd_cache_mqtt_publisher_stop(self)` | Stop the background publishing task (ESP-IDF only; no-op otherwise). Clean shutdown via `done_semaphore` handshake, then yields for idle task TCB cleanup. |
 | `erd_cache_mqtt_publisher_signal_work(self)` | Signal the background task that there is work to do (ESP-IDF only; no-op otherwise). |
 | `erd_cache_mqtt_publisher_loop(self, max_publishes, max_ms)` | Publish up to `max_publishes` updated ERDs within `max_ms` milliseconds. Used on non-ESP-IDF platforms; on ESP-IDF this runs inside the background task. |
-| `erd_cache_mqtt_publisher_on_connected(self)` | Called when MQTT broker connects. Sets `mqtt_connected = true`. |
-| `erd_cache_mqtt_publisher_on_disconnected(self)` | Called when MQTT broker disconnects. Sets `mqtt_connected = false`, increments `missed_loops`. |
+| `erd_cache_mqtt_publisher_on_connected(self)` | Called when MQTT broker connects. Sets `mqtt_connected = true`, resets `disconnect_start_ms`. If disconnect duration ≥ 60 s, marks all valid cache entries as `update_required` for full republish. |
+| `erd_cache_mqtt_publisher_on_disconnected(self)` | Called when MQTT broker disconnects. Sets `mqtt_connected = false`, records `disconnect_start_ms`. |
 | `erd_cache_mqtt_publisher_set_time_fn(self, get_time_ms)` | Override the time source (defaults to `esphome::millis`). Useful for testing. |
 | `erd_cache_mqtt_publisher_get_publish_rate(self)` | Returns the number of ERD publishes in the last 60 seconds, then resets the window. |
 
@@ -57,9 +57,8 @@ On non-ESP-IDF platforms, `erd_cache_mqtt_publisher_loop()` is called directly f
 
 ## MQTT Connect/Disconnect Handling
 
-The publisher subscribes to `mqtt_client_on_mqtt_connect` and `mqtt_client_on_mqtt_disconnect` events:
-- On connect: sets `mqtt_connected = true`, signals work to wake the background task
-- On disconnect: sets `mqtt_connected = false`, increments `missed_loops`
+- On connect: sets `mqtt_connected = true`, resets `disconnect_start_ms`. If disconnect duration ≥ 60 s, marks all valid cache entries as `update_required` for full republish.
+- On disconnect: sets `mqtt_connected = false`, records `disconnect_start_ms`
 
 When `mqtt_connected` is false, the publisher skips publishing and increments `missed_loops` (main loop) or continues the wait loop (background task).
 

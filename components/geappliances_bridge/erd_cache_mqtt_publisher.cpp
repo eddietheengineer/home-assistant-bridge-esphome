@@ -405,38 +405,70 @@ uint16_t erd_cache_mqtt_publisher_loop(
 
 void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
 {
+  /* Threshold for considering a disconnect "long enough" to warrant a full
+   * republish of all cached ERDs.  A 60 s gap covers broker restarts that
+   * lose their in-memory retained store before the next autosave flush,
+   * while avoiding unnecessary republishes on short network blips. */
+  static const uint32_t RECONNECT_REPUBLISH_THRESHOLD_MS = 60000;
+
+  bool was_long_disconnect = false;
+  uint32_t disconnect_start = 0;
+
 #ifdef USE_ESP_IDF
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->mqtt_connected = true;
       self->first_round_done = false;
+      disconnect_start = self->disconnect_start_ms;
+      self->disconnect_start_ms = 0;
       xSemaphoreGive(self->state_mutex);
     }
   } else {
     self->mqtt_connected = true;
     self->first_round_done = false;
+    disconnect_start = self->disconnect_start_ms;
+    self->disconnect_start_ms = 0;
   }
 #else
   self->mqtt_connected = true;
   self->first_round_done = false;
+  disconnect_start = self->disconnect_start_ms;
+  self->disconnect_start_ms = 0;
 #endif
-  ESP_LOGI(PUBLISHER_TAG, "MQTT reconnected — resuming ERD cache publishing");
+
+  uint32_t now = self->get_time_ms ? self->get_time_ms() : 0;
+  if (disconnect_start != 0 && (now - disconnect_start >= RECONNECT_REPUBLISH_THRESHOLD_MS)) {
+    was_long_disconnect = true;
+  }
+
+  if (was_long_disconnect) {
+    ESP_LOGI(PUBLISHER_TAG, "MQTT reconnected after %lu s — republishing all cached ERDs",
+             (unsigned long)((now - disconnect_start) / 1000));
+    erd_cache_mark_all_updated(self->cache);
+  } else {
+    ESP_LOGI(PUBLISHER_TAG, "MQTT reconnected — resuming ERD cache publishing");
+  }
   /* Wake the background task so it can start publishing again. */
   erd_cache_mqtt_publisher_signal_work(self);
 }
 void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self)
 {
+  uint32_t now = self->get_time_ms ? self->get_time_ms() : 0;
+
 #ifdef USE_ESP_IDF
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->mqtt_connected = false;
+      self->disconnect_start_ms = now;
       xSemaphoreGive(self->state_mutex);
     }
   } else {
     self->mqtt_connected = false;
+    self->disconnect_start_ms = now;
   }
 #else
   self->mqtt_connected = false;
+  self->disconnect_start_ms = now;
 #endif
   ESP_LOGW(PUBLISHER_TAG, "MQTT disconnected — pausing ERD cache publishing");
 }

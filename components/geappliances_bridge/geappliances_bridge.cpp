@@ -236,49 +236,7 @@ void GeappliancesBridge::loop() {
   esp_task_wdt_reset();
 #endif
 
-  // On ESP-IDF, signal the background MQTT publisher task instead of
-  // blocking the main loop on the IDF MQTT mutex.  On non-ESP-IDF
-  // platforms, fall back to the direct loop() call as before.
-  // Pause ERD cache publishing during HA discovery cleanup & publish
-  // to avoid competing for the ESP-IDF MQTT task's inbound/outbound
-  // queues, which causes dropped retained messages during cleanup.
-  bool ha_discovery_active = ha_discovery_manager_is_processing(&this->ha_discovery_manager_);
-
-  if (ha_discovery_active) {
-    if (this->erd_cache_publisher_.cache != nullptr) {
-      erd_cache_mqtt_publisher_pause(&this->erd_cache_publisher_);
-      if (!this->erd_cache_publisher_paused_) {
-        ESP_LOGD(TAG, "ERD cache publisher paused during MQTT discovery payload generation");
-        this->erd_cache_publisher_paused_ = true;
-      }
-    }
-  } else {
-    if (this->erd_cache_publisher_.cache != nullptr) {
-      erd_cache_mqtt_publisher_resume(&this->erd_cache_publisher_);
-      if (this->erd_cache_publisher_paused_) {
-        ESP_LOGD(TAG, "ERD cache publisher resumed after MQTT discovery payload generation");
-        this->erd_cache_publisher_paused_ = false;
-        this->discovery_just_resumed_ = true;
-      }
-    }
-  }
-
-  /* Check steady state BEFORE signaling work — the background task sets
-   * first_round_done during its drain, and we want to read it before
-   * the next signal_work() wakes it again. */
-  if (this->discovery_just_resumed_ &&
-      erd_cache_mqtt_publisher_first_round_done(&this->erd_cache_publisher_)) {
-    ESP_LOGI(TAG, "Device is in steady state");
-    this->discovery_just_resumed_ = false;
-  }
-
-  if (this->erd_cache_publisher_.cache != nullptr && !ha_discovery_active) {
-#ifdef USE_ESP_IDF
-    erd_cache_mqtt_publisher_signal_work(&this->erd_cache_publisher_);
-#else
-    erd_cache_mqtt_publisher_loop(&this->erd_cache_publisher_, 5, 20);
-#endif
-  }
+  this->update_publisher_state_();
 
   // Start HA discovery once steady state is reached and generate_device_config is enabled.
   if (this->steady_state_reached_ && !this->ha_discovery_started_ && this->generate_device_config_) {
@@ -354,6 +312,62 @@ void GeappliancesBridge::loop() {
       }
       this->last_erd_cache_stats_publish_ = now;
     }
+  }
+}
+// ---------------------------------------------------------------------------
+// Publisher pause/resume + steady-state detection
+// ---------------------------------------------------------------------------
+// Explicit state machine for the ERD cache publisher during HA discovery.
+// States:
+//   IDLE       — publisher running normally (erd_cache_publisher_paused_ = false)
+//   PAUSED     — publisher paused during discovery (erd_cache_publisher_paused_ = true)
+//   RESUMING   — just resumed, waiting for first full drain (discovery_just_resumed_ = true)
+//
+// Transitions:
+//   IDLE  -> PAUSED   : ha_discovery_manager_is_processing() returns true
+//   PAUSED -> RESUMING : ha_discovery_manager_is_processing() returns false
+//   RESUMING -> IDLE   : first_round_done() returns true (steady state reached)
+
+void GeappliancesBridge::update_publisher_state_()
+{
+  bool ha_discovery_active = ha_discovery_manager_is_processing(&this->ha_discovery_manager_);
+
+  if (ha_discovery_active) {
+    // Transition: IDLE -> PAUSED
+    if (this->erd_cache_publisher_.cache != nullptr) {
+      erd_cache_mqtt_publisher_pause(&this->erd_cache_publisher_);
+      if (!this->erd_cache_publisher_paused_) {
+        ESP_LOGD(TAG, "ERD cache publisher paused during MQTT discovery payload generation");
+        this->erd_cache_publisher_paused_ = true;
+      }
+    }
+  } else {
+    // Transition: PAUSED -> RESUMING
+    if (this->erd_cache_publisher_.cache != nullptr) {
+      erd_cache_mqtt_publisher_resume(&this->erd_cache_publisher_);
+      if (this->erd_cache_publisher_paused_) {
+        ESP_LOGD(TAG, "ERD cache publisher resumed after MQTT discovery payload generation");
+        this->erd_cache_publisher_paused_ = false;
+        this->discovery_just_resumed_ = true;
+      }
+    }
+  }
+
+  /* Check steady state BEFORE signaling work — the background task sets
+   * first_round_done during its drain, and we want to read it before
+   * the next signal_work() wakes it again. */
+  if (this->discovery_just_resumed_ &&
+      erd_cache_mqtt_publisher_first_round_done(&this->erd_cache_publisher_)) {
+    ESP_LOGI(TAG, "Device is in steady state");
+    this->discovery_just_resumed_ = false;
+  }
+
+  if (this->erd_cache_publisher_.cache != nullptr && !ha_discovery_active) {
+#ifdef USE_ESP_IDF
+    erd_cache_mqtt_publisher_signal_work(&this->erd_cache_publisher_);
+#else
+    erd_cache_mqtt_publisher_loop(&this->erd_cache_publisher_, 5, 20);
+#endif
   }
 }
 

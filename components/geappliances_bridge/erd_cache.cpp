@@ -248,3 +248,13 @@ uint32_t erd_cache_get_required_update_rate(erd_cache_t* self)
   self->required_update_count_window = 0;
   return count;
 }
+
+void erd_cache_mark_all_updated(erd_cache_t* self)
+{
+  for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
+    erd_cache_entry_t* e = &self->entries[i];
+    if (e->valid) {
+      e->update_required = true;
+    }
+  }
+}
