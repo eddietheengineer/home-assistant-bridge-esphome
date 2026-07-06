@@ -255,6 +255,12 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool erd_cache_publisher_paused_{false};
   bool discovery_just_resumed_{false};
 
+  // OTA-triggered discovery cleanup: set in setup() if reboot source is
+  // "esphome.ota". Driven in loop() after steady state, before discovery.
+  // After cleanup, reboots (same as DiscoveryRefresh) for fresh republish.
+  bool ota_cleanup_needed_{false};
+  bool ota_cleanup_in_progress_{false};
+
   // Autodiscovery manager (extracted from god class)
   AutodiscoveryManager autodiscovery_manager_;
 
