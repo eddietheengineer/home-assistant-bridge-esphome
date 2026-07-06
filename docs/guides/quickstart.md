@@ -82,7 +82,7 @@ After flashing, the adapter boots and goes through startup:
 4. **Bridge init** — starts subscription or polling.
 5. **Discovery** — publishes Home Assistant entities.
 
-Check the ESPHome logs for progress:
+Check the ESPHome logs for progress. Example output:
 
 ```
 [INFO] geappliances_bridge: Autodiscovery found appliance at address 0xC0
@@ -90,6 +90,8 @@ Check the ESPHome logs for progress:
 [INFO] geappliances_bridge: Subscription bridge active
 [INFO] geappliances_bridge: Published 1247 discovery topics
 ```
+
+*Actual log output will vary by appliance type and configuration.*
 
 In Home Assistant, check **Devices** — you should see a new GE Appliances device with entities for cycle state, temperature, door state, etc.
 

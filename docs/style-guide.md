@@ -193,13 +193,4 @@ All new specs in `docs/spec/` must follow this template. See `docs/spec/spec-tem
 
 ## Review Checklist
 
-Before committing documentation changes, verify:
-
-- [ ] Follows the correct document type conventions above.
-- [ ] All code blocks have language tags.
-- [ ] All mermaid diagrams render (no syntax errors).
-- [ ] Cross-references use relative paths and resolve.
-- [ ] No trailing whitespace or lines > 120 chars (prose).
-- [ ] Terminology matches the table above.
-- [ ] Spec documents follow the template exactly.
-- [ ] If specs changed, pipeline was rerun (per copilot-instructions.md).
+See [Review Checklist](./review-checklist.md) for the pre-commit quality checklist.

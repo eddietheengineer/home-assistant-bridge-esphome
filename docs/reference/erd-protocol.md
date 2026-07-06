@@ -17,14 +17,16 @@ An ERD is a named data point on a GE appliance, identified by a 16-bit hex ID. E
 
 | Range | Category |
 |---|---|
-| `0x0000`–`0x00FF` | Common (all appliances) |
-| `0x1000`–`0x1FFF` | Refrigeration |
-| `0x2000`–`0x2FFF` | Laundry |
-| `0x3000`–`0x3FFF` | Dishwasher |
-| `0x4000`–`0x4FFF` | Water Heater |
-| `0x5000`–`0x5FFF` | Range |
-| `0x6000`–`0x6FFF` | Air Conditioning |
-| `0x7000`–`0x7FFF` | Small Appliance / Energy |
+| `0x0000`-`0x00FF` | Common (all appliances) |
+| `0x1000`-`0x1FFF` | Refrigeration |
+| `0x2000`-`0x2FFF` | Laundry |
+| `0x3000`-`0x3FFF` | Dishwasher |
+| `0x4000`-`0x4FFF` | Water Heater |
+| `0x5000`-`0x5FFF` | Range |
+| `0x6000`-`0x6FFF` | Energy |
+| `0x7000`-`0x7FFF` | Air Conditioning |
+| `0x8000`-`0x8FFF` | Water Filter |
+| `0x9000`-`0x9FFF` | Small Appliance |
 
 ### Well-Known ERDs
 

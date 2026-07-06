@@ -56,6 +56,6 @@ Use this checklist before committing documentation changes.
 
 ## Before Commit
 
-- [ ] If spec documents changed, the pipeline was rerun (`python3 scripts/ha_discovery/run_pipeline.py`).
+- [ ] If ERD definitions, overrides, or pipeline scripts changed, the pipeline was rerun.
 - [ ] The [docs/README.md](./README.md) index is updated if new docs were added.
 - [ ] No generated files (`.pyc`, build artifacts) are included.

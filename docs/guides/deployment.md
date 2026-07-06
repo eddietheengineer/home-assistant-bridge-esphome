@@ -2,9 +2,9 @@
 
 Configuration examples for specific appliance types and deployment scenarios.
 
-## Appliance Types
+## Base Configuration
 
-### Dishwasher
+All appliance configurations share this base. Only the `geappliances_bridge` section changes per appliance type.
 
 ```yaml
 esp32:
@@ -12,6 +12,10 @@ esp32:
   variant: esp32c3
   framework:
     type: esp-idf
+
+external_components:
+  - source: github://eddietheengineer/home-assistant-bridge-esphome@develop
+    components: [ geappliances_bridge ]
 
 mqtt:
   broker: !secret mqtt_broker
@@ -24,50 +28,46 @@ uart:
     tx_pin: GPIO21
     rx_pin: GPIO20
     baud_rate: 230400
-
-geappliances_bridge:
-  gea3_uart_id: gea3_uart
-  mode: auto
-  appliance_api_parsing: true
-  throttle_rate_seconds: 1
-  filter_config_topics: true
 ```
 
-**Notes:** Dishwashers typically support GEA3 subscriptions. Auto mode is recommended — it starts with subscription and falls back to polling if needed.
+## Appliance-Specific Configuration
+
+### Dishwasher
+
+```yaml
+geappliances_bridge:
+  gea3_uart_id: gea3_uart
+```
+
+**Notes:** Use defaults. Auto mode starts with subscription and falls back to polling if needed.
 
 ### Refrigerator
 
 ```yaml
 geappliances_bridge:
   gea3_uart_id: gea3_uart
-  mode: auto
-  appliance_api_parsing: true
-  throttle_rate_seconds: 2  # Refrigerators update less frequently
+  throttle_rate_seconds: 2
 ```
 
-**Notes:** Refrigerators have many ERDs (temperature zones, door states, ice maker). The `throttle_rate_seconds: 2` reduces MQTT traffic. Entity count is typically 800–1200.
+**Notes:** Refrigerators have many ERDs (temperature zones, door states, ice maker). Increase throttle to reduce MQTT traffic. Entity count is typically 800–1200.
 
 ### Range / Oven
 
 ```yaml
 geappliances_bridge:
   gea3_uart_id: gea3_uart
-  mode: auto
-  appliance_api_parsing: true
 ```
 
-**Notes:** Ranges have cycle state, temperature, and timer ERDs. Some models support subscription, others require polling.
+**Notes:** Use defaults. Some models support subscription, others require polling — auto mode handles both.
 
 ### Washer / Dryer
 
 ```yaml
 geappliances_bridge:
   gea3_uart_id: gea3_uart
-  mode: auto
-  appliance_api_parsing: true
 ```
 
-**Notes:** Laundry appliances have cycle progress, remaining time, and option ERDs. Cycle state changes are the most frequent updates.
+**Notes:** Use defaults. Cycle state changes are the most frequent updates.
 
 ### Water Heater
 
@@ -75,8 +75,7 @@ geappliances_bridge:
 geappliances_bridge:
   gea3_uart_id: gea3_uart
   mode: poll
-  polling_interval: 30000  # 30 seconds — water heaters change slowly
-  appliance_api_parsing: true
+  polling_interval: 30000
 ```
 
 **Notes:** Water heaters typically don't support GEA3 subscriptions. Use poll mode with a longer interval to reduce bus traffic.
@@ -86,16 +85,13 @@ geappliances_bridge:
 ```yaml
 geappliances_bridge:
   gea3_uart_id: gea3_uart
-  mode: auto
-  appliance_api_parsing: true
-  throttle_rate_seconds: 1
 ```
 
-**Notes:** HVAC units have many diagnostic ERDs. `filter_config_topics: true` (default) removes internal diagnostic entities from Home Assistant discovery.
+**Notes:** Use defaults. `filter_config_topics: true` (default) removes internal diagnostic entities from Home Assistant discovery.
 
 ## GEA2 (Legacy Appliances)
 
-For older appliances using the GEA2 protocol, configure both UARTs:
+For older appliances using the GEA2 protocol, add a second UART and configure both:
 
 ```yaml
 uart:
@@ -118,7 +114,7 @@ geappliances_bridge:
   polling_interval: 10000
 ```
 
-**Important:** The `rx_full_threshold: 1` and `rx_timeout: 1` settings on the GEA2 UART are required for reliable communication. See [HARDWARE.md](../../HARDWARE.md) for details.
+**Important:** The `rx_full_threshold: 1` and `rx_timeout: 1` settings on the GEA2 UART are required for reliable communication. See [HARDWARE.md](../HARDWARE.md) for details.
 
 ## ESP32-C6 Deployment
 

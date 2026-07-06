@@ -1,18 +1,19 @@
 # Interface Reference
 
-Key C interfaces used within the bridge component.
+Key C interfaces used within the bridge component. For full vtable definitions, see the individual module specs.
 
 ## i_mqtt_client
 
 Abstract MQTT client interface. Decouples bridge modules from ESPHome's MQTT implementation.
 
 **File:** `components/geappliances_bridge/i_mqtt_client.h`
+**Spec:** [i_mqtt_client spec](../spec/i_mqtt_client.md)
 
-| Method | Description |
-|---|---|
-| `register_erd()` | Register an ERD for MQTT publishing |
-| `publish_erd()` | Publish an ERD value to MQTT |
-| `update_erd_write_result()` | Report write success/failure to MQTT |
+| Method | Signature | Description |
+|---|---|---|
+| `register_erd()` | `void(i_mqtt_client_t* self, tiny_erd_t erd)` | Register an ERD for MQTT publishing |
+| `publish_erd()` | `void(i_mqtt_client_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t len)` | Publish an ERD value to MQTT |
+| `update_erd_write_result()` | `void(i_mqtt_client_t* self, tiny_erd_t erd, bool success, failure_reason)` | Report write success/failure to MQTT |
 
 **Implementation:** `EsphomeMqttClientAdapter` bridges to ESPHome's `global_mqtt_client`.
 
@@ -23,6 +24,7 @@ Abstract MQTT client interface. Decouples bridge modules from ESPHome's MQTT imp
 Abstract interface between the startup HSM and the bridge. The HSM calls methods on this interface to drive startup phases without depending on the concrete `GeappliancesBridge` class.
 
 **File:** `components/geappliances_bridge/i_bridge_services.h`
+**Spec:** [IBridgeServices spec](../spec/i_bridge_services.md)
 
 | Method | Description |
 |---|---|

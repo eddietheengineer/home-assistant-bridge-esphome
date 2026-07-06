@@ -24,7 +24,7 @@ sequenceDiagram
 
     HSM->>UART: Initialize GEA2/GEA3 interfaces
     HSM->>HSM: protocol_stack (entry)
-    HSM->>HSM: startup_delay (10s wait)
+    HSM->>HSM: startup_delay (5s wait)
     Note over HSM: Wait for appliance to stabilize
 
     HSM->>AD: run_autodiscovery()
@@ -57,48 +57,21 @@ sequenceDiagram
 
 ## Phase-by-Phase Breakdown
 
-### Phase 1: Protocol Stack
+### Phase 1: Protocol Stack + Startup Delay
 
-Initializes UART adapters and GEA2/GEA3 protocol interfaces. This phase is
-instantaneous — it transitions immediately to `startup_delay` on entry.
-
-| Detail | Value |
-|---|---|
-| **Source** | `geappliances_bridge_startup_hsm.cpp` `startup_state_protocol_stack` |
-| **Duration** | <1 ms (immediate transition) |
-| **Failure behavior** | N/A (no failure path; hardware init is synchronous) |
-| **Transition** | `startup_delay` |
-
-### Phase 1.5: Startup Delay
-
-Waits `AUTODISCOVERY_STARTUP_DELAY_MS` (10 seconds) for the appliance board to
+Initializes UART adapters and GEA2/GEA3 protocol interfaces, then waits
+`AUTODISCOVERY_STARTUP_DELAY_MS` (5 seconds) for the appliance board to
 stabilize before beginning broadcast discovery. The HSM polls
 `is_startup_delay_elapsed()` on each `signal_run_loop` iteration.
 
 | Detail | Value |
 |---|---|
-| **Source** | `geappliances_bridge_startup_hsm.cpp` `startup_state_startup_delay` |
-| **Duration** | 10 seconds (`AUTODISCOVERY_STARTUP_DELAY_MS`) |
+| **Source** | `geappliances_bridge_startup_hsm.cpp` `startup_state_protocol_stack`, `startup_state_startup_delay` |
+| **Duration** | ~5 seconds (`AUTODISCOVERY_STARTUP_DELAY_MS`) |
 | **Failure behavior** | None (unconditional delay) |
 | **Transition** | `autodiscovery` |
 
-### Phase 2: Autodiscovery
-
-Runs the `AutodiscoveryManager`, which broadcasts on the GEA bus to find the
-appliance's host address and protocol version (GEA2 or GEA3). The manager is
-self-driving: it owns its own timers and event subscriptions. If no board
-responds, it retries indefinitely — this phase will not transition until a
-valid board address is discovered.
-
-| Detail | Value |
-|---|---|
-| **Source** | `geappliances_bridge_startup_hsm.cpp` `startup_state_autodiscovery` |
-| **Duration** | Variable (depends on appliance response; retries indefinitely) |
-| **Failure behavior** | No explicit timeout; retries forever on no response |
-| **Signals** | `signal_autodiscovery_complete` (from manager callback) |
-| **Transition** | `device_id` |
-
-### Phase 3: Device Identity
+### Phase 2: Device Identity
 
 Runs the `DeviceIdentityManager` to read three identity ERDs in sequence:
 `0x0008` (appliance type), `0x0001` (model number), `0x0002` (serial number).
@@ -115,7 +88,7 @@ retries indefinitely.
 | **Signals** | `signal_device_id_complete` |
 | **Transition** | `mqtt_client_init` |
 
-### Phase 4: MQTT Client Init
+### Phase 3: MQTT Client Init
 
 Initializes the MQTT client adapter and the ERD cache MQTT publisher with the
 device ID. This phase is fast — it does not wait for the MQTT broker
@@ -128,7 +101,7 @@ connection. It also kicks off feature-bit reading before transitioning.
 | **Failure behavior** | Idempotent init; no failure path |
 | **Transition** | `feature_bits` |
 
-### Phase 5: Feature Bits
+### Phase 4: Feature Bits
 
 Runs the `FeatureBitManager` to read and parse 11 appliance API feature bit
 ERDs: `0x0092` (common features) and `0x0093`–`0x0097`, `0x0109`–`0x010D`
@@ -144,7 +117,7 @@ client queue is full, it schedules a retry timer (`QUEUE_RETRY_MS = 50 ms`).
 | **Signals** | `signal_feature_bits_complete`, `signal_mqtt_connected` |
 | **Transition** | `bridge_init` |
 
-### Phase 6: Bridge Init
+### Phase 5: Bridge Init
 
 Initializes the ERD bridge in the configured mode (`BRIDGE_MODE_POLL`,
 `BRIDGE_MODE_SUBSCRIBE`, or `BRIDGE_MODE_AUTO`). Waits for both
@@ -161,7 +134,7 @@ complete.
 | **Signals** | `signal_bridge_ready` |
 | **Transition** | `subscription_watch` |
 
-### Phase 7: Subscription Watch
+### Phase 6: Subscription Watch
 
 In `BRIDGE_MODE_AUTO`, monitors the subscription bridge's internal state
 machine for steady-state readiness. Falls back to polling if no subscription
@@ -177,7 +150,7 @@ transitions immediately.
 | **Signals** | `signal_subscription_fallback` |
 | **Transition** | `running` |
 
-### Phase 8: Running
+### Phase 7: Running
 
 The terminal state of the startup sequence. All recurring tasks run every
 `loop()` iteration: subscription/polling failure handling, poll state

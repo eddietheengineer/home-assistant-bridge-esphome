@@ -88,11 +88,9 @@ Complete reference for the `geappliances_bridge` ESPHome component configuration
 
 ### `generate_device_config`
 
-| Property | Value |
-|---|---|
 | **Type** | `bool` |
 | **Default** | `true` |
-| **Description** | Currently disabled. Reserved for future use. |
+| **Description** | Deprecated. Has no effect. |
 
 ## Diagnostic Sensors
 
