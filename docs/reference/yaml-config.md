@@ -34,7 +34,7 @@ Complete reference for the `geappliances_bridge` ESPHome component configuration
 | **Type** | `enum` |
 | **Default** | `auto` |
 | **Options** | `auto`, `subscribe`, `poll` |
-| **Description** | Operating mode. `auto` starts with subscription and falls back to polling if no ERD responses within 10 seconds. `subscribe` uses appliance-pushed updates only. `poll` actively reads ERDs at the polling interval. |
+| **Description** | Operating mode. `auto` starts with subscription and falls back to polling if the subscription bridge enters the failed state. `subscribe` uses appliance-pushed updates only. `poll` actively reads ERDs at the polling interval. |
 
 ### `polling_interval`
 
@@ -90,7 +90,7 @@ Complete reference for the `geappliances_bridge` ESPHome component configuration
 
 | **Type** | `bool` |
 | **Default** | `true` |
-| **Description** | Deprecated. Has no effect. |
+| **Description** | When `true` (default), triggers Home Assistant MQTT discovery once steady state is reached. Set to `false` to disable discovery. |
 
 ## Diagnostic Sensors
 

@@ -11,13 +11,16 @@ Abstract MQTT client interface. Decouples bridge modules from ESPHome's MQTT imp
 
 | Method | Signature | Description |
 |---|---|---|
-| `register_erd()` | `void(i_mqtt_client_t* self, tiny_erd_t erd)` | Register an ERD for MQTT publishing |
-| `publish_erd()` | `void(i_mqtt_client_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t len)` | Publish an ERD value to MQTT |
-| `update_erd_write_result()` | `void(i_mqtt_client_t* self, tiny_erd_t erd, bool success, failure_reason)` | Report write success/failure to MQTT |
+| `mqtt_client_register_erd()` | `void(i_mqtt_client_t* self, tiny_erd_t erd)` | Register an ERD for MQTT publishing |
+| `mqtt_client_update_erd_write_result()` | `void(i_mqtt_client_t* self, tiny_erd_t erd, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason)` | Report write success/failure to MQTT |
+| `mqtt_client_on_write_request()` | `i_tiny_event_t*(i_mqtt_client_t* self)` | Event fired when a write command arrives on a `*/write` topic |
+| `mqtt_client_on_mqtt_disconnect()` | `i_tiny_event_t*(i_mqtt_client_t* self)` | Event fired when the client disconnects from the MQTT broker |
+| `mqtt_client_on_mqtt_connect()` | `i_tiny_event_t*(i_mqtt_client_t* self)` | Event fired when the client connects to the MQTT broker |
+| `mqtt_client_publish_raw()` | `void(i_mqtt_client_t* self, const char* topic, const char* payload, size_t payload_len, bool retain)` | Publish a raw MQTT message |
+| `mqtt_client_subscribe()` | `void(i_mqtt_client_t* self, const char* topic, callback, void* arg)` | Subscribe to a topic with a raw C callback |
+| `mqtt_client_unsubscribe()` | `void(i_mqtt_client_t* self, const char* topic)` | Unsubscribe from a topic |
 
 **Implementation:** `EsphomeMqttClientAdapter` bridges to ESPHome's `global_mqtt_client`.
-
-**Event:** `mqtt_client_on_write_request` — fired when a write command arrives on a `*/write` topic. Subscribed by `ErdWriteBridge`.
 
 ## IBridgeServices
 
@@ -28,12 +31,20 @@ Abstract interface between the startup HSM and the bridge. The HSM calls methods
 
 | Method | Description |
 |---|---|
-| `start_autodiscovery()` | Begin appliance discovery |
-| `start_device_identity()` | Read identity ERDs |
-| `start_feature_bits()` | Read feature bit ERDs |
-| `init_mqtt_client()` | Initialize MQTT adapter with device ID |
-| `init_bridge()` | Initialize polling/subscription bridge |
-| `is_phase_complete()` | Query if a startup phase finished |
+| `run_autodiscovery()` | Run one tick of the autodiscovery manager |
+| `init_device_id_reading()` | Initialize device-ID reading |
+| `start_feature_bit_reading()` | Begin the feature-bit reading sequence |
+| `initialize_mqtt_client()` | Initialize the MQTT client adapter |
+| `initialize_erd_bridge()` | Initialize the ERD bridge in the configured mode |
+| `is_autodiscovery_complete()` | Query if autodiscovery finished |
+| `is_device_id_complete()` | Query if device ID is ready |
+| `is_feature_bits_complete()` | Query if feature bits are parsed |
+| `is_bridge_initialized()` | Query if the ERD bridge is initialized |
+| `maybe_start_custom_erd_polling()` | Start custom-ERD polling if conditions are met |
+| `handle_subscription_failed()` | Handle subscription bridge failure (AUTO fallback) |
+| `handle_polling_failed()` | Handle polling bridge failure |
+| `check_steady_state()` | Check if appliance-side data path reached steady state |
+| `initialize_erd_cache_publisher()` | Initialize the ERD cache MQTT publisher |
 | `loop()` | Drive ongoing work in main loop |
 
 **Implementation:** `GeappliancesBridge` implements this interface.
