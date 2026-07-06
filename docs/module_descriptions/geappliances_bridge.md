@@ -24,7 +24,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `set_mode(mode)` | Set bridge mode: POLL (0), SUBSCRIBE (1), or AUTO (2) |
 | `set_polling_interval(ms)` | Set polling interval (default 10000 ms) |
 | `set_appliance_api_parsing(bool)` | Enable feature bit-based ERD filtering (default true) |
-| `set_generate_device_config(bool)` | Enable/disable HA device config generation (default true). When enabled, HA discovery runs on OTA reboot or Discovery Refresh button press. Normal boots skip discovery (topics retained by MQTT broker). |
+| `set_generate_device_config(bool)` | Enable/disable HA device config generation (default true). When enabled, HA discovery runs on OTA reboot. The Discovery Refresh button always works regardless of this flag. Normal boots skip discovery (topics retained by MQTT broker). |
 | `set_erd_publish_rate_sensor(sensor)` | Set sensor for ERD publish rate monitoring |
 | `set_erd_cache_entries_sensor(sensor)` | Set sensor for ERD cache entries count |
 | `set_erd_cache_updates_sensor(sensor)` | Set sensor for ERD cache updates count |

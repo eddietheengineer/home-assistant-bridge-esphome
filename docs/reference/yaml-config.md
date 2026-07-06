@@ -90,7 +90,7 @@ Complete reference for the `geappliances_bridge` ESPHome component configuration
 
 | **Type** | `bool` |
 | **Default** | `true` |
-| **Description** | When `true` (default), triggers Home Assistant MQTT discovery once steady state is reached. Set to `false` to disable discovery. |
+| **Description** | When `true` (default), the bridge runs HA discovery on OTA reboot. The Discovery Refresh button always works regardless of this flag. Normal boots skip discovery (topics retained by MQTT broker). |
 
 ## Diagnostic Sensors
 
