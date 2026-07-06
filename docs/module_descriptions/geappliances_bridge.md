@@ -42,7 +42,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `init_erd_cache_publisher_()` | Initialize the ERD cache MQTT publisher and HA discovery manager |
 | `init_polling_bridge_(log_as_info)` | Initialize the polling bridge with the probe list |
 | `run_protocol_stack_()` | Drive GEA2/GEA3 hardware (includes GEA2 tight loop) |
-| `update_publisher_state_()` | Publisher pause/resume during HA discovery + steady-state detection |
+| `update_publisher_state_()` | Publisher pause/resume during HA discovery + discovery_just_resumed_ tracking |
 | `start_feature_bit_reading_()` | Start the feature bit read sequence |
 | `start_custom_erd_polling_()` | Initialize polling for user-configured custom ERDs |
 | `maybe_start_custom_erd_polling_()` | Guarded entry point for custom ERD polling (prevents re-initialization) |

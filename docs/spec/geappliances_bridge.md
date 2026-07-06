@@ -234,11 +234,11 @@ Each `loop()` iteration performs the following discovery-related work in order:
 
 2. **OTA-triggered cleanup + republish + reboot (ESP-IDF only):**
    - **Start cleanup:** If `generate_device_config_` is `true`, `ota_cleanup_needed_` is `true`, `ota_cleanup_in_progress_` is `false`, `ota_discovery_publishing_` is `false`, `ota_reboot_pending_` is `false`, and the bridge is ready (`steady_state_reached_`, `mqtt_client_adapter_initialized_`, device ID complete), configure and start the cleanup module, then set `ota_cleanup_in_progress_` to `true`.
-   - **Drive cleanup:** If `ota_cleanup_in_progress_` is `true`, call `ha_discovery_cleanup_run()` each iteration. When done, clear `ota_cleanup_in_progress_` and `ota_cleanup_needed_`, destroy the cleanup module, configure and start the discovery manager for fresh publishing, and set `ota_discovery_publishing_` to `true`.
+   - **Drive cleanup:** If `ota_cleanup_in_progress_` is `true`, call `ha_discovery_cleanup_run()` each iteration. When done, clear `ota_cleanup_in_progress_` and `ota_cleanup_needed_`, destroy the cleanup module, call `ha_discovery_manager_init()` to reset the discovery manager, configure and start the discovery manager for fresh publishing, and set `ota_discovery_publishing_` to `true`.
    - **Drive discovery publishing:** If `ota_discovery_publishing_` is `true`, call `ha_discovery_manager_run()` while the manager is processing. When done, clear `ota_discovery_publishing_`, call `mark_boot_successful_for_reboot()`, and set `ota_reboot_pending_` to `true` with `ota_reboot_start_ms_` set to the current time.
    - **Wait then reboot:** If `ota_reboot_pending_` is `true`, feed the watchdog each iteration. After 5 seconds elapsed, call `esphome::App.safe_reboot()`.
 
-3. **DiscoveryRefresh button (queued):** If `discovery_refresh_in_progress_` is `true`, `ota_cleanup_in_progress_` is `false`, `ota_discovery_publishing_` is `false`, `ota_reboot_pending_` is `false`, and the bridge is ready, configure and start the cleanup module, clear `discovery_refresh_in_progress_`, and set `ota_cleanup_in_progress_` to `true`. This hands off to the same cleanup → publish → reboot path as OTA.
+3. **DiscoveryRefresh button (queued, ESP-IDF only):** If `discovery_refresh_in_progress_` is `true`, `ota_cleanup_in_progress_` is `false`, `ota_discovery_publishing_` is `false`, `ota_reboot_pending_` is `false`, and the bridge is ready, configure and start the cleanup module under `#ifdef USE_ESP_IDF`, clear `discovery_refresh_in_progress_`, and set `ota_cleanup_in_progress_` to `true`. This hands off to the same cleanup → publish → reboot path as OTA.
 
 ```mermaid
 flowchart TD
