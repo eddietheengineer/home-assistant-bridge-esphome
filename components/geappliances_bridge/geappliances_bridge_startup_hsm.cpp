@@ -74,6 +74,13 @@ tiny_hsm_result_t startup_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, c
   return tiny_hsm_result_signal_consumed;
 }
 
+// ============================================================================
+// Phase 1: Protocol Stack — drive GEA2/GEA3 hardware
+//
+// This is the initial state.  It transitions to autodiscovery as soon as
+// the first loop() call arrives (the protocol stack is always running).
+// ============================================================================
+// ============================================================================(Top priority code quality improvements)
 // Phase 1.5: Startup Delay — wait for appliance board to stabilize
 //
 // Waits AUTODISCOVERY_STARTUP_DELAY_MS (5 seconds) before transitioning to
