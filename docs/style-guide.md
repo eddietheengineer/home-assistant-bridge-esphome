@@ -10,7 +10,7 @@ docs/
 ├── style-guide.md             # This file
 ├── architecture/
 │   ├── overview.md            # C4 context + container diagrams, system summary
-│   ├── startup-sequence.md    # 7-phase startup HSM sequence diagram
+│   ├── startup-sequence.md    # 8-phase startup HSM sequence diagram
 │   ├── data-flow.md           # Read path, write path, discovery flow
 │   └── roadmap.md             # Future features and architectural improvements
 ├── spec/                      # One file per module (detailed specifications)
@@ -41,7 +41,7 @@ Detailed behavioral contracts for each module. Follow the spec template exactly.
 3. **Behavior** — Numbered requirements with Rationale, Implementation, Verification
 4. **Notes** — Design decisions, tradeoffs, known limitations
 
-### Module Descriptions (`doc/module_descriptions/`)
+### Module Descriptions (`./module_descriptions/`)
 
 Lightweight summaries for architecture overview. One paragraph of purpose, bullet list of responsibilities, bullet list of dependencies.
 

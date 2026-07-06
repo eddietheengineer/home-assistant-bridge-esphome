@@ -7,7 +7,7 @@ Key C interfaces used within the bridge component. For full vtable definitions, 
 Abstract MQTT client interface. Decouples bridge modules from ESPHome's MQTT implementation.
 
 **File:** `components/geappliances_bridge/i_mqtt_client.h`
-**Spec:** [i_mqtt_client spec](../../doc/spec/i_mqtt_client.md)
+**Spec:** [i_mqtt_client spec](../spec/i_mqtt_client.md)
 
 | Method | Signature | Description |
 |---|---|---|
@@ -27,7 +27,7 @@ Abstract MQTT client interface. Decouples bridge modules from ESPHome's MQTT imp
 Abstract interface between the startup HSM and the bridge. The HSM calls methods on this interface to drive startup phases without depending on the concrete `GeappliancesBridge` class.
 
 **File:** `components/geappliances_bridge/i_bridge_services.h`
-**Spec:** [IBridgeServices spec](../../doc/spec/i_bridge_services.md)
+**Spec:** [IBridgeServices spec](../spec/i_bridge_services.md)
 
 | Method | Description |
 |---|---|

@@ -39,7 +39,7 @@ geappliances_bridge:
   gea3_uart_id: gea3_uart
 ```
 
-For a complete configuration with all options, see [doc/example.yaml](./doc/example.yaml).
+For a complete configuration with all options, see [docs/example.yaml](./docs/example.yaml).
 
 ## Documentation
 

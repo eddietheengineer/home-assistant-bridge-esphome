@@ -149,7 +149,7 @@ tick. The startup HSM feeds the watchdog between phases.
 
 | Document | Description |
 |---|---|
-| [Startup Sequence](./startup-sequence.md) | 7-phase startup HSM sequence diagram |
+| [Startup Sequence](./startup-sequence.md) | 8-phase startup HSM sequence diagram |
 | [Data Flow](./data-flow.md) | Read path, write path, discovery flow |
-| [Module Descriptions](../doc/module_descriptions/) | Lightweight summary for each module |
-| [Specifications](../../doc/spec/) | Detailed behavioral contracts per module |
+| [Module Descriptions](../module_descriptions/) | Lightweight summary for each module |
+| [Specifications](../spec/) | Detailed behavioral contracts per module |

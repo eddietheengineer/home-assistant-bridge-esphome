@@ -9,7 +9,7 @@ Lightweight one-paragraph summaries for each module in the bridge component.
 | Description | Module |
 |---|---|
 | [geappliances_bridge.md](./geappliances_bridge.md) | Main ESPHome component entry point |
-| [geappliances_bridge_startup_hsm.md](./geappliances_bridge_startup_hsm.md) | 7-phase startup state machine |
+| [geappliances_bridge_startup_hsm.md](./geappliances_bridge_startup_hsm.md) | 8-phase startup state machine |
 | [autodiscovery_manager.md](./autodiscovery_manager.md) | GEA bus broadcast discovery |
 | [device_identity_manager.md](./device_identity_manager.md) | Appliance identity ERD reading |
 | [feature_bit_manager.md](./feature_bit_manager.md) | Feature bit ERD parsing |
