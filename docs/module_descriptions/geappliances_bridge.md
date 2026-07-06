@@ -68,7 +68,7 @@ During `startup_state_bridge_init`, `initialize_erd_bridge_()` runs:
 4. **Initialize bridges**:
    - **Polling mode**: Initializes `erd_bridge_poll_` with the probe list, known host address, and appliance type.
    - **Subscription mode**: Initializes `erd_bridge_subscribe_` with the known host address.
-   - **Write bridge**: Always initialized with the broadcast address (updated after appliance identification).
+   - **Write bridge**: Always initialized with the real host address (updated after appliance identification).
 
 ## Dependencies
 

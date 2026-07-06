@@ -312,6 +312,7 @@ void GeappliancesBridge::loop() {
       this->ota_cleanup_needed_ = false;
       ESP_LOGI(TAG, "HA discovery cleanup complete, publishing fresh discovery...");
       ha_discovery_cleanup_destroy(&this->ha_discovery_manager_.cleanup);
+      ha_discovery_manager_init(&this->ha_discovery_manager_);
 
       // Publish fresh HA discovery payloads.
       ha_discovery_manager_configure(

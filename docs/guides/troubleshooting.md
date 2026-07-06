@@ -159,7 +159,7 @@ Diagnostic flow for common issues with the GE Appliances Bridge.
 ### Diagnostic Steps
 
 1. **Check logs for OTA detection:** Look for "Detected OTA reboot, will clean old discovery topics on startup".
-2. **Check logs for discovery refresh:** Look for "Discovery refresh queued, will execute when appliance is ready" followed by "Starting OTA-triggered HA discovery cleanup...".
+2. **Check logs for discovery refresh:** Look for "Discovery refresh queued, will execute when appliance is ready" followed by "HA discovery cleanup complete, publishing fresh discovery...".
 3. **Wait for the cycle to complete:** The cleanup → publish → reboot cycle can take 1–2 minutes depending on the number of entities.
 
 

@@ -46,7 +46,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `set_polling_interval(ms)` | Set polling interval (default 10000 ms) |
 | `set_appliance_api_parsing(bool)` | Enable feature bit-based ERD filtering (default true) |
 | `set_generate_device_config(bool)` | Enable HA discovery payload generation (default true) |
-| `set_filter_config_topics(bool)` | Filter non-config topics during discovery cleanup (default true) |
+| `set_filter_config_topics(bool)` | Filter diagnostic entities during discovery publishing (default true) |
 | `add_custom_erd(erd)` | Add a custom ERD to poll |
 | `set_erd_publish_rate_sensor(sensor)` | Sensor for ERD publish rate |
 | `set_erd_cache_entries_sensor(sensor)` | Sensor for ERD cache entry count |
@@ -196,7 +196,7 @@ Two boolean configuration flags control discovery behavior. Both are set via the
 | Flag | Default | Description |
 |------|---------|-------------|
 | `generate_device_config_` | `true` | When `true`, the bridge runs HA discovery on OTA reboot. When `false`, the OTA path is skipped entirely. The Discovery Refresh button always works regardless of this flag (it's a user-initiated manual action). Normal boots skip discovery regardless (topics retained by MQTT broker). |
-| `filter_config_topics_` | `true` | When `true`, the discovery manager filters out non-config topics during cleanup (only `/config` discovery payloads are removed). Passed to `ha_discovery_manager_configure()`. |
+| `filter_config_topics_` | `true` | When `true`, the discovery manager filters out internal/diagnostic entities during discovery publishing. Passed to `ha_discovery_manager_configure()`. |
 
 **Configuration setters:**
 
@@ -222,7 +222,7 @@ Both setters store their value directly into the corresponding member variable. 
 
 ### 11.3 OTA Reboot Detection (setup())
 
-In `setup()`, on ESP32 platforms, the bridge reads the reboot reason via `esp_reset_reason()`. If the reset is a software reset (`ESP_RST_SW`), it loads a stored reboot source string from NVS preferences. If the source is `"esphome.ota"`, `ota_cleanup_needed_` is set to `true`.
+In `setup()`, under `#ifdef USE_ESP_IDF`, the bridge reads the reboot reason via `esp_reset_reason()`. If the reset is a software reset (`ESP_RST_SW`), it loads a stored reboot source string from NVS preferences. If the source is `"esphome.ota"`, `ota_cleanup_needed_` is set to `true`.
 
 This ensures cleanup only runs for OTA updates, not for the bridge's own reboots (which store `"geappliances_bridge"` as the reboot source) or other software resets.
 
@@ -294,7 +294,7 @@ This is critical because the cleanup → publish → reboot cycle involves two r
 The bridge owns a `ha_discovery_manager_t` instance (`ha_discovery_manager_`) and drives it from `loop()`:
 
 - **Configuration:** `ha_discovery_manager_configure()` is called when discovery starts (during OTA or Discovery Refresh flow), passing the device identity (ID, model, serial, appliance type), the `filter_config_topics_` flag, the ERD cache, and the MQTT client interface.
-- **Start:** `ha_discovery_manager_start()` transitions the manager from `IDLE` to `BUILDING` (on ESP-IDF) or directly to `COMPLETE` (on non-ESP-IDF).
+- **Start:** `ha_discovery_manager_start()` transitions the manager from `IDLE` to `BUILDING`.
 - **Drive:** `ha_discovery_manager_run()` is called each `loop()` iteration while `ha_discovery_manager_is_processing()` returns `true`. This advances the manager through its state machine, decompressing JSONL chunks and publishing discovery payloads at a rate-limited interval (50 ms).
 - **Completion:** When the manager reaches `COMPLETE` or `FAILED` state, `ha_discovery_manager_is_processing()` returns `false`, signaling that discovery publishing is done.
 

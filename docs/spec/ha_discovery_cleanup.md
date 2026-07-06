@@ -422,7 +422,7 @@ The cleanup module is independent of the discovery manager's own state and buffe
 
 ## 11. Invariants
 
-1. **ESP-IDF only:** The entire module is guarded by `#ifdef USE_ESP_IDF`. On non-ESP-IDF platforms, the module is not compiled.
+1. **ESP-IDF only:** The entire module is guarded by `#ifdef USE_ESP_IDF`.
 2. **No discovery state knowledge:** The cleanup module has no awareness of the discovery manager's internal state, buffers, or entity list. It operates purely on what the broker returns via the wildcard subscription.
 3. **Two-pass verification:** Cleanup is not considered complete until two consecutive passes find no topics. This handles the race condition where topics discovered in one pass may not have been fully flushed before the next subscription fires.
 4. **Drain between passes:** After unsubscribing, the module waits for the inbound MQTT event queue to drain before re-subscribing. This prevents stale callbacks from a previous pass contaminating the next pass's results.
