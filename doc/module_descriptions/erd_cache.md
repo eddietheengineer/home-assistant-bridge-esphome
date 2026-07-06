@@ -19,6 +19,7 @@ Fixed-size ERD cache with inline/heap data storage. Stores the latest data for u
 | `erd_cache_get_next_entry(self, iterator)` | Returns the next valid entry in the cache, iterating all entries. Does NOT require `update_required = true` and does NOT clear any flags — it is a read-only iteration. Resets iterator to 0 when exhausted. |
 | `erd_cache_get_update_rate(self)` | Returns the number of cache updates since the last call, then resets the window counter. |
 | `erd_cache_get_required_update_rate(self)` | Returns the number of updates that set `update_required = true` since the last call, then resets the window counter. |
+| `erd_cache_mark_all_updated(self)` | Marks all valid entries as `update_required = true`. Used after a long MQTT disconnect to force a full drain of retained values to the broker. |
 
 ## Storage Strategy
 

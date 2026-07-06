@@ -190,25 +190,25 @@ The publisher subscribes to `mqtt_client_on_mqtt_connect` and `mqtt_client_on_mq
 ```c
 void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self);
 ```
-
 - Set `mqtt_connected = true` (under `state_mutex` on ESP-IDF)
-- Log info: "MQTT reconnected — resuming ERD cache publishing"
+- Record disconnect duration and reset `disconnect_start_ms` to 0
+- If disconnect duration ≥ 60 s: call `erd_cache_mark_all_updated()` to mark all valid cache entries as `update_required`, then log info with the disconnect duration
+- If disconnect duration < 60 s: log info: "MQTT reconnected — resuming ERD cache publishing"
 - Call `erd_cache_mqtt_publisher_signal_work()` to wake the background task
 
 ### 5.2 On Disconnect
 
 ```c
 void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self);
-```
-
 - Set `mqtt_connected = false` (under `state_mutex` on ESP-IDF)
+- Record `disconnect_start_ms = get_time_ms()` (under `state_mutex` on ESP-IDF)
 - Log warning: "MQTT disconnected — pausing ERD cache publishing"
 
 ### 5.3 Behavior While Disconnected
 
 - **Main-loop mode**: `erd_cache_mqtt_publisher_loop()` returns 0 immediately and increments `missed_loops`
 - **Background task**: the task checks `mqtt_connected` each iteration and skips publishing (loops back to wait)
-- **No full re-publish after reconnect**: the publisher relies on retained messages already on the broker. Only newly updated cache entries are published after reconnect.
+- **Conditional full re-publish after reconnect**: if the disconnect duration exceeded 60 s, all valid cache entries are marked as `update_required` on reconnect, forcing a full drain of retained values to the broker. Short blips (<60 s) resume normally with only newly updated entries published.
 
 ---
 
@@ -281,7 +281,7 @@ Override the time source (defaults to `esphome::millis`). Used for testing to co
 
 ## 10. Known Limitations
 
-1. **Broker restart loses retained messages:** If the MQTT broker restarts and loses its retained message store, the publisher does not re-publish all cached ERDs. Only newly updated entries will be published after reconnect. A full re-publish mechanism would require tracking which ERDs have been published and re-sending them after reconnect.
+1. **Broker restart with short disconnect:** If the MQTT broker restarts and the disconnect duration is <60 s, the publisher will not re-publish all cached ERDs. The 60 s threshold is a heuristic — broker restarts that complete within this window are treated as transient network blips.
 2. **No publish retry:** If `mqtt_client_publish_raw()` fails (e.g., internal queue full), the entry is not retried. The cache entry remains marked as `update_required=true` and will be picked up on the next iteration.
 3. **Single device ID:** The publisher is configured with one device ID at init time. Supporting multiple devices would require multiple publisher instances.
 4. **Hex encoding is CPU-intensive:** Converting binary data to hex via `snprintf` per byte is simple but not optimal for large payloads. A lookup table or bit-manipulation approach would be faster.
