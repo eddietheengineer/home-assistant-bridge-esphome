@@ -84,14 +84,14 @@ When `press_action()` delegates to `bridge_->trigger_discovery_refresh()`, the b
 1. **Idempotency guard**: If `discovery_refresh_in_progress_` is `true`, log a warning and return immediately. Prevents concurrent cleanup sessions.
 2. **Steady-state guard**: If `steady_state_reached_` is `false`, log a warning and return. Discovery refresh is only valid after the bridge has completed its initial startup and reached steady-state operation.
 3. **Processing guard**: If `ha_discovery_manager_is_processing()` returns `true` (manager is in `building` or `discovering` state), log a warning and return. Cleanup must not start while the discovery manager is actively processing.
-4. **Configure cleanup**: On ESP-IDF platforms, call `ha_discovery_cleanup_configure()` with the device ID, MQTT client interface, and time source, then `ha_discovery_cleanup_start()`.
-5. **Set in-progress flag**: Set `discovery_refresh_in_progress_` to `true`.
+4. **Configure cleanup**: On ESP-IDF platforms, call `ha_discovery_cleanup_configure()` with the device ID, MQTT client interface, and time source, then `ha_discovery_cleanup_start()`. The cleanup module is embedded within `ha_discovery_manager_t` and accessed as `this->ha_discovery_manager_.cleanup`.
+5. **Set in-progress flag**: Set `discovery_refresh_in_progress_` to `true`. This runs on ALL platforms (the assignment is outside the `#ifdef USE_ESP_IDF` block).
 
-On non-ESP-IDF platforms, steps 4-5 are no-ops (dependency pointers are cast away with `(void)` suppressions).
+On non-ESP-IDF platforms, step 4 is a no-op (dependency pointers are cast away with `(void)` suppressions), but step 5 still executes — the flag is set to `true`.
 
 ### 4.3 Cleanup Completion and Reboot
 
-The bridge's main loop polls the cleanup module while `discovery_refresh_in_progress_` is `true`:
+The bridge's main loop checks `discovery_refresh_in_progress_` and, if `true`, enters the cleanup completion path. **The entire completion loop (lines 262-282) is wrapped in `#ifdef USE_ESP_IDF`**:
 
 1. Call `ha_discovery_cleanup_run()` each loop iteration
 2. When `ha_discovery_cleanup_is_done()` returns `true`:
@@ -102,7 +102,7 @@ The bridge's main loop polls the cleanup module while `discovery_refresh_in_prog
    - Delay 500 ms via `vTaskDelay` to allow final retained-clear messages to transmit
    - Call `esphome::App.reboot()` to restart the device
 
----
+On non-ESP-IDF platforms, the cleanup completion loop is dead code: `discovery_refresh_in_progress_` is set to `true` in `trigger_discovery_refresh()` but is never cleared, since the `#ifdef USE_ESP_IDF` block containing the cleanup logic is not compiled.
 
 ## 5. State Transitions
 
@@ -185,7 +185,7 @@ The button refuses to start cleanup while the discovery manager is in an active 
 2. **No ownership:** The button does not own or manage the lifecycle of the bridge.
 3. **Delegation-only behavior:** The button performs no cleanup logic itself — all work is delegated to `GeappliancesBridge::trigger_discovery_refresh()`.
 4. **Guard chain is ordered:** `trigger_discovery_refresh()` checks guards in a fixed order: idempotency, steady-state, then processing. The order matters because the idempotency guard is the cheapest check and prevents re-entry during an active cleanup.
-5. **Non-ESP-IDF is a no-op:** On non-ESP-IDF platforms, `trigger_discovery_refresh()` performs the guard checks but does not configure or start the cleanup module.
+5. **Non-ESP-IDF sets the flag but has no cleanup loop:** On non-ESP-IDF platforms, `trigger_discovery_refresh()` performs the guard checks and sets `discovery_refresh_in_progress_` to `true`, but does not configure or start the cleanup module. The cleanup completion loop is wrapped in `#ifdef USE_ESP_IDF`, so the flag is never cleared — it remains `true` until the process exits.
 
 ---
 
@@ -194,5 +194,5 @@ The button refuses to start cleanup while the discovery manager is in an active 
 1. **No visual feedback:** The button provides no indication of whether the press was accepted or rejected. The user must check logs to determine the outcome.
 2. **Device reboot is mandatory:** After cleanup completes, the device always reboots. There is no option to complete cleanup without rebooting.
 3. **500 ms pre-reboot delay is fixed:** The delay between cleanup completion and reboot is hardcoded to 500 ms. If the MQTT broker is slow to acknowledge retained-clear messages, some messages may be lost.
-4. **Non-ESP-IDF platforms have no effect:** The cleanup and reboot flow is only implemented for ESP-IDF. On other platforms, pressing the button performs guard checks but takes no action.
+4. **Non-ESP-IDF platforms set the flag but have no cleanup loop:** The cleanup and reboot flow is only implemented for ESP-IDF. On other platforms, pressing the button performs guard checks and sets `discovery_refresh_in_progress_` to `true`, but the cleanup completion loop is dead code (wrapped in `#ifdef USE_ESP_IDF`), so the flag is never cleared and no reboot occurs.
 5. **No cancellation:** Once cleanup has started, there is no way to cancel it. The device will proceed through cleanup and reboot.

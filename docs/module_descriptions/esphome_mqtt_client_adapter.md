@@ -51,8 +51,8 @@ The adapter implements the `i_mqtt_client_api_t` interface:
   - A 3-second stall on MQTT reconnect from synchronous re-subscriptions
 - **No pending update queue**: ERD updates are published directly to MQTT via the ERD cache MQTT publisher. There is no queue for pending updates during disconnects — `drain_pending_updates()` and `get_pending_update_count()` are no-ops returning 0.
 - **No settle delay**: There is no `mqtt_connected_at_ms` timestamp or settle delay mechanism. The adapter simply fires connect/disconnect events.
-- **Hex payloads**: All ERD values are published as uppercase hex strings. String conversion is handled at the application level, not in the MQTT adapter.
-- **ErdRegistry integration**: The adapter delegates valid-ERD filtering, string-ERD type detection, and registered-ERD tracking to the ErdRegistry, set via `set_erd_registry()`.
+- **Hex payloads**: All ERD values are published as lowercase hex strings (e.g., `%02x`). String conversion is handled at the application level, not in the MQTT adapter.
+- **ErdRegistry integration**: The adapter calls `register_erd()` on the ErdRegistry (when set) to track registered ERDs. It does not call `is_valid()` or perform string-ERD type detection; those capabilities exist in ErdRegistry but are not used by this adapter.
 
 ## Testing
 

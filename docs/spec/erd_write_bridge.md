@@ -201,7 +201,7 @@ erd_write_bridge_destroy(&this->erd_write_bridge_);
 
 ## 9. MQTT Topics
 
-The write bridge publishes results via `mqtt_client_update_erd_write_result()`. The exact topic and payload format is determined by the `i_mqtt_client_t::update_erd_write_result` implementation in the MQTT adapter.
+The write bridge publishes results via `mqtt_client_update_erd_write_result()`. The exact topic and payload format is determined by the `i_mqtt_client_t::update_erd_write_result` implementation in the MQTT adapter; the table below reflects the format produced by the default ESPHome adapter.
 
 | Result | Topic |
 |--------|-------|
