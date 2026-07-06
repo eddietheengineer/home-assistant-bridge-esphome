@@ -305,7 +305,9 @@ void GeappliancesBridge::loop() {
 #endif
 
   // Start HA discovery once steady state is reached and generate_device_config is enabled.
-  if (this->steady_state_reached_ && !this->ha_discovery_started_ && this->generate_device_config_) {
+  // Skip if OTA cleanup is in progress — the device will reboot after cleanup.
+  if (this->steady_state_reached_ && !this->ha_discovery_started_ && this->generate_device_config_ &&
+      !this->ota_cleanup_in_progress_) {
     this->ha_discovery_started_ = true;
     ha_discovery_manager_configure(
       &this->ha_discovery_manager_,
