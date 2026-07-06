@@ -273,9 +273,6 @@ void erd_bridge_subscribe_init(
         case tiny_gea3_erd_client_activity_type_subscribe_failed:
           tiny_hsm_send_signal(&self->hsm, signal_subscription_failed, nullptr);
           break;
-        case tiny_gea3_erd_client_activity_type_write_completed:
-        case tiny_gea3_erd_client_activity_type_write_failed:
-          break;
       }
     });
   tiny_event_subscribe(tiny_gea3_erd_client_on_activity(erd_client), &self->erd_client_activity_subscription);

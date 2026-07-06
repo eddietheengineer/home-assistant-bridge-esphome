@@ -44,8 +44,6 @@ typedef struct {
 } i_mqtt_client_t;
 
 typedef struct i_mqtt_client_api_t {
-  void (*register_erd)(i_mqtt_client_t* self, tiny_erd_t erd);
-
   void (*update_erd_write_result)(i_mqtt_client_t* self, tiny_erd_t erd, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason);
 
   i_tiny_event_t* (*on_write_request)(i_mqtt_client_t* self);
@@ -61,13 +59,6 @@ typedef struct i_mqtt_client_api_t {
   void (*unsubscribe)(i_mqtt_client_t* self, const char* topic);
 } i_mqtt_client_api_t;
 
-/*!
- * Register a newly discovered ERD.
- */
-static inline void mqtt_client_register_erd(i_mqtt_client_t* self, tiny_erd_t erd)
-{
-  self->api->register_erd(self, erd);
-}
 
 
 /*!

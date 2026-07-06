@@ -16,7 +16,6 @@
 #include <cstring>
 
 #include "esphome/core/log.h"
-#include "esphome/core/hal.h"
 
 #ifdef USE_ESP_IDF
 #include "esp_attr.h"
@@ -26,6 +25,8 @@
 #ifndef USE_ESP_IDF_STUBS
 #define MINIZ_NO_ARCHIVE_APIS
 #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
+#define MINIZ_NO_DEFLATE_APIS
+#define MINIZ_NO_ZLIB_APIS
 #define MINIZ_NO_STDIO
 #include "miniz.h"
 #endif

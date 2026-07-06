@@ -41,10 +41,6 @@ typedef struct {
   // string-ERD type detection, and registered-ERD tracking in one place.
   // Set via esphome_mqtt_client_adapter_set_erd_registry().
   esphome::geappliances_bridge::ErdRegistry* erd_registry;
-  // Buffer for decoded hex payload from write topic.
-  // Max ERD write payload is 32 bytes (64 hex chars).
-  uint8_t write_payload_buffer_[32];
-  uint8_t write_payload_size_;
   // Tracked write topic for unsubscribe on destroy.
   char write_topic_[128];
 } esphome_mqtt_client_adapter_t;
@@ -66,34 +62,12 @@ void esphome_mqtt_client_adapter_notify_disconnected(
 
 void esphome_mqtt_client_adapter_notify_connected(
   esphome_mqtt_client_adapter_t* self);
-
-/*!
- * No-op: write command subscriptions are not available without MQTT.
- */
 void esphome_mqtt_client_adapter_subscribe_write_topic(
   esphome_mqtt_client_adapter_t* self);
 
-/*!
- * No-op: returns 0 (no pending updates).
- */
-size_t esphome_mqtt_client_adapter_drain_pending_updates(
-  esphome_mqtt_client_adapter_t* self);
 
 void esphome_mqtt_client_adapter_destroy(
   esphome_mqtt_client_adapter_t* self);
-
-size_t esphome_mqtt_client_adapter_get_pending_update_count(
-  const esphome_mqtt_client_adapter_t* self);
-
-/*!
- * Publish an MQTT message.
- */
-void esphome_mqtt_client_adapter_publish(
-  esphome_mqtt_client_adapter_t* self,
-  const std::string& topic,
-  const std::string& payload,
-  bool retain);
-
 /*!
  * Publish raw MQTT message (C-string topic and payload).
  * Implements the i_mqtt_client_t publish_raw vtable slot.

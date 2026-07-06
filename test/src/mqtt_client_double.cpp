@@ -6,14 +6,6 @@
 #include "CppUTestExt/MockSupport.h"
 #include "double/mqtt_client_double.hpp"
 
-static void register_erd(i_mqtt_client_t* self, tiny_erd_t erd)
-{
-  mock()
-    .actualCall("register_erd")
-    .onObject(self)
-    .withParameter("erd", erd);
-}
-
 static void update_erd_write_result(i_mqtt_client_t* self, tiny_erd_t erd, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason)
 {
   mock()
@@ -61,7 +53,6 @@ static void unsubscribe(i_mqtt_client_t* self, const char* topic)
 }
 
 static const i_mqtt_client_api_t api = {
-  register_erd,
   update_erd_write_result,
   on_write_request,
   on_mqtt_disconnect,

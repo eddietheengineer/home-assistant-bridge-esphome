@@ -68,32 +68,7 @@ TEST(esphome_mqtt_client_adapter, init_sets_api_pointer)
   CHECK(adapter.interface.api != nullptr);
 }
 
-TEST(esphome_mqtt_client_adapter, init_creates_device_id)
-{
-  init_adapter();
-  // Calling register_erd should not crash even without registry
-  adapter.interface.api->register_erd(&adapter.interface, 0x0008);
-}
 
-/* ------------------------------------------------------------------ */
-/* register_erd                                                         */
-/* ------------------------------------------------------------------ */
-
-TEST(esphome_mqtt_client_adapter, register_erd_tracks_in_output_set)
-{
-  tiny_erd_t valid[] = {0x0008};
-  erd_registry.set_valid_erds(valid, 1);
-  init_adapter_with_registry();
-  adapter.interface.api->register_erd(&adapter.interface, 0x0008);
-  CHECK_EQUAL(1u, erd_registry.registered_erd_count());
-  CHECK_EQUAL(0x0008u, erd_registry.registered_erd(0));
-}
-
-TEST(esphome_mqtt_client_adapter, register_erd_without_output_set)
-{
-  init_adapter();
-  adapter.interface.api->register_erd(&adapter.interface, 0x0008);
-}
 
 /* ------------------------------------------------------------------ */
 /* update_erd_write_result                                              */
@@ -147,32 +122,6 @@ TEST(esphome_mqtt_client_adapter, subscribe_write_topic_is_noop)
   init_adapter();
   esphome_mqtt_client_adapter_subscribe_write_topic(&adapter);
   // Should not crash
-}
-
-TEST(esphome_mqtt_client_adapter, drain_pending_updates_returns_zero)
-{
-  init_adapter();
-
-  size_t remaining = esphome_mqtt_client_adapter_drain_pending_updates(&adapter);
-  CHECK_EQUAL(0u, remaining);
-}
-
-TEST(esphome_mqtt_client_adapter, get_pending_update_count_returns_zero)
-{
-  init_adapter();
-
-  CHECK_EQUAL(0u, esphome_mqtt_client_adapter_get_pending_update_count(&adapter));
-}
-
-/* ------------------------------------------------------------------ */
-/* publish helper                                                       */
-/* ------------------------------------------------------------------ */
-
-TEST(esphome_mqtt_client_adapter, publish_helper_does_not_crash)
-{
-  init_adapter();
-  esphome_mqtt_client_adapter_publish(&adapter, "test/topic", "test_payload", true);
-  // Should not crash — logs via ESP_LOGD
 }
 
 /* ------------------------------------------------------------------ */

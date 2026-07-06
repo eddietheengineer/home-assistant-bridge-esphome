@@ -161,9 +161,6 @@ TEST_GROUP(erd_bridge_subscribe)
     tiny_timer_group_double_elapse_time(&timer_group, ticks);
   }
 
-  void nothing_should_happen()
-  {
-  }
 };
 
 TEST(erd_bridge_subscribe, should_subscribe_when_initialized)
@@ -177,7 +174,6 @@ TEST(erd_bridge_subscribe, should_retry_subscribe_after_a_delay_if_the_subscribe
   a_subscription_should_be_requested_and_will_fail_to_queue_for(0xC0);
   when_the_bridge_is_initialized();
 
-  nothing_should_happen();
   after(resubscribe_delay - 1);
 
   a_subscription_should_be_requested_and_will_fail_to_queue_for(0xC0);
@@ -197,7 +193,6 @@ TEST(erd_bridge_subscribe, should_retry_subscribe_if_the_subscribe_request_fails
 TEST(erd_bridge_subscribe, should_not_retry_subscribe_if_the_subscribe_request_fails_for_a_different_address)
 {
   given_that_the_bridge_has_been_initialized();
-  nothing_should_happen();
   when_a_subscribe_failure_is_received_for(0xC1);
 }
 
@@ -211,7 +206,6 @@ TEST(erd_bridge_subscribe, should_resubscribe_after_receiving_a_subscription_hos
 TEST(erd_bridge_subscribe, should_ignore_subscription_host_came_online_from_other_addresses)
 {
   given_that_the_bridge_has_been_initialized_and_a_subscription_is_active_for(0xC0);
-  nothing_should_happen();
   when_a_subscription_host_came_online_is_received_for(0xC1);
 }
 
@@ -242,7 +236,6 @@ TEST(erd_bridge_subscribe, should_preserve_cache_data_on_host_came_online)
 TEST(erd_bridge_subscribe, should_ignore_subscription_added_activity_for_other_addresses)
 {
   given_that_the_bridge_has_been_initialized();
-  nothing_should_happen();
   after_a_subscription_is_added_or_retained_for(0xC1);
   after(subscription_retention_period);
 }
@@ -255,11 +248,9 @@ TEST(erd_bridge_subscribe, should_periodically_retain_an_active_subscription)
   given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
 
   // Advance past the quiet period to reach steady state.
-  nothing_should_happen();
   after(subscription_quiet_period);
 
   // Now in steady state; retention should fire.
-  nothing_should_happen();
   after(subscription_retention_period - subscription_quiet_period - 1);
 
   a_subscription_retention_should_be_requested_for(0xC0);
@@ -290,7 +281,6 @@ TEST(erd_bridge_subscribe, should_handle_erd_publications_even_when_a_subscripti
 TEST(erd_bridge_subscribe, should_ignore_erd_publications_from_other_hosts)
 {
   given_that_the_bridge_has_been_initialized();
-  nothing_should_happen();
   when_an_erd_publication_is_received(0xC1, 0xABCD, uint32_t(0x12345678));
 }
 
@@ -316,7 +306,6 @@ TEST(erd_bridge_subscribe, should_transition_to_steady_after_quiet_period_with_n
   given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
 
   // Advance to just before the quiet period — nothing should happen.
-  nothing_should_happen();
   after(subscription_quiet_period - 1);
 
   // Quiet period elapses, transitioning to steady. No mock expectations
@@ -338,7 +327,6 @@ TEST(erd_bridge_subscribe, should_return_to_subscribed_on_new_erd_while_steady)
   given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
 
   // Advance past the quiet period to reach steady state.
-  nothing_should_happen();
   after(subscription_quiet_period);
 
   // A new ERD publication should transition back to subscribed.
@@ -346,7 +334,6 @@ TEST(erd_bridge_subscribe, should_return_to_subscribed_on_new_erd_while_steady)
 
   // The quiet timer should have been re-armed; advancing past it again
   // should transition back to steady.
-  nothing_should_happen();
   after(subscription_quiet_period - 1);
 
   after(1);
@@ -360,7 +347,6 @@ TEST(erd_bridge_subscribe, should_retain_subscription_in_steady_state)
   given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
 
   // Advance past the quiet period to reach steady state.
-  nothing_should_happen();
   after(subscription_quiet_period);
 
   // Retention should fire at 30s from when subscribed was entered.
@@ -376,7 +362,6 @@ TEST(erd_bridge_subscribe, should_resubscribe_on_host_came_online_from_steady)
   given_that_an_erd_publication_has_been_received(0xC0, 0xABCD, uint32_t(0x12345678));
 
   // Advance past the quiet period to reach steady state.
-  nothing_should_happen();
   after(subscription_quiet_period);
 
   // Host came online from steady should transition to subscribing.
@@ -481,11 +466,8 @@ TEST_GROUP(erd_bridge_subscribe_dual)
   {
     tiny_timer_group_double_elapse_time(&timer_group, ticks);
   }
-
-  void nothing_should_happen()
-  {
-  }
 };
+
 
 TEST(erd_bridge_subscribe_dual, each_bridge_subscribes_to_its_own_address_at_init)
 {
@@ -516,11 +498,9 @@ TEST(erd_bridge_subscribe_dual, each_bridge_independently_retains_its_subscripti
   when_an_erd_publication_is_received(address_b, 0xABCD, uint32_t(0x12345678));
 
   // Advance past the quiet period for both bridges.
-  nothing_should_happen();
   after(subscription_quiet_period);
 
   // Now both are in steady state; retention should fire for both.
-  nothing_should_happen();
   after(subscription_retention_period - subscription_quiet_period - 1);
 
   mock()
@@ -546,7 +526,6 @@ TEST(erd_bridge_subscribe_dual, resubscribing_one_bridge_does_not_affect_the_oth
   when_an_erd_publication_is_received(address_b, 0xABCD, uint32_t(0x12345678));
 
   // Advance past the quiet period for both bridges.
-  nothing_should_happen();
   after(subscription_quiet_period);
 
   // bridge_b's host comes back online: only bridge_b should resubscribe

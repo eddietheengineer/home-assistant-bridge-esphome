@@ -121,9 +121,6 @@ TEST_GROUP(erd_bridge_poll)
     trigger_read_completed(address, erd, &_value, sizeof(_value));
   }
 
-  void nothing_should_happen()
-  {
-  }
 };
 
 // Regression: the cache should NOT be cleared on re-probe after appliance lost.
@@ -184,7 +181,6 @@ TEST(erd_bridge_poll, should_not_republish_mqtt_when_polled_erd_data_is_unchange
 
   should_request_read(0xC0, polled_erd);
   after(polling_interval);
-  nothing_should_happen();
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 }
 TEST(erd_bridge_poll, should_republish_mqtt_when_polled_erd_data_changes)
@@ -197,7 +193,6 @@ TEST(erd_bridge_poll, should_republish_mqtt_when_polled_erd_data_changes)
 
   should_request_read(0xC0, polled_erd);
   after(polling_interval);
-  nothing_should_happen();
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
   should_request_read(0xC0, polled_erd);
@@ -260,10 +255,8 @@ TEST(erd_bridge_poll, should_register_and_poll_late_erd)
   should_request_read(0xC0, late_erd);
   after(polling_interval);
 
-  nothing_should_happen();
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
-  nothing_should_happen();
   when_a_poll_read_completes(0xC0, late_erd, uint8_t(0xCD));
 }
 
