@@ -1,214 +1,59 @@
 # home-assistant-bridge-esphome
 
-ESPHome external component for GE Appliances bridge supporting the GEA2 and GEA3 protocols.
-
-Subscribes to data hosted by a GE Appliances product and publishes it to an MQTT server under `geappliances/<device ID>`. ERDs are identified by 16-bit identifiers and the raw binary data is published as a hex string to `geappliances/<device ID>/erd/<ERD ID>/value`. Data can be written to an ERD by writing a hex string of the appropriate size to `geappliances/<device ID>/erd/<ERD ID>/write`.
-
-This is intended to be used with the MQTT server provided by Home Assistant, but it should work with other MQTT servers.
+ESPHome external component bridging GE Appliances (GEA2/GEA3 serial protocols) to Home Assistant via MQTT.
 
 ## Hardware
 
-This component is designed for use with the **FirstBuild Home Assistant Adapter** featuring the SeeedStudio Xiao ESP32-C3 microcontroller. The adapter provides an RJ45 connection for GEA3 serial communication with GE Appliances.
+This component runs on the **FirstBuild Home Assistant Adapter** (SeeedStudio Xiao ESP32-C3 or ESP32-C6) with an RJ45 connection for GEA3 serial communication.
 
-Available from [FirstBuild](https://firstbuild.com/inventions/home-assistant-adapter/)
+Available from [FirstBuild](https://firstbuild.com/inventions/home-assistant-adapter/).
 
 ## Configuration
 
-Add to your ESPHome YAML configuration:
+Add to your ESPHome YAML:
 
 ```yaml
 esp32:
   board: seeed_xiao_esp32c3
   variant: esp32c3
-  framework: 
+  framework:
     type: esp-idf
 
-# External component configuration
 external_components:
   - source: github://eddietheengineer/home-assistant-bridge-esphome@develop
     components: [ geappliances_bridge ]
 
-# MQTT configuration for Home Assistant
 mqtt:
   broker: !secret mqtt_broker
   username: !secret mqtt_username
   password: !secret mqtt_password
-  port: 1883
   discovery: true
-  discovery_prefix: homeassistant
-  clean_session: true
 
-# UART configuration
 uart:
-  # GEA3 UART (newer appliances)
   - id: gea3_uart
-    tx_pin: GPIO21  # D6 on Xiao ESP32-C3
-    rx_pin: GPIO20  # D7 on Xiao ESP32-C3
+    tx_pin: GPIO21
+    rx_pin: GPIO20
     baud_rate: 230400
 
-  - id: gea2_uart
-    tx_pin: GPIO9  # D9 on Xiao ESP32-C3
-    rx_pin: GPIO10  # D10 on Xiao ESP32-C3
-    baud_rate: 19200
-    rx_full_threshold: 1
-    rx_timeout: 1
-
-# GE Appliances Bridge component
 geappliances_bridge:
   gea3_uart_id: gea3_uart
-  gea2_uart_id: gea2_uart
-  # device_id: "YourDeviceId"             # Optional: Uncomment to use a custom device ID
-  # mode: auto                            # Default: auto   Options: auto, subscribe, poll
-  # polling_interval: 10000               # Default: 10000 ms (10 seconds), used when in polling mode
-  # appliance_api_parsing: true           # Default: true, restricts polling to appliance-supported ERDs
-  # throttle_rate_seconds: 1              # Default: 1, min seconds between publishes per ERD (0-255, 0=disabled)
-  # filter_config_topics: true            # Default: true, filters internal/diagnostic entities from HA discovery
-
-  # Diagnostic sensors and discovery refresh button are auto-created by default.
-  # To disable: erd_publish_rate_sensor: false, discovery_refresh_button: false, etc.
 ```
 
-## Configurable Parameters
+For a complete configuration with all options, see [docs/example.yaml](./docs/example.yaml).
 
-### Mode
+## Documentation
 
-The `mode` parameter is **optional**. 
+| Resource | Description |
+|---|---|
+| [Quickstart](./docs/guides/quickstart.md) | Get up and running in 5 minutes |
+| [Deployment Guide](./docs/guides/deployment.md) | Configuration per appliance type |
+| [Troubleshooting](./docs/guides/troubleshooting.md) | Common issues and fixes |
+| [Hardware Guide](./HARDWARE.md) | Pin configuration and wiring |
+| [YAML Reference](./docs/reference/yaml-config.md) | All configuration options |
+| [MQTT Topics](./docs/reference/mqtt-topics.md) | Topic schema and payloads |
+| [Architecture](./docs/architecture/overview.md) | System design and data flow |
+| [Contributing](./CONTRIBUTING.md) | Development workflow |
 
-1. **Auto Mode (Default)** - The adapter starts with subscription mode and automatically falls back to polling mode if no ERD responses are received within 10 seconds. This provides the best of both worlds: real-time updates when possible, with automatic fallback for compatibility.
+## License
 
-2. **Subscribe Mode** - The adapter subscribes to ERD updates from the appliance. The appliance pushes changes as they occur.
-
-3. **Poll Mode** - The adapter actively polls the appliance for ERD values at a configurable interval `polling_interval`
-
-### Autodiscovery
-
-After connecting to the MQTT server, the component waits 5 seconds and then performs a protocol autodiscovery to find the appliance on the bus before generating a device ID.
-
-- If `gea3_uart_id` is configured, a GEA3 broadcast is sent; if a board responds its address is used.
-- Discovery repeats until at least one board is found.
-- The first-responding board's address and protocol are used for all subsequent ERD communication.
-
-### Auto-Generated Device ID
-
-The `device_id` parameter is **optional**. If not provided, the component will automatically generate a device ID by reading the following ERDs from the appliance:
-
-- **Appliance Type** (ERD 0x0008)
-- **Model Number** (ERD 0x0001)
-- **Serial Number** (ERD 0x0002)
-
-The auto-generated device ID format is: `ApplianceTypeName_ModelNumber_SerialNumber`
-
-The appliance type names are loaded from the [GE Appliances Public API Documentation](https://github.com/geappliances/public-appliance-api-documentation) library during the ESPHome build process
-
-Generated device ID example: `Dishwasher_ZL4200ABC_12345678` (for appliance type 6 - Dishwasher)
-
-See [doc/example.yaml](doc/example.yaml) for the complete configuration example.
-
-### Appliance API Parsing
-
-The `appliance_api_parsing` parameter is **optional** (default: `true`). When enabled, the component reads appliance API feature bit ERDs (0x0092–0x010D) after discovery to determine which ERDs are actually supported by the connected appliance. In polling mode this restricts polling to only those ERDs, resulting in faster poll cycles and a cleaner MQTT topic namespace. Set to `false` to poll all known ERDs regardless of appliance support.
-
-
-## Additional Configuration Options
-
-- **`adapter_address`** (default: `0xE4`) — The bridge's address on the GEA bus.
-- **`custom_erds`** (default: none) — A list of additional ERD IDs to poll beyond the standard list. Useful for ERDs not yet in the appliance API documentation.
-- **`throttle_rate_seconds`** (default: `1`) — Minimum interval in seconds between MQTT publishes for any individual ERD. Set to 0 to disable (publish on every update). Range: 0–255. Useful for reducing MQTT traffic when the appliance generates frequent updates.
-- **`generate_device_config`** (default: `true`) — Currently disabled
-- **`filter_config_topics`** (default: `true`) — Filters out internal/diagnostic entities (firmware metadata, commissioning state, usage profiles, cycle definitions, fault data, etc.) from Home Assistant MQTT discovery. Reduces entity count by ~19% (from ~9,310 to ~7,520) and firmware data by ~8.8%. Set to `false` to include all entities.
-- **Diagnostic sensors** (`erd_publish_rate_sensor`, `erd_cache_entries_sensor`, `erd_cache_updates_sensor`, `mqtt_publish_rate_sensor`) — Auto-created by default with `discovery: false` (only visible via ESPHome API, not MQTT discovery). Set to `false` to disable, or provide a dict to customize (e.g. `name`).
-- **`discovery_refresh_button`** — Auto-created by default with `discovery: false`. Exposes an ESPHome button entity that triggers a Home Assistant MQTT discovery cleanup when pressed. Useful for clearing stale discovery topics after firmware updates or configuration changes. Set to `false` to disable, or provide a dict to customize (e.g. `name`).
-
-
-## Development
-
-### ERD List Generation
-
-When polling, the device uses an auto-generated ERD list (`erd_lists.h`) based on the [GE Appliances Public API Documentation](https://github.com/geappliances/public-appliance-api-documentation). The ERD list is automatically generated during the build process from `appliance_api_erd_definitions.json`.
-
-**To manually regenerate the ERD list:**
-The generation script categorizes ERDs by appliance type based on their hex address ranges (common, refrigeration, laundry, dishwasher, water heater, range, air conditioning, water filter, small appliance, and energy ERDs). See [scripts/README.md](scripts/README.md) for more details.
-
-### Running Tests
-
-This project includes unit tests for the core bridge functionality. The tests are built using CppUTest.
-
-#### Prerequisites
-
-Install CppUTest:
-
-**Ubuntu/Debian:**
-```bash
-sudo apt-get install cpputest libcpputest-dev
-```
-
-**macOS:**
-```bash
-brew install cpputest
-```
-
-#### Running the Tests
-
-Clone the repository with submodules:
-```bash
-git clone --recursive https://github.com/joshualongenecker/home-assistant-bridge-esphome.git
-cd home-assistant-bridge-esphome
-```
-
-Build and run the tests:
-```bash
-make test
-```
-
-This will:
-1. Compile the test suite
-2. Run all unit tests
-3. Display the test results
-
-The tests cover:
-- MQTT bridge functionality
-- Subscription management
-- ERD publication handling
-- Uptime monitoring
-- **Application-level integration tests** (simulated appliance testing)
-- **Configuration-based testing** (different YAML scenarios)
-
-#### Simulated Application Testing
-
-The project includes comprehensive simulated application-level tests that validate complete workflows without physical hardware:
-
-- **Configuration scenarios** - Testing different YAML configurations (subscription mode, polling modes with various intervals)
-- **Multiple appliance types** - Dishwashers, refrigerators, washers with realistic ERD patterns
-- **Device ID generation** - Simulating ERD reads for appliance identification
-- **Subscription mode** - Testing ERD publications and MQTT publishing
-- **Polling mode** - Testing periodic ERD polling with different intervals
-- **MQTT write forwarding** - Testing write requests from Home Assistant
-- **Error handling** - Testing failure scenarios and retry logic
-
-See [test/simulation/README.md](test/simulation/README.md) for detailed information about the simulation testing framework and examples of how to create comprehensive appliance simulation tests.
-
-## Recommended Upstream Changes
-
-The following changes should be proposed to the upstream `public-appliance-api-documentation`
-repository so the source definitions are corrected:
-
-### Remove `write` from Sensor Lock conditional ERDs
-
-These ERDs list `write` in `erd_operations` but are only writable when
-Sensor Lock ERD (0x7042) is set — a special diagnostic mode. They should
-not be exposed as writeable in normal operation. Remove `write` from
-`erd_operations` for:
-
-| ERD  | Name                              |
-|------|-----------------------------------|
-| 0x7100 | Inside ambient temperature       |
-| 0x7101 | Inside coil temperature          |
-| 0x7102 | Outside ambient temperature      |
-| 0x7103 | Outside coil temperature         |
-| 0x7108 | Indoor Coil Vapor Temperature    |
-| 0x710a | Outdoor Coil Vapor Temperature   |
-| 0x7130 | Inside fan speed                 |
-| 0x7131 | Outside fan speed                |
-| 0x7132 | Inside target fan speed          |
-| 0x7133 | Outside target fan speed         |
-| 0x7601 | Inverter Actual Speed RPM        |
+MIT — see [LICENSE](./LICENSE).
