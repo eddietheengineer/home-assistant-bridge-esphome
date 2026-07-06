@@ -307,7 +307,7 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
   mock().expectOneCall("maybe_start_custom_erd_polling").onObject(&svc);
   mock().expectOneCall("check_steady_state").onObject(&svc).andReturnValue(false);
   /* Drive the HSM through all phases. */
-  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_protocol_stack);
+  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_startup_delay);
   CHECK(wrapper.hsm.current == startup_state_startup_delay);
 
   tiny_hsm_send_signal(&wrapper.hsm, signal_run_loop, nullptr);
@@ -339,7 +339,7 @@ TEST(startup_hsm, full_startup_flow_reaches_running)
 TEST(startup_hsm, services_from_hsm_returns_correct_pointer)
 {
   mock().expectOneCall("record_startup_delay_start").onObject(&svc);
-  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_protocol_stack);
+  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_startup_delay);
   // protocol_stack entry transitions to startup_delay which calls record_startup_delay_start.
 
   IBridgeServices* recovered = services_from_hsm(&wrapper.hsm);
@@ -355,7 +355,7 @@ TEST(startup_hsm, services_from_hsm_returns_correct_pointer)
 TEST(startup_hsm, wrapper_destroy_nulls_services)
 {
   mock().expectOneCall("record_startup_delay_start").onObject(&svc);
-  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_protocol_stack);
+  startup_hsm_wrapper_init(&wrapper, &svc, startup_state_startup_delay);
 
   CHECK(wrapper.services == &svc);
 

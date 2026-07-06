@@ -265,7 +265,7 @@ void GeappliancesBridge::loop() {
 
   // Initialize the startup HSM on the first loop() call.
   if (this->startup_hsm_wrapper_.hsm.current == nullptr) {
-    startup_hsm_wrapper_init(&this->startup_hsm_wrapper_, this, startup_state_protocol_stack);
+    startup_hsm_wrapper_init(&this->startup_hsm_wrapper_, this, startup_state_startup_delay);
   }
 
   // Send the run_loop signal to the current HSM state — this drives
@@ -723,8 +723,7 @@ void GeappliancesBridge::dump_config() {
 
   // Display current startup state for debugging
   const char* phase_str = "Unknown";
-  if (this->startup_hsm_wrapper_.hsm.current == startup_state_protocol_stack)       phase_str = "Protocol Stack";
-  else if (this->startup_hsm_wrapper_.hsm.current == startup_state_startup_delay)   phase_str = "Startup Delay";
+  if (this->startup_hsm_wrapper_.hsm.current == startup_state_startup_delay)   phase_str = "Startup Delay";
   else if (this->startup_hsm_wrapper_.hsm.current == startup_state_autodiscovery)    phase_str = "Autodiscovery";
   else if (this->startup_hsm_wrapper_.hsm.current == startup_state_device_id)        phase_str = "Device ID";
   else if (this->startup_hsm_wrapper_.hsm.current == startup_state_mqtt_client_init) phase_str = "MQTT Client Init";

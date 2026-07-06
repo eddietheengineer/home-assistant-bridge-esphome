@@ -55,17 +55,7 @@ namespace esphome {
 namespace geappliances_bridge {
 
 enum FeatureBitState {
-  FEATURE_BIT_STATE_READING_0092,
-  FEATURE_BIT_STATE_READING_0093,
-  FEATURE_BIT_STATE_READING_0094,
-  FEATURE_BIT_STATE_READING_0095,
-  FEATURE_BIT_STATE_READING_0096,
-  FEATURE_BIT_STATE_READING_0097,
-  FEATURE_BIT_STATE_READING_0109,
-  FEATURE_BIT_STATE_READING_010A,
-  FEATURE_BIT_STATE_READING_010B,
-  FEATURE_BIT_STATE_READING_010C,
-  FEATURE_BIT_STATE_READING_010D,
+  FEATURE_BIT_STATE_READING,
   FEATURE_BIT_STATE_PARSING,
   FEATURE_BIT_STATE_FAILED,
   FEATURE_BIT_STATE_COMPLETE,
@@ -144,7 +134,8 @@ class FeatureBitManager {
   /// Add an ERD to the valid list (deduplicated).
   void add_valid_erd_(tiny_erd_t erd);
 
-  FeatureBitState state_{FEATURE_BIT_STATE_READING_0092};
+  FeatureBitState state_{FEATURE_BIT_STATE_READING};
+  uint8_t reading_idx_{0};  /* index into feature_erd_list_ (0-10) */
   bool read_queued_{false};  /* true while a read is in-flight (guards idempotent start/queue) */
 
   i_tiny_gea3_erd_client_t* erd_client_{nullptr};
@@ -161,32 +152,12 @@ class FeatureBitManager {
   tiny_timer_t queue_retry_timer_;
 
   struct FeatureBitErdData {
-    uint8_t erd_0092[8]{};
-    uint8_t erd_0093[8]{};
-    uint8_t erd_0094[8]{};
-    uint8_t erd_0095[8]{};
-    uint8_t erd_0096[8]{};
-    uint8_t erd_0097[8]{};
-    uint8_t erd_0109[8]{};
-    uint8_t erd_010A[8]{};
-    uint8_t erd_010B[8]{};
-    uint8_t erd_010C[8]{};
-    uint8_t erd_010D[8]{};
-    uint8_t erd_0092_size{0};
-    uint8_t erd_0093_size{0};
-    uint8_t erd_0094_size{0};
-    uint8_t erd_0095_size{0};
-    uint8_t erd_0096_size{0};
-    uint8_t erd_0097_size{0};
-    uint8_t erd_0109_size{0};
-    uint8_t erd_010A_size{0};
-    uint8_t erd_010B_size{0};
-    uint8_t erd_010C_size{0};
-    uint8_t erd_010D_size{0};
+    uint8_t data[11][8]{};  /* 11 feature ERDs, each up to 8 bytes */
+    uint8_t sizes[11]{};    /* corresponding sizes */
   };
 
   FeatureBitErdData erd_data_;
-  /* Fixed-capacity ERD list — replaces std::set and std::vector. */
+  /* Fixed-capacity ERD list - replaces std::set and std::vector. */
 public:
   tiny_erd_t valid_erds_[FEATURE_BIT_MAX_ERDS];
 private:

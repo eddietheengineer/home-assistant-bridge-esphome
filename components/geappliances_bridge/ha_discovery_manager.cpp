@@ -129,7 +129,7 @@ static void json_unescape(const char* src, size_t src_len, char* out, int out_si
  * Embedding it directly in another JSON string requires no transformation —
  * the escape sequences remain valid.
  * Returns the number of bytes written (excluding null terminator). */
-static int json_reescape(const char* src, size_t src_len, char* out, int out_size)
+static int json_embed_value(const char* src, size_t src_len, char* out, int out_size)
 {
     if (src_len >= (size_t)out_size) src_len = (size_t)(out_size - 1);
     memcpy(out, src, src_len);
@@ -594,7 +594,7 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             n = snprintf(payload + pos, space, "\"value_template\":\"");
             if (n < 0 || n >= space) goto too_large;
             pos += n; space -= n;
-            int reescaped = json_reescape(val, len, payload + pos, space);
+            int reescaped = json_embed_value(val, len, payload + pos, space);
             if (reescaped >= space) goto too_large;
             pos += reescaped; space -= reescaped;
             n = snprintf(payload + pos, space, "\",");
@@ -607,7 +607,7 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             n = snprintf(payload + pos, space, "\"command_topic\":\"%s\",\"command_template\":\"", self->actual_command_topic_buf);
             if (n < 0 || n >= space) goto too_large;
             pos += n; space -= n;
-            int reescaped = json_reescape(val, len, payload + pos, space);
+            int reescaped = json_embed_value(val, len, payload + pos, space);
             if (reescaped >= space) goto too_large;
             pos += reescaped; space -= reescaped;
             n = snprintf(payload + pos, space, "\",");

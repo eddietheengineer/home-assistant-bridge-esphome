@@ -177,7 +177,7 @@ TEST(feature_bit_manager, init_stores_all_parameters)
   mgr.start();
 
   // State should remain READING_0092 after successful queue (self-driving model).
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, mgr.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, mgr.get_state());
 }
 
 TEST(feature_bit_manager, init_sets_state_to_reading_0092)
@@ -190,7 +190,7 @@ TEST(feature_bit_manager, init_sets_state_to_reading_0092)
 
   mgr.init(&ec.interface, 0xC0, &tg.timer_group);
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, mgr.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, mgr.get_state());
 }
 
 TEST(feature_bit_manager, init_resets_parse_state)
@@ -204,7 +204,7 @@ TEST(feature_bit_manager, init_resets_parse_state)
   mgr.init(&ec.interface, 0xC0, &tg.timer_group);
 
   // State starts at READING_0092, not PARSING or COMPLETE.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, mgr.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, mgr.get_state());
 }
 
 /* ------------------------------------------------------------------ */
@@ -219,7 +219,7 @@ TEST(feature_bit_manager, start_queues_common_feature_read_first)
   manager.start();
 
   // State remains READING_0092 (self-driving; no IN_FLIGHT state).
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 }
 
 TEST(feature_bit_manager, start_is_idempotent)
@@ -234,7 +234,7 @@ TEST(feature_bit_manager, start_is_idempotent)
   // read was already queued).  No additional read mock expected.
   manager.start();
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 }
 
 TEST(feature_bit_manager, start_does_nothing_when_not_at_first_state)
@@ -252,7 +252,7 @@ TEST(feature_bit_manager, start_does_nothing_when_not_at_first_state)
   // Now state is READING_0093. start() should be a no-op.
   manager.start();
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0093, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 }
 
 /* ------------------------------------------------------------------ */
@@ -270,7 +270,7 @@ TEST(feature_bit_manager, read_completed_transitions_to_appliance_feature_api_0)
   expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_0);
   trigger_read_completed(ERD_COMMON_FEATURE_API, feature_data, 8);
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0093, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 }
 
 TEST(feature_bit_manager, read_completed_transitions_to_appliance_feature_api_1)
@@ -286,7 +286,7 @@ TEST(feature_bit_manager, read_completed_transitions_to_appliance_feature_api_1)
   expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_1);
   trigger_read_completed(ERD_APPLIANCE_FEATURE_API_0, feature_data, 8);
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0094, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 }
 
 /* ------------------------------------------------------------------ */
@@ -336,7 +336,7 @@ TEST(feature_bit_manager, read_failed_skips_feature_api_0_to_api_1)
   expect_successful_read(0xC0, ERD_APPLIANCE_FEATURE_API_1);
   trigger_read_failed(ERD_APPLIANCE_FEATURE_API_0);
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0094, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 }
 
 TEST(feature_bit_manager, read_failed_on_last_erd_transitions_to_parsing)
@@ -481,14 +481,14 @@ TEST(feature_bit_manager, queue_full_keeps_current_state)
   manager.start();
 
   // State remains READING_0092 when queue is full.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 
   // Elapse 50ms to trigger the retry timer, which attempts another read (also failing).
   expect_failed_read(0xC0, ERD_COMMON_FEATURE_API);
   tiny_timer_group_double_elapse_time(&timer_group, 50);
 
   // State still READING_0092 after the retry also fails.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 }
 /* ------------------------------------------------------------------ */
 
@@ -500,14 +500,14 @@ TEST(feature_bit_manager, queue_full_retry_timer_retries_on_elapse)
   expect_failed_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 
   // Elapse 50ms to trigger the retry timer, which attempts another read (also failing).
   expect_failed_read(0xC0, ERD_COMMON_FEATURE_API);
   tiny_timer_group_double_elapse_time(&timer_group, 50);
 
   // State is still READING_0092 after the retry also fails.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 }
 
 TEST(feature_bit_manager, queue_retry_timer_noop_when_already_queued)
@@ -518,7 +518,7 @@ TEST(feature_bit_manager, queue_retry_timer_noop_when_already_queued)
   expect_failed_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 
   // An activity event arrives before the timer fires. Since read_queued_ is false,
   // on_erd_activity_ retries the queue and it succeeds this time. The event
@@ -537,7 +537,7 @@ TEST(feature_bit_manager, queue_retry_timer_noop_when_already_queued)
   tiny_timer_group_double_elapse_time(&timer_group, 50);
 
   // No additional read mock needed — the timer was a no-op.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0093, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 }
 TEST(feature_bit_manager, unrelated_erd_events_are_ignored)
 {
@@ -547,7 +547,7 @@ TEST(feature_bit_manager, unrelated_erd_events_are_ignored)
   expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 
   // Trigger a read_completed for ERD_APPLIANCE_FEATURE_API_0 — wrong ERD,
   // we're waiting for ERD_COMMON_FEATURE_API. It should be silently ignored.
@@ -555,7 +555,7 @@ TEST(feature_bit_manager, unrelated_erd_events_are_ignored)
   trigger_read_completed(ERD_APPLIANCE_FEATURE_API_0, data, 8);
 
   // State should remain READING_0092; no additional read queued.
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 }
 
 
@@ -694,7 +694,7 @@ TEST(feature_bit_manager, erd_data_sizes_capped_at_8)
 
   // The manager caps at 8 bytes internally.  Verify by checking that
   // the subsequent read was queued (proving the event was processed).
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0093, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 }
 
 /* ------------------------------------------------------------------ */
@@ -744,7 +744,7 @@ TEST(feature_bit_manager, each_reading_state_queues_correct_erd)
   args.read_completed.erd = ERD_APPLIANCE_FEATURE_API_0;
   tiny_gea3_erd_client_double_trigger_activity_event(&ec, &args);
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0094, mgr.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, mgr.get_state());
 }
 
 /* ------------------------------------------------------------------ */
@@ -843,7 +843,7 @@ TEST(feature_bit_manager, events_ignored_in_failed_state)
   expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 
   // Trigger read_failed for ERD_COMMON_FEATURE_API to enter FAILED state.
   trigger_read_failed(ERD_COMMON_FEATURE_API);
@@ -867,7 +867,7 @@ TEST(feature_bit_manager, queue_retry_timer_noop_in_failed_state)
   expect_successful_read(0xC0, ERD_COMMON_FEATURE_API);
   manager.start();
 
-  CHECK_EQUAL(FEATURE_BIT_STATE_READING_0092, manager.get_state());
+  CHECK_EQUAL(FEATURE_BIT_STATE_READING, manager.get_state());
 
   // Trigger read_failed for 0x0092 to enter FAILED state.
   trigger_read_failed(ERD_COMMON_FEATURE_API);
