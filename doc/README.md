@@ -1,40 +1,24 @@
-# Documentation and Test Configurations
+# doc/
 
-This directory contains ESPHome configuration examples and test files.
+Legacy documentation directory. New documentation lives in [docs/](../docs/README.md).
+
+## Subdirectories
+
+| Directory | Description |
+|---|---|
+| [spec/](./spec/) | Detailed behavioral specifications for each module (27 specs) |
+| [module_descriptions/](./module_descriptions/) | Lightweight one-paragraph summaries for each module (21 descriptions) |
 
 ## Files
 
-### example.yaml
-Complete example configuration for the GE Appliances Bridge component. This shows how to configure the component in a real deployment with actual secrets.
-
-### test-compile.yaml
-Test configuration used by the CI/CD pipeline to verify that the component compiles correctly. This file is identical to example.yaml except it uses a local component source for testing.
-
-### test-secrets.yaml
-Template file containing dummy secret values for CI compilation testing. These values allow the configuration to compile without exposing real credentials.
-
-**DO NOT use these values in production!**
-
-## Usage
-
-For local development or production, create your own `secrets.yaml` file with your actual credentials:
-
-```yaml
-wifi_ssid: "YourWiFiSSID"
-wifi_password: "YourWiFiPassword"
-mqtt_broker: "your.mqtt.broker"
-mqtt_username: "your_username"
-mqtt_password: "your_password"
-api_encryption_key: "your_32_character_encryption_key"
-```
-
-The `secrets.yaml` file is excluded from version control via `.gitignore` to protect your credentials.
-
-## CI/CD Testing
-
-The GitHub Actions workflow automatically:
-1. Copies `test-secrets.yaml` to `secrets.yaml` for compilation
-2. Compiles `test-compile.yaml` to verify the component works
-3. Cleans up the temporary secrets file
-
-This ensures that every PR is tested for compilation errors before merging.
+| File | Description |
+|---|---|
+| [architecture.md](./architecture.md) | Original architecture document (superseded by [docs/architecture/overview.md](../docs/architecture/overview.md)) |
+| [example.yaml](./example.yaml) | Complete ESPHome configuration example |
+| [test-compile.yaml](./test-compile.yaml) | CI compilation test configuration |
+| [test-secrets.yaml](./test-secrets.yaml) | Dummy secrets for CI compilation |
+| [secrets.yaml](./secrets.yaml) | Template for local secrets (gitignored) |
+| [ha-mqtt-discovery-embedded-compressed-jsonl.md](./ha-mqtt-discovery-embedded-compressed-jsonl.md) | HA discovery embedded JSONL plan (superseded by [docs/guides/pipeline.md](../docs/guides/pipeline.md)) |
+| [heap-optimization-plan.md](./heap-optimization-plan.md) | Heap optimization analysis (implementation artifact) |
+| [pipeline-improvements.md](./pipeline-improvements.md) | Pipeline improvement recommendations (implementation artifact) |
+| [dual_appliance_plan.md](./dual_appliance_plan.md) | Dual appliance support plan (superseded by [docs/architecture/roadmap.md](../docs/architecture/roadmap.md)) |
