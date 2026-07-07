@@ -191,8 +191,9 @@ void FeatureBitManager::handle_read_completed_(tiny_erd_t erd, const void* data,
    * avoid storing data in the wrong slot. */
   uint8_t idx = this->reading_idx_;
   if (idx >= FEATURE_ERD_COUNT || erd != feature_erd_list[idx]) {
-    ESP_LOGW(TAG, "Feature bit ERD 0x%04X: unexpected (expected 0x%04X at index %u), skipping",
+    ESP_LOGE(TAG, "Feature bit ERD 0x%04X: unexpected (expected 0x%04X at index %u), skipping",
              erd, (idx < FEATURE_ERD_COUNT) ? feature_erd_list[idx] : 0, idx);
+    this->skip_to_next_erd_(erd);
     return;
   }
 
