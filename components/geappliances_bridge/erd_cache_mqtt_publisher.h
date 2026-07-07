@@ -56,6 +56,8 @@ typedef struct {
   uint32_t publish_count_window;   // Publishes in the last 60s window
   uint32_t (*get_time_ms)(void);
   uint32_t disconnect_start_ms;  /* millis() when MQTT disconnected; 0 if connected */
+  uint32_t disconnect_count;             // Total MQTT disconnects since init
+  uint32_t last_disconnect_duration_ms;  // Duration of last disconnect (ms)
 #ifndef USE_ESP_IDF
   // Pre-allocated buffers for non-IDF path to avoid stack allocation.
   char loop_topic[128];
@@ -153,6 +155,18 @@ uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* s
  * last resume.  Thread-safe — acquires the state mutex on ESP-IDF.
  */
 bool erd_cache_mqtt_publisher_first_round_done(erd_cache_mqtt_publisher_t* self);
+
+/*!
+ * Returns the total number of MQTT disconnects since init.
+ * Thread-safe — acquires the state mutex on ESP-IDF.
+ */
+uint32_t erd_cache_mqtt_publisher_get_disconnect_count(erd_cache_mqtt_publisher_t* self);
+
+/*!
+ * Returns the duration of the last MQTT disconnect in milliseconds.
+ * Thread-safe — acquires the state mutex on ESP-IDF.
+ */
+uint32_t erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(erd_cache_mqtt_publisher_t* self);
 
 #ifdef __cplusplus
 }

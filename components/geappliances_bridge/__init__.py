@@ -33,6 +33,8 @@ CONF_ERD_PUBLISH_RATE_SENSOR = "erd_publish_rate_sensor"
 CONF_ERD_CACHE_ENTRIES_SENSOR = "erd_cache_entries_sensor"
 CONF_ERD_CACHE_UPDATES_SENSOR = "erd_cache_updates_sensor"
 CONF_MQTT_PUBLISH_RATE_SENSOR = "mqtt_publish_rate_sensor"
+CONF_MQTT_DISCONNECT_COUNT_SENSOR = "mqtt_disconnect_count_sensor"
+CONF_MQTT_DISCONNECT_DURATION_SENSOR = "mqtt_disconnect_duration_sensor"
 CONF_THROTTLE_RATE_SECONDS = "throttle_rate_seconds"
 CONF_FILTER_CONFIG_TOPICS = "filter_config_topics"
 CONF_DISCOVERY_REFRESH_BUTTON = "discovery_refresh_button"
@@ -131,6 +133,18 @@ CONFIG_SCHEMA = cv.Schema(
             cv.boolean,
             sensor.sensor_schema(state_class="measurement").extend(cv.Schema({
                 cv.Optional("name", default="MQTT Publish Rate"): cv.string,
+            })),
+        ),
+        cv.Optional(CONF_MQTT_DISCONNECT_COUNT_SENSOR, default=True): cv.Any(
+            cv.boolean,
+            sensor.sensor_schema(state_class="total_increasing").extend(cv.Schema({
+                cv.Optional("name", default="MQTT Disconnect Count"): cv.string,
+            })),
+        ),
+        cv.Optional(CONF_MQTT_DISCONNECT_DURATION_SENSOR, default=True): cv.Any(
+            cv.boolean,
+            sensor.sensor_schema(state_class="measurement").extend(cv.Schema({
+                cv.Optional("name", default="MQTT Last Disconnect Duration"): cv.string,
             })),
         ),
         cv.Optional(CONF_FILTER_CONFIG_TOPICS, default=True): cv.boolean,
@@ -247,6 +261,34 @@ async def to_code(config: dict[str, Any]) -> None:
             }
         sens = await sensor.new_sensor(val)
         cg.add(var.set_mqtt_publish_rate_sensor(sens))
+
+    val = config.get(CONF_MQTT_DISCONNECT_COUNT_SENSOR, True)
+    if val is not False:
+        if val is True:
+            val = {
+                "name": "MQTT Disconnect Count",
+                CONF_ID: ID("mqtt_disconnect_count", is_declaration=True, type=sensor.Sensor),
+                CONF_STATE_CLASS: _make_state_class("total_increasing"),
+                "disabled_by_default": False,
+                "force_update": False,
+                "accuracy_decimals": 0,
+            }
+        sens = await sensor.new_sensor(val)
+        cg.add(var.set_mqtt_disconnect_count_sensor(sens))
+
+    val = config.get(CONF_MQTT_DISCONNECT_DURATION_SENSOR, True)
+    if val is not False:
+        if val is True:
+            val = {
+                "name": "MQTT Last Disconnect Duration",
+                CONF_ID: ID("mqtt_disconnect_duration", is_declaration=True, type=sensor.Sensor),
+                CONF_STATE_CLASS: _make_state_class("measurement"),
+                "disabled_by_default": False,
+                "force_update": False,
+                "unit_of_measurement": "ms",
+            }
+        sens = await sensor.new_sensor(val)
+        cg.add(var.set_mqtt_disconnect_duration_sensor(sens))
 
     # Create discovery refresh button (auto-created by default, set to false to disable)
     val = config.get(CONF_DISCOVERY_REFRESH_BUTTON, True)
