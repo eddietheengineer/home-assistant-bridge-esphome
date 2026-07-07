@@ -34,7 +34,7 @@ You can create the configuration either through the **ESPHome Dashboard** in Hom
 1. In Home Assistant, navigate to **Settings** → **Devices & Services** → **ESPHome** → **Add Device** → **New Device**.
 2. Enter a device name (e.g., `gea-bridge`) and click **Next**.
 3. Click **Edit** to open the YAML editor.
-4. Replace the default content with the configuration below, selecting the section matching your appliance protocol.
+4. Replace the default content with the configuration below.
 5. Click **Save**, then click **Install**. Select a download method (e.g., **Download UF2** for flashing via USB) and follow the prompts.
 6. Once installed, the device will appear in the ESPHome dashboard. Click **Logs** to monitor startup.
 
@@ -57,74 +57,6 @@ mqtt_password: "your_mqtt_password"
 ap_password: "FallbackAPPassword"
 ```
 
-### Step 3: Configuration
-
-Choose the configuration matching your appliance's serial protocol.
-
-#### GEA3 (Newer Appliances)
-
-```yaml
-esp32:
-  board: seeed_xiao_esp32c3
-  framework:
-    type: esp-idf
-
-external_components:
-  - source: github://eddietheengineer/home-assistant-bridge-esphome@develop
-    components: [ geappliances_bridge ]
-
-mqtt:
-  broker: !secret mqtt_broker
-  username: !secret mqtt_username
-  password: !secret mqtt_password
-  discovery: true
-
-uart:
-  - id: gea3_uart
-    tx_pin: GPIO21  # D6 on Xiao ESP32-C3
-    rx_pin: GPIO20  # D7 on Xiao ESP32-C3
-    baud_rate: 230400
-
-geappliances_bridge:
-  gea3_uart_id: gea3_uart
-```
-
-#### GEA2 (Older Appliances)
-
-GEA2 appliances communicate at 19200 baud. The `rx_full_threshold` and `rx_timeout` settings are **required** for reliable communication:
-
-```yaml
-esp32:
-  board: seeed_xiao_esp32c3
-  framework:
-    type: esp-idf
-
-external_components:
-  - source: github://eddietheengineer/home-assistant-bridge-esphome@develop
-    components: [ geappliances_bridge ]
-
-mqtt:
-  broker: !secret mqtt_broker
-  username: !secret mqtt_username
-  password: !secret mqtt_password
-  discovery: true
-
-uart:
-  - id: gea2_uart
-    tx_pin: GPIO9   # D9 on Xiao ESP32-C3
-    rx_pin: GPIO10  # D10 on Xiao ESP32-C3
-    baud_rate: 19200
-    rx_full_threshold: 1  # required: deliver each byte immediately
-    rx_timeout: 1         # required: minimise idle-flush latency
-
-geappliances_bridge:
-  gea2_uart_id: gea2_uart
-```
-
-#### GEA2 + GEA3 (Both Protocols)
-
-For setups needing both interfaces simultaneously:
-
 ```yaml
 esp32:
   board: seeed_xiao_esp32c3
@@ -151,8 +83,8 @@ uart:
     tx_pin: GPIO9   # D9 on Xiao ESP32-C3
     rx_pin: GPIO10  # D10 on Xiao ESP32-C3
     baud_rate: 19200
-    rx_full_threshold: 1
-    rx_timeout: 1
+    rx_full_threshold: 1  # required for GEA2: deliver each byte immediately
+    rx_timeout: 1         # required for GEA2: minimise idle-flush latency
 
 geappliances_bridge:
   gea3_uart_id: gea3_uart
