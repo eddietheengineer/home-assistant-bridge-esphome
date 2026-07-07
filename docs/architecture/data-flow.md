@@ -113,7 +113,7 @@ OTA reboot → detect "esphome.ota" → wait for steady state
 ### Discovery Refresh Flow
 
 ```
-Button press → queue request (set discovery_refresh_in_progress_)
+Button press → queue request via `ota_cleanup_manager_.trigger_discovery_refresh()`
   → wait for steady state, MQTT, device ID
   → cleanup old discovery topics
   → publish fresh discovery topics

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The main ESPHome component class that orchestrates the entire GE Appliances bridge. It manages UART interfaces for GEA2/GEA3 protocols, drives the startup state machine, handles MQTT connection lifecycle, and coordinates all sub-managers (autodiscovery, device identity, feature bits).
+The main ESPHome component class that orchestrates the entire GE Appliances bridge. It manages UART interfaces for GEA2/GEA3 protocols, drives the startup state machine, handles MQTT connection lifecycle, and coordinates all sub-managers (autodiscovery, device identity, feature bits, OTA cleanup, diagnostic sensor publishing).
 
 ## Public API
 
@@ -33,8 +33,6 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `add_custom_erd(erd)` | Add a custom ERD to poll |
 ## Protected Methods
 
-| Method | Description |
-|--------|-------------|
 | `handle_erd_client_activity_(args)` | Route ERD activity to appropriate manager (device identity, feature bits, subscription ERD tracking) |
 | `should_route_to_feature_bits_(erd)` | Decide whether an ERD read goes to FeatureBitManager or DeviceIdentityManager |
 | `initialize_mqtt_client_()` | Create and configure the MQTT client adapter |
@@ -48,7 +46,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `maybe_start_custom_erd_polling_()` | Guarded entry point for custom ERD polling (prevents re-initialization) |
 | `log_poll_state_transitions_()` | Debug: log polling HSM state changes |
 | `on_poll_discovery_complete_()` | Callback from polling bridge when probe phase completes |
-| `trigger_discovery_refresh()` | Queue a discovery cleanup + republish + reboot. If pressed before steady state/MQTT/device ID are ready, the request is queued and executes once the bridge is ready. |
+| `trigger_discovery_refresh()` | Queue a discovery cleanup + republish + reboot. Public method (was protected). Delegates to `ota_cleanup_manager_.trigger_discovery_refresh()`. If pressed before steady state/MQTT/device ID are ready, the request is queued and executes once the bridge is ready. |
 
 The bridge progresses through a linear sequence of phases via the `startup_hsm_`:
 
@@ -82,8 +80,10 @@ During `startup_state_bridge_init`, `initialize_erd_bridge_()` runs:
 - Bridges: `erd_bridge_subscribe`, `erd_bridge_poll`, `erd_write_bridge`
 - `erd_poll_list_builder` — builds the probe list for the polling bridge
 - `erd_registry` — single owner of valid-ERD filter, string-type set, and registered-ERD tracking
-- `erd_cache_mqtt_publisher` — drains ERD cache updates to MQTT each loop()
+- `erd_cache_mqtt_publisher` — drains ERD cache updates to MQTT each `loop()`
 - `erd_bridge_common.h` — shared signals, timing constants, and utility templates
+- `OtaCleanupManager` — owns the OTA-triggered cleanup → republish → reboot state machine and the DiscoveryRefresh path
+- `DiagnosticSensorPublisher` — owns periodic publishing of diagnostic sensor values (ERD/MQTT publish rate, cache stats, disconnect stats)
 - `tiny_hsm`, `tiny_timer` — state machine and timer infrastructure
 
 ## Key Design Decisions
@@ -93,7 +93,7 @@ During `startup_state_bridge_init`, `initialize_erd_bridge_()` runs:
 - **IBridgeServices interface**: `GeappliancesBridge` implements `IBridgeServices`, the abstract contract consumed by the startup HSM. This eliminates `friend` declarations and lets the HSM be unit-tested with a mock.
 - **Phase timeouts**: Device ID phase has a 30 s timeout, feature bits phase has a 60 s timeout — both prevent the startup HSM from stalling indefinitely.
 - **Probe list ownership**: The `poll_probe_list_` member stores the built probe list so the pointer passed to `erd_bridge_poll_init()` remains valid across the probe phase.
-- **ERD cache publisher**: The `erd_cache_mqtt_publisher_` drains `update_required` entries from the shared cache and publishes them to MQTT each `loop()`, decoupling the bridges from direct MQTT interaction.
+- **loop() delegation:** `loop()` delegates ongoing work to `ota_cleanup_manager_.loop()` (OTA cleanup, discovery refresh, reboot) and `diagnostic_sensor_publisher_.loop()` (periodic diagnostic sensor publishing) instead of driving them inline.
 
 ## Testing
 
