@@ -5,8 +5,12 @@
 
 #include "erd_poll_list_builder.h"
 #include "erd_lists.h"
+#include "geappliances_bridge_log.h"
+#include "esphome/core/log.h"
 #include <algorithm>
 #include <cstring>
+
+GEA_TAG(TAG) = "erd_poll_list_builder";
 
 namespace esphome {
 namespace geappliances_bridge {
@@ -18,6 +22,9 @@ namespace geappliances_bridge {
 static uint16_t append_erds(uint16_t* out, uint16_t count, const uint16_t* list, uint16_t list_count)
 {
   uint16_t n = (list_count > (ERD_POLL_LIST_MAX_SIZE - count)) ? (ERD_POLL_LIST_MAX_SIZE - count) : list_count;
+  if (n < list_count) {
+    ESP_LOGW(TAG, "Poll list capacity exceeded; truncated %u ERDs (dropped %u)", n, list_count - n);
+  }
   if (list && n > 0) {
     std::memcpy(out + count, list, n * sizeof(uint16_t));
   }

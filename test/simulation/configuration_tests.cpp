@@ -114,7 +114,7 @@ TEST_GROUP(configuration_based_tests)
       &timer_group.timer_group,
       &erd_client.interface,
       polling_interval,
-      0xC0, 0, nullptr, 0,
+      0xC0, nullptr, 0,
       &test_cache);
   }
   
@@ -557,7 +557,7 @@ TEST_GROUP(polling_bridge_config)
       &timer_group.timer_group,
       &erd_client.interface,
       polling_interval,
-      0xC0, 0, nullptr, 0,
+      0xC0, nullptr, 0,
       &test_cache);
   }
 

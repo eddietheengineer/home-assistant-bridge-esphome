@@ -44,7 +44,7 @@ TEST_GROUP_BASE(erd_bridge_poll, simulation_test_base)
       &timer_group.timer_group,
       &erd_client.interface,
       polling_interval,
-      0xC0, 0, list, count,
+      0xC0, list, count,
       &test_cache);
   }
 
@@ -254,7 +254,7 @@ TEST_GROUP_BASE(erd_bridge_poll_probe_list, simulation_test_base)
       &timer_group.timer_group,
       &erd_client.interface,
       polling_interval,
-      0xC0, 0, probe_list, 2,
+      0xC0, probe_list, 2,
       &test_cache);
   }
 
@@ -412,7 +412,7 @@ TEST(erd_bridge_poll_empty_list, should_skip_probe_and_enter_polling_with_empty_
     &timer_group.timer_group,
     &erd_client.interface,
     polling_interval,
-    0xC0, 0, nullptr, 0,
+    0xC0, nullptr, 0,
     &test_cache);
 
   // Bridge should be in polling state with empty list.
@@ -458,7 +458,7 @@ TEST_GROUP_BASE(erd_bridge_poll_probe_failures, simulation_test_base)
       &timer_group.timer_group,
       &erd_client.interface,
       polling_interval,
-      0xC0, 0, probe_list, 3,
+      0xC0, probe_list, 3,
       &test_cache);
   }
 

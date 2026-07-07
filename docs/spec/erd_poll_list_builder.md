@@ -36,7 +36,6 @@ ErdPollListResult build_erd_poll_list(const ErdPollListConfig& config);
 | Field | Type | Description |
 |-------|------|-------------|
 | `mode` | `BridgeMode` | Operating mode: `BRIDGE_MODE_POLL`, `BRIDGE_MODE_SUBSCRIBE`, or `BRIDGE_MODE_AUTO`. |
-| `subscription_capable` | `bool` | Whether the appliance supports GEA3 subscriptions. Always `false` for GEA2. |
 | `subscription_active` | `bool` | Whether subscription is currently active and confirmed. Relevant when mode is `SUBSCRIBE` or `AUTO`. |
 | `appliance_api_parsing` | `bool` | Whether appliance API feature bit filtering is enabled. When `true`, only ERDs reported by the feature bits are included. |
 | `feature_bit_valid_erds` | `const tiny_erd_t*` | Raw pointer into the feature bit manager's fixed array. `nullptr` if not available. |
@@ -158,5 +157,4 @@ This prevents out-of-bounds access to the translation table. The constant `maxim
 1. **Result array lifetime managed by caller:** The function returns a value with an embedded fixed array. The caller must store this result in a location whose lifetime covers the probe phase. The bridge stores the result in `GeappliancesBridge::poll_probe_list_`.
 2. **Deduplication destroys original group ordering:** The sort-based deduplication produces ascending ERD-identifier order, not the original group order (common → energy → appliance API → appliance-specific → custom). This is acceptable because the probe phase reads ERDs sequentially regardless of their original grouping.
 3. **No validation of custom ERD values:** Custom ERDs are appended as-is without checking whether they are valid ERD identifiers or whether they overlap with standard ERDs (overlap is handled by deduplication).
-4. **Capacity overflow is silent:** If the total number of ERDs exceeds `ERD_POLL_LIST_MAX_SIZE`, excess ERDs are silently dropped at the point where capacity is reached. The function does not log a warning or return an error code.
-5. **`subscription_capable` is unused in decision logic:** The field is present in the config struct for documentation purposes but does not affect the output. The decision is based solely on `mode` and `subscription_active`.
+4. **Capacity overflow logs a warning:** If the total number of ERDs exceeds `ERD_POLL_LIST_MAX_SIZE`, excess ERDs are dropped at the point where capacity is reached. The function logs a warning via ESP_LOGW when ERDs are dropped.

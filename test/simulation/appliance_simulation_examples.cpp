@@ -96,7 +96,7 @@ TEST_GROUP(appliance_simulation_examples)
       &timer_group.timer_group,
       &erd_client.interface,
       polling_interval,
-      0xFF, 0, nullptr, 0,
+      0xFF, nullptr, 0,
       &test_cache);
   }
   

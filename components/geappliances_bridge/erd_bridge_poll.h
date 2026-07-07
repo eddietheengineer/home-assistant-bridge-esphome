@@ -82,7 +82,6 @@ typedef struct {
   erd_cache_t* erd_cache;
   tiny_gea3_erd_client_request_id_t request_id;
   uint8_t erd_host_address;
-  uint8_t appliance_type;
   const tiny_erd_t* appliance_erd_list;
   uint16_t appliance_erd_list_count;
   uint16_t erd_index;
@@ -153,7 +152,6 @@ void erd_bridge_poll_init(
   i_tiny_gea3_erd_client_t* erd_client,
   uint32_t polling_interval_ms,
   uint8_t host_address,
-  uint8_t appliance_type,
   const tiny_erd_t* probe_list,
   uint16_t probe_list_count,
   erd_cache_t* cache);

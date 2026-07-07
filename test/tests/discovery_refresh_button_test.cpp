@@ -34,7 +34,6 @@ TEST(discovery_refresh_button, can_be_constructed_with_bridge_pointer)
   /* Button constructed successfully — no crash. */
   (void)button;
 }
-
 TEST(discovery_refresh_button, press_action_does_not_crash_with_uninitialized_bridge)
 {
   /* Bridge has not been set up (steady_state_reached_ is false).
@@ -43,7 +42,6 @@ TEST(discovery_refresh_button, press_action_does_not_crash_with_uninitialized_br
   button.press_action();
   /* No crash = pass. */
 }
-
 TEST(discovery_refresh_button, press_action_is_idempotent_after_successful_trigger)
 {
   /* We cannot directly set steady_state_reached_ from test code (it's private),
@@ -54,7 +52,6 @@ TEST(discovery_refresh_button, press_action_is_idempotent_after_successful_trigg
   button.press_action();
   /* Multiple presses must not crash regardless of internal state. */
 }
-
 TEST(discovery_refresh_button, press_action_safe_when_bridge_is_null)
 {
   /* Button constructed with null bridge pointer must not crash on press. */
@@ -62,7 +59,6 @@ TEST(discovery_refresh_button, press_action_safe_when_bridge_is_null)
   button.press_action();
   /* No crash = pass. */
 }
-
 TEST(discovery_refresh_button, multiple_presses_with_null_bridge_are_safe)
 {
   DiscoveryRefreshButton button(nullptr);
@@ -71,7 +67,6 @@ TEST(discovery_refresh_button, multiple_presses_with_null_bridge_are_safe)
   button.press_action();
   /* No crash = pass. */
 }
-
 
 TEST(discovery_refresh_button, button_inherits_from_button_base)
 {

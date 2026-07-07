@@ -91,7 +91,7 @@ TEST_GROUP(application_level)
       &timer_group.timer_group,
       &erd_client.interface,
       polling_interval,
-      0xC0, 0, nullptr, 0,
+      0xC0, nullptr, 0,
       &test_cache);
   }
   

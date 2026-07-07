@@ -13,7 +13,6 @@ ErdPollListResult build_erd_poll_list(const ErdPollListConfig& config);
 | Parameter | Description |
 |-----------|-------------|
 | `config.mode` | The operating mode: `BRIDGE_MODE_POLL`, `BRIDGE_MODE_SUBSCRIBE`, or `BRIDGE_MODE_AUTO`. |
-| `config.subscription_capable` | Whether the appliance supports GEA3 subscriptions (always false for GEA2). |
 | `config.subscription_active` | Whether subscription is currently active and confirmed. Only relevant when mode is SUBSCRIBE or AUTO. |
 | `config.appliance_api_parsing` | Whether appliance API feature bit filtering is enabled. When true, only ERDs reported by the feature bits are included. |
 | `config.feature_bit_valid_erds` | `const tiny_erd_t*` — the valid ERD set produced by the feature bit manager. `NULL` if not available. |

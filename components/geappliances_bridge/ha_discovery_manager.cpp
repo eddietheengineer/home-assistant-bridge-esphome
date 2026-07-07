@@ -800,14 +800,14 @@ static bool should_process_category(const char* category, uint8_t appliance_type
     }
 
     /* Air conditioning: 10=ThermostatRAC, 14=SplitDFSDuctFreeSplitAC,
-     * 20=ZonelinePTAC, 22=PortableAC, 30=UnderCounterIceMaker,
+     * 20=ZonelinePTAC, 22=PortableAC,
      * 31=ThroughWallAC, 35=ZonelineVertical, 36=CentralDFSDuctFreeSplitController,
      * 44=AirHandlerVRF, 52=CentralAC, 56=Thermostat */
     if (appliance_type == 10 || appliance_type == 14 ||
         appliance_type == 20 || appliance_type == 22 ||
-        appliance_type == 30 || appliance_type == 31 ||
-        appliance_type == 35 || appliance_type == 36 ||
-        appliance_type == 44 || appliance_type == 52 ||
+        appliance_type == 31 || appliance_type == 35 ||
+        appliance_type == 36 || appliance_type == 44 ||
+        appliance_type == 52 ||
         appliance_type == 56) {
         if (strcmp(category, "airconditioning") == 0) return true;
         if (strcmp(category, "energy") == 0) return true;
@@ -826,13 +826,14 @@ static bool should_process_category(const char* category, uint8_t appliance_type
     }
 
     /* Small appliance: 18=DeliveryBox, 26=CoffeeBrewer, 27=OpalNuggetIceMaker,
-     * 28=InHomeGrower, 29=Dehumidifer, 33=EspressoCoffeeMaker,
-     * 37=BLEMeshGateway, 38=StandMixer, 50=VacuumSealDrawer,
+     * 28=InHomeGrower, 29=Dehumidifer, 30=UnderCounterIceMaker, 33=EspressoCoffeeMaker,
+     * 37=BLEMeshGateway, 38=StandMixer, 42=SmartPlug, 50=VacuumSealDrawer,
      * 53=SoftStarter, 55=SourdoughStarter */
     if (appliance_type == 18 || appliance_type == 26 ||
         appliance_type == 27 || appliance_type == 28 ||
-        appliance_type == 29 || appliance_type == 33 ||
-        appliance_type == 37 || appliance_type == 38 ||
+        appliance_type == 29 || appliance_type == 30 ||
+        appliance_type == 33 || appliance_type == 37 ||
+        appliance_type == 38 ||
         appliance_type == 42 || appliance_type == 50 ||
         appliance_type == 53 || appliance_type == 55) {
         if (strcmp(category, "smallappliance") == 0) return true;

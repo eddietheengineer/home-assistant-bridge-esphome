@@ -67,7 +67,7 @@ All methods are members of `GeappliancesBridge` (defined in `geappliances_bridge
 
 #### Requirement 3.1.1: Poll List Delegation
 
-`build_poll_list_()` MUST construct an `ErdPollListConfig` from the bridge's current state and delegate to `build_erd_poll_list()`. The config MUST include the bridge mode, subscription capability, subscription active state, appliance API parsing flag, feature-bit valid ERDs, custom ERDs, and appliance type.
+`build_poll_list_()` MUST construct an `ErdPollListConfig` from the bridge's current state and delegate to `build_erd_poll_list()`. The config MUST include the bridge mode, subscription active state, appliance API parsing flag, feature-bit valid ERDs, custom ERDs, and appliance type.
 
 **Rationale:** Decoupling poll-list construction from bridge initialization allows the same logic to be used in three contexts: primary polling mode, custom ERD polling alongside subscription, and AUTO-mode fallback.
 
@@ -75,11 +75,6 @@ All methods are members of `GeappliancesBridge` (defined in `geappliances_bridge
 
 **Verification:** The poll list builder is tested independently; this function is verified by confirming the config fields are populated from the correct bridge members.
 
-#### Requirement 3.1.2: Subscription Capability Detection
-
-The `subscription_capable` field MUST be `!autodiscovery_manager_.is_gea2_protocol()`. GEA2 appliances do not support subscriptions.
-
-**Implementation:** `geappliances_bridge_bridge_init.cpp` line 60.
 
 ### 3.2 Polling Bridge Initialization
 
@@ -99,7 +94,7 @@ The poll list returned by `build_poll_list_()` MUST be copied into the bridge's 
 
 #### Requirement 3.2.3: Bridge Initialization Parameters
 
-`erd_bridge_poll_init()` MUST receive: the polling bridge struct, the shared timer group, the active ERD client, the configured polling interval, the host address, the appliance type, the probe list, and the ERD cache.
+`erd_bridge_poll_init()` MUST receive: the polling bridge struct, the shared timer group, the active ERD client, the configured polling interval, the host address, the probe list, and the ERD cache.
 
 **Implementation:** `geappliances_bridge_bridge_init.cpp` lines 98–107.
 

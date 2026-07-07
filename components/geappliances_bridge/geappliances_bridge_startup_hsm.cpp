@@ -31,6 +31,7 @@ namespace geappliances_bridge {
 
 IBridgeServices* services_from_hsm(tiny_hsm_t* hsm)
 {
+  if (!hsm) return nullptr;
   startup_hsm_wrapper_t* wrapper = container_of(startup_hsm_wrapper_t, hsm, hsm);
   return wrapper->services;
 }
@@ -74,6 +75,12 @@ tiny_hsm_result_t startup_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, c
   return tiny_hsm_result_signal_consumed;
 }
 
+// Phase 1: Protocol Stack — drive GEA2/GEA3 hardware
+//
+// This is the initial state.  It transitions to autodiscovery as soon as
+// the first loop() call arrives (the protocol stack is always running).
+// ============================================================================
+// ============================================================================
 // Phase 1.5: Startup Delay — wait for appliance board to stabilize
 //
 // Waits AUTODISCOVERY_STARTUP_DELAY_MS (5 seconds) before transitioning to
@@ -251,6 +258,7 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
 
   switch (signal) {
     case tiny_hsm_signal_entry:
+      ESP_LOGI(TAG, "Startup: Feature bits phase");
       break;
 
     case signal_run_loop:

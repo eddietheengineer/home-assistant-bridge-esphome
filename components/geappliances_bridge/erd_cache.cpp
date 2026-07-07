@@ -29,6 +29,10 @@ static bool erd_data_changed(const erd_cache_t* self,
 
 void erd_cache_init(erd_cache_t* self)
 {
+  s_slot_overflow_warned = false;
+  s_arena_overflow_warned = false;
+  s_size_rejected_warned = false;
+
   /* Zero entries explicitly to avoid UBSan issues with bool fields after memset. */
   for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
     erd_cache_entry_t* e = &self->entries[i];
@@ -82,9 +86,6 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   erd_cache_entry_t* existing = erd_cache_find(self, erd);
 
   if (existing) {
-    self->update_count++;
-    self->update_count_window++;
-
     /* ERD size is invariant after registration.  Check size BEFORE
      * erd_data_changed to avoid reading past the old buffer when the
      * new size is larger. */
@@ -100,6 +101,10 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
     if (!data_changed) {
       return false;
     }
+
+    /* Count only actual updates (data that changed). */
+    self->update_count++;
+    self->update_count_window++;
 
     /* In-place memcpy into arena */
     memcpy(&self->arena[existing->data_offset], data, data_size);
@@ -234,6 +239,7 @@ void erd_cache_mark_all_updated(erd_cache_t* self)
     erd_cache_entry_t* e = &self->entries[i];
     if (e->valid) {
       e->update_required = true;
+      e->publish_cooldown = 0;
     }
   }
 }

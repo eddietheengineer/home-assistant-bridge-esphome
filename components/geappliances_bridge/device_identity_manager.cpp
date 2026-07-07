@@ -87,6 +87,9 @@ void DeviceIdentityManager::on_erd_read_completed(tiny_erd_t erd, const uint8_t*
              "%s_%s_%s", type_str.c_str(), sanitized_model.c_str(), sanitized_serial.c_str());
     ESP_LOGI(TAG, "Generated device ID: %s", this->generated_device_id_);
     this->state_ = DEVICE_ID_STATE_COMPLETE;
+
+  } else {
+    ESP_LOGW(TAG, "Unexpected ERD 0x%04X in on_erd_read_completed", erd);
   }
 }
 
@@ -95,7 +98,9 @@ void DeviceIdentityManager::on_erd_read_failed(tiny_erd_t erd)
   // Stay in the current state and immediately re-queue the ERD read.
   // Retries indefinitely -- never give up.
   ESP_LOGW(TAG, "Failed to read ERD 0x%04X for device ID generation, retrying", erd);
-  this->try_queue_read_(erd);
+  if (!this->try_queue_read_(erd)) {
+    ESP_LOGD(TAG, "Could not re-queue ERD 0x%04X read (client unavailable)", erd);
+  }
 }
 
 const char* DeviceIdentityManager::get_device_id() const
