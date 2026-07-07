@@ -826,8 +826,8 @@ static bool should_process_category(const char* category, uint8_t appliance_type
     }
 
     /* Small appliance: 18=DeliveryBox, 26=CoffeeBrewer, 27=OpalNuggetIceMaker,
-     * 28=InHomeGrower, 29=Dehumidifer, 33=EspressoCoffeeMaker,
-     * 37=BLEMeshGateway, 38=StandMixer, 50=VacuumSealDrawer,
+     * 28=InHomeGrower, 29=Dehumidifer, 30=UnderCounterIceMaker, 33=EspressoCoffeeMaker,
+     * 37=BLEMeshGateway, 38=StandMixer, 42=SmartPlug, 50=VacuumSealDrawer,
      * 53=SoftStarter, 55=SourdoughStarter */
     if (appliance_type == 18 || appliance_type == 26 ||
         appliance_type == 27 || appliance_type == 28 ||
