@@ -74,7 +74,9 @@ class OtaCleanupManager {
   /// Check if the appliance is ready for cleanup (steady state, MQTT, device ID).
   bool is_ready() const;
 
- private:
+private:
+  enum CleanupTrigger { NONE, OTA, DISCOVERY_REFRESH };
+
   // State machine flags
   bool ota_cleanup_needed_{false};
   bool ota_cleanup_in_progress_{false};
@@ -82,6 +84,7 @@ class OtaCleanupManager {
   bool ota_reboot_pending_{false};
   uint32_t ota_reboot_start_ms_{0};
   bool discovery_refresh_in_progress_{false};
+  CleanupTrigger cleanup_trigger_{NONE};
 
   // References to bridge state
   ha_discovery_manager_t* ha_discovery_manager_{nullptr};

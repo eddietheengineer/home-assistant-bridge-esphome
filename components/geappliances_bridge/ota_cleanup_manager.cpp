@@ -42,18 +42,20 @@ void OtaCleanupManager::init(
 
 void OtaCleanupManager::trigger_ota_cleanup() {
   this->ota_cleanup_needed_ = true;
+  this->cleanup_trigger_ = CleanupTrigger::OTA;
 }
 
 void OtaCleanupManager::trigger_discovery_refresh() {
   if (this->discovery_refresh_in_progress_ ||
+      this->ota_cleanup_needed_ ||
       this->ota_cleanup_in_progress_ ||
       this->ota_discovery_publishing_ ||
       this->ota_reboot_pending_) {
     ESP_LOGW(TAG, "Discovery refresh already in progress, ignoring");
     return;
   }
-
   this->discovery_refresh_in_progress_ = true;
+  this->cleanup_trigger_ = CleanupTrigger::DISCOVERY_REFRESH;
   ESP_LOGI(TAG, "Discovery refresh queued, will execute when appliance is ready");
 }
 
@@ -101,7 +103,9 @@ void OtaCleanupManager::loop() {
     ha_discovery_cleanup_run(&this->ha_discovery_manager_->cleanup);
     if (ha_discovery_cleanup_is_done(&this->ha_discovery_manager_->cleanup)) {
       this->ota_cleanup_in_progress_ = false;
-      this->ota_cleanup_needed_ = false;
+      if (this->cleanup_trigger_ == CleanupTrigger::OTA) {
+        this->ota_cleanup_needed_ = false;
+      }
       ESP_LOGI(TAG, "HA discovery cleanup complete, publishing fresh discovery...");
       ha_discovery_cleanup_destroy(&this->ha_discovery_manager_->cleanup);
       ha_discovery_manager_init(this->ha_discovery_manager_);
@@ -127,6 +131,7 @@ void OtaCleanupManager::loop() {
       ha_discovery_manager_run(this->ha_discovery_manager_);
     } else {
       this->ota_discovery_publishing_ = false;
+      this->cleanup_trigger_ = CleanupTrigger::NONE;
       ESP_LOGI(TAG, "OTA HA discovery publish complete, preparing reboot...");
 
       // Clear safe mode counter and mark OTA valid before reboot.
