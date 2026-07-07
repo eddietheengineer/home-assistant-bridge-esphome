@@ -425,7 +425,22 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
 #endif
 
   uint32_t now = self->get_time_ms ? self->get_time_ms() : 0;
-  if (disconnect_start != 0 && (now - disconnect_start >= RECONNECT_REPUBLISH_THRESHOLD_MS)) {
+  uint32_t duration = (disconnect_start != 0) ? (now - disconnect_start) : 0;
+
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      self->last_disconnect_duration_ms = duration;
+      xSemaphoreGive(self->state_mutex);
+    }
+  } else {
+    self->last_disconnect_duration_ms = duration;
+  }
+#else
+  self->last_disconnect_duration_ms = duration;
+#endif
+
+  if (disconnect_start != 0 && duration >= RECONNECT_REPUBLISH_THRESHOLD_MS) {
     was_long_disconnect = true;
   }
 
@@ -448,15 +463,18 @@ void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self)
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->mqtt_connected = false;
       self->disconnect_start_ms = now;
+      self->disconnect_count++;
       xSemaphoreGive(self->state_mutex);
     }
   } else {
     self->mqtt_connected = false;
     self->disconnect_start_ms = now;
+    self->disconnect_count++;
   }
 #else
   self->mqtt_connected = false;
   self->disconnect_start_ms = now;
+  self->disconnect_count++;
 #endif
   ESP_LOGW(PUBLISHER_TAG, "MQTT disconnected — pausing ERD cache publishing");
 }
@@ -538,4 +556,32 @@ bool erd_cache_mqtt_publisher_first_round_done(erd_cache_mqtt_publisher_t* self)
   }
 #endif
   return self->first_round_done;
+}
+
+uint32_t erd_cache_mqtt_publisher_get_disconnect_count(erd_cache_mqtt_publisher_t* self)
+{
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      uint32_t count = self->disconnect_count;
+      xSemaphoreGive(self->state_mutex);
+      return count;
+    }
+  }
+#endif
+  return self->disconnect_count;
+}
+
+uint32_t erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(erd_cache_mqtt_publisher_t* self)
+{
+#ifdef USE_ESP_IDF
+  if (self->state_mutex) {
+    if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      uint32_t duration = self->last_disconnect_duration_ms;
+      xSemaphoreGive(self->state_mutex);
+      return duration;
+    }
+  }
+#endif
+  return self->last_disconnect_duration_ms;
 }

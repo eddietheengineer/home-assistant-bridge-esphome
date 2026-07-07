@@ -902,3 +902,113 @@ TEST(erd_cache_mqtt_publisher, loop_skips_rate_limited_entries)
   published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
   CHECK_EQUAL(1u, published);
 }
+
+/* ------------------------------------------------------------------ */
+/* Disconnect count and duration sensors                                */
+/* ------------------------------------------------------------------ */
+
+TEST(erd_cache_mqtt_publisher, disconnect_count_starts_at_zero)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+
+  CHECK_EQUAL(0u, erd_cache_mqtt_publisher_get_disconnect_count(&publisher));
+}
+
+TEST(erd_cache_mqtt_publisher, disconnect_count_increments_on_disconnect)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+  CHECK_EQUAL(1u, erd_cache_mqtt_publisher_get_disconnect_count(&publisher));
+
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+  CHECK_EQUAL(2u, erd_cache_mqtt_publisher_get_disconnect_count(&publisher));
+
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+  CHECK_EQUAL(3u, erd_cache_mqtt_publisher_get_disconnect_count(&publisher));
+}
+
+TEST(erd_cache_mqtt_publisher, last_disconnect_duration_starts_at_zero)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+
+  CHECK_EQUAL(0u, erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(&publisher));
+}
+
+TEST(erd_cache_mqtt_publisher, last_disconnect_duration_set_on_reconnect)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+
+  /* Simulate disconnect at time 0 (default time source returns 0). */
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+  CHECK_EQUAL(0u, erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(&publisher));
+
+  /* Simulate reconnect — duration is now - 0 = 0 since time hasn't advanced. */
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+  CHECK_EQUAL(0u, erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(&publisher));
+}
+
+TEST(erd_cache_mqtt_publisher, last_disconnect_duration_reflects_gap)
+{
+  /* Use a custom time source to control millis() values. */
+  static uint32_t fake_time = 2000;
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+  erd_cache_mqtt_publisher_set_time_fn(&publisher, +[]() -> uint32_t { return fake_time; });
+
+  /* Disconnect at t=2000. */
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+
+  /* Advance time to t=6000 (4 second gap). */
+  fake_time = 6000;
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  CHECK_EQUAL(4000u, erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(&publisher));
+
+  /* Reset for other tests. */
+  fake_time = 2000;
+}
+
+TEST(erd_cache_mqtt_publisher, last_disconnect_duration_overwritten_on_subsequent_reconnect)
+{
+  static uint32_t fake_time = 1000;
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+  erd_cache_mqtt_publisher_set_time_fn(&publisher, +[]() -> uint32_t { return fake_time; });
+
+  /* First disconnect/reconnect: 100ms gap. */
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+  fake_time = 1100;
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+  CHECK_EQUAL(100u, erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(&publisher));
+
+  /* Second disconnect/reconnect: 500ms gap. */
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+  fake_time = 1600;
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+  CHECK_EQUAL(500u, erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(&publisher));
+
+  fake_time = 1000;
+}

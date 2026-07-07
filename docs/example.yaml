@@ -81,6 +81,10 @@ geappliances_bridge:
   #   name: "ERD Cache Update Rate"
   # mqtt_publish_rate_sensor:
   #   name: "MQTT Publish Rate"
+  # mqtt_disconnect_count_sensor:
+  #   name: "MQTT Disconnect Count"
+  # mqtt_disconnect_duration_sensor:
+  #   name: "MQTT Last Disconnect Duration"
   # To disable any entity, set it to false:
   # erd_publish_rate_sensor: false
   # discovery_refresh_button: false

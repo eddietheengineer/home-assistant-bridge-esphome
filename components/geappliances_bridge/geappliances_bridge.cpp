@@ -407,6 +407,22 @@ void GeappliancesBridge::loop() {
       this->last_erd_cache_stats_publish_ = now;
     }
   }
+
+  // Publish MQTT disconnect sensors every ~60 seconds.
+  if (this->mqtt_disconnect_count_sensor_ != nullptr || this->mqtt_disconnect_duration_sensor_ != nullptr) {
+    uint32_t now = esphome::millis();
+    if (now - this->last_mqtt_disconnect_stats_publish_ >= ERD_PUBLISH_RATE_INTERVAL_MS) {
+      if (this->mqtt_disconnect_count_sensor_ != nullptr) {
+        this->mqtt_disconnect_count_sensor_->publish_state(
+          static_cast<float>(erd_cache_mqtt_publisher_get_disconnect_count(&this->erd_cache_publisher_)));
+      }
+      if (this->mqtt_disconnect_duration_sensor_ != nullptr) {
+        this->mqtt_disconnect_duration_sensor_->publish_state(
+          static_cast<float>(erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(&this->erd_cache_publisher_)));
+      }
+      this->last_mqtt_disconnect_stats_publish_ = now;
+    }
+  }
 }
 // ---------------------------------------------------------------------------
 // Publisher pause/resume + steady-state detection
