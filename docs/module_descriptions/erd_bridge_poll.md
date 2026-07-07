@@ -70,7 +70,7 @@ Beyond the core polling state, the struct tracks:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `polling_failure_count` | `uint8_t` | Consecutive cycle failure counter. Incremented on each full cycle where all ERDs fail. Reset on any successful read. Transitions to `state_failed` when reaching 3. |
+| `polling_failure_count` | `uint8_t` | Consecutive cycle failure counter. Incremented when any ERD in the cycle fails. Reset on a cycle with no failures. Transitions to `state_failed` when reaching 3. |
 | `cycle_has_failure` | `bool` | True if any ERD in the current polling cycle has failed. Reset at cycle start; checked on cycle completion to increment `polling_failure_count`. |
 | `cycle_sending_in_progress` | `bool` | True while a cycle's read requests are being sent in budgeted chunks. When set, the polling timer handler resumes sending instead of starting a new cycle. |
 | `on_discovery_complete` | `void (*)(void*)` | Callback invoked once when transitioning to `state_polling`. |

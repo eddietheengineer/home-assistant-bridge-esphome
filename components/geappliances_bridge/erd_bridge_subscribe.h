@@ -14,7 +14,7 @@
 //   - Forward ERD publications to erd_cache
 //
 // NOT responsible for:
-//   - Polling (see erd_bridge_subscribe.h)
+//   - Polling (see erd_bridge_poll.h)
 //   - Write requests or MQTT interaction
 //   - Bridge initialization or startup phase management
 //

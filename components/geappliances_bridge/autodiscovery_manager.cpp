@@ -70,14 +70,16 @@ void AutodiscoveryManager::init(tiny_timer_group_t* timer_group,
 void AutodiscoveryManager::cleanup()
 {
   // Unsubscribe from GEA3 ERD client activity events.
-  if (this->gea3_erd_client_ != nullptr) {
+  // Match the guards in init(): only unsubscribe if we actually subscribed.
+  if (this->has_gea3_uart_ && this->gea3_erd_client_ != nullptr) {
     tiny_event_unsubscribe(
       tiny_gea3_erd_client_on_activity(this->gea3_erd_client_),
       &this->gea3_activity_subscription_);
   }
 
   // Unsubscribe from GEA2 adapter ERD client activity events.
-  if (this->gea2_adapter_client_ != nullptr) {
+  // Match the guards in init(): only unsubscribe if we actually subscribed.
+  if (this->has_gea2_uart_ && this->gea2_adapter_client_ != nullptr) {
     tiny_event_unsubscribe(
       tiny_gea3_erd_client_on_activity(this->gea2_adapter_client_),
       &this->gea2_activity_subscription_);

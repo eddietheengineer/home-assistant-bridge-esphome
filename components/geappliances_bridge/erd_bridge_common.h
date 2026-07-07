@@ -6,8 +6,8 @@
 //
 // Responsibilities:
 //   - Declare signal enum values shared by both bridge implementations
-//   - Define timing constants (retry_delay, resubscribe_delay, etc.)
-//   - Provide arm_timer / disarm_timer / erd_set helpers
+//   - Define timing constants (resubscribe_delay, etc.)
+//   - Provide arm_timer / disarm_timer helpers
 //
 // NOT responsible for:
 //   - Any bridge state or lifecycle logic
@@ -50,7 +50,6 @@ enum {
   resubscribe_delay = 1000,
   subscription_retention_period = 30 * 1000,
   subscription_quiet_period = 2 * 1000,
-  retry_delay = 100,
   appliance_lost_timeout = 60000
 };
 
@@ -87,8 +86,7 @@ static inline bool subscription_is_active(subscription_state_t state)
 // Shared signal identifiers
 // ============================================================================
 enum {
-  signal_start = tiny_hsm_signal_user_start,
-  signal_timer_expired,
+  signal_timer_expired = tiny_hsm_signal_user_start,
   signal_polling_timer_expired,
   signal_subscription_failed,
   signal_subscription_added_or_retained,
@@ -102,8 +100,8 @@ enum {
 
 // ============================================================================
 // Fixed-capacity ERD set — replaces std::set<tiny_erd_t> to eliminate heap
-// node allocations.  Sorted array with linear search; O(n) lookups and
-// inserts (n is small: bounded by probe list or subscription ERDs).
+// Sorted array with binary search; O(log n) lookups and
+// O(n) inserts (n is small: bounded by probe list or subscription ERDs).
 // ============================================================================
 
 #define ERD_SET_CAPACITY POLLING_LIST_MAX_SIZE
@@ -182,12 +180,6 @@ template<typename T>
 static void disarm_timer(T* self)
 {
   tiny_timer_stop(self->timer_group, &self->timer);
-}
-
-template<typename T>
-static erd_set_t& erd_set(T* self)
-{
-  return self->erd_set;
 }
 // ============================================================================
 // Polling state machine states

@@ -3,6 +3,11 @@
 extern "C" {
 #include "tiny_utils.h"
 }
+#include "esphome/core/log.h"
+
+#include "geappliances_bridge_log.h"
+
+GEA_TAG(TAG) = "esphome_uart_adapter";
 
 static void poll(void* context)
 {
@@ -35,7 +40,11 @@ static void poll(void* context)
 
   while (rx_bytes--) {
     uint8_t byte;
-    self->uart->read_byte(&byte);
+    int result = self->uart->read_byte(&byte);
+    if (result < 0) {
+      ESP_LOGD(TAG, "UART read error (read_byte returned %d), stopping poll", result);
+      break;
+    }
 
     tiny_uart_on_receive_args_t args = { byte };
     tiny_event_publish(&self->receive_event, &args);
