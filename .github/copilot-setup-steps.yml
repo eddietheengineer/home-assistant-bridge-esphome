@@ -15,7 +15,7 @@ steps:
       pip3 install --upgrade pip
       pip3 install esphome
   - name: "Setup test secrets"
-    run: cp doc/test-secrets.yaml doc/secrets.yaml
+    run: cp docs/test-secrets.yaml docs/secrets.yaml
 
 setup_steps:
   - name: Initialize Git Submodules
@@ -45,7 +45,7 @@ setup_steps:
   - name: Setup Test Secrets File
     description: Copy test secrets file for compilation
     commands:
-      - cp doc/test-secrets.yaml doc/secrets.yaml
+    - cp docs/test-secrets.yaml docs/secrets.yaml
     notes: |
       The test-secrets.yaml file contains dummy values that allow the configuration to compile.
       DO NOT use these values in production!
@@ -54,7 +54,7 @@ setup_steps:
   - name: Compile ESPHome Configuration
     description: Compile the example ESPHome configuration to verify the build
     commands:
-      - esphome compile doc/test-compile.yaml
+    - esphome compile docs/test-compile.yaml
     notes: |
       This compiles the ESPHome configuration using the local component directory.
       The first compilation may take longer as ESPHome downloads the ESP-IDF framework.
@@ -70,7 +70,7 @@ setup_steps:
   - name: Clean Up
     description: Remove the secrets file after compilation (optional)
     commands:
-      - rm -f doc/secrets.yaml
+      - rm -f docs/secrets.yaml
     notes: |
       This step is optional and cleans up the temporary secrets file.
       Only run this if you want to ensure secrets are not accidentally committed.
@@ -80,7 +80,7 @@ verification:
   steps:
     - Run 'esphome version' to verify ESPHome is installed
     - Run 'git submodule status' to verify all submodules are initialized
-    - Attempt to compile with 'esphome compile doc/test-compile.yaml'
+    - Attempt to compile with 'esphome compile docs/test-compile.yaml'
     - Check that the build completes without errors
 
 troubleshooting:
@@ -95,7 +95,7 @@ troubleshooting:
       solution: Install ESPHome with 'pip3 install esphome' and ensure pip's bin directory is in your PATH
     
     - issue: Missing secrets file
-      solution: Copy the test secrets file with 'cp doc/test-secrets.yaml doc/secrets.yaml'
+      solution: Copy the test secrets file with 'cp docs/test-secrets.yaml docs/secrets.yaml'
     
     - issue: ESP-IDF framework download fails
       solution: Check your internet connection. ESPHome will download ESP-IDF automatically on first run.
@@ -113,13 +113,13 @@ troubleshooting:
 additional_info:
   project_structure: |
     - components/geappliances_bridge/: The ESPHome component implementation
-    - doc/test-compile.yaml: Test configuration for CI compilation testing
-    - doc/test-secrets.yaml: Dummy secrets for testing
+    - docs/test-compile.yaml: Test configuration for CI compilation testing
+    - docs/test-secrets.yaml: Dummy secrets for testing
     - lib/: Submodule dependencies (tiny, tiny-gea-api, public-appliance-api-documentation)
   
   build_process: |
     The build process:
-    1. ESPHome reads the YAML configuration (doc/test-compile.yaml)
+    1. ESPHome reads the YAML configuration (docs/test-compile.yaml)
     2. Loads the external component from components/geappliances_bridge/
     3. Auto-generates erd_lists.h from the public-appliance-api-documentation submodule
     4. Compiles the code using ESP-IDF framework for the ESP32-C3 target

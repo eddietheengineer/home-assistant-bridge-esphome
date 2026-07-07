@@ -62,7 +62,7 @@ ErdPollListResult build_poll_list_(GeappliancesBridge* bridge)
     config.subscription_active = subscription_is_active(sub_state);
   }
   config.appliance_api_parsing = bridge->appliance_api_parsing_;
-  config.feature_bit_valid_erds = bridge->feature_bit_manager_.get_valid_erd_count() ? bridge->feature_bit_manager_.valid_erds_ : nullptr;
+  config.feature_bit_valid_erds = bridge->feature_bit_manager_.get_valid_erds();
   config.feature_bit_valid_erds_count = bridge->feature_bit_manager_.get_valid_erd_count();
   config.custom_erds = bridge->custom_erds_count_ > 0 ? bridge->custom_erds_ : nullptr;
   config.custom_erds_count = bridge->custom_erds_count_;
@@ -199,7 +199,7 @@ void GeappliancesBridge::initialize_erd_bridge_()
   if (this->appliance_api_parsing_ &&
       this->feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE &&
       this->feature_bit_manager_.get_valid_erd_count() > 0) {
-    this->erd_registry_.set_valid_erds(this->feature_bit_manager_.valid_erds_,
+    this->erd_registry_.set_valid_erds(this->feature_bit_manager_.get_valid_erds(),
                                        this->feature_bit_manager_.get_valid_erd_count());
   }
 

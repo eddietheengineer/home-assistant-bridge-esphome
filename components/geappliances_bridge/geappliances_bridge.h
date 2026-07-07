@@ -70,8 +70,9 @@ extern "C" {
 #include "feature_bit_manager.h"
 #include "autodiscovery_manager.h"
 #include "geappliances_bridge_startup_hsm.h"
+#include "ota_cleanup_manager.h"
+#include "diagnostic_sensor_publisher.h"
 #include "erd_poll_list_builder.h"
-
 #include "appliance_type_map.h"
 
 namespace esphome {
@@ -83,8 +84,8 @@ namespace geappliances_bridge {
 
 class GeappliancesBridge : public Component, public IBridgeServices {
   friend ErdPollListResult build_poll_list_(GeappliancesBridge* bridge);
-  friend class DiscoveryRefreshButton;
   friend tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t*);
+  friend class DiscoveryRefreshButton;
 
  public:
   static constexpr unsigned long baud = 230400;
@@ -104,12 +105,12 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_appliance_api_parsing(bool appliance_api_parsing) { this->appliance_api_parsing_ = appliance_api_parsing; }
   void set_generate_device_config(bool generate_device_config) { this->generate_device_config_ = generate_device_config; }
   void set_filter_config_topics(bool filter_config_topics) { this->filter_config_topics_ = filter_config_topics; }
-  void set_erd_publish_rate_sensor(sensor::Sensor* sensor) { this->erd_publish_rate_sensor_ = sensor; }
-  void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; }
-  void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; }
-  void set_mqtt_publish_rate_sensor(sensor::Sensor* sensor) { this->mqtt_publish_rate_sensor_ = sensor; }
-  void set_mqtt_disconnect_count_sensor(sensor::Sensor* sensor) { this->mqtt_disconnect_count_sensor_ = sensor; }
-  void set_mqtt_disconnect_duration_sensor(sensor::Sensor* sensor) { this->mqtt_disconnect_duration_sensor_ = sensor; }
+  void set_erd_publish_rate_sensor(sensor::Sensor* sensor) { this->erd_publish_rate_sensor_ = sensor; this->diagnostic_sensor_publisher_.set_erd_publish_rate_sensor(sensor); }
+  void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; this->diagnostic_sensor_publisher_.set_erd_cache_entries_sensor(sensor); }
+  void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; this->diagnostic_sensor_publisher_.set_erd_cache_updates_sensor(sensor); }
+  void set_mqtt_publish_rate_sensor(sensor::Sensor* sensor) { this->mqtt_publish_rate_sensor_ = sensor; this->diagnostic_sensor_publisher_.set_mqtt_publish_rate_sensor(sensor); }
+  void set_mqtt_disconnect_count_sensor(sensor::Sensor* sensor) { this->mqtt_disconnect_count_sensor_ = sensor; this->diagnostic_sensor_publisher_.set_mqtt_disconnect_count_sensor(sensor); }
+  void set_mqtt_disconnect_duration_sensor(sensor::Sensor* sensor) { this->mqtt_disconnect_duration_sensor_ = sensor; this->diagnostic_sensor_publisher_.set_mqtt_disconnect_duration_sensor(sensor); }
   void set_throttle_rate_seconds(uint8_t rate) { this->throttle_rate_seconds_ = rate; }
   void add_custom_erd(tiny_erd_t erd);
 
@@ -232,16 +233,12 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // ERD publish rate sensor: counts ERD updates per ~60s window and
   // publishes to Home Assistant.
   sensor::Sensor* erd_publish_rate_sensor_{nullptr};
-  uint32_t last_erd_publish_rate_publish_{0};
-  static constexpr uint32_t ERD_PUBLISH_RATE_INTERVAL_MS = 60000;
 
   sensor::Sensor* erd_cache_entries_sensor_{nullptr};
   sensor::Sensor* erd_cache_updates_sensor_{nullptr};
   sensor::Sensor* mqtt_publish_rate_sensor_{nullptr};
   sensor::Sensor* mqtt_disconnect_count_sensor_{nullptr};
   sensor::Sensor* mqtt_disconnect_duration_sensor_{nullptr};
-  uint32_t last_erd_cache_stats_publish_{0};
-  uint32_t last_mqtt_disconnect_stats_publish_{0};
   // ERD registry: single owner of valid-ERD filter, string-type set,
   // and runtime registered-ERD tracking.
   ErdRegistry erd_registry_;
@@ -258,21 +255,21 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // HA discovery manager: publishes one-shot HA MQTT discovery payloads
   // after steady state is reached.
   ha_discovery_manager_t ha_discovery_manager_;
-  bool discovery_refresh_in_progress_{false};
   bool erd_cache_publisher_paused_{false};
   bool discovery_just_resumed_{false};
 
   // OTA-triggered discovery cleanup: set in setup() if reboot source is
   // "esphome.ota". Driven in loop() after steady state, before discovery.
   // After cleanup, reboots (same as DiscoveryRefresh) for fresh republish.
-  bool ota_cleanup_needed_{false};
-  bool ota_cleanup_in_progress_{false};
-  bool ota_discovery_publishing_{false};
-  bool ota_reboot_pending_{false};
-  uint32_t ota_reboot_start_ms_{0};
 
   // Autodiscovery manager (extracted from god class)
   AutodiscoveryManager autodiscovery_manager_;
+  // OTA cleanup manager: owns the OTA-triggered discovery cleanup state
+  // machine and the DiscoveryRefresh path (cleanup → republish → reboot).
+  OtaCleanupManager ota_cleanup_manager_;
+  // Diagnostic sensor publisher: owns periodic publishing of ERD/MQTT
+  // diagnostic sensors (publish rate, cache stats, disconnect stats).
+  DiagnosticSensorPublisher diagnostic_sensor_publisher_;
 
 
   tiny_timer_group_t timer_group_;

@@ -20,26 +20,7 @@ SRC_DIRS := \
   test/tests \
   test/simulation \
 
-SRC_FILES := \
-  components/geappliances_bridge/erd_cache.cpp \
-  components/geappliances_bridge/erd_bridge_subscribe.cpp \
-  components/geappliances_bridge/erd_bridge_poll.cpp \
-  components/geappliances_bridge/erd_write_bridge.cpp \
-  components/geappliances_bridge/gea2_erd_client_adapter.cpp \
-  components/geappliances_bridge/device_identity_manager.cpp \
-  components/geappliances_bridge/erd_poll_list_builder.cpp \
-  components/geappliances_bridge/feature_bit_manager.cpp \
-  components/geappliances_bridge/autodiscovery_manager.cpp \
-  components/geappliances_bridge/esphome_mqtt_client_adapter.cpp \
-  components/geappliances_bridge/ha_discovery_cleanup.cpp \
-  components/geappliances_bridge/ha_discovery_manager.cpp \
-  components/geappliances_bridge/erd_cache_mqtt_publisher.cpp \
-  components/geappliances_bridge/erd_registry.cpp \
-  components/geappliances_bridge/esphome_time_source.cpp \
-  components/geappliances_bridge/esphome_uart_adapter.cpp \
-  components/geappliances_bridge/geappliances_bridge.cpp \
-  components/geappliances_bridge/geappliances_bridge_bridge_init.cpp \
-  components/geappliances_bridge/geappliances_bridge_startup_hsm.cpp
+SRC_FILES := $(wildcard components/geappliances_bridge/*.cpp)
 
 SRCS := $(SRC_FILES) $(shell find $(SRC_DIRS) -maxdepth 1 -name *.cpp -or -name *.c -or -name *.s)
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)

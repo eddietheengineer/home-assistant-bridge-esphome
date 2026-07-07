@@ -143,25 +143,87 @@ def generate_header(input_dir: Path, header_name: str = "ha_discovery_data") -> 
             'raw_size': len(raw_data),
         }
     
-    # Generate chunk tables and data arrays
+    # Generate chunk tables and data arrays (extern declarations only)
     for cpp_name, info in category_data.items():
         lines.append(f'// {info["category"]}.jsonl chunks')
-        lines.append(f'static const ha_discovery_chunk_t ha_discovery_chunk_{cpp_name}[] = {{')
+        lines.append(f'extern const ha_discovery_chunk_t ha_discovery_chunk_{cpp_name}[];')
+        lines.append('')
+        
+        lines.append(f'// {info["category"]}.jsonl compressed data ({len(info["all_compressed"])} bytes from {info["raw_size"]} bytes)')
+        lines.append(f'extern const uint8_t ha_discovery_data_{cpp_name}[];')
+        lines.append('')
+    
+    # Generate category array (extern declaration)
+    lines.append('/* Category table */')
+    lines.append('extern const ha_discovery_category_t ha_discovery_categories[];')
+    lines.append('')
+    lines.append(f'extern const uint16_t ha_discovery_category_count;')
+    lines.append('')
+    lines.append('#endif')
+    lines.append('')
+    
+    return '\n'.join(lines)
+def generate_cpp(input_dir: Path, header_name: str = "ha_discovery_data") -> str:
+    """Generate a .cpp companion file with actual array definitions.
+
+    The header contains extern const declarations; this file provides
+    the definitions so the linker can resolve them.
+    """
+    lines = []
+    lines.append(f'#include "{header_name}.h"')
+    lines.append('')
+
+    # Process all categories
+    category_data = {}
+    for category in CATEGORIES:
+        jsonl_path = input_dir / f'{category}.jsonl'
+        if not jsonl_path.exists():
+            continue
+
+        with open(jsonl_path, 'rb') as f:
+            raw_data = f.read()
+
+        chunks = split_into_chunks(raw_data)
+        cpp_name = category_to_cpp_name(category)
+
+        all_compressed = b''.join(c for c, _ in chunks)
+
+        chunk_descriptors = []
+        offset = 0
+        max_decompressed = 0
+        for compressed, decompressed_size in chunks:
+            chunk_descriptors.append((offset, len(compressed)))
+            max_decompressed = max(max_decompressed, decompressed_size)
+            offset += len(compressed)
+
+        category_data[cpp_name] = {
+            'category': category,
+            'all_compressed': all_compressed,
+            'chunks': chunk_descriptors,
+            'num_chunks': len(chunks),
+            'max_decompressed': max_decompressed,
+            'raw_size': len(raw_data),
+        }
+
+    # Generate chunk tables and data arrays (definitions)
+    for cpp_name, info in category_data.items():
+        lines.append(f'// {info["category"]}.jsonl chunks')
+        lines.append(f'const ha_discovery_chunk_t ha_discovery_chunk_{cpp_name}[] = {{')
         for i, (offset, size) in enumerate(info['chunks']):
             comma = ',' if i + 1 < info['num_chunks'] else ''
             lines.append(f'  {{ {offset}, {size} }}{comma}')
         lines.append('};')
         lines.append('')
-        
+
         lines.append(f'// {info["category"]}.jsonl compressed data ({len(info["all_compressed"])} bytes from {info["raw_size"]} bytes)')
-        lines.append(f'static const uint8_t ha_discovery_data_{cpp_name}[] = {{')
+        lines.append(f'const uint8_t ha_discovery_data_{cpp_name}[] = {{')
         lines.append(bytes_to_c_array(info['all_compressed']))
         lines.append('};')
         lines.append('')
-    
-    # Generate category array (C++-compatible initialization)
+
+    # Generate category array (definition)
     lines.append('/* Category table */')
-    lines.append('static const ha_discovery_category_t ha_discovery_categories[] = {')
+    lines.append('const ha_discovery_category_t ha_discovery_categories[] = {')
     for cpp_name, info in category_data.items():
         lines.append(f'  {{ "{info["category"]}", ha_discovery_data_{cpp_name},')
         lines.append(f'     ha_discovery_chunk_{cpp_name},')
@@ -169,14 +231,12 @@ def generate_header(input_dir: Path, header_name: str = "ha_discovery_data") -> 
         lines.append(f'     {info["max_decompressed"]} }},')
     lines.append('};')
     lines.append('')
-    lines.append(f'static const uint16_t ha_discovery_category_count = {len(category_data)};')
+    lines.append(f'const uint16_t ha_discovery_category_count = {len(category_data)};')
     lines.append('')
-    lines.append('#endif')
-    lines.append('')
-    
+
     return '\n'.join(lines)
 def generate_header_to_file(input_dir: Path, output_dir: Path, header_name: str = "ha_discovery_data", extension: str = ".h") -> None:
-    """Generate the compressed header and write it to output_dir/components/geappliances_bridge/<header_name><extension>.
+    """Generate the compressed header and .cpp companion and write them to output_dir/components/geappliances_bridge/.
 
     Used by generate_erd_lists.py for in-process generation.
     output_dir is the repo root (parent of ha_discovery/).
@@ -187,6 +247,13 @@ def generate_header_to_file(input_dir: Path, output_dir: Path, header_name: str 
     output_file.parent.mkdir(parents=True, exist_ok=True)
     with open(output_file, 'w') as f:
         f.write(header)
+
+    # Also generate .cpp companion
+    cpp_content = generate_cpp(input_dir, header_name)
+    cpp_file = output_dir / 'components' / 'geappliances_bridge' / f'{header_name}.cpp'
+    print(f"Writing compressed source to {cpp_file}")
+    with open(cpp_file, 'w') as f:
+        f.write(cpp_content)
 
 
 def main():
@@ -222,6 +289,13 @@ def main():
     print(f"Writing compressed header to {output_file}")
     with open(output_file, 'w') as f:
         f.write(header)
+
+    # Also generate .cpp companion
+    cpp_content = generate_cpp(input_dir, args.header_name)
+    cpp_file = repo_root / 'components' / 'geappliances_bridge' / f'{args.header_name}.cpp'
+    print(f"Writing compressed source to {cpp_file}")
+    with open(cpp_file, 'w') as f:
+        f.write(cpp_content)
 
     # Print summary
     total_compressed = 0
