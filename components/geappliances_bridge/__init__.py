@@ -243,33 +243,6 @@ async def to_code(config: dict[str, Any]) -> None:
     await _create_diagnostic_sensor(config, CONF_MQTT_DISCONNECT_COUNT_SENSOR, "MQTT Disconnect Count", "mqtt_disconnect_count", "total_increasing", var, "set_mqtt_disconnect_count_sensor", {"accuracy_decimals": 0})
     await _create_diagnostic_sensor(config, CONF_MQTT_DISCONNECT_DURATION_SENSOR, "MQTT Last Disconnect Duration", "mqtt_disconnect_duration", "measurement", var, "set_mqtt_disconnect_duration_sensor", {"unit_of_measurement": "ms"})
 
-    val = config.get(CONF_MQTT_DISCONNECT_COUNT_SENSOR, True)
-    if val is not False:
-        if val is True:
-            val = {
-                "name": "MQTT Disconnect Count",
-                CONF_ID: ID("mqtt_disconnect_count", is_declaration=True, type=sensor.Sensor),
-                CONF_STATE_CLASS: _make_state_class("total_increasing"),
-                "disabled_by_default": False,
-                "force_update": False,
-                "accuracy_decimals": 0,
-            }
-        sens = await sensor.new_sensor(val)
-        cg.add(var.set_mqtt_disconnect_count_sensor(sens))
-
-    val = config.get(CONF_MQTT_DISCONNECT_DURATION_SENSOR, True)
-    if val is not False:
-        if val is True:
-            val = {
-                "name": "MQTT Last Disconnect Duration",
-                CONF_ID: ID("mqtt_disconnect_duration", is_declaration=True, type=sensor.Sensor),
-                CONF_STATE_CLASS: _make_state_class("measurement"),
-                "disabled_by_default": False,
-                "force_update": False,
-                "unit_of_measurement": "ms",
-            }
-        sens = await sensor.new_sensor(val)
-        cg.add(var.set_mqtt_disconnect_duration_sensor(sens))
 
     # Create discovery refresh button (auto-created by default, set to false to disable)
     val = config.get(CONF_DISCOVERY_REFRESH_BUTTON, True)
