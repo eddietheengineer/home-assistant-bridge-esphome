@@ -40,38 +40,12 @@ static ha_discovery_cleanup_t make_cleanup(const char* device_id)
     return cl;
 }
 
-/* ------------------------------------------------------------------ */
-/* Domain mapping tests                                                 */
-/* ------------------------------------------------------------------ */
-
 TEST_GROUP(ha_discovery_cleanup)
 {
     void setup() {}
     void teardown() {}
 };
 
-TEST(ha_discovery_cleanup, all_domains_map_correctly)
-{
-    for (int i = 0; i < HA_DOMAIN_COUNT; i++) {
-        int idx = ha_domain_to_index(HA_DOMAIN_STRINGS[i], strlen(HA_DOMAIN_STRINGS[i]));
-        CHECK_EQUAL(i, idx);
-    }
-}
-TEST(ha_discovery_cleanup, unknown_domain_returns_negative)
-{
-    int idx = ha_domain_to_index("unknown_domain", 14);
-    CHECK_EQUAL(-1, idx);
-}
-TEST(ha_discovery_cleanup, partial_match_does_not_map)
-{
-    int idx = ha_domain_to_index("sens", 3);
-    CHECK_EQUAL(-1, idx);
-}
-TEST(ha_discovery_cleanup, domain_count_is_21)
-{
-    CHECK_EQUAL(21, HA_DOMAIN_COUNT);
-}
-/* ------------------------------------------------------------------ */
 /* Pack via callback                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -302,19 +276,6 @@ TEST(ha_discovery_cleanup, compacting_buffer_drain_and_refill)
     }
     CHECK_EQUAL(0, cl.queue_count);
 }
-
-/* ------------------------------------------------------------------ */
-/* Domain strings array integrity                                       */
-/* ------------------------------------------------------------------ */
-
-TEST(ha_discovery_cleanup, domain_strings_non_null)
-{
-    for (int i = 0; i < HA_DOMAIN_COUNT; i++) {
-        CHECK(HA_DOMAIN_STRINGS[i] != NULL);
-        CHECK(strlen(HA_DOMAIN_STRINGS[i]) > 0);
-    }
-}
-
 /* ------------------------------------------------------------------ */
 /* Drain wait state initialization                                      */
 /* ------------------------------------------------------------------ */

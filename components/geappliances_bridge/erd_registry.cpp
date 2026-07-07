@@ -1,7 +1,9 @@
 #include "erd_registry.h"
+#include <algorithm>
 
 namespace esphome {
 namespace geappliances_bridge {
+
 
 void ErdRegistry::set_valid_erds(const tiny_erd_t* erds, uint16_t count)
 {
@@ -15,6 +17,8 @@ void ErdRegistry::set_valid_erds(const tiny_erd_t* erds, uint16_t count)
     valid_erds_[i] = erds[i];
   }
   valid_erds_count_ = n;
+  /* Sort for binary search in is_valid(). */
+  std::sort(valid_erds_, valid_erds_ + n);
   valid_erds_ready_ = true;
 }
 
@@ -38,10 +42,8 @@ bool ErdRegistry::is_valid(tiny_erd_t erd) const
   if (!valid_erds_ready_) {
     return true;  /* No filter active: all ERDs are valid. */
   }
-  for (uint16_t i = 0; i < valid_erds_count_; i++) {
-    if (valid_erds_[i] == erd) return true;
-  }
-  return false;
+  /* Binary search in sorted array. */
+  return std::binary_search(valid_erds_, valid_erds_ + valid_erds_count_, erd);
 }
 
 tiny_erd_t ErdRegistry::registered_erd(uint16_t idx) const

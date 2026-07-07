@@ -68,24 +68,6 @@ typedef enum {
 /* Payload buffer for building discovery payloads. */
 #define HA_DISCOVERY_PAYLOAD_BUF_SIZE 8192
 
-/* Home Assistant domain strings for discovery topic generation. */
-#define HA_DOMAIN_COUNT 21
-static const char* const HA_DOMAIN_STRINGS[HA_DOMAIN_COUNT] = {
-    "alarm_control_panel", "binary_sensor", "button", "camera", "climate",
-    "cover", "date", "datetime", "event", "fan", "light", "lock", "number",
-    "select", "sensor", "switch", "text", "time", "update", "vacuum", "valve"
-};
-
-static inline int ha_domain_to_index(const char* str, size_t len) {
-    for (int i = 0; i < HA_DOMAIN_COUNT; i++) {
-        if (strlen(HA_DOMAIN_STRINGS[i]) == len &&
-            strncmp(HA_DOMAIN_STRINGS[i], str, len) == 0) {
-            return i;
-        }
-    }
-    return -1;
-}
-
 /*!
  * @brief Home Assistant MQTT Discovery manager.
  *

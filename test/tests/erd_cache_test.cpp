@@ -2,7 +2,7 @@
  * @file
  * @brief Unit tests for the ERD cache (erd_cache.h / erd_cache.cpp).
  *
- * Tests cover: init/destroy, inline vs heap storage, update flow,
+ * Tests cover: init/destroy, arena storage, update flow,
  * change detection, iterators, rate counters,
  * cache full, size change detection.
  *
@@ -66,7 +66,7 @@ TEST(erd_cache, destroy_on_uninitialized_is_safe)
   erd_cache_destroy(&uninit);
 }
 
-TEST(erd_cache, insert_inline_1_byte)
+TEST(erd_cache, insert_1_byte)
 {
   uint8_t data[] = { 0xAB };
   bool result = erd_cache_update(&cache, 0x0001, data, 1);
@@ -75,14 +75,14 @@ TEST(erd_cache, insert_inline_1_byte)
 
   erd_cache_entry_t* entry = find_entry(&cache, 0x0001);
   CHECK(NULL != entry);
-  CHECK_FALSE(entry->uses_heap);
   CHECK_EQUAL(1, entry->data_size);
-  CHECK_EQUAL(0xAB, entry->inline_data[0]);
+  const uint8_t* stored = erd_cache_entry_data(&cache, entry);
+  CHECK_EQUAL(0xAB, stored[0]);
   CHECK_TRUE(entry->update_required);
   CHECK_TRUE(entry->valid);
 }
 
-TEST(erd_cache, insert_inline_4_bytes)
+TEST(erd_cache, insert_4_bytes)
 {
   uint8_t data[] = { 0x01, 0x02, 0x03, 0x04 };
   bool result = erd_cache_update(&cache, 0x0010, data, 4);
@@ -90,12 +90,12 @@ TEST(erd_cache, insert_inline_4_bytes)
 
   erd_cache_entry_t* entry = find_entry(&cache, 0x0010);
   CHECK(NULL != entry);
-  CHECK_FALSE(entry->uses_heap);
   CHECK_EQUAL(4, entry->data_size);
-  MEMCMP_EQUAL(data, entry->inline_data, 4);
+  const uint8_t* stored = erd_cache_entry_data(&cache, entry);
+  MEMCMP_EQUAL(data, stored, 4);
 }
 
-TEST(erd_cache, insert_heap_5_bytes)
+TEST(erd_cache, insert_5_bytes)
 {
   uint8_t data[] = { 0x01, 0x02, 0x03, 0x04, 0x05 };
   bool result = erd_cache_update(&cache, 0x0020, data, 5);
@@ -103,12 +103,12 @@ TEST(erd_cache, insert_heap_5_bytes)
 
   erd_cache_entry_t* entry = find_entry(&cache, 0x0020);
   CHECK(NULL != entry);
-  CHECK_TRUE(entry->uses_heap);
   CHECK_EQUAL(5, entry->data_size);
-  MEMCMP_EQUAL(data, entry->ext_data, 5);
+  const uint8_t* stored = erd_cache_entry_data(&cache, entry);
+  MEMCMP_EQUAL(data, stored, 5);
 }
 
-TEST(erd_cache, insert_heap_large)
+TEST(erd_cache, insert_large)
 {
   uint8_t data[32];
   for (int i = 0; i < 32; i++) data[i] = (uint8_t)i;
@@ -117,12 +117,12 @@ TEST(erd_cache, insert_heap_large)
 
   erd_cache_entry_t* entry = find_entry(&cache, 0x0100);
   CHECK(NULL != entry);
-  CHECK_TRUE(entry->uses_heap);
   CHECK_EQUAL(32, entry->data_size);
-  MEMCMP_EQUAL(data, entry->ext_data, 32);
+  const uint8_t* stored = erd_cache_entry_data(&cache, entry);
+  MEMCMP_EQUAL(data, stored, 32);
 }
 
-TEST(erd_cache, update_existing_inline)
+TEST(erd_cache, update_existing_small)
 {
   uint8_t data1[] = { 0x01 };
   uint8_t data2[] = { 0x02 };
@@ -132,11 +132,12 @@ TEST(erd_cache, update_existing_inline)
 
   erd_cache_entry_t* entry = find_entry(&cache, 0x0001);
   CHECK(NULL != entry);
-  CHECK_EQUAL(0x02, entry->inline_data[0]);
+  const uint8_t* stored = erd_cache_entry_data(&cache, entry);
+  CHECK_EQUAL(0x02, stored[0]);
   CHECK_TRUE(entry->update_required);
 }
 
-TEST(erd_cache, update_existing_heap)
+TEST(erd_cache, update_existing_medium)
 {
   uint8_t data1[] = { 0x01, 0x02, 0x03, 0x04, 0x05 };
   uint8_t data2[] = { 0xAA, 0xBB, 0xCC, 0xDD, 0xEE };
@@ -146,7 +147,8 @@ TEST(erd_cache, update_existing_heap)
 
   erd_cache_entry_t* entry = find_entry(&cache, 0x0020);
   CHECK(NULL != entry);
-  MEMCMP_EQUAL(data2, entry->ext_data, 5);
+  const uint8_t* stored = erd_cache_entry_data(&cache, entry);
+  MEMCMP_EQUAL(data2, stored, 5);
 }
 
 TEST(erd_cache, size_change_grows_returns_false)
@@ -343,17 +345,16 @@ TEST(erd_cache, find_returns_null_for_unknown_erd)
   CHECK(NULL == entry);
 }
 
-TEST(erd_cache, destroy_frees_heap_data)
+TEST(erd_cache, destroy_clears_arena)
 {
   uint8_t data[] = { 0x01, 0x02, 0x03, 0x04, 0x05 };
   erd_cache_update(&cache, 0x0020, data, 5);
 
-  erd_cache_entry_t* entry = find_entry(&cache, 0x0020);
-  CHECK(NULL != entry);
-  CHECK(NULL != entry->ext_data);
+  CHECK_EQUAL(5, erd_cache_get_arena_usage(&cache));
 
   erd_cache_destroy(&cache);
   CHECK_FALSE(cache.initialized);
+  CHECK_EQUAL(0, erd_cache_get_arena_usage(&cache));
 }
 
 TEST(erd_cache, reinit_after_destroy)
@@ -666,4 +667,74 @@ TEST(erd_cache, rate_limit_unchanged_data_does_not_reset_cooldown)
   entry = erd_cache_get_next_updated(&cache, &iter);
   CHECK(entry != NULL);
   CHECK_EQUAL(0x0001, entry->erd);
+}
+
+/* New test: ERD exceeding GEA3 max size is rejected */
+TEST(erd_cache, insert_rejected_over_248_bytes)
+{
+  uint8_t data[249];
+  memset(data, 0xAA, sizeof(data));
+  bool result = erd_cache_update(&cache, 0x0100, data, 249);
+  CHECK_FALSE(result);
+  CHECK_EQUAL(0, erd_cache_get_count(&cache));
+}
+
+/* New test: ERD at exactly 248 bytes is accepted */
+TEST(erd_cache, insert_accepted_at_248_bytes)
+{
+  uint8_t data[248];
+  memset(data, 0xBB, sizeof(data));
+  bool result = erd_cache_update(&cache, 0x0100, data, 248);
+  CHECK_TRUE(result);
+  CHECK_EQUAL(1, erd_cache_get_count(&cache));
+
+  erd_cache_entry_t* entry = find_entry(&cache, 0x0100);
+  CHECK(NULL != entry);
+  CHECK_EQUAL(248, entry->data_size);
+  const uint8_t* stored = erd_cache_entry_data(&cache, entry);
+  MEMCMP_EQUAL(data, stored, 248);
+}
+
+/* New test: Arena full rejects new ERD */
+TEST(erd_cache, arena_full_rejects_new_erd)
+{
+  /* Fill arena with 16 entries of 248 bytes each = 3968 bytes */
+  for (int i = 0; i < 16; i++) {
+    uint8_t data[248];
+    memset(data, (uint8_t)i, sizeof(data));
+    tiny_erd_t erd = (tiny_erd_t)(0x0001 + i);
+    bool result = erd_cache_update(&cache, erd, data, 248);
+    CHECK_TRUE(result);
+  }
+  CHECK_EQUAL(16, erd_cache_get_count(&cache));
+
+  /* Next 248-byte ERD should fail (arena_offset would be 3968 + 248 = 4216 > 4096) */
+  uint8_t data[248];
+  memset(data, 0xFF, sizeof(data));
+  bool result = erd_cache_update(&cache, 0xFFFF, data, 248);
+  CHECK_FALSE(result);
+  CHECK_EQUAL(16, erd_cache_get_count(&cache));
+}
+
+/* New test: Arena usage tracking */
+TEST(erd_cache, arena_usage_tracking)
+{
+  CHECK_EQUAL(0, erd_cache_get_arena_usage(&cache));
+  CHECK_EQUAL(0, erd_cache_get_arena_usage_percent(&cache));
+
+  /* Add 100 bytes */
+  uint8_t data[100];
+  memset(data, 0xAA, sizeof(data));
+  erd_cache_update(&cache, 0x0001, data, 100);
+
+  CHECK_EQUAL(100, erd_cache_get_arena_usage(&cache));
+  CHECK_EQUAL(2, erd_cache_get_arena_usage_percent(&cache)); /* 100/4096 = 2.4% */
+
+  /* Add another 50 bytes */
+  uint8_t data2[50];
+  memset(data2, 0xBB, sizeof(data2));
+  erd_cache_update(&cache, 0x0002, data2, 50);
+
+  CHECK_EQUAL(150, erd_cache_get_arena_usage(&cache));
+  CHECK_EQUAL(3, erd_cache_get_arena_usage_percent(&cache)); /* 150/4096 = 3.6% */
 }

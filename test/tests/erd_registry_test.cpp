@@ -168,13 +168,13 @@ TEST(erd_registry, register_at_capacity)
   CHECK_EQUAL(ERD_REGISTRY_MAX_VALID, registry.registered_erd_count());
 }
 
-TEST(erd_registry, valid_erd_order_preserved)
+TEST(erd_registry, valid_erd_sorted)
 {
   tiny_erd_t erds[] = { 0x0100, 0x0050, 0x0200 };
   registry.set_valid_erds(erds, 3);
 
-  CHECK_EQUAL(0x0100, registry.valid_erd(0));
-  CHECK_EQUAL(0x0050, registry.valid_erd(1));
+  CHECK_EQUAL(0x0050, registry.valid_erd(0));
+  CHECK_EQUAL(0x0100, registry.valid_erd(1));
   CHECK_EQUAL(0x0200, registry.valid_erd(2));
 }
 

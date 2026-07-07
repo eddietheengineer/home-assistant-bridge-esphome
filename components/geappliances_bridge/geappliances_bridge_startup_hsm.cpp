@@ -58,7 +58,8 @@ tiny_hsm_result_t startup_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, c
   (void)hsm;
 
   // The top state is the root of the hierarchy.  Any signal not consumed
-  // by a child state will bubble up here and be deferred (ignored).
+  // by a child state will bubble up here.  We consume it to avoid the
+  // signal being silently dropped (deferred at root = lost).
   switch (signal) {
     case tiny_hsm_signal_entry:
     case tiny_hsm_signal_exit:
@@ -66,43 +67,13 @@ tiny_hsm_result_t startup_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, c
       break;
 
     default:
-      return tiny_hsm_result_signal_deferred;
+      // Unhandled signal at root — consume it to avoid silent loss.
+      break;
   }
 
   return tiny_hsm_result_signal_consumed;
 }
 
-// ============================================================================
-// Phase 1: Protocol Stack — drive GEA2/GEA3 hardware
-//
-// This is the initial state.  It transitions to autodiscovery as soon as
-// the first loop() call arrives (the protocol stack is always running).
-// ============================================================================
-
-tiny_hsm_result_t startup_state_protocol_stack(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
-{
-  IBridgeServices* svc = services_from_hsm(hsm);
-  (void)svc;
-  (void)data;
-
-  switch (signal) {
-    case tiny_hsm_signal_entry:
-      // Transition to the startup delay state.  The delay gives the appliance
-      // board time to stabilize before we start broadcasting.
-      tiny_hsm_transition(hsm, startup_state_startup_delay);
-      break;
-
-    case tiny_hsm_signal_exit:
-      break;
-
-    default:
-      return tiny_hsm_result_signal_deferred;
-  }
-
-  return tiny_hsm_result_signal_consumed;
-}
-
-// ============================================================================
 // Phase 1.5: Startup Delay — wait for appliance board to stabilize
 //
 // Waits AUTODISCOVERY_STARTUP_DELAY_MS (5 seconds) before transitioning to
@@ -458,7 +429,6 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
 
 static const tiny_hsm_state_descriptor_t startup_hsm_state_descriptors[] = {
   { .state = startup_state_top,              .parent = nullptr },
-  { .state = startup_state_protocol_stack,   .parent = startup_state_top },
   { .state = startup_state_startup_delay,    .parent = startup_state_top },
   { .state = startup_state_autodiscovery,    .parent = startup_state_top },
   { .state = startup_state_device_id,        .parent = startup_state_top },

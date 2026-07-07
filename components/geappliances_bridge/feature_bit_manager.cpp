@@ -17,6 +17,17 @@ namespace geappliances_bridge {
 
 GEA_TAG(TAG) = "feature_bit";
 
+/* Ordered list of feature bit ERDs to read. */
+static constexpr tiny_erd_t feature_erd_list[] = {
+  ERD_COMMON_FEATURE_API,
+  ERD_APPLIANCE_FEATURE_API_0, ERD_APPLIANCE_FEATURE_API_1,
+  ERD_APPLIANCE_FEATURE_API_2, ERD_APPLIANCE_FEATURE_API_3,
+  ERD_APPLIANCE_FEATURE_API_4, ERD_APPLIANCE_FEATURE_API_5,
+  ERD_APPLIANCE_FEATURE_API_6, ERD_APPLIANCE_FEATURE_API_7,
+  ERD_APPLIANCE_FEATURE_API_8, ERD_APPLIANCE_FEATURE_API_9,
+};
+static constexpr uint8_t FEATURE_ERD_COUNT = sizeof(feature_erd_list) / sizeof(feature_erd_list[0]);
+
 // =============================================================================
 // Public API
 // =============================================================================
@@ -47,8 +58,8 @@ void FeatureBitManager::init(i_tiny_gea3_erd_client_t* erd_client,
   this->erd_client_    = erd_client;
   this->host_address_  = host_address;
   this->timer_group_   = timer_group;
-  this->state_         = FEATURE_BIT_STATE_READING_0092;
-  this->read_queued_   = false;
+  this->state_         = FEATURE_BIT_STATE_READING;
+  this->reading_idx_   = 0;
   this->parse_erd_idx_ = 0;
   this->common_parse_idx_ = 0;
   this->parse_common_done_ = false;
@@ -90,8 +101,8 @@ void FeatureBitManager::cleanup()
   this->erd_client_ = nullptr;
   this->timer_group_ = nullptr;
   this->host_address_ = 0;
-  this->state_ = FEATURE_BIT_STATE_READING_0092;
-  this->read_queued_ = false;
+  this->state_ = FEATURE_BIT_STATE_READING;
+  this->reading_idx_ = 0;
 }
 
 void FeatureBitManager::start()
@@ -101,7 +112,7 @@ void FeatureBitManager::start()
     return;
   }
   /* Idempotent: only queue the first read if we're at the start and haven't queued yet. */
-  if (this->state_ != FEATURE_BIT_STATE_READING_0092 || this->read_queued_) {
+  if (this->state_ != FEATURE_BIT_STATE_READING || this->reading_idx_ != 0 || this->read_queued_) {
     return;
   }
   ESP_LOGI(TAG, "Reading appliance API feature bits...");
@@ -173,7 +184,7 @@ void FeatureBitManager::on_erd_activity_(const void* args)
 
 void FeatureBitManager::handle_read_completed_(tiny_erd_t erd, const void* data, uint8_t size)
 {
-  this->read_queued_ = false;  /* Read completed, clear the guard */
+  this->read_queued_ = false;
 
   if (data == nullptr) {
     ESP_LOGW(TAG, "Feature bit ERD 0x%04X: null data pointer, skipping", erd);
@@ -187,81 +198,25 @@ void FeatureBitManager::handle_read_completed_(tiny_erd_t erd, const void* data,
              erd, size, copy_size);
   }
 
-  /* Store the ERD data and advance to the next state */
-  if (erd == ERD_COMMON_FEATURE_API)    {
-    memcpy(this->erd_data_.erd_0092, data, copy_size);
-    this->erd_data_.erd_0092_size = copy_size;
-    ESP_LOGD(TAG, "Read common feature API (0x0092): %u bytes", copy_size);
-    this->state_ = FEATURE_BIT_STATE_READING_0093;
+  /* Store the ERD data in the corresponding buffer. */
+  uint8_t idx = this->reading_idx_;
+  if (idx < FEATURE_ERD_COUNT) {
+    memcpy(this->erd_data_.data[idx], data, copy_size);
+    this->erd_data_.sizes[idx] = copy_size;
   }
-  else if (erd == ERD_APPLIANCE_FEATURE_API_0) {
-    memcpy(this->erd_data_.erd_0093, data, copy_size);
-    this->erd_data_.erd_0093_size = copy_size;
-    ESP_LOGD(TAG, "Read appliance feature API 0 (0x0093): %u bytes", copy_size);
-    this->state_ = FEATURE_BIT_STATE_READING_0094;
-  }
-  else if (erd == ERD_APPLIANCE_FEATURE_API_1) {
-    memcpy(this->erd_data_.erd_0094, data, copy_size);
-    this->erd_data_.erd_0094_size = copy_size;
-    ESP_LOGD(TAG, "Read appliance feature API 1 (0x0094): %u bytes", copy_size);
-    this->state_ = FEATURE_BIT_STATE_READING_0095;
-  }
-  else if (erd == ERD_APPLIANCE_FEATURE_API_2) {
-    memcpy(this->erd_data_.erd_0095, data, copy_size);
-    this->erd_data_.erd_0095_size = copy_size;
-    ESP_LOGD(TAG, "Read appliance feature API 2 (0x0095): %u bytes", copy_size);
-    this->state_ = FEATURE_BIT_STATE_READING_0096;
-  }
-  else if (erd == ERD_APPLIANCE_FEATURE_API_3) {
-    memcpy(this->erd_data_.erd_0096, data, copy_size);
-    this->erd_data_.erd_0096_size = copy_size;
-    ESP_LOGD(TAG, "Read appliance feature API 3 (0x0096): %u bytes", copy_size);
-    this->state_ = FEATURE_BIT_STATE_READING_0097;
-  }
-  else if (erd == ERD_APPLIANCE_FEATURE_API_4) {
-    memcpy(this->erd_data_.erd_0097, data, copy_size);
-    this->erd_data_.erd_0097_size = copy_size;
-    ESP_LOGD(TAG, "Read appliance feature API 4 (0x0097): %u bytes", copy_size);
-    this->state_ = FEATURE_BIT_STATE_READING_0109;
-  }
-  else if (erd == ERD_APPLIANCE_FEATURE_API_5) {
-    memcpy(this->erd_data_.erd_0109, data, copy_size);
-    this->erd_data_.erd_0109_size = copy_size;
-    ESP_LOGD(TAG, "Read appliance feature API 5 (0x0109): %u bytes", copy_size);
-    this->state_ = FEATURE_BIT_STATE_READING_010A;
-  }
-  else if (erd == ERD_APPLIANCE_FEATURE_API_6) {
-    memcpy(this->erd_data_.erd_010A, data, copy_size);
-    this->erd_data_.erd_010A_size = copy_size;
-    ESP_LOGD(TAG, "Read appliance feature API 6 (0x010A): %u bytes", copy_size);
-    this->state_ = FEATURE_BIT_STATE_READING_010B;
-  }
-  else if (erd == ERD_APPLIANCE_FEATURE_API_7) {
-    memcpy(this->erd_data_.erd_010B, data, copy_size);
-    this->erd_data_.erd_010B_size = copy_size;
-    ESP_LOGD(TAG, "Read appliance feature API 7 (0x010B): %u bytes", copy_size);
-    this->state_ = FEATURE_BIT_STATE_READING_010C;
-  }
-  else if (erd == ERD_APPLIANCE_FEATURE_API_8) {
-    memcpy(this->erd_data_.erd_010C, data, copy_size);
-    this->erd_data_.erd_010C_size = copy_size;
-    ESP_LOGD(TAG, "Read appliance feature API 8 (0x010C): %u bytes", copy_size);
-    this->state_ = FEATURE_BIT_STATE_READING_010D;
-  }
-  else if (erd == ERD_APPLIANCE_FEATURE_API_9) {
-    memcpy(this->erd_data_.erd_010D, data, copy_size);
-    this->erd_data_.erd_010D_size = copy_size;
-    /* All ERDs read - transition to parsing */
+
+  ESP_LOGD(TAG, "Read feature ERD 0x%04X (%u/%u): %u bytes",
+           erd, idx + 1, FEATURE_ERD_COUNT, copy_size);
+
+  /* Advance to next ERD or transition to parsing. */
+  this->reading_idx_++;
+  if (this->reading_idx_ >= FEATURE_ERD_COUNT) {
     this->state_ = FEATURE_BIT_STATE_PARSING;
     this->start_parse_timer_();
     return;
   }
-  else {
-    /* Unexpected ERD - ignore */
-    return;
-  }
 
-  /* Queue the next ERD in the sequence */
+  /* Queue the next ERD in the sequence. */
   this->queue_erd_read_();
 }
 
@@ -271,35 +226,23 @@ void FeatureBitManager::handle_read_completed_(tiny_erd_t erd, const void* data,
 
 void FeatureBitManager::queue_erd_read_()
 {
-  tiny_erd_t feature_erd = 0;
-  [[maybe_unused]] const char* feature_name = nullptr;
-
-  switch (this->state_) {
-    case FEATURE_BIT_STATE_READING_0092: feature_erd = ERD_COMMON_FEATURE_API;    feature_name = "common feature API (0x0092)";          break;
-    case FEATURE_BIT_STATE_READING_0093: feature_erd = ERD_APPLIANCE_FEATURE_API_0; feature_name = "appliance feature API 0 (0x0093)";       break;
-    case FEATURE_BIT_STATE_READING_0094: feature_erd = ERD_APPLIANCE_FEATURE_API_1; feature_name = "appliance feature API 1 (0x0094)";       break;
-    case FEATURE_BIT_STATE_READING_0095: feature_erd = ERD_APPLIANCE_FEATURE_API_2; feature_name = "appliance feature API 2 (0x0095)";       break;
-    case FEATURE_BIT_STATE_READING_0096: feature_erd = ERD_APPLIANCE_FEATURE_API_3; feature_name = "appliance feature API 3 (0x0096)";       break;
-    case FEATURE_BIT_STATE_READING_0097: feature_erd = ERD_APPLIANCE_FEATURE_API_4; feature_name = "appliance feature API 4 (0x0097)";       break;
-    case FEATURE_BIT_STATE_READING_0109: feature_erd = ERD_APPLIANCE_FEATURE_API_5; feature_name = "appliance feature API 5 (0x0109)";       break;
-    case FEATURE_BIT_STATE_READING_010A: feature_erd = ERD_APPLIANCE_FEATURE_API_6; feature_name = "appliance feature API 6 (0x010A)";       break;
-    case FEATURE_BIT_STATE_READING_010B: feature_erd = ERD_APPLIANCE_FEATURE_API_7; feature_name = "appliance feature API 7 (0x010B)";       break;
-    case FEATURE_BIT_STATE_READING_010C: feature_erd = ERD_APPLIANCE_FEATURE_API_8; feature_name = "appliance feature API 8 (0x010C)";       break;
-    case FEATURE_BIT_STATE_READING_010D: feature_erd = ERD_APPLIANCE_FEATURE_API_9; feature_name = "appliance feature API 9 (0x010D)";       break;
-    default: return;  /* Not in a READING state - nothing to queue */
+  if (this->reading_idx_ >= FEATURE_ERD_COUNT) {
+    return;  /* Not in a READING state - nothing to queue */
   }
+
+  tiny_erd_t feature_erd = feature_erd_list[this->reading_idx_];
 
   /* Try to queue the read. If the queue is full, stay in the current state
    * and schedule a retry timer. */
   tiny_gea3_erd_client_request_id_t req_id;
   if (tiny_gea3_erd_client_read(this->erd_client_, &req_id, this->host_address_, feature_erd)) {
-    ESP_LOGV(TAG, "Queued read for %s", feature_name);
+    ESP_LOGV(TAG, "Queued read for feature ERD 0x%04X", feature_erd);
     this->read_queued_ = true;
   } else {
     /* Queue is full — arm a one-shot retry timer so we don't stall
      * indefinitely when no other ERD activity occurs. */
-    ESP_LOGD(TAG, "Queue full for %s, scheduling retry in %u ms",
-             feature_name, static_cast<unsigned>(QUEUE_RETRY_MS));
+    ESP_LOGD(TAG, "Queue full for ERD 0x%04X, scheduling retry in %u ms",
+             feature_erd, static_cast<unsigned>(QUEUE_RETRY_MS));
     tiny_timer_start(this->timer_group_,
                      &this->queue_retry_timer_,
                      QUEUE_RETRY_MS,
@@ -307,27 +250,12 @@ void FeatureBitManager::queue_erd_read_()
                      FeatureBitManager::queue_retry_timer_callback_);
   }
 }
-
-// =============================================================================
-// Map a READING state to the ERD value (for event filtering)
-// =============================================================================
-
 tiny_erd_t FeatureBitManager::get_expected_erd_() const
 {
-  switch (this->state_) {
-    case FEATURE_BIT_STATE_READING_0092: return ERD_COMMON_FEATURE_API;
-    case FEATURE_BIT_STATE_READING_0093: return ERD_APPLIANCE_FEATURE_API_0;
-    case FEATURE_BIT_STATE_READING_0094: return ERD_APPLIANCE_FEATURE_API_1;
-    case FEATURE_BIT_STATE_READING_0095: return ERD_APPLIANCE_FEATURE_API_2;
-    case FEATURE_BIT_STATE_READING_0096: return ERD_APPLIANCE_FEATURE_API_3;
-    case FEATURE_BIT_STATE_READING_0097: return ERD_APPLIANCE_FEATURE_API_4;
-    case FEATURE_BIT_STATE_READING_0109: return ERD_APPLIANCE_FEATURE_API_5;
-    case FEATURE_BIT_STATE_READING_010A: return ERD_APPLIANCE_FEATURE_API_6;
-    case FEATURE_BIT_STATE_READING_010B: return ERD_APPLIANCE_FEATURE_API_7;
-    case FEATURE_BIT_STATE_READING_010C: return ERD_APPLIANCE_FEATURE_API_8;
-    case FEATURE_BIT_STATE_READING_010D: return ERD_APPLIANCE_FEATURE_API_9;
-    default: return 0;  /* Not in a READING state */
+  if (this->reading_idx_ >= FEATURE_ERD_COUNT) {
+    return 0;  /* Not in a READING state */
   }
+  return feature_erd_list[this->reading_idx_];
 }
 
 // =============================================================================
@@ -360,36 +288,28 @@ void FeatureBitManager::queue_retry_()
 
 void FeatureBitManager::skip_to_next_erd_(tiny_erd_t failed_erd)
 {
-  this->read_queued_ = false;  /* Read failed, clear the guard */
+  this->read_queued_ = false;
 
   ESP_LOGD(TAG, "Feature bit ERD 0x%04X failed or not supported, skipping", failed_erd);
 
-  switch (failed_erd) {
-    case ERD_COMMON_FEATURE_API:
-      /* ERD 0x0092 (common feature API) is the foundation for all feature
-       * filtering. Without it, we have no way to know which ERDs are
-       * supported. Mark as failed so the bridge falls back to full polling. */
-      ESP_LOGW(TAG, "Common feature API (0x0092) not supported; feature bit filtering disabled");
-      this->state_ = FEATURE_BIT_STATE_FAILED;
-      return;
-    case ERD_APPLIANCE_FEATURE_API_0: this->state_ = FEATURE_BIT_STATE_READING_0094; break;
-    case ERD_APPLIANCE_FEATURE_API_1: this->state_ = FEATURE_BIT_STATE_READING_0095; break;
-    case ERD_APPLIANCE_FEATURE_API_2: this->state_ = FEATURE_BIT_STATE_READING_0096; break;
-    case ERD_APPLIANCE_FEATURE_API_3: this->state_ = FEATURE_BIT_STATE_READING_0097; break;
-    case ERD_APPLIANCE_FEATURE_API_4: this->state_ = FEATURE_BIT_STATE_READING_0109; break;
-    case ERD_APPLIANCE_FEATURE_API_5: this->state_ = FEATURE_BIT_STATE_READING_010A; break;
-    case ERD_APPLIANCE_FEATURE_API_6: this->state_ = FEATURE_BIT_STATE_READING_010B; break;
-    case ERD_APPLIANCE_FEATURE_API_7: this->state_ = FEATURE_BIT_STATE_READING_010C; break;
-    case ERD_APPLIANCE_FEATURE_API_8: this->state_ = FEATURE_BIT_STATE_READING_010D; break;
-    case ERD_APPLIANCE_FEATURE_API_9:
-      /* Last ERD failed - transition to parsing with whatever we have */
-      this->state_ = FEATURE_BIT_STATE_PARSING;
-      this->start_parse_timer_();
-      return;
-    default: break;
+  /* ERD 0x0092 (common feature API) is the foundation for all feature
+   * filtering. Without it, we have no way to know which ERDs are
+   * supported. Mark as failed so the bridge falls back to full polling. */
+  if (failed_erd == ERD_COMMON_FEATURE_API) {
+    ESP_LOGW(TAG, "Common feature API (0x0092) not supported; feature bit filtering disabled");
+    this->state_ = FEATURE_BIT_STATE_FAILED;
+    return;
   }
 
-  /* Queue the next ERD read */
+  /* Advance to next ERD or transition to parsing. */
+  this->reading_idx_++;
+  if (this->reading_idx_ >= FEATURE_ERD_COUNT) {
+    this->state_ = FEATURE_BIT_STATE_PARSING;
+    this->start_parse_timer_();
+    return;
+  }
+
+  /* Queue the next ERD read. */
   this->queue_erd_read_();
 }
 
@@ -429,9 +349,10 @@ void FeatureBitManager::parse_next_step_()
     this->valid_erds_count_ = 0;
     this->valid_list_ready_ = false;
 
-    if (this->erd_data_.erd_0092_size > 0) {
+    /* Index 0 is the common feature API (0x0092). */
+    if (this->erd_data_.sizes[0] > 0) {
       uint32_t common_bits = static_cast<uint32_t>(
-        read_be64(this->erd_data_.erd_0092, this->erd_data_.erd_0092_size) & 0xFFFFFFFFu);
+        read_be64(this->erd_data_.data[0], this->erd_data_.sizes[0]) & 0xFFFFFFFFu);
       ESP_LOGI(TAG, "Common feature API (0x0092) value: 0x%08X", common_bits);
       (void)common_bits; /* Used in ESP_LOGI that may be compiled out. */
     }
@@ -443,9 +364,9 @@ void FeatureBitManager::parse_next_step_()
     uint16_t end = (start + COMMON_PARSE_PER_CALL > common_feature_descriptor_count)
                    ? common_feature_descriptor_count : start + COMMON_PARSE_PER_CALL;
 
-    if (this->erd_data_.erd_0092_size > 0) {
+    if (this->erd_data_.sizes[0] > 0) {
       uint32_t common_bits = static_cast<uint32_t>(
-        read_be64(this->erd_data_.erd_0092, this->erd_data_.erd_0092_size) & 0xFFFFFFFFu);
+        read_be64(this->erd_data_.data[0], this->erd_data_.sizes[0]) & 0xFFFFFFFFu);
       for (uint16_t i = start; i < end; i++) {
         const auto& desc = common_feature_descriptors[i];
         if (common_bits & desc.bit_mask) {
@@ -468,7 +389,8 @@ void FeatureBitManager::parse_next_step_()
     return;
   }
 
-  /* Static tables for appliance ERDs (indexed 0-9). */
+  /* Static tables for appliance ERDs (indexed 0-9 in parse_erd_idx_,
+   * mapping to erd_data_ indices 1-10). */
   [[maybe_unused]] static const char* const erd_names[10] = {
     "0x0093", "0x0094", "0x0095", "0x0096", "0x0097",
     "0x0109", "0x010A", "0x010B", "0x010C", "0x010D"
@@ -477,28 +399,13 @@ void FeatureBitManager::parse_next_step_()
   /* Process one appliance ERD per tick to avoid blocking the timer for too long. */
   if (this->parse_erd_idx_ < 10) {
     uint8_t idx = this->parse_erd_idx_;
+    uint8_t data_idx = idx + 1;  /* erd_data_ index: 1-10 for appliance features */
 
-    /* Map index to the actual erd_data_ member. */
-    const uint8_t* api_bufs[10] = {
-      this->erd_data_.erd_0093, this->erd_data_.erd_0094,
-      this->erd_data_.erd_0095, this->erd_data_.erd_0096,
-      this->erd_data_.erd_0097, this->erd_data_.erd_0109,
-      this->erd_data_.erd_010A, this->erd_data_.erd_010B,
-      this->erd_data_.erd_010C, this->erd_data_.erd_010D
-    };
-    const uint8_t api_sizes[10] = {
-      this->erd_data_.erd_0093_size, this->erd_data_.erd_0094_size,
-      this->erd_data_.erd_0095_size, this->erd_data_.erd_0096_size,
-      this->erd_data_.erd_0097_size, this->erd_data_.erd_0109_size,
-      this->erd_data_.erd_010A_size, this->erd_data_.erd_010B_size,
-      this->erd_data_.erd_010C_size, this->erd_data_.erd_010D_size
-    };
-
-    if (api_sizes[idx] < APPLIANCE_FEATURE_ERD_SIZE) {
+    if (this->erd_data_.sizes[data_idx] < APPLIANCE_FEATURE_ERD_SIZE) {
       this->parse_erd_idx_++;
       return;  /* Will process next ERD on next tick */
     }
-    const uint8_t* api_buf = api_bufs[idx];
+    const uint8_t* api_buf = this->erd_data_.data[data_idx];
     uint16_t appliance_type    = (static_cast<uint16_t>(api_buf[0]) << 8) | api_buf[1];
     uint16_t version           = (static_cast<uint16_t>(api_buf[2]) << 8) | api_buf[3];
     uint32_t feature_bitmap    = (static_cast<uint32_t>(api_buf[4]) << 24) |

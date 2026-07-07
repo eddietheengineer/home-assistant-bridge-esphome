@@ -119,7 +119,7 @@ void GeappliancesBridge::start_feature_bit_reading_()
   // PARSING/COMPLETE mean it's past the reading phase.
   // Note: the feature_bit_reading_started_ flag prevents re-init while the first read is in-flight.
   FeatureBitState state = this->feature_bit_manager_.get_state();
-  if (state != FEATURE_BIT_STATE_READING_0092) {
+  if (state != FEATURE_BIT_STATE_READING) {
     return;
   }
   // Additional guard: if start() was already called and the first read

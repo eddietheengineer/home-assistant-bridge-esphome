@@ -14,19 +14,8 @@ import sys
 import zlib
 from pathlib import Path
 
-
-CATEGORIES = [
-    "common",
-    "refrigeration",
-    "laundry",
-    "dishwasher",
-    "waterheater",
-    "range",
-    "airconditioning",
-    "waterfilter",
-    "smallappliance",
-    "energy",
-]
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from pipeline.ha_constants import CATEGORIES_LIST as CATEGORIES
 
 # Target decompressed chunk size (must fit in decompress_buf: 18KB).
 CHUNK_TARGET_DECOMPRESSED = 4000

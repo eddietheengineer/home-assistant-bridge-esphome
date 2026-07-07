@@ -160,7 +160,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 
   // Startup HSM — replaces the manual switch-based phase progression.
-  //   protocol_stack → autodiscovery → device_id → mqtt_client_init
+  //   startup_delay → autodiscovery → device_id → mqtt_client_init
   //                 → feature_bits → bridge_init → subscription_watch
   //                 → running
   startup_hsm_wrapper_t startup_hsm_wrapper_;

@@ -545,8 +545,8 @@ TEST(erd_cache_change_detection, size_grow_same_prefix_change_detected)
   CHECK_FALSE(erd_cache_update(&cache, 0x1001, data2, sizeof(data2)));
 }
 
-/* Inline-to-heap promotion is treated as appliance lost — returns false. */
-TEST(erd_cache_change_detection, inline_to_heap_promotion_change_detected)
+/* Size change (growth) is treated as appliance lost — returns false. */
+TEST(erd_cache_change_detection, size_change_grow_rejected)
 {
   uint8_t data_small[8];
   memset(data_small, 0xAA, sizeof(data_small));
@@ -558,8 +558,8 @@ TEST(erd_cache_change_detection, inline_to_heap_promotion_change_detected)
   CHECK_FALSE(erd_cache_update(&cache, 0x1001, data_large, sizeof(data_large)));
 }
 
-/* Heap-to-inline shrink is treated as appliance lost — returns false. */
-TEST(erd_cache_change_detection, heap_to_inline_shrink_change_detected)
+/* Size change (shrink) is treated as appliance lost — returns false. */
+TEST(erd_cache_change_detection, size_change_shrink_rejected)
 {
   uint8_t data_large[20];
   memset(data_large, 0xAA, sizeof(data_large));
@@ -570,8 +570,8 @@ TEST(erd_cache_change_detection, heap_to_inline_shrink_change_detected)
   CHECK_FALSE(erd_cache_update(&cache, 0x1001, data_small, sizeof(data_small)));
 }
 
-/* New entry with data > 4 bytes uses heap storage */
-TEST(erd_cache_change_detection, heap_path_new_entry_uses_heap)
+/* New entry with data stored in arena */
+TEST(erd_cache_change_detection, arena_path_new_entry_stored)
 {
   uint8_t data[20];
   for (uint8_t i = 0; i < 20; i++) {
@@ -584,15 +584,15 @@ TEST(erd_cache_change_detection, heap_path_new_entry_uses_heap)
   uint16_t iterator = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iterator);
   CHECK(entry != NULL);
-  CHECK_TRUE(entry->uses_heap);
   CHECK_EQUAL(20u, entry->data_size);
+  const uint8_t* stored = erd_cache_entry_data(&cache, entry);
   for (uint8_t i = 0; i < 20; i++) {
-    CHECK_EQUAL(i, entry->ext_data[i]);
+    CHECK_EQUAL(i, stored[i]);
   }
 }
 
-/* Update existing heap entry with different data */
-TEST(erd_cache_change_detection, heap_path_update_existing_entry)
+/* Update existing arena entry with different data */
+TEST(erd_cache_change_detection, arena_path_update_existing_entry)
 {
   uint8_t data1[20];
   for (uint8_t i = 0; i < 20; i++) {
@@ -611,10 +611,10 @@ TEST(erd_cache_change_detection, heap_path_update_existing_entry)
   uint16_t iterator = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_entry(&cache, &iterator);
   CHECK(entry != NULL);
-  CHECK_TRUE(entry->uses_heap);
   CHECK_EQUAL(20u, entry->data_size);
+  const uint8_t* stored = erd_cache_entry_data(&cache, entry);
   for (uint8_t i = 0; i < 20; i++) {
-    CHECK_EQUAL(255 - i, entry->ext_data[i]);
+    CHECK_EQUAL(255 - i, stored[i]);
   }
 }
 

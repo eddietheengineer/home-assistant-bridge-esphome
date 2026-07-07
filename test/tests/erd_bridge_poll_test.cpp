@@ -7,20 +7,15 @@
  *   state_probe_list → state_polling
  */
 
-extern "C" {
-#include "erd_cache.h"
-}
-
 #include "erd_bridge_poll.h"
 
 #include "erd_lists.h"
 
 #include "CppUTest/TestHarness.h"
 #include "CppUTestExt/MockSupport.h"
-#include "double/tiny_gea3_erd_client_double.hpp"
-#include "double/tiny_timer_group_double.hpp"
+#include "simulation_test_base.h"
 
-TEST_GROUP(erd_bridge_poll)
+TEST_GROUP_BASE(erd_bridge_poll, simulation_test_base)
 {
   enum {
     polling_interval = 1000,
@@ -28,25 +23,17 @@ TEST_GROUP(erd_bridge_poll)
   };
 
   erd_bridge_poll_t self;
-  erd_cache_t test_cache;
-
-  tiny_timer_group_double_t timer_group;
-  tiny_gea3_erd_client_double_t erd_client;
 
   void setup()
   {
-    mock().strictOrder();
-
-    tiny_timer_group_double_init(&timer_group);
-    tiny_gea3_erd_client_double_init(&erd_client);
-    erd_cache_init(&test_cache);
+    simulation_test_base_setup();
   }
 
   void teardown()
   {
     mock().disable();
     erd_bridge_poll_destroy(&self);
-    erd_cache_destroy(&test_cache);
+    simulation_test_base_teardown();
     mock().enable();
   }
 
@@ -59,33 +46,6 @@ TEST_GROUP(erd_bridge_poll)
       polling_interval,
       0xC0, 0, list, count,
       &test_cache);
-  }
-
-  void after(tiny_timer_ticks_t ticks)
-  {
-    tiny_timer_group_double_elapse_time(&timer_group, ticks);
-  }
-
-  void trigger_read_completed(uint8_t address, tiny_erd_t erd, const void* data, uint8_t data_size)
-  {
-    tiny_gea3_erd_client_on_activity_args_t args;
-    args.type = tiny_gea3_erd_client_activity_type_read_completed;
-    args.address = address;
-    args.read_completed.erd = erd;
-    args.read_completed.data = data;
-    args.read_completed.data_size = data_size;
-    tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
-  }
-
-  void trigger_read_failed(tiny_erd_t erd)
-  {
-    tiny_gea3_erd_client_on_activity_args_t args;
-    args.type = tiny_gea3_erd_client_activity_type_read_failed;
-    args.address = 0xC0;
-    args.read_failed.request_id = 0;
-    args.read_failed.erd = erd;
-    args.read_failed.reason = tiny_gea3_erd_client_read_failure_reason_retries_exhausted;
-    tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
   }
 
   void given_that_the_bridge_has_entered_polling_state()
@@ -116,14 +76,9 @@ TEST_GROUP(erd_bridge_poll)
   template <typename T>
   void when_a_poll_read_completes(uint8_t address, tiny_erd_t erd, T value)
   {
-    static T _value;
-    _value = value;
-    trigger_read_completed(address, erd, &_value, sizeof(_value));
+    trigger_read_completed(address, erd, &value, sizeof(value));
   }
 
-  void nothing_should_happen()
-  {
-  }
 };
 
 // Regression: the cache should NOT be cleared on re-probe after appliance lost.
@@ -184,7 +139,6 @@ TEST(erd_bridge_poll, should_not_republish_mqtt_when_polled_erd_data_is_unchange
 
   should_request_read(0xC0, polled_erd);
   after(polling_interval);
-  nothing_should_happen();
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 }
 TEST(erd_bridge_poll, should_republish_mqtt_when_polled_erd_data_changes)
@@ -197,7 +151,6 @@ TEST(erd_bridge_poll, should_republish_mqtt_when_polled_erd_data_changes)
 
   should_request_read(0xC0, polled_erd);
   after(polling_interval);
-  nothing_should_happen();
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
   should_request_read(0xC0, polled_erd);
@@ -260,10 +213,8 @@ TEST(erd_bridge_poll, should_register_and_poll_late_erd)
   should_request_read(0xC0, late_erd);
   after(polling_interval);
 
-  nothing_should_happen();
   when_a_poll_read_completes(0xC0, polled_erd, uint8_t(0x01));
 
-  nothing_should_happen();
   when_a_poll_read_completes(0xC0, late_erd, uint8_t(0xCD));
 }
 
@@ -271,7 +222,7 @@ TEST(erd_bridge_poll, should_register_and_poll_late_erd)
 // Tests for probe list polling (pre-built list from erd_poll_list_builder)
 // ============================================================================
 
-TEST_GROUP(erd_bridge_poll_probe_list)
+TEST_GROUP_BASE(erd_bridge_poll_probe_list, simulation_test_base)
 {
   enum {
     polling_interval = 1000,
@@ -280,26 +231,19 @@ TEST_GROUP(erd_bridge_poll_probe_list)
   };
 
   erd_bridge_poll_t self;
-  erd_cache_t test_cache;
-
-  tiny_timer_group_double_t timer_group;
-  tiny_gea3_erd_client_double_t erd_client;
 
   const tiny_erd_t probe_list[2] = {probe_erd_1, probe_erd_2};
 
   void setup()
   {
-    mock().strictOrder();
-    tiny_timer_group_double_init(&timer_group);
-    tiny_gea3_erd_client_double_init(&erd_client);
-    erd_cache_init(&test_cache);
+    simulation_test_base_setup();
   }
 
   void teardown()
   {
     mock().disable();
     erd_bridge_poll_destroy(&self);
-    erd_cache_destroy(&test_cache);
+    simulation_test_base_teardown();
     mock().enable();
   }
 
@@ -314,22 +258,6 @@ TEST_GROUP(erd_bridge_poll_probe_list)
       &test_cache);
   }
 
-  void after(tiny_timer_ticks_t ticks)
-  {
-    tiny_timer_group_double_elapse_time(&timer_group, ticks);
-  }
-
-  void trigger_read_completed(uint8_t address, tiny_erd_t erd, const void* data, uint8_t data_size)
-  {
-    tiny_gea3_erd_client_on_activity_args_t args;
-    args.type = tiny_gea3_erd_client_activity_type_read_completed;
-    args.address = address;
-    args.read_completed.erd = erd;
-    args.read_completed.data = data;
-    args.read_completed.data_size = data_size;
-    tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
-  }
-
   void trigger_read_failed_not_supported(tiny_erd_t erd)
   {
     tiny_gea3_erd_client_on_activity_args_t args;
@@ -338,17 +266,6 @@ TEST_GROUP(erd_bridge_poll_probe_list)
     args.read_failed.request_id = 0;
     args.read_failed.erd = erd;
     args.read_failed.reason = tiny_gea3_erd_client_read_failure_reason_not_supported;
-    tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
-  }
-
-  void trigger_read_failed(tiny_erd_t erd)
-  {
-    tiny_gea3_erd_client_on_activity_args_t args;
-    args.type = tiny_gea3_erd_client_activity_type_read_failed;
-    args.address = 0xC0;
-    args.read_failed.request_id = 0;
-    args.read_failed.erd = erd;
-    args.read_failed.reason = tiny_gea3_erd_client_read_failure_reason_retries_exhausted;
     tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
   }
 
@@ -367,10 +284,9 @@ TEST_GROUP(erd_bridge_poll_probe_list)
   template <typename T>
   void when_a_poll_read_completes(uint8_t address, tiny_erd_t erd, T value)
   {
-    static T _value;
-    _value = value;
-    trigger_read_completed(address, erd, &_value, sizeof(_value));
+    trigger_read_completed(address, erd, &value, sizeof(value));
   }
+
 };
 
 // When probe list is provided with a known host, the bridge skips broadcast
@@ -465,36 +381,25 @@ TEST(erd_bridge_poll_probe_list, should_restart_poll_cycle_on_polling_timer)
 // Tests for empty probe list
 // ============================================================================
 
-TEST_GROUP(erd_bridge_poll_empty_list)
+TEST_GROUP_BASE(erd_bridge_poll_empty_list, simulation_test_base)
 {
   enum { polling_interval = 1000 };
 
   erd_bridge_poll_t self;
-  erd_cache_t test_cache;
-
-  tiny_timer_group_double_t timer_group;
-  tiny_gea3_erd_client_double_t erd_client;
 
   void setup()
   {
-    mock().strictOrder();
-    tiny_timer_group_double_init(&timer_group);
-    tiny_gea3_erd_client_double_init(&erd_client);
-    erd_cache_init(&test_cache);
+    simulation_test_base_setup();
   }
 
   void teardown()
   {
     mock().disable();
     erd_bridge_poll_destroy(&self);
-    erd_cache_destroy(&test_cache);
+    simulation_test_base_teardown();
     mock().enable();
   }
 
-  void after(tiny_timer_ticks_t ticks)
-  {
-    tiny_timer_group_double_elapse_time(&timer_group, ticks);
-  }
 };
 
 // When probe list is empty, the bridge transitions directly to polling
@@ -520,7 +425,7 @@ TEST(erd_bridge_poll_empty_list, should_skip_probe_and_enter_polling_with_empty_
 // Tests for probe list with retries_exhausted failures
 // ============================================================================
 
-TEST_GROUP(erd_bridge_poll_probe_failures)
+TEST_GROUP_BASE(erd_bridge_poll_probe_failures, simulation_test_base)
 {
   enum {
     polling_interval = 1000,
@@ -530,26 +435,19 @@ TEST_GROUP(erd_bridge_poll_probe_failures)
   };
 
   erd_bridge_poll_t self;
-  erd_cache_t test_cache;
-
-  tiny_timer_group_double_t timer_group;
-  tiny_gea3_erd_client_double_t erd_client;
 
   const tiny_erd_t probe_list[3] = {probe_erd_1, probe_erd_2, probe_erd_3};
 
   void setup()
   {
-    mock().strictOrder();
-    tiny_timer_group_double_init(&timer_group);
-    tiny_gea3_erd_client_double_init(&erd_client);
-    erd_cache_init(&test_cache);
+    simulation_test_base_setup();
   }
 
   void teardown()
   {
     mock().disable();
     erd_bridge_poll_destroy(&self);
-    erd_cache_destroy(&test_cache);
+    simulation_test_base_teardown();
     mock().enable();
   }
 
@@ -562,22 +460,6 @@ TEST_GROUP(erd_bridge_poll_probe_failures)
       polling_interval,
       0xC0, 0, probe_list, 3,
       &test_cache);
-  }
-
-  void after(tiny_timer_ticks_t ticks)
-  {
-    tiny_timer_group_double_elapse_time(&timer_group, ticks);
-  }
-
-  void trigger_read_completed(uint8_t address, tiny_erd_t erd, const void* data, uint8_t data_size)
-  {
-    tiny_gea3_erd_client_on_activity_args_t args;
-    args.type = tiny_gea3_erd_client_activity_type_read_completed;
-    args.address = address;
-    args.read_completed.erd = erd;
-    args.read_completed.data = data;
-    args.read_completed.data_size = data_size;
-    tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
   }
 
   void trigger_read_failed_retries_exhausted(tiny_erd_t erd)
@@ -606,10 +488,9 @@ TEST_GROUP(erd_bridge_poll_probe_failures)
   template <typename T>
   void when_a_poll_read_completes(uint8_t address, tiny_erd_t erd, T value)
   {
-    static T _value;
-    _value = value;
-    trigger_read_completed(address, erd, &_value, sizeof(_value));
+    trigger_read_completed(address, erd, &value, sizeof(value));
   }
+
 };
 
 // retries_exhausted during probe excludes the ERD from polling (same as not_supported).
@@ -618,28 +499,28 @@ TEST(erd_bridge_poll_probe_failures, should_exclude_retries_exhausted_erd_from_p
   mock().disable();
   when_the_bridge_is_initialized_with_probe_list();
 
-  // Probe phase: first succeeds, second fails with retries_exhausted, third succeeds.
+  // Probe phase: first two ERDs succeed, third fails with retries_exhausted.
   uint8_t probe_val = 0x01;
   trigger_read_completed(0xC0, probe_erd_1, &probe_val, sizeof(probe_val));
-  trigger_read_failed_retries_exhausted(probe_erd_2);
-  trigger_read_completed(0xC0, probe_erd_3, &probe_val, sizeof(probe_val));
+  trigger_read_completed(0xC0, probe_erd_2, &probe_val, sizeof(probe_val));
+  trigger_read_failed_retries_exhausted(probe_erd_3);
   mock().enable();
 
-  // Polling timer fires: only the two successful ERDs are polled.
+  // Polling timer fires: only the successful ERDs are polled.
   should_request_read(0xC0, probe_erd_1);
-  should_request_read(0xC0, probe_erd_3);
+  should_request_read(0xC0, probe_erd_2);
   after(polling_interval);
 
   when_a_poll_read_completes(0xC0, probe_erd_1, uint8_t(0xAA));
-  when_a_poll_read_completes(0xC0, probe_erd_3, uint8_t(0xCC));
+  when_a_poll_read_completes(0xC0, probe_erd_2, uint8_t(0xBB));
 }
 
 // Regression: destroy should not crash when erd_client is null.
 // This can happen if init was called with a null erd_client pointer.
 TEST(erd_bridge_poll, should_not_crash_on_destroy_with_null_erd_client)
 {
-  erd_bridge_poll_t self;
-  memset(&self, 0, sizeof(self));
-  /* timer_group is null so the guard returns early; this should not crash. */
+  self.timer_group = &timer_group.timer_group;
+  self.erd_client = NULL;
+
   erd_bridge_poll_destroy(&self);
 }

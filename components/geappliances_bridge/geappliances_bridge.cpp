@@ -22,9 +22,9 @@ namespace geappliances_bridge {
 // Safe mode RTC key (matches esphome::safe_mode::RTC_KEY).
 // Used to manually clear the boot loop counter before rebooting after cleanup,
 // so rapid reboots during config-hash OTA don't trigger safe mode.
+#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
 static constexpr uint32_t SAFE_MODE_RTC_KEY = 233825507UL;
 
-#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
 static void mark_boot_successful_for_reboot()
 {
   // Clear the safe mode boot loop counter in preferences and persist immediately.
@@ -265,7 +265,7 @@ void GeappliancesBridge::loop() {
 
   // Initialize the startup HSM on the first loop() call.
   if (this->startup_hsm_wrapper_.hsm.current == nullptr) {
-    startup_hsm_wrapper_init(&this->startup_hsm_wrapper_, this, startup_state_protocol_stack);
+    startup_hsm_wrapper_init(&this->startup_hsm_wrapper_, this, startup_state_startup_delay);
   }
 
   // Send the run_loop signal to the current HSM state — this drives
@@ -723,8 +723,7 @@ void GeappliancesBridge::dump_config() {
 
   // Display current startup state for debugging
   const char* phase_str = "Unknown";
-  if (this->startup_hsm_wrapper_.hsm.current == startup_state_protocol_stack)       phase_str = "Protocol Stack";
-  else if (this->startup_hsm_wrapper_.hsm.current == startup_state_startup_delay)   phase_str = "Startup Delay";
+  if (this->startup_hsm_wrapper_.hsm.current == startup_state_startup_delay)   phase_str = "Startup Delay";
   else if (this->startup_hsm_wrapper_.hsm.current == startup_state_autodiscovery)    phase_str = "Autodiscovery";
   else if (this->startup_hsm_wrapper_.hsm.current == startup_state_device_id)        phase_str = "Device ID";
   else if (this->startup_hsm_wrapper_.hsm.current == startup_state_mqtt_client_init) phase_str = "MQTT Client Init";
@@ -914,8 +913,11 @@ bool GeappliancesBridge::check_steady_state()
 
   if (steady) {
     this->steady_state_reached_ = true;
-    ESP_LOGI(TAG, "Appliance Bridge is in steady state (ERDs cached: %u)",
-             erd_cache_get_count(&this->erd_cache_));
+    ESP_LOGI(TAG, "Appliance Bridge is in steady state (ERDs cached: %u, arena: %u/%u bytes, %u%%)",
+             erd_cache_get_count(&this->erd_cache_),
+             erd_cache_get_arena_usage(&this->erd_cache_),
+             ERD_CACHE_ARENA_SIZE,
+             erd_cache_get_arena_usage_percent(&this->erd_cache_));
   }
 
   return steady;

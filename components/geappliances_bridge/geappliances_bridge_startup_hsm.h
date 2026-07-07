@@ -5,7 +5,7 @@
  * Replaces the manual switch-based phase progression with a proper
  * tiny_hsm-based hierarchical state machine.  The startup sequence is:
  *
- *   protocol_stack → autodiscovery → device_id → mqtt_client_init
+ *   startup_delay → autodiscovery → device_id → mqtt_client_init
  *                 → feature_bits → bridge_init → subscription_watch
  *                 → running
  *
@@ -77,9 +77,6 @@ typedef struct {
 } startup_hsm_wrapper_t;
 
 tiny_hsm_result_t startup_state_top(
-  tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
-
-tiny_hsm_result_t startup_state_protocol_stack(
   tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 
 tiny_hsm_result_t startup_state_startup_delay(

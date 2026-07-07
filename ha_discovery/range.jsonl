@@ -1080,7 +1080,7 @@
 {"i":"5520","n":"Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Bridge Mode","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Burner State","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5520","n":"Cooktop Status - Burner Power Level","d":"sensor","ds":13,"vt":"{{ ((value[4:6] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level","soff":"00"}
+{"i":"5520","n":"Cooktop Status - Burner Power Level","d":"sensor","ds":13,"vt":"{{ ((value[4:6] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level"}
 {"i":"5520","n":"Cooktop Status - Support Status","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 1) % 2 else '00' }}","fi":"support_status_1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Bridge Supported","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 2) % 2 else '00' }}","fi":"bridge_supported_1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Warming Zone Supported","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 4) % 2 else '00' }}","fi":"warming_zone_supported_1","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1088,7 +1088,7 @@
 {"i":"5520","n":"Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode_1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Bridge Mode","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode_1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Burner State","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[6:8] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5520","n":"Cooktop Status - Burner Power Level","d":"sensor","ds":13,"vt":"{{ ((value[8:10] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_1","soff":"00"}
+{"i":"5520","n":"Cooktop Status - Burner Power Level","d":"sensor","ds":13,"vt":"{{ ((value[8:10] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_1"}
 {"i":"5520","n":"Cooktop Status - Support Status","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[10:12] | int(base=16)) // 1) % 2 else '00' }}","fi":"support_status_2","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Bridge Supported","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[10:12] | int(base=16)) // 2) % 2 else '00' }}","fi":"bridge_supported_2","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Warming Zone Supported","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[10:12] | int(base=16)) // 4) % 2 else '00' }}","fi":"warming_zone_supported_2","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1096,7 +1096,7 @@
 {"i":"5520","n":"Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[10:12] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode_2","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Bridge Mode","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[10:12] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode_2","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Burner State","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[10:12] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5520","n":"Cooktop Status - Burner Power Level","d":"sensor","ds":13,"vt":"{{ ((value[12:14] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_2","soff":"00"}
+{"i":"5520","n":"Cooktop Status - Burner Power Level","d":"sensor","ds":13,"vt":"{{ ((value[12:14] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_2"}
 {"i":"5520","n":"Cooktop Status - Support Status","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[14:16] | int(base=16)) // 1) % 2 else '00' }}","fi":"support_status_3","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Bridge Supported","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[14:16] | int(base=16)) // 2) % 2 else '00' }}","fi":"bridge_supported_3","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Warming Zone Supported","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[14:16] | int(base=16)) // 4) % 2 else '00' }}","fi":"warming_zone_supported_3","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1104,7 +1104,7 @@
 {"i":"5520","n":"Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[14:16] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode_3","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Bridge Mode","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[14:16] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode_3","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Burner State","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[14:16] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5520","n":"Cooktop Status - Burner Power Level","d":"sensor","ds":13,"vt":"{{ ((value[16:18] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_3","soff":"00"}
+{"i":"5520","n":"Cooktop Status - Burner Power Level","d":"sensor","ds":13,"vt":"{{ ((value[16:18] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_3"}
 {"i":"5520","n":"Cooktop Status - Support Status","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[18:20] | int(base=16)) // 1) % 2 else '00' }}","fi":"support_status_4","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Bridge Supported","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[18:20] | int(base=16)) // 2) % 2 else '00' }}","fi":"bridge_supported_4","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Warming Zone Supported","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[18:20] | int(base=16)) // 4) % 2 else '00' }}","fi":"warming_zone_supported_4","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1112,7 +1112,7 @@
 {"i":"5520","n":"Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[18:20] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode_4","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Bridge Mode","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[18:20] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode_4","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Burner State","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[18:20] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5520","n":"Cooktop Status - Burner Power Level","d":"sensor","ds":13,"vt":"{{ ((value[20:22] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_4","soff":"00"}
+{"i":"5520","n":"Cooktop Status - Burner Power Level","d":"sensor","ds":13,"vt":"{{ ((value[20:22] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_4"}
 {"i":"5520","n":"Cooktop Status - Support Status","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 1) % 2 else '00' }}","fi":"support_status_5","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Bridge Supported","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 2) % 2 else '00' }}","fi":"bridge_supported_5","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Warming Zone Supported","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 4) % 2 else '00' }}","fi":"warming_zone_supported_5","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1120,7 +1120,7 @@
 {"i":"5520","n":"Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode_5","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Bridge Mode","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode_5","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5520","n":"Cooktop Status - Burner State","d":"binary_sensor","ds":13,"vt":"{{ '01' if ((value[22:24] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state_5","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5520","n":"Cooktop Status - Burner Power Level","d":"sensor","ds":13,"vt":"{{ ((value[24:26] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_5","soff":"00"}
+{"i":"5520","n":"Cooktop Status - Burner Power Level","d":"sensor","ds":13,"vt":"{{ ((value[24:26] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_5"}
 {"i":"5521","n":"Cooktop Built-In Temperature Sensors - Left Front Temperature","d":"sensor","ds":12,"u":"°F","dc":"temperature","sc":"measurement","vt":"{{ value[0:4] | int(base=16) }}"}
 {"i":"5521","n":"Cooktop Built-In Temperature Sensors - Left Rear","d":"sensor","ds":12,"u":"°F","sc":"measurement","vt":"{{ value[4:8] | int(base=16) }}","fi":"left_rear"}
 {"i":"5521","n":"Cooktop Built-In Temperature Sensors - Center Front","d":"sensor","ds":12,"u":"°F","sc":"measurement","vt":"{{ value[8:12] | int(base=16) }}","fi":"center_front"}
@@ -1135,7 +1135,7 @@
 {"i":"5522","n":"Extended Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Burner State","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[2:4] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[4:6] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level","soff":"00"}
+{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[4:6] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level"}
 {"i":"5522","n":"Extended Cooktop Status - Support Status","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[8:10] | int(base=16)) // 1) % 2 else '00' }}","fi":"support_status_1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[8:10] | int(base=16)) // 2) % 2 else '00' }}","fi":"bridge_supported_1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Warming Zone Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[8:10] | int(base=16)) // 4) % 2 else '00' }}","fi":"warming_zone_supported_1","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1143,7 +1143,7 @@
 {"i":"5522","n":"Extended Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[8:10] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode_1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[8:10] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode_1","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Burner State","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[8:10] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state_1","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[10:12] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_1","soff":"00"}
+{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[10:12] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_1"}
 {"i":"5522","n":"Extended Cooktop Status - Support Status","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[14:16] | int(base=16)) // 1) % 2 else '00' }}","fi":"support_status_2","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[14:16] | int(base=16)) // 2) % 2 else '00' }}","fi":"bridge_supported_2","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Warming Zone Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[14:16] | int(base=16)) // 4) % 2 else '00' }}","fi":"warming_zone_supported_2","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1151,7 +1151,7 @@
 {"i":"5522","n":"Extended Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[14:16] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode_2","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[14:16] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode_2","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Burner State","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[14:16] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state_2","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[16:18] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_2","soff":"00"}
+{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[16:18] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_2"}
 {"i":"5522","n":"Extended Cooktop Status - Support Status","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[20:22] | int(base=16)) // 1) % 2 else '00' }}","fi":"support_status_3","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[20:22] | int(base=16)) // 2) % 2 else '00' }}","fi":"bridge_supported_3","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Warming Zone Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[20:22] | int(base=16)) // 4) % 2 else '00' }}","fi":"warming_zone_supported_3","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1159,7 +1159,7 @@
 {"i":"5522","n":"Extended Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[20:22] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode_3","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[20:22] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode_3","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Burner State","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[20:22] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state_3","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[22:24] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_3","soff":"00"}
+{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[22:24] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_3"}
 {"i":"5522","n":"Extended Cooktop Status - Support Status","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[26:28] | int(base=16)) // 1) % 2 else '00' }}","fi":"support_status_4","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[26:28] | int(base=16)) // 2) % 2 else '00' }}","fi":"bridge_supported_4","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Warming Zone Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[26:28] | int(base=16)) // 4) % 2 else '00' }}","fi":"warming_zone_supported_4","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1167,7 +1167,7 @@
 {"i":"5522","n":"Extended Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[26:28] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode_4","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[26:28] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode_4","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Burner State","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[26:28] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state_4","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[28:30] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_4","soff":"00"}
+{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[28:30] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_4"}
 {"i":"5522","n":"Extended Cooktop Status - Support Status","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[32:34] | int(base=16)) // 1) % 2 else '00' }}","fi":"support_status_5","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[32:34] | int(base=16)) // 2) % 2 else '00' }}","fi":"bridge_supported_5","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Warming Zone Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[32:34] | int(base=16)) // 4) % 2 else '00' }}","fi":"warming_zone_supported_5","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1175,7 +1175,7 @@
 {"i":"5522","n":"Extended Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[32:34] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode_5","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[32:34] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode_5","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Burner State","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[32:34] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state_5","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[34:36] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_5","soff":"00"}
+{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[34:36] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_5"}
 {"i":"5522","n":"Extended Cooktop Status - Support Status","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[38:40] | int(base=16)) // 1) % 2 else '00' }}","fi":"support_status_6","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[38:40] | int(base=16)) // 2) % 2 else '00' }}","fi":"bridge_supported_6","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Warming Zone Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[38:40] | int(base=16)) // 4) % 2 else '00' }}","fi":"warming_zone_supported_6","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1183,7 +1183,7 @@
 {"i":"5522","n":"Extended Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[38:40] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode_6","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[38:40] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode_6","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Burner State","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[38:40] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state_6","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[40:42] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_6","soff":"00"}
+{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[40:42] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_6"}
 {"i":"5522","n":"Extended Cooktop Status - Support Status","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[44:46] | int(base=16)) // 1) % 2 else '00' }}","fi":"support_status_7","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[44:46] | int(base=16)) // 2) % 2 else '00' }}","fi":"bridge_supported_7","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Warming Zone Supported","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[44:46] | int(base=16)) // 4) % 2 else '00' }}","fi":"warming_zone_supported_7","pon":"01","poff":"00","son":"01","soff":"00"}
@@ -1191,7 +1191,7 @@
 {"i":"5522","n":"Extended Cooktop Status - Sous Vide Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[44:46] | int(base=16)) // 16) % 2 else '00' }}","fi":"sous_vide_mode_7","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Bridge Mode","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[44:46] | int(base=16)) // 32) % 2 else '00' }}","fi":"bridge_mode_7","pon":"01","poff":"00","son":"01","soff":"00"}
 {"i":"5522","n":"Extended Cooktop Status - Burner State","d":"binary_sensor","ds":32,"vt":"{{ '01' if ((value[44:46] | int(base=16)) // 64) % 2 else '00' }}","fi":"burner_state_7","pon":"01","poff":"00","son":"01","soff":"00"}
-{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[46:48] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_7","soff":"00"}
+{"i":"5522","n":"Extended Cooktop Status - Burner Power Level","d":"sensor","ds":32,"vt":"{{ ((value[46:48] | int(base=16)) // 1) % 128 }}","fi":"burner_power_level_7"}
 {"i":"5523","n":"Water Reservoir Status","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'Empty', '02': 'Full', '03': 'Initial Inspection'}.get(value[:2], 'Unknown') }}"}
 {"i":"562d","n":"Cooktop Right Front Burner Termination Reason","d":"sensor","ds":1,"dc":"enum","vt":"{{ {'00': 'Unknown', '01': 'Canceled', '02': 'Fault', '03': 'PanNotPresent', '04': 'ControlLock', '05': 'ClcBleDisconnected', '06': 'ClcDeselected', '07': 'ClcRemoteRequestOff'}.get(value[:2], 'Unknown') }}"}
 {"i":"5670","n":"Closed-Loop Cooking Device Remote Control Enabled","d":"binary_sensor","ds":1,"pon":"01","poff":"00","son":"01","soff":"00"}

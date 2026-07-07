@@ -26,6 +26,8 @@
 /* Miniz configuration for ESP-IDF builds */
 #define MINIZ_NO_ARCHIVE_APIS
 #define MINIZ_NO_ZLIB_COMPATIBLE_NAMES
+#define MINIZ_NO_DEFLATE_APIS
+#define MINIZ_NO_ZLIB_APIS
 #define MINIZ_NO_STDIO
 
 #include "miniz.h"

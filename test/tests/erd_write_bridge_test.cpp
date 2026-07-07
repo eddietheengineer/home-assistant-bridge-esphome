@@ -5,40 +5,32 @@
 
 extern "C" {
 #include "erd_write_bridge.h"
-#include "erd_cache.h"
 }
 
 #include "CppUTest/TestHarness.h"
 #include "CppUTestExt/MockSupport.h"
 #include "double/mqtt_client_double.hpp"
-#include "double/tiny_gea3_erd_client_double.hpp"
-#include "double/tiny_timer_group_double.hpp"
+#include "simulation_test_base.h"
 #include "tiny_gea_constants.h"
 
-TEST_GROUP(erd_write_bridge)
+TEST_GROUP_BASE(erd_write_bridge, simulation_test_base)
 {
   erd_write_bridge_t self;
-  erd_cache_t test_cache;
 
-  tiny_timer_group_double_t timer_group;
-  tiny_gea3_erd_client_double_t erd_client;
   mqtt_client_double_t mqtt_client;
 
   void setup()
   {
-    mock().strictOrder();
-
-    tiny_timer_group_double_init(&timer_group);
-    tiny_gea3_erd_client_double_init(&erd_client);
+    simulation_test_base_setup();
     mqtt_client_double_init(&mqtt_client);
-    erd_cache_init(&test_cache);
   }
+
   tiny_gea3_erd_client_request_id_t mock_request_id;
 
   void teardown()
   {
     erd_write_bridge_destroy(&self);
-    erd_cache_destroy(&test_cache);
+    simulation_test_base_teardown();
   }
 
   void when_the_bridge_is_initialized(uint8_t host_address = 0xC0)

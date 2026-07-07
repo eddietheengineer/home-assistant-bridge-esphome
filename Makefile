@@ -73,11 +73,11 @@ CPPUTEST_INC := -I$(CPPUTEST_PREFIX)/include
 CPPUTEST_LIB := -L$(CPPUTEST_PREFIX)/lib
 
 CFLAGS += -std=c11 -pedantic
-CPPFLAGS += $(SANITIZE_FLAGS) -fno-omit-frame-pointer -DUSE_ESP_IDF -DUSE_ESP_IDF_STUBS -DHA_DISCOVERY_TEST_EXPORT -DHA_DISCOVERY_CLEANUP_TEST_BUF_SIZE=512 -DHA_CLEANUP_TEST_BUF_SIZE=512 -DHA_DISCOVERY_CLEANUP_TEST_EXPORT
+CPPFLAGS += $(SANITIZE_FLAGS) -fno-omit-frame-pointer -fprofile-arcs -ftest-coverage -DUSE_ESP_IDF -DUSE_ESP_IDF_STUBS -DHA_DISCOVERY_TEST_EXPORT -DHA_DISCOVERY_CLEANUP_TEST_BUF_SIZE=512 -DHA_CLEANUP_TEST_BUF_SIZE=512 -DHA_DISCOVERY_CLEANUP_TEST_EXPORT
 CPPFLAGS += $(INC_FLAGS) $(CPPUTEST_INC) -MMD -MP -g -Wall -Wextra -Wcast-qual -Werror
 CXXFLAGS += -std=c++17
-LDFLAGS := $(SANITIZE_FLAGS) $(CPPUTEST_LIB)
-LDLIBS := -lstdc++ -lCppUTest -lCppUTestExt -lm
+LDFLAGS := $(SANITIZE_FLAGS) $(CPPUTEST_LIB) --coverage
+LDLIBS := -lstdc++ -lCppUTest -lCppUTestExt -lm --coverage
 
 BUILD_DEPS += $(MAKEFILE_LIST)
 
@@ -118,3 +118,30 @@ pytest:
 	@python3 -m pytest scripts/test_generate_erd_lists.py scripts/test_ha_discovery.py -v
 
 -include $(DEPS)
+
+.PHONY: coverage
+coverage: $(BUILD_DIR)/$(TARGET)
+	@which lcov >/dev/null 2>&1 || { echo "lcov not found. Install with: sudo apt install lcov"; exit 1; }
+	@echo Generating coverage report...
+	@mkdir -p coverage
+	@lcov --capture --directory . --output-file coverage/raw.info \
+		--exclude "*/test/*" \
+		--exclude "*/lib/tiny/test/*" \
+		--exclude "*/lib/tiny-gea-api/test/*" \
+		--exclude "*/build/*" \
+		--exclude "*/miniz.h" \
+		--exclude "*/esphome_stubs.cpp" \
+		--exclude "*/mqtt_client_double.cpp" \
+		--exclude "*/tiny_*_double.cpp" \
+		--exclude "*/test_runner.cpp" \
+		--exclude "*/simulation/*" 2>/dev/null || true
+	@lcov --extract coverage/raw.info "*/components/*" --output-file coverage/components.info 2>/dev/null || true
+	@lcov --list coverage/components.info
+	@echo "Generating HTML report in coverage/html/..."
+	@genhtml coverage/components.info --output-directory coverage/html
+	@echo "HTML report: coverage/html/index.html"
+
+.PHONY: cov-clean
+cov-clean:
+	@find . -name "*.gcda" -delete 2>/dev/null || true
+	@echo Cleaned gcda files.

@@ -37,6 +37,15 @@ void gea2_erd_client_adapter_init(
 
 Initialization sets up the GEA3 API vtable, stores the GEA2 client pointer, initializes the adapter's activity event, and subscribes to the GEA2 client's activity event for re-publishing.
 
+### `gea2_erd_client_adapter_destroy(self, gea2_client)`
+
+Unsubscribes the adapter from the GEA2 client's activity event. Guards against null `self`, null `gea2_client`, and mismatched client pointer. Idempotent — safe to call multiple times. Sets `self->gea2_client` to `nullptr` after unsubscribe.
+
+| Parameter | Description |
+|-----------|-------------|
+| `self` | Pointer to the adapter struct (may be null) |
+| `gea2_client` | GEA2 client that was passed to `init()` (may be null) |
+
 ## i_tiny_gea3_erd_client API Implementation
 
 The adapter implements `i_tiny_gea3_erd_client_api_t` with the following callbacks:
