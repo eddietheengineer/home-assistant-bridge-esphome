@@ -85,7 +85,6 @@ namespace geappliances_bridge {
 class GeappliancesBridge : public Component, public IBridgeServices {
   friend ErdPollListResult build_poll_list_(GeappliancesBridge* bridge);
   friend tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t*);
-  friend class DiscoveryRefreshButton;
 
  public:
   static constexpr unsigned long baud = 230400;
@@ -113,6 +112,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_mqtt_disconnect_duration_sensor(sensor::Sensor* sensor) { this->mqtt_disconnect_duration_sensor_ = sensor; this->diagnostic_sensor_publisher_.set_mqtt_disconnect_duration_sensor(sensor); }
   void set_throttle_rate_seconds(uint8_t rate) { this->throttle_rate_seconds_ = rate; }
   void add_custom_erd(tiny_erd_t erd);
+  void trigger_discovery_refresh();
 
  protected:
   // ── IBridgeServices implementation (called exclusively by the startup HSM) ──
@@ -159,7 +159,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void init_erd_cache_publisher_();
   void init_polling_bridge_(bool log_as_info);
   void on_poll_discovery_complete_();
-  void trigger_discovery_refresh();
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 
   // Startup HSM — replaces the manual switch-based phase progression.
