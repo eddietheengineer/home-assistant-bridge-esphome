@@ -12,7 +12,7 @@ Provides shared timing constants, HSM signal identifiers, state enums, and utili
 - Define HSM signal identifiers shared by both bridge state machines.
 - Provide `subscription_state_t` and `polling_state_t` enums with name helpers.
 - Implement `erd_set_t`, a fixed-capacity sorted ERD set that replaces `std::set<tiny_erd_t>` to eliminate heap allocations.
-- Provide `arm_timer` / `disarm_timer` / `erd_set` utility templates.
+- Provide `arm_timer` / `disarm_timer` utility templates.
 
 ### 1.3 Not Responsible For
 
@@ -31,7 +31,6 @@ enum {
   resubscribe_delay             = 1000,
   subscription_retention_period = 30 * 1000,
   subscription_quiet_period     = 2 * 1000,
-  retry_delay                   = 100,
   appliance_lost_timeout        = 60000
 };
 ```
@@ -41,7 +40,6 @@ enum {
 | `resubscribe_delay` | 1,000 | Wait before retrying a subscription request after failure. |
 | `subscription_retention_period` | 30,000 | Maximum time a subscription is retained without activity before being considered stale. |
 | `subscription_quiet_period` | 2,000 | Quiet period after subscribing before considering the subscription steady. |
-| `retry_delay` | 100 | Wait between individual retry attempts for transient failures. |
 | `appliance_lost_timeout` | 60,000 | Time without appliance communication before marking the appliance as lost. |
 
 ### 2.2 Subscription State Machine
@@ -99,8 +97,7 @@ typedef enum {
 
 ```c
 enum {
-  signal_start,
-  signal_timer_expired,
+  signal_timer_expired = tiny_hsm_signal_user_start,
   signal_polling_timer_expired,
   signal_subscription_failed,
   signal_subscription_added_or_retained,
@@ -115,7 +112,6 @@ enum {
 
 | Signal | Description |
 |--------|-------------|
-| `signal_start` | Alias for `tiny_hsm_signal_user_start`; triggers the initial transition. |
 | `signal_timer_expired` | Generic timer callback; fires when `arm_timer`'s duration elapses. |
 | `signal_polling_timer_expired` | Polling cycle timer expired; triggers the next read batch. |
 | `signal_subscription_failed` | Subscription request was rejected or timed out. |
@@ -147,26 +143,6 @@ A fixed-capacity sorted array that replaces `std::set<tiny_erd_t>`. Capacity is 
 | `erd_set_insert(self, erd)` | `bool` | Inserts `erd` in sorted order. Returns `false` if already present or capacity is full. |
 | `erd_set_clear(self)` | `void` | Resets `count` to zero without clearing the underlying array. |
 
-### 2.6 Utility Templates
-
-```c
-template<typename T>
-static void arm_timer(T* self, tiny_timer_ticks_t ticks);
-
-template<typename T>
-static void disarm_timer(T* self);
-
-template<typename T>
-static erd_set_t& erd_set(T* self);
-```
-
-| Template | Description |
-|----------|-------------|
-| `arm_timer(self, ticks)` | Starts a timer on `self->timer_group` / `self->timer` that fires `signal_timer_expired` after `ticks` timer ticks. Tick resolution is not guaranteed but is generally 1 millisecond; actual durations may be longer than specified but not shorter. |
-| `disarm_timer(self)` | Stops the timer on `self->timer_group` / `self->timer`. |
-| `erd_set(self)` | Returns a reference to `self->erd_set`. |
-
-All templates assume the target type `T` has members `timer_group`, `timer`, `hsm`, and `erd_set`.
 
 ---
 
@@ -218,6 +194,6 @@ All templates assume the target type `T` has members `timer_group`, `timer`, `hs
 
 2. **Binary search over linear.** Despite the comment in the header referencing "linear search," the actual implementation uses binary search for both `erd_set_contains` and `erd_set_insert`. This is the correct choice for maintaining sorted order efficiently.
 
-3. **Implicit inline templates.** The `arm_timer`, `disarm_timer`, and `erd_set` templates are implicitly inline (defined in a header). Each translation unit gets its own copy, avoiding ODR violations.
+3. **Implicit inline templates.** The `arm_timer` and `disarm_timer` templates are implicitly inline (defined in a header). Each translation unit gets its own copy, avoiding ODR violations.
 
-4. **Signal enum starts at `tiny_hsm_signal_user_start`.** The first signal (`signal_start`) is explicitly aliased to `tiny_hsm_signal_user_start`, ensuring all bridge signals occupy the user-defined signal range of the HSM.
+4. **Signal enum starts at `tiny_hsm_signal_user_start`.** The first signal (`signal_timer_expired`) is anchored to `tiny_hsm_signal_user_start`, ensuring all bridge signals occupy the user-defined signal range of the HSM.

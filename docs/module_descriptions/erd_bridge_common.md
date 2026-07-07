@@ -13,7 +13,6 @@ Defined as an anonymous `enum` (compile-time constants, no runtime storage):
 | `resubscribe_delay` | 1000 ms | Wait before retrying `subscribe()` after failure (subscription bridge) |
 | `subscription_retention_period` | 30000 ms (30 s) | Interval for retaining subscriptions (subscription bridge) |
 | `subscription_quiet_period` | 2000 ms (2 s) | Quiet period after subscription before transitioning to steady state |
-| `retry_delay` | 100 ms | Timeout for individual ERD read retries (both bridges) |
 | `appliance_lost_timeout` | 60000 ms (60 s) | Time without a successful read before declaring appliance lost (polling bridge) |
 
 ## Shared Signal Identifiers
@@ -22,7 +21,6 @@ Signal IDs shared between both bridge state machines, defined as an anonymous `e
 
 | Signal | Used By | Description |
 |--------|---------|-------------|
-| `signal_start` | Both (aliased to `tiny_hsm_signal_user_start`) | Initial signal to start the state machine |
 | `signal_timer_expired` | Both | Generic timer fired (retry timer in subscription, retention timer in subscription) |
 | `signal_polling_timer_expired` | Polling only | Polling cycle interval timer fired |
 | `signal_subscription_failed` | Subscription only | `subscribe()` call failed |
@@ -64,9 +62,6 @@ Starts a one-shot timer that sends `signal_timer_expired` to the HSM when it fir
 
 Stops the timer. Safe to call even if the timer is not active.
 
-### `erd_set(T* self)`
-
-Returns a reference to the `erd_set_t` stored directly in the bridge struct. Used by both bridges to track registered ERDs.
 
 ## Subscription State Machine States
 
@@ -116,7 +111,7 @@ Defined as `polling_state_t` enum:
 ## Key Design Decisions
 
 - **Header-only with inline**: All functions are template or `static inline`, avoiding ODR violations when both `erd_bridge_subscribe.cpp` and `erd_bridge_poll.cpp` include this header.
-- **Shared signal namespace**: Both bridges use the same signal ID range (starting from `tiny_hsm_signal_user_start`) to avoid conflicts. Each bridge's HSM only receives signals relevant to its own state machine.
+- **Implicit inline templates.** The `arm_timer` and `disarm_timer` templates are implicitly inline (defined in a header). Each translation unit gets its own copy, avoiding ODR violations.
 - **Fixed-capacity ERD set**: Replaced `std::set<tiny_erd_t>` with a sorted array (`erd_set_t`) to eliminate per-ERD heap allocations. This was a critical fix — the previous `std::set` caused heap fragmentation and memory pressure on the ESP32. Binary search keeps lookups fast (O(log n)) for the small set sizes involved.
 - **No MQTT dependency**: This header does not reference `i_mqtt_client`, `i_tiny_gea3_erd_client`, or `<set>`. Write handling and MQTT disconnect handling have been extracted to `erd_write_bridge` and `erd_cache_mqtt_publisher` respectively.
 - **No heap allocation**: The `erd_set_t` struct is embedded directly in each bridge struct — no dynamic allocation, no `void*` casting.
