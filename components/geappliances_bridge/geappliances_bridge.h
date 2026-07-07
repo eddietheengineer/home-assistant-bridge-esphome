@@ -125,7 +125,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void initialize_mqtt_client() override;
 
   void start_feature_bit_reading() override;
-  bool is_feature_bits_complete() override;
+  bool is_feature_bits_complete() const override;
 
   void record_startup_delay_start() override;
   bool is_startup_delay_elapsed() const override;
@@ -225,7 +225,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   polling_state_t last_logged_poll_state_{polling_state_none};
   subscription_state_t last_logged_subscribe_state_{subscription_state_none};
-  bool feature_bit_failure_logged_{false};
+  mutable bool feature_bit_failure_logged_{false};
 
   // ERD publish rate sensor: counts ERD updates per ~60s window and
   // publishes to Home Assistant.

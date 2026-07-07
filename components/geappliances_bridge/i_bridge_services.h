@@ -64,7 +64,7 @@ class IBridgeServices {
   /// Begin the feature-bit reading sequence (self-driving, no further polling needed).
   virtual void start_feature_bit_reading() = 0;
   /// Returns true once all feature-bit ERDs have been read and parsed.
-  virtual bool is_feature_bits_complete() = 0;
+  virtual bool is_feature_bits_complete() const = 0;
 
   // -- Bridge initialization -------------------------------------------------
 

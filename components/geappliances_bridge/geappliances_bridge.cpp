@@ -857,7 +857,7 @@ void GeappliancesBridge::start_feature_bit_reading()
   start_feature_bit_reading_();
 }
 
-bool GeappliancesBridge::is_feature_bits_complete()
+bool GeappliancesBridge::is_feature_bits_complete() const
 {
   FeatureBitState state = feature_bit_manager_.get_state();
   if (state == FEATURE_BIT_STATE_FAILED && !feature_bit_failure_logged_) {

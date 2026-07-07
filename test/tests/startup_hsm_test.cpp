@@ -64,7 +64,7 @@ class MockBridgeServices : public IBridgeServices {
   void start_feature_bit_reading() override {
     mock().actualCall("start_feature_bit_reading").onObject(this);
   }
-  bool is_feature_bits_complete() override {
+  bool is_feature_bits_complete() const override {
     return mock().actualCall("is_feature_bits_complete").onObject(this)
                .returnBoolValueOrDefault(false);
   }
