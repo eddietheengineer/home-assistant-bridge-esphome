@@ -31,18 +31,17 @@ TEST_GROUP(discovery_refresh_button)
 TEST(discovery_refresh_button, can_be_constructed_with_bridge_pointer)
 {
   DiscoveryRefreshButton button(&bridge);
-  // Verify the button was constructed and is addressable.
-  CHECK(&button != nullptr);}
-
+  /* Button constructed successfully — no crash. */
+  (void)button;
+}
 TEST(discovery_refresh_button, press_action_does_not_crash_with_uninitialized_bridge)
 {
   /* Bridge has not been set up (steady_state_reached_ is false).
    * trigger_discovery_refresh() will early-return due to the steady-state guard. */
   DiscoveryRefreshButton button(&bridge);
   button.press_action();
-  // Verify the bridge object is still valid after the no-op press.
-  CHECK(&bridge != nullptr);}
-
+  /* No crash = pass. */
+}
 TEST(discovery_refresh_button, press_action_is_idempotent_after_successful_trigger)
 {
   /* We cannot directly set steady_state_reached_ from test code (it's private),
@@ -51,27 +50,23 @@ TEST(discovery_refresh_button, press_action_is_idempotent_after_successful_trigg
   button.press_action();
   button.press_action();
   button.press_action();
-  // Multiple presses must not crash regardless of internal state.
-  CHECK(&bridge != nullptr);}
-
+  /* Multiple presses must not crash regardless of internal state. */
+}
 TEST(discovery_refresh_button, press_action_safe_when_bridge_is_null)
 {
   /* Button constructed with null bridge pointer must not crash on press. */
   DiscoveryRefreshButton button(nullptr);
   button.press_action();
-  // The null guard in press_action() prevents dereferencing a null pointer.
-  // Verify the button object is still valid after the no-op press.
-  CHECK(&button != nullptr);}
-
+  /* No crash = pass. */
+}
 TEST(discovery_refresh_button, multiple_presses_with_null_bridge_are_safe)
 {
   DiscoveryRefreshButton button(nullptr);
   button.press_action();
   button.press_action();
   button.press_action();
-  // Verify the button object is still valid after multiple no-op presses.
-  CHECK(&button != nullptr);}
-
+  /* No crash = pass. */
+}
 
 TEST(discovery_refresh_button, button_inherits_from_button_base)
 {
@@ -87,4 +82,5 @@ TEST(discovery_refresh_button, press_action_safe_after_teardown)
   DiscoveryRefreshButton button(&bridge);
   bridge.teardown();
   button.press_action();
-  CHECK(&bridge != nullptr);}
+  /* No crash = pass. */
+}
