@@ -341,7 +341,6 @@ TEST(startup_hsm, services_from_hsm_returns_correct_pointer)
   mock().expectOneCall("record_startup_delay_start").onObject(&svc);
   startup_hsm_wrapper_init(&wrapper, &svc, startup_state_startup_delay);
   // startup_delay is the initial state and calls record_startup_delay_start on entry.
-
   IBridgeServices* recovered = services_from_hsm(&wrapper.hsm);
 
   CHECK(recovered == &svc);

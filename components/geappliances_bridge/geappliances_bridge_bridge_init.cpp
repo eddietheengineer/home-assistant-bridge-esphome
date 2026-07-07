@@ -57,7 +57,6 @@ ErdPollListResult build_poll_list_(GeappliancesBridge* bridge)
 {
   ErdPollListConfig config;
   config.mode = bridge->mode_;
-  config.subscription_capable = !bridge->autodiscovery_manager_.is_gea2_protocol();
   {
     subscription_state_t sub_state = bridge->get_subscription_state();
     config.subscription_active = subscription_is_active(sub_state);
@@ -101,7 +100,6 @@ void GeappliancesBridge::init_polling_bridge_(bool log_as_info)
       this->autodiscovery_manager_.get_active_erd_client(),
       this->polling_interval_ms_,
       this->autodiscovery_manager_.get_host_address(),
-      this->device_identity_manager_.get_appliance_type(),
       this->poll_probe_list_,
       this->poll_probe_list_count_,
       &this->erd_cache_);

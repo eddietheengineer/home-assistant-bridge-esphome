@@ -41,7 +41,7 @@ Copies the valid-ERD set from the Feature Bit Manager and enables valid-ERD filt
 **Behavior:**
 - If `erds` is null or `count` is zero: returns immediately; the current filter state is unchanged (if filtering was previously enabled, it stays enabled). This prevents an empty set from silently suppressing all publishes.
 - If `count` exceeds `ERD_REGISTRY_MAX_VALID`: copies only the first `ERD_REGISTRY_MAX_VALID` entries.
-- On success: sets `valid_erds_ready_` to `true`, activating the filter.
+- On success: sorts `valid_erds_` in ascending order (for binary search), then sets `valid_erds_ready_` to `true`, activating the filter.
 
 Called once during bridge initialization, after the Feature Bit Manager completes parsing.
 
@@ -92,7 +92,7 @@ Returns `true` if the ERD passes the valid-ERD filter.
 
 **Behavior:**
 - If `valid_erds_ready_` is `false`: returns `true` (no filter active — all ERDs are valid).
-- Otherwise: scans `valid_erds_` for a match; returns `true` if found, `false` otherwise.
+- Otherwise: performs a binary search on `valid_erds_`; returns `true` if found, `false` otherwise.
 
 ---
 
@@ -199,6 +199,6 @@ Diagnostics
 ## 10. Known Limitations
 
 1. **Fixed capacity:** Both arrays are capped at 645 entries. If the appliance reports more than 645 valid ERDs, excess entries are silently dropped. If more than 645 unique ERDs are registered at runtime, excess registrations are dropped.
-2. **Linear scan for `is_valid()`:** Validation scans the valid set sequentially. With up to 645 entries, this is bounded but not O(1). The set is small enough that this is acceptable for the target platform.
+2. **Binary search for `is_valid()`:** Validation uses `std::binary_search` on the sorted valid set. O(log n) lookup, bounded by the 645-entry capacity.
 3. **No removal:** ERDs cannot be unregistered or removed from the valid set. If the appliance's supported ERD set changes at runtime (e.g., firmware update), the registry must be re-initialized.
-4. **No ordering guarantee:** The valid set preserves the order provided by the Feature Bit Manager. The registered set is ordered by first registration time. Neither is sorted.
+4. **No ordering guarantee:** The valid set is sorted in ascending order after `set_valid_erds()` is called, to enable binary search in `is_valid()`. The registered set is ordered by first registration time. Neither preserves the original input order.

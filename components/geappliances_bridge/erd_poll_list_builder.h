@@ -31,7 +31,6 @@
 
 #pragma once
 #include <cstdint>
-#include <string>
 
 #include "tiny_erd.h"
 #include "erd_lists.h"
@@ -50,12 +49,7 @@ struct ErdPollListConfig {
   /// The operating mode (POLL, SUBSCRIBE, or AUTO).
   BridgeMode mode;
 
-  /// Whether the appliance supports GEA3 subscriptions.
-  /// For GEA2 appliances this is always false.
-  bool subscription_capable;
-
   /// Whether subscription is currently active and confirmed.
-  /// Only relevant when mode == SUBSCRIBE or (mode == AUTO and subscription is valid).
   bool subscription_active;
 
   /// Whether appliance API feature bit filtering is enabled.

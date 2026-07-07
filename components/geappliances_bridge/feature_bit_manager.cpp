@@ -186,6 +186,17 @@ void FeatureBitManager::handle_read_completed_(tiny_erd_t erd, const void* data,
 {
   this->read_queued_ = false;
 
+  /* Validate the incoming ERD matches the expected one in the sequence.
+   * If ERDs arrive out of order or an unexpected ERD fires, skip it to
+   * avoid storing data in the wrong slot. */
+  uint8_t idx = this->reading_idx_;
+  if (idx >= FEATURE_ERD_COUNT || erd != feature_erd_list[idx]) {
+    ESP_LOGE(TAG, "Feature bit ERD 0x%04X: unexpected (expected 0x%04X at index %u), skipping",
+             erd, (idx < FEATURE_ERD_COUNT) ? feature_erd_list[idx] : 0, idx);
+    this->skip_to_next_erd_(erd);
+    return;
+  }
+
   if (data == nullptr) {
     ESP_LOGW(TAG, "Feature bit ERD 0x%04X: null data pointer, skipping", erd);
     this->skip_to_next_erd_(erd);
@@ -199,11 +210,8 @@ void FeatureBitManager::handle_read_completed_(tiny_erd_t erd, const void* data,
   }
 
   /* Store the ERD data in the corresponding buffer. */
-  uint8_t idx = this->reading_idx_;
-  if (idx < FEATURE_ERD_COUNT) {
-    memcpy(this->erd_data_.data[idx], data, copy_size);
-    this->erd_data_.sizes[idx] = copy_size;
-  }
+  memcpy(this->erd_data_.data[idx], data, copy_size);
+  this->erd_data_.sizes[idx] = copy_size;
 
   ESP_LOGD(TAG, "Read feature ERD 0x%04X (%u/%u): %u bytes",
            erd, idx + 1, FEATURE_ERD_COUNT, copy_size);

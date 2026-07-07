@@ -500,7 +500,7 @@ void GeappliancesBridge::run_protocol_stack_()
   // so tiny_timer_group_run() fires both poll callbacks on every call.  By
   // disabling the inactive adapter, its poll() returns early without reading
   // bytes or publishing events to an interface that isn't being driven.
-  uint32_t loop_start = esphome::millis();
+  uint32_t protocol_stack_start = esphome::millis();
   if (this->gea2_uart_ != nullptr && this->uart_ != nullptr) {
     esphome_uart_adapter_set_enabled(&this->uart_adapter_, !need_gea2_loop);
     esphome_uart_adapter_set_enabled(&this->gea2_uart_adapter_, need_gea2_loop);
@@ -516,7 +516,6 @@ void GeappliancesBridge::run_protocol_stack_()
     // Hard safety cap: never run longer than 2x the nominal duration.
     // If the loop exceeds this, break to avoid starving the ESPHome
     // framework watchdog (which fires at 30 ms intervals).
-    static constexpr uint32_t GEA2_LOOP_HARD_CAP_MS = GEA2_LOOP_DURATION_MS * 2;
     while (millis() - loop_start_ms < GEA2_LOOP_DURATION_MS) {
       // Safety break: if we've exceeded the hard cap, exit immediately.
       // This can happen if millis() jumps (e.g., after deep sleep wake)
@@ -569,7 +568,6 @@ void GeappliancesBridge::run_protocol_stack_()
     // bridge initialization, and steady-state polling/subscription.
     if (this->uart_ != nullptr) {
       uint32_t gea3_loop_start_ms = millis();
-      static constexpr uint32_t GEA3_LOOP_HARD_CAP_MS = GEA3_LOOP_DURATION_MS * 2;
       while (millis() - gea3_loop_start_ms < GEA3_LOOP_DURATION_MS) {
         if (millis() - gea3_loop_start_ms >= GEA3_LOOP_HARD_CAP_MS) {
           ESP_LOGW(TAG, "GEA3 tight loop exceeded hard cap (%u ms), breaking",
@@ -594,7 +592,7 @@ void GeappliancesBridge::run_protocol_stack_()
       }
     }
   }
-  uint32_t loop_elapsed = esphome::millis() - loop_start;
+  uint32_t loop_elapsed = esphome::millis() - protocol_stack_start;
   if (loop_elapsed >= 1000) {
     ESP_LOGW(TAG, "Long run_protocol_stack: %ums (mode=%s, polling=%s)",
              loop_elapsed, this->mode_ == BRIDGE_MODE_SUBSCRIBE ? "sub" : (this->mode_ == BRIDGE_MODE_AUTO ? "auto" : "poll"),
@@ -621,6 +619,7 @@ void GeappliancesBridge::log_poll_state_transitions_()
     polling_state_t poll_state = this->get_polling_state();
     if (poll_state != polling_state_none && poll_state != this->last_logged_poll_state_) {
       this->last_logged_poll_state_ = poll_state;
+      ESP_LOGD(TAG, "Polling bridge state: %s", polling_state_name(poll_state));
     }
   }
 
@@ -760,6 +759,12 @@ bool GeappliancesBridge::teardown() {
   s_gea2_tick_source.bridge = nullptr;
   this->gea2_tick_count_ = 0;
   this->gea2_last_ms_ = 0;
+  // Clear the seen ERDs set for symmetry with erd_set_init() in setup().
+  erd_set_clear(&this->custom_erd_subscription_seen_erds_);
+  // Reset the feature bit failure log flag for correct behavior after re-init.
+  this->feature_bit_failure_logged_ = false;
+  // Destroy the startup HSM wrapper (unsubscribes event subscriptions).
+  startup_hsm_wrapper_destroy(&this->startup_hsm_wrapper_);
   // Clean up feature bit manager (unsubscribe from ERD client events, stop timers).
   this->feature_bit_manager_.cleanup();
   // Clean up autodiscovery manager (unsubscribe from ERD client events, stop timer).
@@ -869,10 +874,13 @@ void GeappliancesBridge::start_feature_bit_reading()
 
 bool GeappliancesBridge::is_feature_bits_complete() const
 {
-  return feature_bit_manager_.get_state() == FEATURE_BIT_STATE_COMPLETE ||
-         feature_bit_manager_.get_state() == FEATURE_BIT_STATE_FAILED;
+  FeatureBitState state = feature_bit_manager_.get_state();
+  if (state == FEATURE_BIT_STATE_FAILED && !feature_bit_failure_logged_) {
+    feature_bit_failure_logged_ = true;
+    ESP_LOGW(TAG, "Feature bit parsing failed; falling back to full polling mode");
+  }
+  return state == FEATURE_BIT_STATE_COMPLETE || state == FEATURE_BIT_STATE_FAILED;
 }
-
 void GeappliancesBridge::record_startup_delay_start()
 {
   startup_delay_start_ms_ = millis();

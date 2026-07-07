@@ -17,17 +17,18 @@ Reads and parses appliance API feature bit ERDs (0x0092 through 0x010D), buildin
 ## State Machine
 
 ```
-FEATURE_BIT_STATE_READING_0092  (common feature API)
-  → FEATURE_BIT_STATE_READING_0093  (appliance feature API 0)
-    → ... (0094, 0095, 0096, 0097, 0109, 010A, 010B, 010C, 010D)
-      → FEATURE_BIT_STATE_PARSING
-            → FEATURE_BIT_STATE_COMPLETE
-                → valid_list_ready_ = true
+FEATURE_BIT_STATE_READING  (single state for all 11 ERD reads)
+  → reading_idx_ 0: read ERD 0x0092 (common feature API)
+    → reading_idx_ 1: read ERD 0x0093 (appliance feature API 0)
+      → ... (reading_idx_ 2-10: ERDs 0x0094-0x010D)
+        → FEATURE_BIT_STATE_PARSING
+              → FEATURE_BIT_STATE_COMPLETE
+                  → valid_list_ready_ = true
 
 ERD 0x0092 failure → FEATURE_BIT_STATE_FAILED
   → bridge falls back to full polling (no feature filtering)
 
-Any other read failure → skip to next ERD in sequence
+Any other read failure → skip to next ERD in sequence (advance reading_idx_)
 ```
 
 ### Self-Driving Architecture

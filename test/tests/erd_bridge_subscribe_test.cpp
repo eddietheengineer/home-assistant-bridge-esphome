@@ -144,6 +144,10 @@ TEST_GROUP_BASE(erd_bridge_subscribe, simulation_test_base)
       &args);
   }
 
+  void after(tiny_timer_ticks_t ticks)
+  {
+    tiny_timer_group_double_elapse_time(&timer_group, ticks);
+  }
 };
 
 TEST(erd_bridge_subscribe, should_subscribe_when_initialized)

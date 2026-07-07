@@ -75,6 +75,7 @@ static inline bool is_feature_bit_erd(tiny_erd_t erd)
 // GEA protocol transmits ERD values MSB-first (big-endian).
 static inline uint64_t read_be64(const uint8_t* buf, uint8_t size)
 {
+  if (!buf || size == 0) return 0;
   uint64_t bits = 0;
   uint8_t  n    = (size < 8u) ? size : 8u;
   for (uint8_t i = 0; i < n; i++) {

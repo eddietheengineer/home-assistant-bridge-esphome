@@ -499,7 +499,6 @@ static void erd_bridge_poll_init_impl(
   i_tiny_gea3_erd_client_t* erd_client,
   uint32_t                  polling_interval_ms,
   uint8_t                   initial_host_address,
-  uint8_t                   initial_appliance_type,
   const tiny_erd_t*         probe_list,
   uint16_t                  probe_list_count,
   erd_cache_t*              cache)
@@ -510,7 +509,6 @@ static void erd_bridge_poll_init_impl(
   // Must be set before tiny_hsm_init() so state_probe_list entry
   // can probe at the correct address.
   self->erd_host_address       = initial_host_address;
-  self->appliance_type         = initial_appliance_type;
   // Store the pre-known address so that signal_appliance_lost can restore it
   // after a transient read failure.
   self->known_host_address     = initial_host_address;
@@ -560,14 +558,13 @@ void erd_bridge_poll_init(
   i_tiny_gea3_erd_client_t* erd_client,
   uint32_t                  polling_interval_ms,
   uint8_t                   host_address,
-  uint8_t                   appliance_type,
   const tiny_erd_t*         probe_list,
   uint16_t                  probe_list_count,
   erd_cache_t*              cache)
 {
   erd_bridge_poll_init_impl(
     self, timer_group, erd_client, polling_interval_ms,
-    host_address, appliance_type, probe_list, probe_list_count, cache);
+    host_address, probe_list, probe_list_count, cache);
 }
 
 void erd_bridge_poll_destroy(erd_bridge_poll_t* self)

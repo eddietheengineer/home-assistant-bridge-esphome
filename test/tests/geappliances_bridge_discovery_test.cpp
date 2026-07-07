@@ -34,7 +34,6 @@ TEST(geappliances_bridge_discovery, set_generate_device_config_sets_flag_correct
   bridge.set_generate_device_config(false);
   bridge.set_generate_device_config(true);
 }
-
 TEST(geappliances_bridge_discovery, set_filter_config_topics_sets_flag_correctly)
 {
   /* Toggling setter doesn't crash. */
@@ -42,7 +41,6 @@ TEST(geappliances_bridge_discovery, set_filter_config_topics_sets_flag_correctly
   bridge.set_filter_config_topics(true);
   bridge.set_filter_config_topics(false);
 }
-
 TEST(geappliances_bridge_discovery, trigger_discovery_refresh_safe_on_initialized_bridge)
 {
   /* trigger_discovery_refresh() is protected; access via DiscoveryRefreshButton
@@ -52,7 +50,6 @@ TEST(geappliances_bridge_discovery, trigger_discovery_refresh_safe_on_initialize
   button.press_action();
   /* No crash = guard chain works when steady_state_reached_ is false. */
 }
-
 TEST(geappliances_bridge_discovery, button_press_is_idempotent)
 {
   /* Multiple presses don't crash and don't cause side effects
@@ -62,14 +59,12 @@ TEST(geappliances_bridge_discovery, button_press_is_idempotent)
   button.press_action();
   button.press_action();
 }
-
 TEST(geappliances_bridge_discovery, button_safe_with_null_bridge)
 {
   /* Button with null bridge pointer should not crash. */
   DiscoveryRefreshButton button(nullptr);
   button.press_action();
 }
-
 TEST(geappliances_bridge_discovery, button_inherits_from_button_base)
 {
   /* DiscoveryRefreshButton is a subclass of esphome::button::Button. */

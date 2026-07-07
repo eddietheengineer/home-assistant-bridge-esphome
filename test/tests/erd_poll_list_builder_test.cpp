@@ -21,7 +21,6 @@ TEST_GROUP(erd_poll_list_builder)
   void setup()
   {
     config.mode = BRIDGE_MODE_POLL;
-    config.subscription_capable = true;
     config.subscription_active = false;
     config.appliance_api_parsing = false;
     config.feature_bit_valid_erds = nullptr;
@@ -231,7 +230,6 @@ TEST(erd_poll_list_builder, empty_feature_bits_with_api_parsing_returns_only_cus
 TEST(erd_poll_list_builder, gea2_protocol_returns_full_list)
 {
   config.mode = BRIDGE_MODE_POLL;
-  config.subscription_capable = false;
   config.appliance_api_parsing = false;
   config.appliance_type = 0;
 
