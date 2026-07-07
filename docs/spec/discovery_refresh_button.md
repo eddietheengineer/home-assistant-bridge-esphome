@@ -79,18 +79,18 @@ The bridge is expected to outlive the button in normal operation, as both are ma
 
 ### 4.2 trigger_discovery_refresh() Flow
 
-When `press_action()` delegates to `bridge_->trigger_discovery_refresh()`, the bridge performs:
+When `press_action()` delegates to `bridge_->trigger_discovery_refresh()`, the bridge delegates to `ota_cleanup_manager_.trigger_discovery_refresh()`. The `OtaCleanupManager` performs:
 
-1. **Idempotency guard:** If `discovery_refresh_in_progress_` is `true`, log a warning ("Discovery refresh already in progress, ignoring") and return. Prevents concurrent requests.
+1. **Idempotency guard:** If `discovery_refresh_in_progress_` (owned by `OtaCleanupManager`) is `true`, log a warning ("Discovery refresh already in progress, ignoring") and return. Prevents concurrent requests.
 2. **Queue the request:** Set `discovery_refresh_in_progress_` to `true` and log "Discovery refresh queued, will execute when appliance is ready".
 
-No guard checks for steady state, MQTT readiness, or device ID are performed at press time. The request is queued and will execute in `loop()` once all prerequisites are met. This allows the user to press the button at any time, even during startup.
+No guard checks for steady state, MQTT readiness, or device ID are performed at press time. The request is queued and will execute in `OtaCleanupManager::loop()` once all prerequisites are met. This allows the user to press the button at any time, even during startup.
 
-### 4.3 Queued Execution in loop()
+### 4.3 Queued Execution in OtaCleanupManager::loop()
 
-The bridge's main loop checks `discovery_refresh_in_progress_` and, when the bridge is ready, starts the cleanup:
+The bridge's `loop()` calls `ota_cleanup_manager_.loop()`, which checks `discovery_refresh_in_progress_` and, when the bridge is ready, starts the cleanup:
 
-1. **Wait for readiness:** The loop checks `steady_state_reached_`, `mqtt_client_adapter_initialized_`, and `device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE`.
+1. **Wait for readiness:** The manager checks `steady_state_reached_`, `mqtt_client_adapter_initialized_`, and `device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE`.
 2. **Start cleanup:** Once ready, `ha_discovery_cleanup_configure()` and `ha_discovery_cleanup_start()` are called, `discovery_refresh_in_progress_` is cleared, and `ota_cleanup_in_progress_` is set to `true`. This hands off to the shared cleanup → publish → reboot path.
 3. **Drive cleanup:** `ha_discovery_cleanup_run()` is called each loop iteration. When done, the cleanup module is destroyed and fresh discovery topics are published.
 4. **Drive discovery publishing:** `ha_discovery_manager_run()` publishes discovery payloads. When done, `mark_boot_successful_for_reboot()` is called.
@@ -106,21 +106,21 @@ The bridge's main loop checks `discovery_refresh_in_progress_` and, when the bri
 
 | Condition | Result |
 |-----------|--------|
-| `bridge_ != nullptr` | Delegates to `trigger_discovery_refresh()` |
-| `discovery_refresh_in_progress_ == false` | Passes idempotency guard |
-| **Outcome** | `discovery_refresh_in_progress_` set to `true`. The main loop will start cleanup immediately (bridge is already ready), then proceed through cleanup → publish → reboot. |
+| `bridge_ != nullptr` | Delegates to `trigger_discovery_refresh()`, which forwards to `ota_cleanup_manager_.trigger_discovery_refresh()` |
+| `discovery_refresh_in_progress_` (in `OtaCleanupManager`) == false | Passes idempotency guard |
+| **Outcome** | `discovery_refresh_in_progress_` set to `true` in `OtaCleanupManager`. The manager's `loop()` will start cleanup immediately (bridge is already ready), then proceed through cleanup → publish → reboot. |
 
 ### 5.2 Press While Refresh Already In Progress
 
 | Condition | Result |
 |-----------|--------|
-| `discovery_refresh_in_progress_ == true` | **Blocked** — warning logged: "Discovery refresh already in progress, ignoring". No state change. |
+| `discovery_refresh_in_progress_` (in `OtaCleanupManager`) == true | **Blocked** — warning logged: "Discovery refresh already in progress, ignoring". No state change. |
 
 ### 5.3 Press Before Steady State Reached
 
 | Condition | Result |
 |-----------|--------|
-| `steady_state_reached_ == false` (or MQTT not ready, or device ID not complete) | **Queued** — `discovery_refresh_in_progress_` set to `true`. The request waits in `loop()` until all prerequisites are met, then executes. |
+| `steady_state_reached_ == false` (or MQTT not ready, or device ID not complete) | **Queued** — `discovery_refresh_in_progress_` set to `true` in `OtaCleanupManager`. The request waits in `OtaCleanupManager::loop()` until all prerequisites are met, then executes. |
 
 ### 5.4 Press With Null Bridge
 
@@ -144,15 +144,15 @@ The guard is silent — no log message is emitted when `bridge_` is null.
 
 ### 6.2 Idempotency
 
-`trigger_discovery_refresh()` guards against concurrent execution via `discovery_refresh_in_progress_`. Multiple rapid presses of the button are safely ignored after the first press queues the request.
+`trigger_discovery_refresh()` delegates to `ota_cleanup_manager_.trigger_discovery_refresh()`, which guards against concurrent execution via `discovery_refresh_in_progress_` (owned by `OtaCleanupManager`). Multiple rapid presses of the button are safely ignored after the first press queues the request.
 
 ### 6.3 Queued Execution
 
-The request is queued rather than rejected if the bridge is not ready. This eliminates the need for guard checks at press time and allows the user to press the button at any time. The actual cleanup starts in `loop()` once `steady_state_reached_`, `mqtt_client_adapter_initialized_`, and device ID completion are all true.
+The request is queued rather than rejected if the bridge is not ready. This eliminates the need for guard checks at press time and allows the user to press the button at any time. The actual cleanup starts in `OtaCleanupManager::loop()` once `steady_state_reached_`, `mqtt_client_adapter_initialized_`, and device ID completion are all true.
 
 ### 6.4 Shared Path with OTA
 
-The Discovery Refresh button uses the same cleanup → publish → reboot path as OTA-triggered discovery. Both paths share `ota_cleanup_in_progress_`, `ota_discovery_publishing_`, and `ota_reboot_pending_`. This means a Discovery Refresh request and an OTA-triggered cleanup cannot run concurrently — the first one to start owns the path.
+The Discovery Refresh button uses the same cleanup → publish → reboot path as OTA-triggered discovery. Both paths share `ota_cleanup_in_progress_`, `ota_discovery_publishing_`, and `ota_reboot_pending_` (all owned by `OtaCleanupManager`). This means a Discovery Refresh request and an OTA-triggered cleanup cannot run concurrently — the first one to start owns the path.
 
 ---
 
@@ -171,9 +171,9 @@ The Discovery Refresh button uses the same cleanup → publish → reboot path a
 
 1. **Single bridge reference:** `bridge_` is set once at construction and never modified.
 2. **No ownership:** The button does not own or manage the lifecycle of the bridge.
-3. **Delegation-only behavior:** The button performs no cleanup logic itself — all work is delegated to `GeappliancesBridge::trigger_discovery_refresh()`.
-4. **Queued execution:** The request is queued at press time and executes in `loop()` when the bridge is ready. No guard checks for steady state, MQTT, or device ID are performed at press time.
-5. **Shared cleanup path with OTA:** Both OTA reboot and Discovery Refresh use the same `ota_cleanup_in_progress_` → `ota_discovery_publishing_` → `ota_reboot_pending_` flow.
+3. **Delegation-only behavior:** The button performs no cleanup logic itself — all work is delegated to `GeappliancesBridge::trigger_discovery_refresh()`, which forwards to `OtaCleanupManager`.
+4. **Queued execution:** The request is queued at press time and executes in `OtaCleanupManager::loop()` when the bridge is ready. No guard checks for steady state, MQTT, or device ID are performed at press time.
+5. **Shared cleanup path with OTA:** Both OTA reboot and Discovery Refresh use the same `ota_cleanup_in_progress_` → `ota_discovery_publishing_` → `ota_reboot_pending_` flow (all state owned by `OtaCleanupManager`).
 
 ---
 

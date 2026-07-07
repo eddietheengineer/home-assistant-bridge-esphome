@@ -62,6 +62,35 @@ DiscoveryRefreshButton = geappliances_bridge_ns.class_(
 )
 
 
+async def _create_diagnostic_sensor(config: dict[str, Any], config_key: str, default_name: str, sensor_id: str, state_class: str, var: Any, setter_name: str, extra: dict[str, Any] | None = None) -> None:
+    """Create a diagnostic sensor if enabled in config.
+    
+    Args:
+        config: The full configuration dictionary.
+        config_key: The config key to check for the sensor setting.
+        default_name: Default display name for the sensor.
+        sensor_id: The ID slug for the sensor (used for CONF_ID).
+        state_class: Home Assistant state class (e.g. "measurement", "total_increasing").
+        var: The GeappliancesBridge variable to set the sensor on.
+        setter_name: Name of the setter method on var (e.g. "set_erd_publish_rate_sensor").
+        extra: Optional extra sensor config keys (e.g. {"accuracy_decimals": 0}).
+    """
+    val = config.get(config_key, True)
+    if val is not False:
+        if val is True:
+            val = {
+                "name": default_name,
+                CONF_ID: ID(sensor_id, is_declaration=True, type=sensor.Sensor),
+                CONF_STATE_CLASS: _make_state_class(state_class),
+                "disabled_by_default": False,
+                "force_update": False,
+            }
+            if extra:
+                val.update(extra)
+        sens = await sensor.new_sensor(val)
+        cg.add(getattr(var, setter_name)(sens))
+
+
 def _make_state_class(value: str):
     """Wrap a state_class string as an EnumValue for codegen."""
     v = cv.add_class_to_obj(value, EnumValue)
@@ -206,89 +235,14 @@ async def to_code(config: dict[str, Any]) -> None:
     cg.add(var.set_generate_device_config(config[CONF_GENERATE_DEVICE_CONFIG]))
     cg.add(var.set_throttle_rate_seconds(config[CONF_THROTTLE_RATE_SECONDS]))
     cg.add(var.set_filter_config_topics(config[CONF_FILTER_CONFIG_TOPICS]))
-
-
     # Create diagnostic sensors (auto-created by default, set to false to disable)
-    val = config.get(CONF_ERD_PUBLISH_RATE_SENSOR, True)
-    if val is not False:
-        if val is True:
-            val = {
-                "name": "ERD Publish Rate",
-                CONF_ID: ID("erd_publish_rate", is_declaration=True, type=sensor.Sensor),
-                CONF_STATE_CLASS: _make_state_class("measurement"),
-                "disabled_by_default": False,
-                "force_update": False,
-            }
-        sens = await sensor.new_sensor(val)
-        cg.add(var.set_erd_publish_rate_sensor(sens))
+    await _create_diagnostic_sensor(config, CONF_ERD_PUBLISH_RATE_SENSOR, "ERD Publish Rate", "erd_publish_rate", "measurement", var, "set_erd_publish_rate_sensor")
+    await _create_diagnostic_sensor(config, CONF_ERD_CACHE_ENTRIES_SENSOR, "ERD Cache Entries", "erd_cache_entries", "measurement", var, "set_erd_cache_entries_sensor", {"accuracy_decimals": 0})
+    await _create_diagnostic_sensor(config, CONF_ERD_CACHE_UPDATES_SENSOR, "ERD Cache Update Rate", "erd_cache_updates", "measurement", var, "set_erd_cache_updates_sensor")
+    await _create_diagnostic_sensor(config, CONF_MQTT_PUBLISH_RATE_SENSOR, "MQTT Publish Rate", "mqtt_publish_rate", "measurement", var, "set_mqtt_publish_rate_sensor")
+    await _create_diagnostic_sensor(config, CONF_MQTT_DISCONNECT_COUNT_SENSOR, "MQTT Disconnect Count", "mqtt_disconnect_count", "total_increasing", var, "set_mqtt_disconnect_count_sensor", {"accuracy_decimals": 0})
+    await _create_diagnostic_sensor(config, CONF_MQTT_DISCONNECT_DURATION_SENSOR, "MQTT Last Disconnect Duration", "mqtt_disconnect_duration", "measurement", var, "set_mqtt_disconnect_duration_sensor", {"unit_of_measurement": "ms"})
 
-    val = config.get(CONF_ERD_CACHE_ENTRIES_SENSOR, True)
-    if val is not False:
-        if val is True:
-            val = {
-                "name": "ERD Cache Entries",
-                CONF_ID: ID("erd_cache_entries", is_declaration=True, type=sensor.Sensor),
-                CONF_STATE_CLASS: _make_state_class("measurement"),
-                "disabled_by_default": False,
-                "force_update": False,
-                "accuracy_decimals": 0,
-            }
-        sens = await sensor.new_sensor(val)
-        cg.add(var.set_erd_cache_entries_sensor(sens))
-
-    val = config.get(CONF_ERD_CACHE_UPDATES_SENSOR, True)
-    if val is not False:
-        if val is True:
-            val = {
-                "name": "ERD Cache Update Rate",
-                CONF_ID: ID("erd_cache_updates", is_declaration=True, type=sensor.Sensor),
-                CONF_STATE_CLASS: _make_state_class("measurement"),
-                "disabled_by_default": False,
-                "force_update": False,
-            }
-        sens = await sensor.new_sensor(val)
-        cg.add(var.set_erd_cache_updates_sensor(sens))
-
-    val = config.get(CONF_MQTT_PUBLISH_RATE_SENSOR, True)
-    if val is not False:
-        if val is True:
-            val = {
-                "name": "MQTT Publish Rate",
-                CONF_ID: ID("mqtt_publish_rate", is_declaration=True, type=sensor.Sensor),
-                CONF_STATE_CLASS: _make_state_class("measurement"),
-                "disabled_by_default": False,
-                "force_update": False,
-            }
-        sens = await sensor.new_sensor(val)
-        cg.add(var.set_mqtt_publish_rate_sensor(sens))
-
-    val = config.get(CONF_MQTT_DISCONNECT_COUNT_SENSOR, True)
-    if val is not False:
-        if val is True:
-            val = {
-                "name": "MQTT Disconnect Count",
-                CONF_ID: ID("mqtt_disconnect_count", is_declaration=True, type=sensor.Sensor),
-                CONF_STATE_CLASS: _make_state_class("total_increasing"),
-                "disabled_by_default": False,
-                "force_update": False,
-                "accuracy_decimals": 0,
-            }
-        sens = await sensor.new_sensor(val)
-        cg.add(var.set_mqtt_disconnect_count_sensor(sens))
-
-    val = config.get(CONF_MQTT_DISCONNECT_DURATION_SENSOR, True)
-    if val is not False:
-        if val is True:
-            val = {
-                "name": "MQTT Last Disconnect Duration",
-                CONF_ID: ID("mqtt_disconnect_duration", is_declaration=True, type=sensor.Sensor),
-                CONF_STATE_CLASS: _make_state_class("measurement"),
-                "disabled_by_default": False,
-                "force_update": False,
-                "unit_of_measurement": "ms",
-            }
-        sens = await sensor.new_sensor(val)
-        cg.add(var.set_mqtt_disconnect_duration_sensor(sens))
 
     # Create discovery refresh button (auto-created by default, set to false to disable)
     val = config.get(CONF_DISCOVERY_REFRESH_BUTTON, True)

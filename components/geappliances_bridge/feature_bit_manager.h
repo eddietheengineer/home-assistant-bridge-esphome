@@ -98,6 +98,10 @@ class FeatureBitManager {
   /// Returns the valid ERD at the given index (0-based).
   tiny_erd_t get_valid_erd(uint16_t idx) const;
 
+  /// Returns a pointer to the valid ERD array (NULL if none).
+  const tiny_erd_t* get_valid_erds() const { return valid_erds_count_ > 0 ? valid_erds_ : nullptr; }
+
+
   FeatureBitState get_state() const { return state_; }
 
  private:
@@ -158,9 +162,7 @@ class FeatureBitManager {
 
   FeatureBitErdData erd_data_;
   /* Fixed-capacity ERD list - replaces std::set and std::vector. */
-public:
   tiny_erd_t valid_erds_[FEATURE_BIT_MAX_ERDS];
-private:
   uint16_t valid_erds_count_{0};
   bool valid_list_ready_{false};
 
