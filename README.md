@@ -14,7 +14,7 @@ Get the GE Appliances Bridge running in 5 minutes.
 
 ### Prerequisites
 
-- **FirstBuild Home Assistant Adapter** (Xiao ESP32-C3 or ESP32-C6)
+- **FirstBuild Home Assistant Adapter** (Xiao ESP32-C3)
 - **GE Appliance** with GEA3 (or GEA2) serial port
 - **Home Assistant** instance with MQTT integration configured
 - **Ethernet cable** (RJ45) to connect the adapter to the appliance
@@ -66,7 +66,6 @@ Choose the configuration matching your appliance's serial protocol.
 ```yaml
 esp32:
   board: seeed_xiao_esp32c3
-  variant: esp32c3
   framework:
     type: esp-idf
 
@@ -97,7 +96,6 @@ GEA2 appliances communicate at 19200 baud. The `rx_full_threshold` and `rx_timeo
 ```yaml
 esp32:
   board: seeed_xiao_esp32c3
-  variant: esp32c3
   framework:
     type: esp-idf
 
@@ -130,7 +128,6 @@ For setups needing both interfaces simultaneously:
 ```yaml
 esp32:
   board: seeed_xiao_esp32c3
-  variant: esp32c3
   framework:
     type: esp-idf
 
