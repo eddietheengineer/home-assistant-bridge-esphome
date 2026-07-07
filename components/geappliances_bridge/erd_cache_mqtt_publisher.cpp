@@ -75,12 +75,7 @@ static void mqtt_publisher_task(void* arg)
       drained_any = true;
 
       /* Determine data pointer. */
-      const uint8_t* data;
-      if (entry->uses_heap && entry->ext_data != NULL) {
-        data = entry->ext_data;
-      } else {
-        data = entry->inline_data;
-      }
+      const uint8_t* data = erd_cache_entry_data(self->cache, entry);
 
       /* Build topic using pre-allocated buffer. */
       int topic_len = snprintf(self->task_topic, sizeof(self->task_topic),
@@ -335,15 +330,8 @@ uint16_t erd_cache_mqtt_publisher_loop(
     if (self->get_time_ms() - start_ms >= max_ms) {
       break;
     }
-    /* Determine data pointer.
-     * Defensive: if uses_heap is set but ext_data is NULL,
-     * fall back to inline data to avoid a null dereference. */
-    const uint8_t* data;
-    if (entry->uses_heap && entry->ext_data != NULL) {
-      data = entry->ext_data;
-    } else {
-      data = entry->inline_data;
-    }
+    /* Determine data pointer. */
+    const uint8_t* data = erd_cache_entry_data(self->cache, entry);
 
     /* Build topic: geappliances/{device_id}/erd/0x{ERD:04x}/value */
 #ifdef USE_ESP_IDF

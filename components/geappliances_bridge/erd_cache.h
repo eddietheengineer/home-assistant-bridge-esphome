@@ -1,12 +1,12 @@
 /*!
  * @file
- * @brief Fixed-size ERD cache with inline/heap data storage.
+ * @brief Fixed-size ERD cache with static arena storage.
  *
- * Stores the latest data for up to ERD_CACHE_CAPACITY ERDs.  ERDs <= 4 bytes
- * are stored inline (zero heap); larger ERDs use heap allocation.  ERD size
- * is invariant after registration — updates are in-place memcpy with no alloc
- * or free.  Change detection is done at insert/update time, eliminating per-read
- * memcmp overhead.
+ * Stores the latest data for up to ERD_CACHE_CAPACITY ERDs. All ERD data is
+ * stored in a contiguous static arena (bump allocator). ERDs > 248 bytes
+ * (GEA3 max payload) are rejected. ERD size is invariant after registration —
+ * updates are in-place memcpy with no allocation or deallocation. Change
+ * detection is done at insert/update time, eliminating per-read memcmp overhead.
  */
 
 #ifndef erd_cache_h
@@ -17,30 +17,29 @@
 
 #include "tiny_gea3_erd_client.h"
 
-#define ERD_CACHE_INLINE_DATA_SIZE 4
 #define ERD_CACHE_CAPACITY 200
+#define ERD_CACHE_MAX_DATA_SIZE 248    /* GEA3 max payload: 255 - 7 byte overhead */
+#define ERD_CACHE_ARENA_SIZE 4096      /* Static arena for all ERD data */
 
 typedef struct {
   tiny_erd_t erd;
-  union {
-    uint8_t inline_data[ERD_CACHE_INLINE_DATA_SIZE];
-    uint8_t* ext_data;  /* heap pointer for data > 4 bytes */
-  };
-  uint8_t data_size;
-  bool uses_heap;       /* true if ext_data is a heap allocation */
+  uint16_t data_offset;     /* offset into arena (0 = not allocated) */
+  uint8_t data_size;        /* invariant after registration */
   bool update_required;
-  uint8_t publish_cooldown;  /* counts down from max_cooldown to 0; 0 = eligible */
+  uint8_t publish_cooldown; /* counts down from max_cooldown to 0; 0 = eligible */
   bool valid;
 } erd_cache_entry_t;
 
 typedef struct erd_cache_t {
   erd_cache_entry_t entries[ERD_CACHE_CAPACITY];
-  uint32_t update_count;              /* total cache updates since init */
-  uint32_t update_count_window;       /* updates since last get_update_rate() call */
-  uint32_t required_update_count;     /* total updates setting update_required=true since init */
+  uint8_t arena[ERD_CACHE_ARENA_SIZE]; /* static arena for all ERD data */
+  uint16_t arena_offset;               /* next free byte in arena (bump pointer) */
+  uint32_t update_count;               /* total cache updates since init */
+  uint32_t update_count_window;        /* updates since last get_update_rate() call */
+  uint32_t required_update_count;      /* total updates setting update_required=true since init */
   uint32_t required_update_count_window; /* such updates since last get_required_update_rate() call */
-  uint8_t max_cooldown;              /* configured rate limit in seconds; 0 = disabled */
-  bool initialized;                   /* true after first successful erd_cache_init() */
+  uint8_t max_cooldown;                /* configured rate limit in seconds; 0 = disabled */
+  bool initialized;                    /* true after first successful erd_cache_init() */
 } erd_cache_t;
 
 #ifdef __cplusplus
@@ -54,8 +53,12 @@ void erd_cache_destroy(erd_cache_t* self);
  * Always marks update_required only when data has changed.
  * New entries always mark update_required=true.
  * Returns true if update_required was set (or entry was new).
- * Returns false if cache is full, data is unchanged,
- * or ERD size changed (appliance lost). */
+ * Returns false if:
+ *   - data_size > ERD_CACHE_MAX_DATA_SIZE (248 bytes, GEA3 limit)
+ *   - cache is full (200 entries)
+ *   - arena is full (4096 bytes)
+ *   - data is unchanged
+ *   - ERD size changed (appliance lost) */
 bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size);
 
 /* Set the minimum interval (in seconds) between publishes for any ERD.
@@ -115,6 +118,26 @@ uint32_t erd_cache_get_required_update_rate(erd_cache_t* self);
 /* Mark all valid entries as needing republish. Used after a long MQTT
  * disconnect to force a full drain of retained values to the broker. */
 void erd_cache_mark_all_updated(erd_cache_t* self);
+
+/* Returns a pointer to the ERD data in the arena.
+ * Static inline — zero overhead, direct pointer arithmetic.
+ * Returns NULL if entry is NULL or entry is not valid. */
+static inline const uint8_t* erd_cache_entry_data(const erd_cache_t* self, const erd_cache_entry_t* entry) {
+  if (entry == NULL || !entry->valid) return NULL;
+  return &self->arena[entry->data_offset];
+}
+
+/* Returns the number of bytes currently used in the arena.
+ * Useful for monitoring arena utilization. */
+static inline uint16_t erd_cache_get_arena_usage(const erd_cache_t* self) {
+  return self->arena_offset;
+}
+
+/* Returns the arena usage as a percentage (0-100).
+ * Useful for monitoring arena utilization. */
+static inline uint8_t erd_cache_get_arena_usage_percent(const erd_cache_t* self) {
+  return (uint8_t)((self->arena_offset * 100) / ERD_CACHE_ARENA_SIZE);
+}
 
 #ifdef __cplusplus
 }
