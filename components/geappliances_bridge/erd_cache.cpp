@@ -86,6 +86,10 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   erd_cache_entry_t* existing = erd_cache_find(self, erd);
 
   if (existing) {
+    /* Count every cache touch for ERD Publish Rate. */
+    self->update_count++;
+    self->update_count_window++;
+
     /* ERD size is invariant after registration.  Check size BEFORE
      * erd_data_changed to avoid reading past the old buffer when the
      * new size is larger. */
@@ -97,14 +101,10 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
 
     bool data_changed = erd_data_changed(self, existing, data, data_size);
 
-    /* If data hasn't changed, skip entirely. */
+    /* If data hasn't changed, skip storage and publishing. */
     if (!data_changed) {
       return false;
     }
-
-    /* Count only actual updates (data that changed). */
-    self->update_count++;
-    self->update_count_window++;
 
     /* In-place memcpy into arena */
     memcpy(&self->arena[existing->data_offset], data, data_size);
