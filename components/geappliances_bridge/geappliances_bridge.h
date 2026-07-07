@@ -238,6 +238,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   sensor::Sensor* mqtt_publish_rate_sensor_{nullptr};
   sensor::Sensor* mqtt_disconnect_count_sensor_{nullptr};
   sensor::Sensor* mqtt_disconnect_duration_sensor_{nullptr};
+
   // ERD registry: single owner of valid-ERD filter, string-type set,
   // and runtime registered-ERD tracking.
   ErdRegistry erd_registry_;
