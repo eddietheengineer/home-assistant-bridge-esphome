@@ -23,7 +23,7 @@
 
 typedef struct {
   tiny_erd_t erd;
-  uint16_t data_offset;     /* offset into arena (0 = not allocated) */
+  uint16_t data_offset;     /* offset into arena */
   uint8_t data_size;        /* invariant after registration */
   bool update_required;
   uint8_t publish_cooldown; /* counts down from max_cooldown to 0; 0 = eligible */

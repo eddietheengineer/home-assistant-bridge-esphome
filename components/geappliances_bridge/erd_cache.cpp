@@ -39,7 +39,7 @@ void erd_cache_init(erd_cache_t* self)
     e->publish_cooldown = 0;
     e->valid = false;
   }
-  self->arena_offset = 0;
+  memset(self->arena, 0, sizeof(self->arena));
   self->update_count = 0;
   self->update_count_window = 0;
   self->required_update_count = 0;
