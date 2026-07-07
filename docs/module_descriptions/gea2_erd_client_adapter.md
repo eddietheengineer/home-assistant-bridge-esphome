@@ -9,6 +9,7 @@ Wraps a GEA2 ERD client (`i_tiny_gea2_erd_client_t`) and presents it as a GEA3 E
 | Function | Description |
 |----------|-------------|
 | `gea2_erd_client_adapter_init(self, gea2_client)` | Initialize adapter, wrapping the GEA2 client |
+| `gea2_erd_client_adapter_destroy(self, gea2_client)` | Unsubscribe from GEA2 activity event; idempotent, null-safe |
 
 ## Internal i_tiny_gea3_erd_client API Implementation
 

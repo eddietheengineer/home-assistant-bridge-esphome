@@ -9,6 +9,7 @@
 
 extern "C" {
 #include "gea2_erd_client_adapter.h"
+#include "tiny_list.h"
 }
 
 #include "CppUTest/TestHarness.h"
@@ -274,4 +275,44 @@ TEST(gea2_erd_client_adapter, gea2_write_failed_republished_as_gea3_event)
       static_cast<unsigned>(tiny_gea3_erd_client_activity_type_write_failed));
 
   trigger_gea2_write_failed(test_address, test_erd);
+}
+/* ------------------------------------------------------------------ */
+/* Destroy                                                              */
+/* ------------------------------------------------------------------ */
+
+TEST(gea2_erd_client_adapter, destroy_unsubscribes_from_gea2_activity)
+{
+  when_the_adapter_is_initialized();
+
+  /* After init, the adapter subscribed to the GEA2 client's on_activity event. */
+  CHECK_EQUAL(1u, tiny_list_count(&gea2_client.on_activity.subscribers));
+
+  gea2_erd_client_adapter_destroy(&adapter, &gea2_client.interface);
+
+  /* After destroy, the subscription must be removed. */
+  CHECK_EQUAL(0u, tiny_list_count(&gea2_client.on_activity.subscribers));
+}
+
+TEST(gea2_erd_client_adapter, destroy_with_null_self_is_safe)
+{
+  gea2_erd_client_adapter_destroy(nullptr, &gea2_client.interface);
+}
+
+TEST(gea2_erd_client_adapter, destroy_with_null_gea2_client_is_safe)
+{
+  when_the_adapter_is_initialized();
+  gea2_erd_client_adapter_destroy(&adapter, nullptr);
+}
+
+TEST(gea2_erd_client_adapter, destroy_without_init_is_safe)
+{
+  /* adapter is zero-initialized as a TEST_GROUP member; gea2_client is null. */
+  gea2_erd_client_adapter_destroy(&adapter, &gea2_client.interface);
+}
+
+TEST(gea2_erd_client_adapter, double_destroy_is_safe)
+{
+  when_the_adapter_is_initialized();
+  gea2_erd_client_adapter_destroy(&adapter, &gea2_client.interface);
+  gea2_erd_client_adapter_destroy(&adapter, &gea2_client.interface);
 }
