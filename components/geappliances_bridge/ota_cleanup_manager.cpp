@@ -68,33 +68,34 @@ bool OtaCleanupManager::is_ready() const {
          this->device_identity_manager_->get_state() == DEVICE_ID_STATE_COMPLETE;
 }
 
+void OtaCleanupManager::start_cleanup_()
+{
+  if (!this->is_ready()) {
+    return;
+  }
+  ha_discovery_cleanup_configure(&this->ha_discovery_manager_->cleanup,
+      this->device_identity_manager_->get_device_id(),
+      &this->mqtt_client_adapter_->interface, esphome::millis);
+  ha_discovery_cleanup_start(&this->ha_discovery_manager_->cleanup);
+  this->ota_cleanup_in_progress_ = true;
+}
+
 void OtaCleanupManager::loop() {
 #if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
-  // ── OTA-triggered cleanup start ──────────────────────────────────────────
-  if (this->generate_device_config_ &&
-      this->ota_cleanup_needed_ && !this->ota_cleanup_in_progress_ &&
+  // ── Start cleanup (OTA or DiscoveryRefresh) ──────────────────────────────
+  if (!this->ota_cleanup_in_progress_ &&
       !this->ota_discovery_publishing_ && !this->ota_reboot_pending_) {
-    if (this->is_ready()) {
-      ESP_LOGI(TAG, "Starting OTA-triggered HA discovery cleanup...");
-      ha_discovery_cleanup_configure(&this->ha_discovery_manager_->cleanup,
-          this->device_identity_manager_->get_device_id(),
-          &this->mqtt_client_adapter_->interface, esphome::millis);
-      ha_discovery_cleanup_start(&this->ha_discovery_manager_->cleanup);
-      this->ota_cleanup_in_progress_ = true;
-    }
-  }
+    bool ota_trigger = this->generate_device_config_ && this->ota_cleanup_needed_;
+    bool refresh_trigger = this->discovery_refresh_in_progress_;
 
-  // ── DiscoveryRefresh button start ────────────────────────────────────────
-  if (this->discovery_refresh_in_progress_ &&
-      !this->ota_cleanup_in_progress_ &&
-      !this->ota_discovery_publishing_ && !this->ota_reboot_pending_) {
-    if (this->is_ready()) {
-      ha_discovery_cleanup_configure(&this->ha_discovery_manager_->cleanup,
-          this->device_identity_manager_->get_device_id(),
-          &this->mqtt_client_adapter_->interface, esphome::millis);
-      ha_discovery_cleanup_start(&this->ha_discovery_manager_->cleanup);
-      this->discovery_refresh_in_progress_ = false;
-      this->ota_cleanup_in_progress_ = true;
+    if (ota_trigger || refresh_trigger) {
+      if (ota_trigger) {
+        ESP_LOGI(TAG, "Starting OTA-triggered HA discovery cleanup...");
+      }
+      this->start_cleanup_();
+      if (refresh_trigger) {
+        this->discovery_refresh_in_progress_ = false;
+      }
     }
   }
 
