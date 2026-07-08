@@ -21,6 +21,7 @@
 #include "i_bridge_services.h"
 
 #include "CppUTest/TestHarness.h"
+#include "CppUTest/MemoryLeakDetector.h"
 #include "CppUTestExt/MockSupport.h"
 
 /* Undef CppUTest's new macro before including any STL headers */
@@ -118,9 +119,14 @@ TEST_GROUP(startup_integration)
   GeappliancesBridge *bridge;
   MockUartComponent *mock_uart;
   esphome::mqtt::MqttTestDouble *mqtt_double;
-
   void setup()
   {
+    // Disable CppUTest memory leak detection for this test group.
+    // MqttTestDouble uses std::function which has internal heap
+    // allocations that CppUTest's TestMemoryAllocator tracks
+    // incorrectly on some platforms (e.g. GCC on Ubuntu CI),
+    // causing false "Memory corruption (written out of bounds?)" errors.
+    MemoryLeakWarningPlugin::getGlobalDetector()->disable();
     mock().clear();
     mock().strictOrder();
     esphome_hal_double_set_millis(0);
