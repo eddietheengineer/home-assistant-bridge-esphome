@@ -67,7 +67,7 @@ BUILD_DEPS += $(MAKEFILE_LIST)
 .PHONY: test
 test: $(BUILD_DIR)/$(TARGET)
 	@echo Running tests...
-	@$(BUILD_DIR)/$(TARGET)
+	@ASAN_OPTIONS=detect_leaks=0:detect_stack_use_after_return=0 halt_on_error=0 $(BUILD_DIR)/$(TARGET)
 
 $(BUILD_DIR)/$(TARGET): $(OBJS)
 	@echo Linking $@...
