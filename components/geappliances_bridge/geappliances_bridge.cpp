@@ -681,6 +681,10 @@ bool GeappliancesBridge::teardown() {
   return true;
 }
 
+GeappliancesBridge::~GeappliancesBridge() {
+  this->teardown();
+}
+
 // =============================================================================
 // IBridgeServices implementation
 //

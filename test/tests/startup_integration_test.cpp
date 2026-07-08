@@ -21,8 +21,6 @@
 #include "i_bridge_services.h"
 
 #include "CppUTest/TestHarness.h"
-#include "CppUTest/MemoryLeakDetector.h"
-#include "CppUTest/TestMemoryAllocator.h"
 #include "CppUTestExt/MockSupport.h"
 
 /* Undef CppUTest's new macro before including any STL headers */
@@ -120,20 +118,9 @@ TEST_GROUP(startup_integration)
   GeappliancesBridge *bridge;
   MockUartComponent *mock_uart;
   esphome::mqtt::MqttTestDouble *mqtt_double;
-  GlobalMemoryAllocatorStash allocator_stash_;
 
   void setup()
   {
-    // Bypass CppUTest's TestMemoryAllocator for this test group.
-    // CppUTest wraps new/delete/malloc and tracks std::function
-    // internal allocations, but on GCC/Ubuntu CI the std::function
-    // ABI causes false "Memory corruption (written out of bounds?)"
-    // detections. Switch to default allocators to bypass the wrapper.
-    allocator_stash_.save();
-    setCurrentNewAllocatorToDefault();
-    setCurrentNewArrayAllocatorToDefault();
-    setCurrentMallocAllocatorToDefault();
-
     mock().clear();
     mock().strictOrder();
     esphome_hal_double_set_millis(0);
@@ -155,7 +142,6 @@ TEST_GROUP(startup_integration)
     bridge = nullptr;
     mqtt_double = nullptr;
     mock_uart = nullptr;
-    allocator_stash_.restore();
     mock().clear();
   }
 

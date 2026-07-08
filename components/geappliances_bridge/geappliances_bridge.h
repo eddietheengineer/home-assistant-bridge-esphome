@@ -94,6 +94,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void dump_config() override;
   float get_setup_priority() const override;
   bool teardown() override;
+  ~GeappliancesBridge() override;
 
   void set_gea3_uart(uart::UARTComponent *uart) { this->uart_ = uart; }
   void set_gea2_uart(uart::UARTComponent *uart) { this->gea2_uart_ = uart; }
