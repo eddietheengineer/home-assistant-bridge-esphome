@@ -56,6 +56,8 @@ struct MockUartComponent : public esphome::uart::UARTComponent {
     std::memset(read_buffer, 0, sizeof(read_buffer));
   }
 
+  ~MockUartComponent() override = default;
+
   void clear()
   {
     available_count = 0;
@@ -114,30 +116,36 @@ struct MockUartComponent : public esphome::uart::UARTComponent {
 TEST_GROUP(startup_integration)
 {
   GeappliancesBridge bridge;
-  MockUartComponent mock_uart;
-  esphome::mqtt::MqttTestDouble mqtt_double;
+  MockUartComponent *mock_uart;
+  esphome::mqtt::MqttTestDouble *mqtt_double;
 
   void setup()
   {
     mock().clear();
     mock().strictOrder();
     esphome_hal_double_set_millis(0);
-    mock_uart.clear();
-    esphome::mqtt::global_mqtt_client = &mqtt_double;
-    mqtt_double.connected_ = true;
+    mock_uart = new MockUartComponent();
+    mqtt_double = new esphome::mqtt::MqttTestDouble();
+    mock_uart->clear();
+    esphome::mqtt::global_mqtt_client = mqtt_double;
+    mqtt_double->connected_ = true;
   }
 
   void teardown()
   {
     esphome::mqtt::global_mqtt_client = nullptr;
-    mqtt_double.connected_ = false;
+    mqtt_double->connected_ = false;
+    delete mqtt_double;
+    delete mock_uart;
+    mock_uart = nullptr;
+    mqtt_double = nullptr;
     mock().clear();
   }
 
   /* Configure with GEA3 UART in POLL mode. */
   void configure_poll_mode()
   {
-    bridge.set_gea3_uart(&mock_uart);
+    bridge.set_gea3_uart(mock_uart);
     bridge.set_mode(BRIDGE_MODE_POLL);
     bridge.set_appliance_api_parsing(false);
   }
@@ -145,7 +153,7 @@ TEST_GROUP(startup_integration)
   /* Configure with GEA2 UART only. */
   void configure_gea2_only()
   {
-    bridge.set_gea2_uart(&mock_uart);
+    bridge.set_gea2_uart(mock_uart);
     bridge.set_mode(BRIDGE_MODE_POLL);
     bridge.set_appliance_api_parsing(false);
   }
@@ -302,8 +310,8 @@ TEST(startup_integration, no_uart_setup_is_safe)
 
 TEST(startup_integration, both_uart_setup_is_safe)
 {
-  bridge.set_gea3_uart(&mock_uart);
-  bridge.set_gea2_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
+  bridge.set_gea2_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_AUTO);
   bridge.set_appliance_api_parsing(false);
   bridge.setup();
@@ -313,7 +321,7 @@ TEST(startup_integration, both_uart_setup_is_safe)
 
 TEST(startup_integration, subscribe_mode_setup_is_safe)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_SUBSCRIBE);
   bridge.set_appliance_api_parsing(false);
   bridge.setup();
@@ -323,7 +331,7 @@ TEST(startup_integration, subscribe_mode_setup_is_safe)
 
 TEST(startup_integration, auto_mode_setup_is_safe)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_AUTO);
   bridge.set_appliance_api_parsing(false);
   bridge.setup();
@@ -335,7 +343,7 @@ TEST(startup_integration, all_modes_cycle)
 {
   for (int mode = BRIDGE_MODE_POLL; mode <= BRIDGE_MODE_AUTO; mode++) {
     esphome_hal_double_set_millis(mode * 1000);
-    bridge.set_gea3_uart(&mock_uart);
+    bridge.set_gea3_uart(mock_uart);
     bridge.set_mode(static_cast<BridgeMode>(mode));
     bridge.set_appliance_api_parsing(false);
     bridge.setup();
@@ -352,7 +360,7 @@ TEST(startup_integration, all_uart_combinations)
 {
   // GEA3 only
   esphome_hal_double_set_millis(0);
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_gea2_uart(nullptr);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(false);
@@ -363,15 +371,15 @@ TEST(startup_integration, all_uart_combinations)
   // GEA2 only
   esphome_hal_double_set_millis(1000);
   bridge.set_gea3_uart(nullptr);
-  bridge.set_gea2_uart(&mock_uart);
+  bridge.set_gea2_uart(mock_uart);
   bridge.setup();
   bridge.loop();
   CHECK(bridge.teardown());
 
   // Both
   esphome_hal_double_set_millis(2000);
-  bridge.set_gea3_uart(&mock_uart);
-  bridge.set_gea2_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
+  bridge.set_gea2_uart(mock_uart);
   bridge.setup();
   bridge.loop();
   CHECK(bridge.teardown());
@@ -392,7 +400,7 @@ TEST(startup_integration, all_configuration_combinations)
     for (int generate = 0; generate <= 1; generate++) {
       for (int filter = 0; filter <= 1; filter++) {
         esphome_hal_double_set_millis(iteration++ * 1000);
-        bridge.set_gea3_uart(&mock_uart);
+        bridge.set_gea3_uart(mock_uart);
         bridge.set_mode(BRIDGE_MODE_POLL);
         bridge.set_appliance_api_parsing(parsing != 0);
         bridge.set_generate_device_config(generate != 0);
@@ -416,7 +424,7 @@ TEST(startup_integration, all_modes_x_all_uart_combinations)
     // GEA3 only
     {
       esphome_hal_double_set_millis(iteration++ * 1000);
-      bridge.set_gea3_uart(&mock_uart);
+      bridge.set_gea3_uart(mock_uart);
       bridge.set_gea2_uart(nullptr);
       bridge.set_mode(static_cast<BridgeMode>(mode));
       bridge.set_appliance_api_parsing(false);
@@ -428,7 +436,7 @@ TEST(startup_integration, all_modes_x_all_uart_combinations)
     {
       esphome_hal_double_set_millis(iteration++ * 1000);
       bridge.set_gea3_uart(nullptr);
-      bridge.set_gea2_uart(&mock_uart);
+      bridge.set_gea2_uart(mock_uart);
       bridge.set_mode(static_cast<BridgeMode>(mode));
       bridge.set_appliance_api_parsing(false);
       bridge.setup();
@@ -438,8 +446,8 @@ TEST(startup_integration, all_modes_x_all_uart_combinations)
     // Both
     {
       esphome_hal_double_set_millis(iteration++ * 1000);
-      bridge.set_gea3_uart(&mock_uart);
-      bridge.set_gea2_uart(&mock_uart);
+      bridge.set_gea3_uart(mock_uart);
+      bridge.set_gea2_uart(mock_uart);
       bridge.set_mode(static_cast<BridgeMode>(mode));
       bridge.set_appliance_api_parsing(false);
       bridge.setup();
@@ -662,14 +670,14 @@ TEST(startup_integration, bridge_with_no_mqtt_client)
   esphome::mqtt::global_mqtt_client = nullptr;
   bridge.setup();
   bridge.loop();
-  esphome::mqtt::global_mqtt_client = &mqtt_double;
+  esphome::mqtt::global_mqtt_client = mqtt_double;
   CHECK(bridge.teardown());
 }
 
 TEST(startup_integration, bridge_with_mqtt_disconnected)
 {
   configure_poll_mode();
-  mqtt_double.connected_ = false;
+  mqtt_double->connected_ = false;
   bridge.setup();
   bridge.loop();
   CHECK(bridge.teardown());
@@ -678,13 +686,13 @@ TEST(startup_integration, bridge_with_mqtt_disconnected)
 TEST(startup_integration, bridge_with_mqtt_reconnects)
 {
   configure_poll_mode();
-  mqtt_double.connected_ = false;
+  mqtt_double->connected_ = false;
   bridge.setup();
   bridge.loop();
   esphome_hal_double_set_millis(1000);
-  mqtt_double.connected_ = true;
-  if (mqtt_double.on_connect_callback_) {
-    mqtt_double.on_connect_callback_(false);
+  mqtt_double->connected_ = true;
+  if (mqtt_double->on_connect_callback_) {
+    mqtt_double->on_connect_callback_(false);
   }
   bridge.loop();
   CHECK(bridge.teardown());
@@ -696,9 +704,9 @@ TEST(startup_integration, bridge_with_mqtt_disconnects)
   bridge.setup();
   bridge.loop();
   esphome_hal_double_set_millis(1000);
-  mqtt_double.connected_ = false;
-  if (mqtt_double.on_disconnect_callback_) {
-    mqtt_double.on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+  mqtt_double->connected_ = false;
+  if (mqtt_double->on_disconnect_callback_) {
+    mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
   }
   bridge.loop();
   CHECK(bridge.teardown());
@@ -710,7 +718,7 @@ TEST(startup_integration, bridge_with_mqtt_message_simulation)
   bridge.setup();
   bridge.loop();
   esphome_hal_double_set_millis(1000);
-  mqtt_double.simulate_message("geappliances/test/erd/0x0092/write", "01");
+  mqtt_double->simulate_message("geappliances/test/erd/0x0092/write", "01");
   bridge.loop();
   CHECK(bridge.teardown());
 }
@@ -724,7 +732,7 @@ TEST(startup_integration, bridge_with_concurrent_mqtt_messages)
     esphome_hal_double_set_millis(1000 + i * 100);
     char topic[64];
     snprintf(topic, sizeof(topic), "geappliances/test/erd/0x%04x/write", 0x0092 + i);
-    mqtt_double.simulate_message(topic, "01");
+    mqtt_double->simulate_message(topic, "01");
   }
   bridge.loop();
   CHECK(bridge.teardown());
@@ -736,12 +744,12 @@ TEST(startup_integration, bridge_with_alternating_mqtt_state)
   bridge.setup();
   for (int i = 0; i < 10; i++) {
     esphome_hal_double_set_millis(i * 1000);
-    mqtt_double.connected_ = (i % 2 == 0);
-    if (mqtt_double.connected_ && mqtt_double.on_connect_callback_) {
-      mqtt_double.on_connect_callback_(false);
+    mqtt_double->connected_ = (i % 2 == 0);
+    if (mqtt_double->connected_ && mqtt_double->on_connect_callback_) {
+      mqtt_double->on_connect_callback_(false);
     }
-    if (!mqtt_double.connected_ && mqtt_double.on_disconnect_callback_) {
-      mqtt_double.on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+    if (!mqtt_double->connected_ && mqtt_double->on_disconnect_callback_) {
+      mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
     }
     bridge.loop();
   }
@@ -793,7 +801,7 @@ TEST(startup_integration, bridge_with_boundary_millis_values)
                             UINT32_MAX - 1, UINT32_MAX };
   for (size_t i = 0; i < sizeof(boundaries) / sizeof(boundaries[0]); i++) {
     esphome_hal_double_set_millis(boundaries[i]);
-    bridge.set_gea3_uart(&mock_uart);
+    bridge.set_gea3_uart(mock_uart);
     bridge.set_mode(BRIDGE_MODE_POLL);
     bridge.set_appliance_api_parsing(false);
     bridge.setup();
@@ -819,7 +827,7 @@ TEST(startup_integration, bridge_with_rapid_loop_calls)
 
 TEST(startup_integration, bridge_with_custom_client_address)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(false);
   bridge.set_client_address(0xC0);
@@ -830,7 +838,7 @@ TEST(startup_integration, bridge_with_custom_client_address)
 
 TEST(startup_integration, bridge_with_preconfigured_device_id)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(false);
   bridge.set_device_id("my-custom-device");
@@ -841,7 +849,7 @@ TEST(startup_integration, bridge_with_preconfigured_device_id)
 
 TEST(startup_integration, bridge_with_long_device_id)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(false);
   std::string long_id(91, 'A');
@@ -853,7 +861,7 @@ TEST(startup_integration, bridge_with_long_device_id)
 
 TEST(startup_integration, bridge_with_very_long_device_id)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(false);
   std::string very_long_id(200, 'B');
@@ -865,7 +873,7 @@ TEST(startup_integration, bridge_with_very_long_device_id)
 
 TEST(startup_integration, bridge_with_special_characters_in_device_id)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(false);
   bridge.set_device_id("device-with_special.chars&123");
@@ -876,7 +884,7 @@ TEST(startup_integration, bridge_with_special_characters_in_device_id)
 
 TEST(startup_integration, bridge_with_custom_polling_interval)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(false);
   bridge.set_polling_interval(5000);
@@ -887,7 +895,7 @@ TEST(startup_integration, bridge_with_custom_polling_interval)
 
 TEST(startup_integration, bridge_with_throttle_rate_zero)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(false);
   bridge.set_throttle_rate_seconds(0);
@@ -930,7 +938,7 @@ TEST(startup_integration, all_modes_x_custom_erds)
   int iteration = 0;
   for (int mode = BRIDGE_MODE_POLL; mode <= BRIDGE_MODE_AUTO; mode++) {
     esphome_hal_double_set_millis(iteration++ * 1000);
-    bridge.set_gea3_uart(&mock_uart);
+    bridge.set_gea3_uart(mock_uart);
     bridge.set_mode(static_cast<BridgeMode>(mode));
     bridge.set_appliance_api_parsing(false);
     bridge.setup();
@@ -997,9 +1005,9 @@ TEST(startup_integration, bridge_with_all_error_conditions)
   IBridgeServices* services = &bridge;
   services->handle_subscription_failed();
   services->handle_polling_failed();
-  mqtt_double.connected_ = false;
-  if (mqtt_double.on_disconnect_callback_) {
-    mqtt_double.on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+  mqtt_double->connected_ = false;
+  if (mqtt_double->on_disconnect_callback_) {
+    mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
   }
   bridge.loop();
   CHECK(bridge.teardown());
@@ -1013,11 +1021,11 @@ TEST(startup_integration, bridge_full_lifecycle_stress)
 {
   for (int i = 0; i < 10; i++) {
     esphome_hal_double_set_millis(i * 5000);
-    bridge.set_gea3_uart(&mock_uart);
+    bridge.set_gea3_uart(mock_uart);
     bridge.set_mode(static_cast<BridgeMode>(i % 4));
     bridge.set_appliance_api_parsing(i % 2 == 0);
     bridge.setup();
-    mqtt_double.connected_ = (i % 2 == 0);
+    mqtt_double->connected_ = (i % 2 == 0);
     for (int j = 0; j < 20; j++) {
       esphome_hal_double_set_millis(i * 5000 + j * 100);
       bridge.loop();
@@ -1032,15 +1040,15 @@ TEST(startup_integration, bridge_stress_with_mqtt_events)
   bridge.setup();
   for (int i = 0; i < 200; i++) {
     esphome_hal_double_set_millis(i * 100);
-    mqtt_double.connected_ = (i % 2 == 0);
-    if (mqtt_double.on_connect_callback_ && mqtt_double.connected_) {
-      mqtt_double.on_connect_callback_(false);
+    mqtt_double->connected_ = (i % 2 == 0);
+    if (mqtt_double->on_connect_callback_ && mqtt_double->connected_) {
+      mqtt_double->on_connect_callback_(false);
     }
-    if (mqtt_double.on_disconnect_callback_ && !mqtt_double.connected_) {
-      mqtt_double.on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+    if (mqtt_double->on_disconnect_callback_ && !mqtt_double->connected_) {
+      mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
     }
     if (i % 5 == 0) {
-      mqtt_double.simulate_message("geappliances/test/erd/0x0092/write", "01");
+      mqtt_double->simulate_message("geappliances/test/erd/0x0092/write", "01");
     }
     bridge.loop();
   }
@@ -1086,7 +1094,7 @@ TEST(startup_integration, state_consistency_across_lifecycle_cycles)
 {
   for (int i = 0; i < 5; i++) {
     esphome_hal_double_set_millis(i * 1000);
-    bridge.set_gea3_uart(&mock_uart);
+    bridge.set_gea3_uart(mock_uart);
     bridge.set_mode(BRIDGE_MODE_POLL);
     bridge.set_appliance_api_parsing(false);
     bridge.setup();
@@ -1111,7 +1119,7 @@ TEST(startup_integration, setup_with_gea3_uart_does_not_crash)
 
 TEST(startup_integration, subscribe_mode_with_gea3_uart)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_SUBSCRIBE);
   bridge.set_appliance_api_parsing(false);
   bridge.setup();
@@ -1121,7 +1129,7 @@ TEST(startup_integration, subscribe_mode_with_gea3_uart)
 
 TEST(startup_integration, auto_mode_with_gea3_uart)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_AUTO);
   bridge.set_appliance_api_parsing(false);
   bridge.setup();
@@ -1131,8 +1139,8 @@ TEST(startup_integration, auto_mode_with_gea3_uart)
 
 TEST(startup_integration, both_uarts_with_gea3_and_gea2)
 {
-  bridge.set_gea3_uart(&mock_uart);
-  bridge.set_gea2_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
+  bridge.set_gea2_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_AUTO);
   bridge.set_appliance_api_parsing(false);
   bridge.setup();
@@ -1142,7 +1150,7 @@ TEST(startup_integration, both_uarts_with_gea3_and_gea2)
 
 TEST(startup_integration, gea3_with_feature_bit_parsing)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(true);
   bridge.setup();
@@ -1152,7 +1160,7 @@ TEST(startup_integration, gea3_with_feature_bit_parsing)
 
 TEST(startup_integration, gea3_with_preconfigured_device_id)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(false);
   bridge.set_device_id("my-custom-device");
@@ -1163,22 +1171,22 @@ TEST(startup_integration, gea3_with_preconfigured_device_id)
 
 TEST(startup_integration, gea3_with_no_mqtt)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(false);
   esphome::mqtt::global_mqtt_client = nullptr;
   bridge.setup();
   bridge.loop();
-  esphome::mqtt::global_mqtt_client = &mqtt_double;
+  esphome::mqtt::global_mqtt_client = mqtt_double;
   CHECK(bridge.teardown());
 }
 
 TEST(startup_integration, gea3_with_mqtt_disconnected)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(false);
-  mqtt_double.connected_ = false;
+  mqtt_double->connected_ = false;
   bridge.setup();
   bridge.loop();
   CHECK(bridge.teardown());
@@ -1213,7 +1221,7 @@ TEST(startup_integration, full_startup_sequence_reaches_bridge_init)
 
 TEST(startup_integration, full_startup_with_subscribe_mode)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_SUBSCRIBE);
   bridge.set_appliance_api_parsing(false);
   bridge.setup();
@@ -1235,7 +1243,7 @@ TEST(startup_integration, full_startup_with_subscribe_mode)
 
 TEST(startup_integration, full_startup_with_auto_mode)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_AUTO);
   bridge.set_appliance_api_parsing(false);
   bridge.setup();
@@ -1257,7 +1265,7 @@ TEST(startup_integration, full_startup_with_auto_mode)
 
 TEST(startup_integration, full_startup_with_preconfigured_device_id)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(false);
   bridge.set_device_id("my-custom-device");
@@ -1280,7 +1288,7 @@ TEST(startup_integration, full_startup_with_preconfigured_device_id)
 
 TEST(startup_integration, full_startup_with_feature_bit_parsing_enabled)
 {
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(true);
   bridge.setup();
@@ -1302,8 +1310,8 @@ TEST(startup_integration, full_startup_with_feature_bit_parsing_enabled)
 
 TEST(startup_integration, full_startup_with_both_uarts)
 {
-  bridge.set_gea3_uart(&mock_uart);
-  bridge.set_gea2_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
+  bridge.set_gea2_uart(mock_uart);
   bridge.set_mode(BRIDGE_MODE_AUTO);
   bridge.set_appliance_api_parsing(false);
   bridge.setup();
@@ -1378,7 +1386,7 @@ TEST(startup_integration, full_startup_with_no_mqtt)
     bridge.loop();
   }
 
-  esphome::mqtt::global_mqtt_client = &mqtt_double;
+  esphome::mqtt::global_mqtt_client = mqtt_double;
   CHECK(bridge.teardown());
 }
 
@@ -1391,9 +1399,9 @@ TEST(startup_integration, full_startup_with_mqtt_disconnect_during_startup)
   esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS + 100);
   bridge.loop();
 
-  mqtt_double.connected_ = false;
-  if (mqtt_double.on_disconnect_callback_) {
-    mqtt_double.on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+  mqtt_double->connected_ = false;
+  if (mqtt_double->on_disconnect_callback_) {
+    mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
   }
 
   for (int i = 0; i < 100; i++) {
@@ -1407,16 +1415,16 @@ TEST(startup_integration, full_startup_with_mqtt_disconnect_during_startup)
 TEST(startup_integration, full_startup_with_mqtt_reconnect_during_startup)
 {
   configure_poll_mode();
-  mqtt_double.connected_ = false;
+  mqtt_double->connected_ = false;
   bridge.setup();
   bridge.loop();
 
   esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS + 100);
   bridge.loop();
 
-  mqtt_double.connected_ = true;
-  if (mqtt_double.on_connect_callback_) {
-    mqtt_double.on_connect_callback_(false);
+  mqtt_double->connected_ = true;
+  if (mqtt_double->on_connect_callback_) {
+    mqtt_double->on_connect_callback_(false);
   }
 
   for (int i = 0; i < 100; i++) {
@@ -1439,7 +1447,7 @@ TEST(startup_integration, full_startup_with_mqtt_messages_during_startup)
   for (int i = 0; i < 100; i++) {
     esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS + 1000 + i * 100);
     if (i % 10 == 0) {
-      mqtt_double.simulate_message("geappliances/test/erd/0x0092/write", "01");
+      mqtt_double->simulate_message("geappliances/test/erd/0x0092/write", "01");
     }
     bridge.loop();
   }
@@ -1458,12 +1466,12 @@ TEST(startup_integration, full_startup_with_alternating_mqtt_during_startup)
 
   for (int i = 0; i < 100; i++) {
     esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS + 1000 + i * 100);
-    mqtt_double.connected_ = (i % 2 == 0);
-    if (mqtt_double.connected_ && mqtt_double.on_connect_callback_) {
-      mqtt_double.on_connect_callback_(false);
+    mqtt_double->connected_ = (i % 2 == 0);
+    if (mqtt_double->connected_ && mqtt_double->on_connect_callback_) {
+      mqtt_double->on_connect_callback_(false);
     }
-    if (!mqtt_double.connected_ && mqtt_double.on_disconnect_callback_) {
-      mqtt_double.on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+    if (!mqtt_double->connected_ && mqtt_double->on_disconnect_callback_) {
+      mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
     }
     bridge.loop();
   }
@@ -1484,9 +1492,9 @@ TEST(startup_integration, full_startup_with_all_error_conditions)
   services->handle_subscription_failed();
   services->handle_polling_failed();
 
-  mqtt_double.connected_ = false;
-  if (mqtt_double.on_disconnect_callback_) {
-    mqtt_double.on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+  mqtt_double->connected_ = false;
+  if (mqtt_double->on_disconnect_callback_) {
+    mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
   }
 
   for (int i = 0; i < 100; i++) {
@@ -1541,7 +1549,7 @@ TEST(startup_integration, full_startup_stress_across_all_modes)
 {
   for (int mode = BRIDGE_MODE_POLL; mode <= BRIDGE_MODE_AUTO; mode++) {
     esphome_hal_double_set_millis(mode * 5000);
-    bridge.set_gea3_uart(&mock_uart);
+    bridge.set_gea3_uart(mock_uart);
     bridge.set_mode(static_cast<BridgeMode>(mode));
     bridge.set_appliance_api_parsing(false);
     bridge.setup();
@@ -1566,7 +1574,7 @@ TEST(startup_integration, full_startup_stress_with_all_uart_combinations)
 {
   // GEA3 only
   esphome_hal_double_set_millis(0);
-  bridge.set_gea3_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
   bridge.set_gea2_uart(nullptr);
   bridge.set_mode(BRIDGE_MODE_POLL);
   bridge.set_appliance_api_parsing(false);
@@ -1582,7 +1590,7 @@ TEST(startup_integration, full_startup_stress_with_all_uart_combinations)
   // GEA2 only
   esphome_hal_double_set_millis(10000);
   bridge.set_gea3_uart(nullptr);
-  bridge.set_gea2_uart(&mock_uart);
+  bridge.set_gea2_uart(mock_uart);
   bridge.setup();
   bridge.loop();
   esphome_hal_double_set_millis(10000 + AUTODISCOVERY_STARTUP_DELAY_MS + 100);
@@ -1594,8 +1602,8 @@ TEST(startup_integration, full_startup_stress_with_all_uart_combinations)
 
   // Both
   esphome_hal_double_set_millis(20000);
-  bridge.set_gea3_uart(&mock_uart);
-  bridge.set_gea2_uart(&mock_uart);
+  bridge.set_gea3_uart(mock_uart);
+  bridge.set_gea2_uart(mock_uart);
   bridge.setup();
   bridge.loop();
   esphome_hal_double_set_millis(20000 + AUTODISCOVERY_STARTUP_DELAY_MS + 100);
