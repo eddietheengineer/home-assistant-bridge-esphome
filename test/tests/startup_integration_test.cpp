@@ -136,12 +136,12 @@ TEST_GROUP(startup_integration)
   {
     esphome::mqtt::global_mqtt_client = nullptr;
     mqtt_double->connected_ = false;
+    delete bridge;
     delete mqtt_double;
     delete mock_uart;
-    delete bridge;
+    bridge = nullptr;
     mqtt_double = nullptr;
     mock_uart = nullptr;
-    bridge = nullptr;
     mock().clear();
   }
 
