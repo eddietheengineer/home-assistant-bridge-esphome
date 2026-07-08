@@ -2,22 +2,13 @@
  * @file
  * @brief Concrete test implementation of MQTTClientComponent that stores
  *        subscription callbacks so they can be invoked manually in tests.
- *
- * IMPORTANT: This header must be included AFTER undefing CppUTest's new
- * macro, since it depends on <functional> which uses placement new.
  */
 
 #ifndef mqtt_test_double_hpp
 #define mqtt_test_double_hpp
 
-/* Undef CppUTest's new macro before including any STL headers */
-#ifdef new
-#undef new
-#endif
-
 #include "esphome/components/mqtt/mqtt_client.h"
 #include <string>
-#include <functional>
 
 namespace esphome {
 namespace mqtt {
@@ -26,9 +17,12 @@ class MqttTestDouble : public MQTTClientComponent {
  public:
   bool connected_{false};
 
-  std::function<void(const std::string&, const std::string&)> subscribe_callback_;
-  std::function<void(bool)> on_connect_callback_;
-  std::function<void(MQTTClientDisconnectReason)> on_disconnect_callback_;
+  subscribe_callback_fn subscribe_callback_{nullptr};
+  void* subscribe_context_{nullptr};
+  on_connect_fn on_connect_callback_{nullptr};
+  void* on_connect_context_{nullptr};
+  on_disconnect_fn on_disconnect_callback_{nullptr};
+  void* on_disconnect_context_{nullptr};
 
   bool is_connected() override { return connected_; }
 
@@ -39,24 +33,31 @@ class MqttTestDouble : public MQTTClientComponent {
                uint8_t /*qos*/, bool /*retain*/) override { return true; }
 
   void subscribe(const std::string& /*topic*/,
-                 std::function<void(const std::string&, const std::string&)> callback,
+                 subscribe_callback_fn callback,
+                 void* context,
                  uint8_t /*qos*/) override {
     subscribe_callback_ = callback;
+    subscribe_context_ = context;
   }
 
-  void unsubscribe(const std::string& /*topic*/) override { }
-
-  void set_on_connect(std::function<on_connect_callback_t>&& callback) override {
-    on_connect_callback_ = std::move(callback);
+  void unsubscribe(const std::string& /*topic*/) override {
+    subscribe_callback_ = nullptr;
+    subscribe_context_ = nullptr;
   }
 
-  void set_on_disconnect(std::function<on_disconnect_callback_t>&& callback) override {
-    on_disconnect_callback_ = std::move(callback);
+  void set_on_connect(on_connect_fn callback, void* context) override {
+    on_connect_callback_ = callback;
+    on_connect_context_ = context;
+  }
+
+  void set_on_disconnect(on_disconnect_fn callback, void* context) override {
+    on_disconnect_callback_ = callback;
+    on_disconnect_context_ = context;
   }
 
   void simulate_message(const std::string& topic, const std::string& payload) {
     if (subscribe_callback_) {
-      subscribe_callback_(topic, payload);
+      subscribe_callback_(topic.c_str(), payload.c_str(), payload.size(), subscribe_context_);
     }
   }
 };

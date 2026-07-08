@@ -99,7 +99,8 @@ TEST_GROUP(esphome_mqtt_client_adapter_subscribe)
   {
     esphome::mqtt::global_mqtt_client = nullptr;
     mqtt_double.connected_ = false;
-    mqtt_double.subscribe_callback_ = std::function<void(const std::string&, const std::string&)>();
+    mqtt_double.subscribe_callback_ = nullptr;
+    mqtt_double.subscribe_context_ = nullptr;
     esphome_mqtt_client_adapter_destroy(&adapter);
     mock().clear();
   }

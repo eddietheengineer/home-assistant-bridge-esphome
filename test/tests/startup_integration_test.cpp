@@ -695,7 +695,7 @@ TEST(startup_integration, bridge_with_mqtt_reconnects)
   esphome_hal_double_set_millis(1000);
   mqtt_double->connected_ = true;
   if (mqtt_double->on_connect_callback_) {
-    mqtt_double->on_connect_callback_(false);
+    mqtt_double->on_connect_callback_(false, mqtt_double->on_connect_context_);
   }
   bridge->loop();
   CHECK(bridge->teardown());
@@ -709,7 +709,7 @@ TEST(startup_integration, bridge_with_mqtt_disconnects)
   esphome_hal_double_set_millis(1000);
   mqtt_double->connected_ = false;
   if (mqtt_double->on_disconnect_callback_) {
-    mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+    mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED, mqtt_double->on_disconnect_context_);
   }
   bridge->loop();
   CHECK(bridge->teardown());
@@ -749,10 +749,10 @@ TEST(startup_integration, bridge_with_alternating_mqtt_state)
     esphome_hal_double_set_millis(i * 1000);
     mqtt_double->connected_ = (i % 2 == 0);
     if (mqtt_double->connected_ && mqtt_double->on_connect_callback_) {
-      mqtt_double->on_connect_callback_(false);
+      mqtt_double->on_connect_callback_(false, mqtt_double->on_connect_context_);
     }
     if (!mqtt_double->connected_ && mqtt_double->on_disconnect_callback_) {
-      mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+      mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED, mqtt_double->on_disconnect_context_);
     }
     bridge->loop();
   }
@@ -1010,7 +1010,7 @@ TEST(startup_integration, bridge_with_all_error_conditions)
   services->handle_polling_failed();
   mqtt_double->connected_ = false;
   if (mqtt_double->on_disconnect_callback_) {
-    mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+    mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED, mqtt_double->on_disconnect_context_);
   }
   bridge->loop();
   CHECK(bridge->teardown());
@@ -1045,10 +1045,10 @@ TEST(startup_integration, bridge_stress_with_mqtt_events)
     esphome_hal_double_set_millis(i * 100);
     mqtt_double->connected_ = (i % 2 == 0);
     if (mqtt_double->on_connect_callback_ && mqtt_double->connected_) {
-      mqtt_double->on_connect_callback_(false);
+      mqtt_double->on_connect_callback_(false, mqtt_double->on_connect_context_);
     }
     if (mqtt_double->on_disconnect_callback_ && !mqtt_double->connected_) {
-      mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+      mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED, mqtt_double->on_disconnect_context_);
     }
     if (i % 5 == 0) {
       mqtt_double->simulate_message("geappliances/test/erd/0x0092/write", "01");
@@ -1404,7 +1404,7 @@ TEST(startup_integration, full_startup_with_mqtt_disconnect_during_startup)
 
   mqtt_double->connected_ = false;
   if (mqtt_double->on_disconnect_callback_) {
-    mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+    mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED, mqtt_double->on_disconnect_context_);
   }
 
   for (int i = 0; i < 100; i++) {
@@ -1427,7 +1427,7 @@ TEST(startup_integration, full_startup_with_mqtt_reconnect_during_startup)
 
   mqtt_double->connected_ = true;
   if (mqtt_double->on_connect_callback_) {
-    mqtt_double->on_connect_callback_(false);
+    mqtt_double->on_connect_callback_(false, mqtt_double->on_connect_context_);
   }
 
   for (int i = 0; i < 100; i++) {
@@ -1471,10 +1471,10 @@ TEST(startup_integration, full_startup_with_alternating_mqtt_during_startup)
     esphome_hal_double_set_millis(AUTODISCOVERY_STARTUP_DELAY_MS + 1000 + i * 100);
     mqtt_double->connected_ = (i % 2 == 0);
     if (mqtt_double->connected_ && mqtt_double->on_connect_callback_) {
-      mqtt_double->on_connect_callback_(false);
+      mqtt_double->on_connect_callback_(false, mqtt_double->on_connect_context_);
     }
     if (!mqtt_double->connected_ && mqtt_double->on_disconnect_callback_) {
-      mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+      mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED, mqtt_double->on_disconnect_context_);
     }
     bridge->loop();
   }
@@ -1497,7 +1497,7 @@ TEST(startup_integration, full_startup_with_all_error_conditions)
 
   mqtt_double->connected_ = false;
   if (mqtt_double->on_disconnect_callback_) {
-    mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED);
+    mqtt_double->on_disconnect_callback_(esphome::mqtt::MQTTClientDisconnectReason::TCP_DISCONNECTED, mqtt_double->on_disconnect_context_);
   }
 
   for (int i = 0; i < 100; i++) {

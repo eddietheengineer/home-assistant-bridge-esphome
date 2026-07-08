@@ -43,6 +43,12 @@ typedef struct {
   esphome::geappliances_bridge::ErdRegistry* erd_registry;
   // Tracked write topic for unsubscribe on destroy.
   char write_topic_[128];
+  // Context for generic subscribe callback (avoids heap allocation).
+  // Only one generic subscription is supported at a time.
+  struct {
+    void (*callback)(const char*, const char*, size_t, void*);
+    void* arg;
+  } subscribe_context;
 } esphome_mqtt_client_adapter_t;
 
 #ifdef __cplusplus

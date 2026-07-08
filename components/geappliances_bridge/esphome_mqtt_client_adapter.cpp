@@ -100,12 +100,18 @@ extern "C" void esphome_mqtt_client_adapter_init(
   // Without this, mqtt_connected stays false forever and the publisher never publishes.
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client != nullptr) {
-    mqtt_client->set_on_connect([self](bool) {
-      esphome_mqtt_client_adapter_notify_connected(self);
-    });
-    mqtt_client->set_on_disconnect([self](esphome::mqtt::MQTTClientDisconnectReason) {
-      esphome_mqtt_client_adapter_notify_disconnected(self);
-    });
+    mqtt_client->set_on_connect(
+      +[](bool, void* ctx) {
+        esphome_mqtt_client_adapter_notify_connected(
+            reinterpret_cast<esphome_mqtt_client_adapter_t*>(ctx));
+      },
+      self);
+    mqtt_client->set_on_disconnect(
+      +[](esphome::mqtt::MQTTClientDisconnectReason, void* ctx) {
+        esphome_mqtt_client_adapter_notify_disconnected(
+            reinterpret_cast<esphome_mqtt_client_adapter_t*>(ctx));
+      },
+      self);
 
     // If already connected when we register, fire the event immediately so the
     // publisher's mqtt_connected flag is set correctly on first loop().
@@ -139,41 +145,45 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
   strncpy(self->write_topic_, topic, sizeof(self->write_topic_) - 1);
   self->write_topic_[sizeof(self->write_topic_) - 1] = '\0';
 
-  mqtt_client->subscribe(topic, [self](const std::string& topic, const std::string& payload) {
-    // Parse ERD from topic: geappliances/{device_id}/erd/0x{ERD}/write
-    auto pos = topic.find("/erd/0x");
-    if (pos == std::string::npos) return;
+  mqtt_client->subscribe(topic,
+    +[](const char* topic, const char* payload, size_t payload_len, void* ctx) {
+      auto self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(ctx);
+      // Parse ERD from topic: geappliances/{device_id}/erd/0x{ERD}/write
+      const char* erd_marker = strstr(topic, "/erd/0x");
+      if (erd_marker == nullptr) return;
 
-    const char* erd_str = topic.c_str() + pos + 5; // skip "erd/"
+      const char* erd_str = erd_marker + 5; // skip "erd/"
 
-    unsigned erd = 0;
-    if (sscanf(erd_str, "%x", &erd) != 1) return;
+      unsigned erd = 0;
+      if (sscanf(erd_str, "%x", &erd) != 1) return;
 
-    // Decode hex payload to a local stack buffer to avoid race condition:
-    // if a new MQTT message arrives before tiny_event_publish() delivers
-    // this one, the local buffer is already consumed by the event handler.
-    uint8_t local_buffer[32];
-    size_t decoded = 0;
-    for (size_t i = 0; i + 1 < payload.size() && decoded < sizeof(local_buffer); i += 2) {
-      unsigned byte = 0;
-      if (sscanf(&payload[i], "%2x", &byte) == 1) {
-        local_buffer[decoded++] = static_cast<uint8_t>(byte);
-      } else {
-        break;
+      // Decode hex payload to a local stack buffer to avoid race condition:
+      // if a new MQTT message arrives before tiny_event_publish() delivers
+      // this one, the local buffer is already consumed by the event handler.
+      uint8_t local_buffer[32];
+      size_t decoded = 0;
+      for (size_t i = 0; i + 1 < payload_len && decoded < sizeof(local_buffer); i += 2) {
+        unsigned byte = 0;
+        if (sscanf(&payload[i], "%2x", &byte) == 1) {
+          local_buffer[decoded++] = static_cast<uint8_t>(byte);
+        } else {
+          break;
+        }
       }
-    }
-    uint8_t local_size = static_cast<uint8_t>(decoded);
+      uint8_t local_size = static_cast<uint8_t>(decoded);
 
-    mqtt_client_on_write_request_args_t args;
-    args.erd = static_cast<tiny_erd_t>(erd);
-    args.size = local_size;
-    args.value = local_buffer;
+      mqtt_client_on_write_request_args_t args;
+      args.erd = static_cast<tiny_erd_t>(erd);
+      args.size = local_size;
+      args.value = local_buffer;
 
-    // tiny_event_publish() is synchronous (subscriber callback runs to
-    // completion before return), so the stack buffer is valid for the
-    // duration of the event delivery.
-    tiny_event_publish(&self->on_write_request_event, &args);
-  }, 0);
+      // tiny_event_publish() is synchronous (subscriber callback runs to
+      // completion before return), so the stack buffer is valid for the
+      // duration of the event delivery.
+      tiny_event_publish(&self->on_write_request_event, &args);
+    },
+    self,
+    0);
 }
 extern "C" void esphome_mqtt_client_adapter_notify_connected(
   esphome_mqtt_client_adapter_t* self)
@@ -188,8 +198,8 @@ extern "C" void esphome_mqtt_client_adapter_destroy(
   // from firing after the adapter is gone (e.g., on re-init or OTA).
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client != nullptr) {
-    mqtt_client->set_on_connect(nullptr);
-    mqtt_client->set_on_disconnect(nullptr);
+    mqtt_client->set_on_connect(nullptr, nullptr);
+    mqtt_client->set_on_disconnect(nullptr, nullptr);
     // Unsubscribe from write topic (also captures 'self' by raw pointer).
     if (self->write_topic_[0] != '\0') {
       mqtt_client->unsubscribe(self->write_topic_);
@@ -219,13 +229,22 @@ extern "C" void esphome_mqtt_client_adapter_subscribe(
   void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg),
   void* arg)
 {
-  (void)_self;
+  auto* self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(_self);
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client == nullptr) return;
 
-  mqtt_client->subscribe(topic, [callback, arg](const std::string& t, const std::string& p) {
-    callback(t.c_str(), p.c_str(), p.size(), arg);
-  }, 0);
+  // Store callback and arg in the adapter's embedded context (no heap allocation).
+  // Only one generic subscription is supported at a time.
+  self->subscribe_context.callback = callback;
+  self->subscribe_context.arg = arg;
+
+  mqtt_client->subscribe(topic,
+    +[](const char* t, const char* p, size_t len, void* c) {
+      auto* adapter = reinterpret_cast<esphome_mqtt_client_adapter_t*>(c);
+      adapter->subscribe_context.callback(t, p, len, adapter->subscribe_context.arg);
+    },
+    self,
+    0);
 }
 
 extern "C" void esphome_mqtt_client_adapter_unsubscribe(

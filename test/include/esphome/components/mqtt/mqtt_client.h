@@ -7,7 +7,6 @@
 #define esphome_components_mqtt_mqtt_client_h
 
 #include <string>
-#include <functional>
 #include <cstdint>
 
 namespace esphome {
@@ -22,6 +21,11 @@ enum class MQTTClientDisconnectReason : int8_t {
   MQTT_MALFORMED_CREDENTIALS = 4,
   MQTT_NOT_AUTHORIZED = 5,
 };
+
+using on_connect_fn = void(*)(bool session_present, void* context);
+using on_disconnect_fn = void(*)(MQTTClientDisconnectReason reason, void* context);
+using subscribe_callback_fn = void(*)(const char* topic, const char* payload, size_t payload_len, void* context);
+
 class MQTTClientComponent {
  public:
   virtual ~MQTTClientComponent() {}
@@ -31,14 +35,13 @@ class MQTTClientComponent {
   virtual bool publish(const char* topic, const char* payload, size_t payload_length,
                        uint8_t qos, bool retain) = 0;
   virtual void subscribe(const std::string& topic,
-                         std::function<void(const std::string&, const std::string&)> callback,
+                         subscribe_callback_fn callback,
+                         void* context,
                          uint8_t qos) = 0;
   virtual void unsubscribe(const std::string& topic) = 0;
 
-  using on_connect_callback_t = void(bool session_present);
-  using on_disconnect_callback_t = void(MQTTClientDisconnectReason reason);
-  virtual void set_on_connect(std::function<on_connect_callback_t> &&callback) = 0;
-  virtual void set_on_disconnect(std::function<on_disconnect_callback_t> &&callback) = 0;
+  virtual void set_on_connect(on_connect_fn callback, void* context) = 0;
+  virtual void set_on_disconnect(on_disconnect_fn callback, void* context) = 0;
 
   static MQTTClientComponent* global_mqtt_client;
 };
