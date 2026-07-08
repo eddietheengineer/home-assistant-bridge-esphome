@@ -651,12 +651,15 @@ bool GeappliancesBridge::teardown() {
   // double-free or missed cleanup.
   if (this->subscription_bridge_initialized_) {
     erd_bridge_subscribe_destroy(&this->erd_bridge_subscribe_);
+    this->subscription_bridge_initialized_ = false;
   }
   if (this->polling_bridge_initialized_) {
     erd_bridge_poll_destroy(&this->erd_bridge_poll_);
+    this->polling_bridge_initialized_ = false;
   }
   if (this->write_bridge_initialized_) {
     erd_write_bridge_destroy(&this->erd_write_bridge_);
+    this->write_bridge_initialized_ = false;
   }
 
   // Destroy the shared ERD cache after bridges are torn down.
@@ -676,6 +679,7 @@ bool GeappliancesBridge::teardown() {
   // memory leaks (device_id string, pending_updates map, etc.).
   if (this->mqtt_client_adapter_initialized_) {
     esphome_mqtt_client_adapter_destroy(&this->mqtt_client_adapter_);
+    this->mqtt_client_adapter_initialized_ = false;
   }
   Component::teardown();
   return true;
