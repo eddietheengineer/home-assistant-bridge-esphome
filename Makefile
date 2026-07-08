@@ -23,6 +23,9 @@ SRC_DIRS := \
 SRC_FILES := $(wildcard components/geappliances_bridge/*.cpp)
 
 SRCS := $(SRC_FILES) $(shell find $(SRC_DIRS) -maxdepth 1 \( -name '*.cpp' -or -name '*.c' -or -name '*.s' \) -not -name 'startup_integration_test.cpp')
+
+# Integration test sources (includes startup_integration_test.cpp)
+SRCS_INTEGRATION := $(SRC_FILES) $(shell find $(SRC_DIRS) -maxdepth 1 \( -name '*.cpp' -or -name '*.c' -or -name '*.s' \))
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
 DEPS := $(OBJS:.o=.d)
 
@@ -97,6 +100,13 @@ clean:
 .PHONY: pytest
 pytest:
 	@python3 -m pytest scripts/test_generate_erd_lists.py scripts/test_ha_discovery.py -v
+
+.PHONY: integration-test
+integration-test:
+	@echo Building integration tests...
+	@$(MAKE) $(BUILD_DIR)/$(TARGET) SRCS="$(SRCS_INTEGRATION)"
+	@echo Running integration tests...
+	@ASAN_OPTIONS=detect_leaks=0:detect_stack_use_after_return=0 halt_on_error=0 $(BUILD_DIR)/$(TARGET)
 
 -include $(DEPS)
 
