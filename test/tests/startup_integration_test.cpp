@@ -22,6 +22,7 @@
 
 #include "CppUTest/TestHarness.h"
 #include "CppUTest/MemoryLeakDetector.h"
+#include "CppUTest/TestMemoryAllocator.h"
 #include "CppUTestExt/MockSupport.h"
 
 /* Undef CppUTest's new macro before including any STL headers */
@@ -119,21 +120,26 @@ TEST_GROUP(startup_integration)
   GeappliancesBridge *bridge;
   MockUartComponent *mock_uart;
   esphome::mqtt::MqttTestDouble *mqtt_double;
-  void *mqtt_double_mem;
+  GlobalMemoryAllocatorStash allocator_stash_;
 
   void setup()
   {
+    // Bypass CppUTest's TestMemoryAllocator for this test group.
+    // CppUTest wraps new/delete/malloc and tracks std::function
+    // internal allocations, but on GCC/Ubuntu CI the std::function
+    // ABI causes false "Memory corruption (written out of bounds?)"
+    // detections. Switch to default allocators to bypass the wrapper.
+    allocator_stash_.save();
+    setCurrentNewAllocatorToDefault();
+    setCurrentNewArrayAllocatorToDefault();
+    setCurrentMallocAllocatorToDefault();
+
     mock().clear();
     mock().strictOrder();
     esphome_hal_double_set_millis(0);
     bridge = new GeappliancesBridge();
     mock_uart = new MockUartComponent();
-    // Use malloc + placement-new for MqttTestDouble to bypass
-    // CppUTest's TestMemoryAllocator which falsely reports
-    // "Memory corruption (written out of bounds?)" on std::function
-    // internal allocations on GCC/Ubuntu CI.
-    mqtt_double_mem = malloc(sizeof(esphome::mqtt::MqttTestDouble));
-    mqtt_double = new (mqtt_double_mem) esphome::mqtt::MqttTestDouble();
+    mqtt_double = new esphome::mqtt::MqttTestDouble();
     mock_uart->clear();
     esphome::mqtt::global_mqtt_client = mqtt_double;
     mqtt_double->connected_ = true;
@@ -143,14 +149,13 @@ TEST_GROUP(startup_integration)
   {
     esphome::mqtt::global_mqtt_client = nullptr;
     mqtt_double->connected_ = false;
-    mqtt_double->~MqttTestDouble();
-    free(mqtt_double_mem);
     delete bridge;
+    delete mqtt_double;
     delete mock_uart;
-    mqtt_double = nullptr;
-    mqtt_double_mem = nullptr;
     bridge = nullptr;
+    mqtt_double = nullptr;
     mock_uart = nullptr;
+    allocator_stash_.restore();
     mock().clear();
   }
 
