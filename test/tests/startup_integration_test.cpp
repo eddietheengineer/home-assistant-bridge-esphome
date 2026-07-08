@@ -119,20 +119,21 @@ TEST_GROUP(startup_integration)
   GeappliancesBridge *bridge;
   MockUartComponent *mock_uart;
   esphome::mqtt::MqttTestDouble *mqtt_double;
+  void *mqtt_double_mem;
+
   void setup()
   {
-    // Disable CppUTest memory leak detection for this test group.
-    // MqttTestDouble uses std::function which has internal heap
-    // allocations that CppUTest's TestMemoryAllocator tracks
-    // incorrectly on some platforms (e.g. GCC on Ubuntu CI),
-    // causing false "Memory corruption (written out of bounds?)" errors.
-    MemoryLeakWarningPlugin::getGlobalDetector()->disable();
     mock().clear();
     mock().strictOrder();
     esphome_hal_double_set_millis(0);
     bridge = new GeappliancesBridge();
     mock_uart = new MockUartComponent();
-    mqtt_double = new esphome::mqtt::MqttTestDouble();
+    // Use malloc + placement-new for MqttTestDouble to bypass
+    // CppUTest's TestMemoryAllocator which falsely reports
+    // "Memory corruption (written out of bounds?)" on std::function
+    // internal allocations on GCC/Ubuntu CI.
+    mqtt_double_mem = malloc(sizeof(esphome::mqtt::MqttTestDouble));
+    mqtt_double = new (mqtt_double_mem) esphome::mqtt::MqttTestDouble();
     mock_uart->clear();
     esphome::mqtt::global_mqtt_client = mqtt_double;
     mqtt_double->connected_ = true;
@@ -142,11 +143,13 @@ TEST_GROUP(startup_integration)
   {
     esphome::mqtt::global_mqtt_client = nullptr;
     mqtt_double->connected_ = false;
+    mqtt_double->~MqttTestDouble();
+    free(mqtt_double_mem);
     delete bridge;
-    delete mqtt_double;
     delete mock_uart;
-    bridge = nullptr;
     mqtt_double = nullptr;
+    mqtt_double_mem = nullptr;
+    bridge = nullptr;
     mock_uart = nullptr;
     mock().clear();
   }
