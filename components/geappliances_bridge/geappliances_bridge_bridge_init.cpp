@@ -191,6 +191,11 @@ void GeappliancesBridge::initialize_erd_bridge_()
     return;
   }
 
+  // Skip if no ERD client is configured (no UART).
+  if (this->uart_ == nullptr && this->gea2_uart_ == nullptr) {
+    return;
+  }
+
   ESP_LOGI(TAG, "Initializing ERD bridge");
 
   // Apply the valid-ERD filter when appliance API parsing is enabled and

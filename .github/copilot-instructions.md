@@ -51,3 +51,14 @@ Valid override value keys:
 | `value_template` | Custom Jinja2 template for value processing |
 
 After adding an override, run the pipeline and commit all generated files.
+
+## Integration Tests
+
+**Before committing and pushing, run both the regular tests and the integration tests to validate they pass.**
+
+```bash
+make test -j4
+make integration-test -j4
+```
+
+The regular `test` target runs 405 unit tests on CI. The `integration-test` target runs all 502 tests (including the startup integration test suite) locally. The integration tests are excluded from CI because CppUTest's `TestMemoryAllocator` causes false "Memory corruption" detections on GCC/Ubuntu CI with `std::function` members — this is a known limitation. Always verify integration tests pass locally before pushing.

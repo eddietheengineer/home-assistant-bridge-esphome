@@ -46,6 +46,7 @@ void startup_hsm_wrapper_init(startup_hsm_wrapper_t* self, IBridgeServices* serv
 void startup_hsm_wrapper_destroy(startup_hsm_wrapper_t* self)
 {
   self->services = nullptr;
+  self->hsm.current = nullptr;
 }
 
 

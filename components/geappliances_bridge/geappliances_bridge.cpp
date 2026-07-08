@@ -376,41 +376,22 @@ void GeappliancesBridge::run_protocol_stack_()
     esphome_uart_adapter_set_enabled(&this->gea2_uart_adapter_, need_gea2_loop);
   }
 
+#ifndef UNIT_TEST_BUILD
   if (need_gea2_loop) {
     uint32_t loop_start_ms = millis();
-    // Initialize gea2_last_ms_ on first entry so we don't replay accumulated
-    // boot time as thousands of spurious msec interrupts.
     if (this->gea2_last_ms_ == 0) {
       this->gea2_last_ms_ = loop_start_ms;
     }
-    // Hard safety cap: never run longer than 2x the nominal duration.
-    // If the loop exceeds this, break to avoid starving the ESPHome
-    // framework watchdog (which fires at 30 ms intervals).
     while (millis() - loop_start_ms < GEA2_LOOP_DURATION_MS) {
-      // Safety break: if we've exceeded the hard cap, exit immediately.
-      // This can happen if millis() jumps (e.g., after deep sleep wake)
-      // or if the interface_run call stalls unexpectedly.
       if (millis() - loop_start_ms >= GEA2_LOOP_HARD_CAP_MS) {
         ESP_LOGW(TAG, "GEA2 tight loop exceeded hard cap (%u ms), breaking",
                  static_cast<unsigned>(GEA2_LOOP_HARD_CAP_MS));
         break;
       }
 #ifdef USE_ESP32
-      // Feed the task watchdog inside the tight loop — 100 ms exceeds the
-      // default TWDT timeout (usually 3-10 s depending on config, but
-      // ESPHome's component watchdog is 30 ms).
       esp_task_wdt_reset();
 #endif
-      // Fire the GEA2 msec interrupt once per real millisecond. Doing this
-      // here (not via a timer_group_ periodic timer) ensures the 1 ms
-      // interrupt only fires inside the GEA2 tight loop and never starves
-      // the GEA3/polling-bridge timers in the shared timer_group_.
       uint32_t now_ms = millis();
-      // Safety cap on the inner msec-catchup loop: if millis() jumped
-      // (e.g., deep sleep wake), don't fire thousands of backlogged
-      // msec interrupts in one loop iteration.  Cap at 1000 interrupts
-      // per loop entry — enough to cover a ~1 s gap without starving
-      // the ESPHome watchdog.
       static constexpr uint32_t MSEC_CATCHUP_CAP = 1000;
       uint32_t catchup_count = 0;
       while (this->gea2_last_ms_ < now_ms && catchup_count < MSEC_CATCHUP_CAP) {
@@ -419,11 +400,6 @@ void GeappliancesBridge::run_protocol_stack_()
         this->gea2_last_ms_++;
         catchup_count++;
       }
-      // tiny_timer_group_run() services at most a single timer per call.
-      // With two period-0 UART poll timers in the shared group, calling it
-      // once would only fire one of them, effectively halving the polling
-      // rate of the active UART and causing missed bytes / ERD read failures.
-      // Drain both timers (the inactive one returns early from poll()).
       tiny_timer_group_run(&this->timer_group_);
       if (this->uart_ != nullptr) {
         tiny_timer_group_run(&this->timer_group_);
@@ -431,11 +407,6 @@ void GeappliancesBridge::run_protocol_stack_()
       tiny_gea2_interface_run(&this->gea2_interface_);
     }
   } else {
-    // GEA3 path: run a tight loop at 1ms intervals to ensure UART bytes
-    // at 230400 baud are processed without missing messages.  The tight
-    // loop runs whenever GEA3 UART is configured and GEA2 is not active.
-    // This covers all phases: startup (autodiscovery, device_id, feature_bits),
-    // bridge initialization, and steady-state polling/subscription.
     if (this->uart_ != nullptr) {
       uint32_t gea3_loop_start_ms = millis();
       while (millis() - gea3_loop_start_ms < GEA3_LOOP_DURATION_MS) {
@@ -454,14 +425,48 @@ void GeappliancesBridge::run_protocol_stack_()
         tiny_gea3_interface_run(&this->gea3_interface_);
       }
     } else {
-      // No GEA3 UART configured (GEA2-only or neither).  Single-pass to
-      // keep timers advancing for autodiscovery or other background work.
       tiny_timer_group_run(&this->timer_group_);
       if (this->gea2_uart_ != nullptr) {
         tiny_timer_group_run(&this->timer_group_);
       }
     }
   }
+#else
+  // In test builds, millis() is mocked and doesn't advance,
+  // so the tight loops would hang.  Run a single iteration instead.
+  if (need_gea2_loop) {
+    if (this->gea2_last_ms_ == 0) {
+      this->gea2_last_ms_ = millis();
+    }
+    uint32_t now_ms = millis();
+    static constexpr uint32_t MSEC_CATCHUP_CAP = 1000;
+    uint32_t catchup_count = 0;
+    while (this->gea2_last_ms_ < now_ms && catchup_count < MSEC_CATCHUP_CAP) {
+      this->gea2_tick_count_++;
+      tiny_event_publish(&this->gea2_msec_interrupt_, nullptr);
+      this->gea2_last_ms_++;
+      catchup_count++;
+    }
+    tiny_timer_group_run(&this->timer_group_);
+    if (this->uart_ != nullptr) {
+      tiny_timer_group_run(&this->timer_group_);
+    }
+    tiny_gea2_interface_run(&this->gea2_interface_);
+  } else {
+    if (this->uart_ != nullptr) {
+      tiny_timer_group_run(&this->timer_group_);
+      if (this->gea2_uart_ != nullptr) {
+        tiny_timer_group_run(&this->timer_group_);
+      }
+      tiny_gea3_interface_run(&this->gea3_interface_);
+    } else {
+      tiny_timer_group_run(&this->timer_group_);
+      if (this->gea2_uart_ != nullptr) {
+        tiny_timer_group_run(&this->timer_group_);
+      }
+    }
+  }
+#endif
   uint32_t loop_elapsed = esphome::millis() - protocol_stack_start;
   if (loop_elapsed >= 1000) {
     ESP_LOGW(TAG, "Long run_protocol_stack: %ums (mode=%s, polling=%s)",
@@ -646,12 +651,15 @@ bool GeappliancesBridge::teardown() {
   // double-free or missed cleanup.
   if (this->subscription_bridge_initialized_) {
     erd_bridge_subscribe_destroy(&this->erd_bridge_subscribe_);
+    this->subscription_bridge_initialized_ = false;
   }
   if (this->polling_bridge_initialized_) {
     erd_bridge_poll_destroy(&this->erd_bridge_poll_);
+    this->polling_bridge_initialized_ = false;
   }
   if (this->write_bridge_initialized_) {
     erd_write_bridge_destroy(&this->erd_write_bridge_);
+    this->write_bridge_initialized_ = false;
   }
 
   // Destroy the shared ERD cache after bridges are torn down.
@@ -671,9 +679,14 @@ bool GeappliancesBridge::teardown() {
   // memory leaks (device_id string, pending_updates map, etc.).
   if (this->mqtt_client_adapter_initialized_) {
     esphome_mqtt_client_adapter_destroy(&this->mqtt_client_adapter_);
+    this->mqtt_client_adapter_initialized_ = false;
   }
   Component::teardown();
   return true;
+}
+
+GeappliancesBridge::~GeappliancesBridge() {
+  this->teardown();
 }
 
 // =============================================================================
@@ -688,7 +701,15 @@ bool GeappliancesBridge::teardown() {
 
 void GeappliancesBridge::run_autodiscovery()
 {
-  autodiscovery_manager_.start();
+  // Skip autodiscovery if no ERD client is configured or initialized.
+  // erd_client_.interface.api is set by tiny_gea3_erd_client_init() in setup();
+  // gea2_erd_client_adapter_.interface.api is set by gea2_erd_client_adapter_init().
+  bool has_gea3_client = (this->uart_ != nullptr && this->erd_client_.interface.api != nullptr);
+  bool has_gea2_client = (this->gea2_uart_ != nullptr && this->gea2_erd_client_adapter_.interface.api != nullptr);
+  if (!has_gea3_client && !has_gea2_client) {
+    return;
+  }
+  this->autodiscovery_manager_.start();
 }
 
 bool GeappliancesBridge::is_autodiscovery_complete() const

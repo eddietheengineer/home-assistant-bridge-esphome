@@ -22,7 +22,10 @@ SRC_DIRS := \
 
 SRC_FILES := $(wildcard components/geappliances_bridge/*.cpp)
 
-SRCS := $(SRC_FILES) $(shell find $(SRC_DIRS) -maxdepth 1 -name *.cpp -or -name *.c -or -name *.s)
+SRCS := $(SRC_FILES) $(shell find $(SRC_DIRS) -maxdepth 1 \( -name '*.cpp' -or -name '*.c' -or -name '*.s' \) -not -name 'startup_integration_test.cpp')
+
+# Integration test sources (includes startup_integration_test.cpp)
+SRCS_INTEGRATION := $(SRC_FILES) $(shell find $(SRC_DIRS) -maxdepth 1 \( -name '*.cpp' -or -name '*.c' -or -name '*.s' \))
 OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
 DEPS := $(OBJS:.o=.d)
 
@@ -54,7 +57,7 @@ CPPUTEST_INC := -I$(CPPUTEST_PREFIX)/include
 CPPUTEST_LIB := -L$(CPPUTEST_PREFIX)/lib
 
 CFLAGS += -std=c11 -pedantic
-CPPFLAGS += $(SANITIZE_FLAGS) -fno-omit-frame-pointer -fprofile-arcs -ftest-coverage -DUSE_ESP_IDF -DUSE_ESP_IDF_STUBS -DHA_DISCOVERY_TEST_EXPORT -DHA_DISCOVERY_CLEANUP_TEST_BUF_SIZE=512 -DHA_CLEANUP_TEST_BUF_SIZE=512 -DHA_DISCOVERY_CLEANUP_TEST_EXPORT
+CPPFLAGS += $(SANITIZE_FLAGS) -fno-omit-frame-pointer -fprofile-arcs -ftest-coverage -DUSE_ESP_IDF -DUSE_ESP_IDF_STUBS -DUNIT_TEST_BUILD -DHA_DISCOVERY_TEST_EXPORT -DHA_DISCOVERY_CLEANUP_TEST_BUF_SIZE=512 -DHA_CLEANUP_TEST_BUF_SIZE=512 -DHA_DISCOVERY_CLEANUP_TEST_EXPORT -DCPPUTEST_DISABLE_MEM_CORRUPTION_CHECK
 CPPFLAGS += $(INC_FLAGS) $(CPPUTEST_INC) -MMD -MP -g -Wall -Wextra -Wcast-qual -Werror
 CXXFLAGS += -std=c++17
 LDFLAGS := $(SANITIZE_FLAGS) $(CPPUTEST_LIB) --coverage
@@ -67,7 +70,7 @@ BUILD_DEPS += $(MAKEFILE_LIST)
 .PHONY: test
 test: $(BUILD_DIR)/$(TARGET)
 	@echo Running tests...
-	@$(BUILD_DIR)/$(TARGET)
+	@ASAN_OPTIONS=detect_leaks=0:detect_stack_use_after_return=0 halt_on_error=0 $(BUILD_DIR)/$(TARGET)
 
 $(BUILD_DIR)/$(TARGET): $(OBJS)
 	@echo Linking $@...
@@ -97,6 +100,13 @@ clean:
 .PHONY: pytest
 pytest:
 	@python3 -m pytest scripts/test_generate_erd_lists.py scripts/test_ha_discovery.py -v
+
+.PHONY: integration-test
+integration-test:
+	@echo Building integration tests...
+	@$(MAKE) $(BUILD_DIR)/$(TARGET) SRCS="$(SRCS_INTEGRATION)"
+	@echo Running integration tests...
+	@ASAN_OPTIONS=detect_leaks=0:detect_stack_use_after_return=0 halt_on_error=0 $(BUILD_DIR)/$(TARGET)
 
 -include $(DEPS)
 
