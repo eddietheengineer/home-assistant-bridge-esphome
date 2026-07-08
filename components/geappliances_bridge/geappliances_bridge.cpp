@@ -17,6 +17,34 @@ GEA_TAG(TAG) = "geappliances_bridge";
 
 namespace esphome {
 namespace geappliances_bridge {
+// -----------------------------------------------------------------------
+// Helper: map a startup HSM state function pointer to a human-readable name
+// -----------------------------------------------------------------------
+static const char* startup_state_name(tiny_hsm_state_t state)
+{
+  if (state == startup_state_startup_delay)      return "Startup Delay";
+  if (state == startup_state_autodiscovery)      return "Autodiscovery";
+  if (state == startup_state_device_id)          return "Device ID";
+  if (state == startup_state_mqtt_client_init)   return "MQTT Client Init";
+  if (state == startup_state_feature_bits)       return "Feature Bits";
+  if (state == startup_state_bridge_init)        return "Bridge Init";
+  if (state == startup_state_subscription_watch) return "Subscription Watch";
+  if (state == startup_state_running)            return "Running";
+  return "Unknown";
+}
+
+// -----------------------------------------------------------------------
+// Helper: map bridge mode (+ subscription state for auto mode) to a name
+// -----------------------------------------------------------------------
+static const char* bridge_mode_name(esphome::geappliances_bridge::BridgeMode mode, subscription_state_t sub_state)
+{
+  if (mode == esphome::geappliances_bridge::BRIDGE_MODE_POLL) return "Polling";
+  if (mode == esphome::geappliances_bridge::BRIDGE_MODE_SUBSCRIBE) return "Subscription";
+  if (mode == esphome::geappliances_bridge::BRIDGE_MODE_AUTO) {
+    return subscription_is_active(sub_state) ? "Auto (Subscription)" : "Auto (Polling - fallback)";
+  }
+  return "Unknown";
+}
 
 void GeappliancesBridge::add_custom_erd(tiny_erd_t erd)
 {
@@ -354,6 +382,43 @@ void GeappliancesBridge::update_publisher_state_()
 // Phase 0: Drive the GEA2/GEA3 hardware stack
 // ---------------------------------------------------------------------------
 
+void GeappliancesBridge::run_gea2_iteration_()
+{
+  if (this->gea2_last_ms_ == 0) {
+    this->gea2_last_ms_ = millis();
+  }
+  uint32_t now_ms = millis();
+  uint32_t catchup_count = 0;
+  while (this->gea2_last_ms_ < now_ms && catchup_count < MSEC_CATCHUP_CAP) {
+    this->gea2_tick_count_++;
+    tiny_event_publish(&this->gea2_msec_interrupt_, nullptr);
+    this->gea2_last_ms_++;
+    catchup_count++;
+  }
+  tiny_timer_group_run(&this->timer_group_);
+  if (this->uart_ != nullptr) {
+    tiny_timer_group_run(&this->timer_group_);
+  }
+  tiny_gea2_interface_run(&this->gea2_interface_);
+}
+
+void GeappliancesBridge::run_gea3_iteration_()
+{
+  tiny_timer_group_run(&this->timer_group_);
+  if (this->gea2_uart_ != nullptr) {
+    tiny_timer_group_run(&this->timer_group_);
+  }
+  tiny_gea3_interface_run(&this->gea3_interface_);
+}
+
+void GeappliancesBridge::run_timer_only_iteration_()
+{
+  tiny_timer_group_run(&this->timer_group_);
+  if (this->gea2_uart_ != nullptr) {
+    tiny_timer_group_run(&this->timer_group_);
+  }
+}
+
 void GeappliancesBridge::run_protocol_stack_()
 {
   // When GEA2 is active (or during GEA2 autodiscovery), run a 100 ms
@@ -376,12 +441,9 @@ void GeappliancesBridge::run_protocol_stack_()
     esphome_uart_adapter_set_enabled(&this->gea2_uart_adapter_, need_gea2_loop);
   }
 
-#ifndef UNIT_TEST_BUILD
   if (need_gea2_loop) {
+#ifndef UNIT_TEST_BUILD
     uint32_t loop_start_ms = millis();
-    if (this->gea2_last_ms_ == 0) {
-      this->gea2_last_ms_ = loop_start_ms;
-    }
     while (millis() - loop_start_ms < GEA2_LOOP_DURATION_MS) {
       if (millis() - loop_start_ms >= GEA2_LOOP_HARD_CAP_MS) {
         ESP_LOGW(TAG, "GEA2 tight loop exceeded hard cap (%u ms), breaking",
@@ -391,82 +453,35 @@ void GeappliancesBridge::run_protocol_stack_()
 #ifdef USE_ESP32
       esp_task_wdt_reset();
 #endif
-      uint32_t now_ms = millis();
-      static constexpr uint32_t MSEC_CATCHUP_CAP = 1000;
-      uint32_t catchup_count = 0;
-      while (this->gea2_last_ms_ < now_ms && catchup_count < MSEC_CATCHUP_CAP) {
-        this->gea2_tick_count_++;
-        tiny_event_publish(&this->gea2_msec_interrupt_, nullptr);
-        this->gea2_last_ms_++;
-        catchup_count++;
-      }
-      tiny_timer_group_run(&this->timer_group_);
-      if (this->uart_ != nullptr) {
-        tiny_timer_group_run(&this->timer_group_);
-      }
-      tiny_gea2_interface_run(&this->gea2_interface_);
+      this->run_gea2_iteration_();
     }
-  } else {
-    if (this->uart_ != nullptr) {
-      uint32_t gea3_loop_start_ms = millis();
-      while (millis() - gea3_loop_start_ms < GEA3_LOOP_DURATION_MS) {
-        if (millis() - gea3_loop_start_ms >= GEA3_LOOP_HARD_CAP_MS) {
-          ESP_LOGW(TAG, "GEA3 tight loop exceeded hard cap (%u ms), breaking",
-                   static_cast<unsigned>(GEA3_LOOP_HARD_CAP_MS));
-          break;
-        }
-#ifdef USE_ESP32
-        esp_task_wdt_reset();
-#endif
-        tiny_timer_group_run(&this->timer_group_);
-        if (this->gea2_uart_ != nullptr) {
-          tiny_timer_group_run(&this->timer_group_);
-        }
-        tiny_gea3_interface_run(&this->gea3_interface_);
-      }
-    } else {
-      tiny_timer_group_run(&this->timer_group_);
-      if (this->gea2_uart_ != nullptr) {
-        tiny_timer_group_run(&this->timer_group_);
-      }
-    }
-  }
 #else
-  // In test builds, millis() is mocked and doesn't advance,
-  // so the tight loops would hang.  Run a single iteration instead.
-  if (need_gea2_loop) {
-    if (this->gea2_last_ms_ == 0) {
-      this->gea2_last_ms_ = millis();
-    }
-    uint32_t now_ms = millis();
-    static constexpr uint32_t MSEC_CATCHUP_CAP = 1000;
-    uint32_t catchup_count = 0;
-    while (this->gea2_last_ms_ < now_ms && catchup_count < MSEC_CATCHUP_CAP) {
-      this->gea2_tick_count_++;
-      tiny_event_publish(&this->gea2_msec_interrupt_, nullptr);
-      this->gea2_last_ms_++;
-      catchup_count++;
-    }
-    tiny_timer_group_run(&this->timer_group_);
-    if (this->uart_ != nullptr) {
-      tiny_timer_group_run(&this->timer_group_);
-    }
-    tiny_gea2_interface_run(&this->gea2_interface_);
-  } else {
-    if (this->uart_ != nullptr) {
-      tiny_timer_group_run(&this->timer_group_);
-      if (this->gea2_uart_ != nullptr) {
-        tiny_timer_group_run(&this->timer_group_);
-      }
-      tiny_gea3_interface_run(&this->gea3_interface_);
-    } else {
-      tiny_timer_group_run(&this->timer_group_);
-      if (this->gea2_uart_ != nullptr) {
-        tiny_timer_group_run(&this->timer_group_);
-      }
-    }
-  }
+    // In test builds, millis() is mocked and doesn't advance,
+    // so the tight loops would hang.  Run a single iteration instead.
+    this->run_gea2_iteration_();
 #endif
+  } else if (this->uart_ != nullptr) {
+#ifndef UNIT_TEST_BUILD
+    uint32_t gea3_loop_start_ms = millis();
+    while (millis() - gea3_loop_start_ms < GEA3_LOOP_DURATION_MS) {
+      if (millis() - gea3_loop_start_ms >= GEA3_LOOP_HARD_CAP_MS) {
+        ESP_LOGW(TAG, "GEA3 tight loop exceeded hard cap (%u ms), breaking",
+                 static_cast<unsigned>(GEA3_LOOP_HARD_CAP_MS));
+        break;
+      }
+#ifdef USE_ESP32
+      esp_task_wdt_reset();
+#endif
+      this->run_gea3_iteration_();
+    }
+#else
+    // In test builds, millis() is mocked and doesn't advance,
+    // so the tight loops would hang.  Run a single iteration instead.
+    this->run_gea3_iteration_();
+#endif
+  } else {
+    this->run_timer_only_iteration_();
+  }
   uint32_t loop_elapsed = esphome::millis() - protocol_stack_start;
   if (loop_elapsed >= 1000) {
     ESP_LOGW(TAG, "Long run_protocol_stack: %ums (mode=%s, polling=%s)",
@@ -571,22 +586,13 @@ void GeappliancesBridge::dump_config() {
   if (this->autodiscovery_manager_.get_state() == AUTODISCOVERY_COMPLETE) {
     ESP_LOGCONFIG(TAG, "  Active Protocol: %s", this->autodiscovery_manager_.is_gea2_protocol() ? "GEA2" : "GEA3");
   }
-
-  // Display bridge mode
-  const char* mode_str = "Unknown";
-  if (this->mode_ == BRIDGE_MODE_POLL) {
-    mode_str = "Polling";
-  } else if (this->mode_ == BRIDGE_MODE_SUBSCRIBE) {
-    mode_str = "Subscription";
-  } else if (this->mode_ == BRIDGE_MODE_AUTO) {
-    subscription_state_t sub_state = this->get_subscription_state();
-    if (subscription_is_active(sub_state)) {
-      mode_str = "Auto (Subscription)";
-    } else {
-      mode_str = "Auto (Polling - fallback)";
-    }
-  }
+  // Display bridge mode — compute into locals so the helper functions are
+  // actually called even when ESP_LOGCONFIG is stubbed to ((void)0) in tests.
+  const char* mode_str = bridge_mode_name(this->mode_, this->get_subscription_state());
+  const char* phase_str = startup_state_name(this->startup_hsm_wrapper_.hsm.current);
   (void)mode_str;
+  (void)phase_str;
+
   ESP_LOGCONFIG(TAG, "  Mode: %s", mode_str);
 
   {
@@ -611,16 +617,6 @@ void GeappliancesBridge::dump_config() {
   }
 
   // Display current startup state for debugging
-  const char* phase_str = "Unknown";
-  if (this->startup_hsm_wrapper_.hsm.current == startup_state_startup_delay)   phase_str = "Startup Delay";
-  else if (this->startup_hsm_wrapper_.hsm.current == startup_state_autodiscovery)    phase_str = "Autodiscovery";
-  else if (this->startup_hsm_wrapper_.hsm.current == startup_state_device_id)        phase_str = "Device ID";
-  else if (this->startup_hsm_wrapper_.hsm.current == startup_state_mqtt_client_init) phase_str = "MQTT Client Init";
-  else if (this->startup_hsm_wrapper_.hsm.current == startup_state_feature_bits)     phase_str = "Feature Bits";
-  else if (this->startup_hsm_wrapper_.hsm.current == startup_state_bridge_init)      phase_str = "Bridge Init";
-  else if (this->startup_hsm_wrapper_.hsm.current == startup_state_subscription_watch) phase_str = "Subscription Watch";
-  else if (this->startup_hsm_wrapper_.hsm.current == startup_state_running)          phase_str = "Running";
-  (void)phase_str;
   ESP_LOGCONFIG(TAG, "  Startup State: %s", phase_str);
 }
 

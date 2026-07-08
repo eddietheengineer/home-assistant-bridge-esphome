@@ -153,6 +153,10 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void initialize_erd_bridge_();
   void start_custom_erd_polling_();
   void maybe_start_custom_erd_polling_();
+  // Protocol stack iteration helpers (extracted from run_protocol_stack_)
+  void run_gea2_iteration_();
+  void run_gea3_iteration_();
+  void run_timer_only_iteration_();
   void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
   void update_publisher_state_();       // Publisher pause/resume + steady-state detection
@@ -203,6 +207,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // GEA2 tight-loop duration: covers the full TX→RX cycle at 19200 baud
   // (see doc/geappliances_bridge.md section 13 for detailed explanation)
   static constexpr uint32_t GEA2_LOOP_DURATION_MS = 100;
+  // Cap on msec catchup iterations to prevent runaway loops
+  static constexpr uint32_t MSEC_CATCHUP_CAP = 1000;
+  // GEA3 tight-loop duration
   static constexpr uint32_t GEA3_LOOP_DURATION_MS = 10;
   static constexpr uint32_t GEA2_LOOP_HARD_CAP_MS = GEA2_LOOP_DURATION_MS * 2;
   static constexpr uint32_t GEA3_LOOP_HARD_CAP_MS = GEA3_LOOP_DURATION_MS * 2;
