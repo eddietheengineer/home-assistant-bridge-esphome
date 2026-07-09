@@ -8,7 +8,7 @@ ESPHome external component bridging GE Appliances (GEA2/GEA3 serial protocols) t
 | **Protocol** | GEA2 (19200 baud) / GEA3 (230400 baud) |
 | **Transport** | MQTT with Home Assistant Auto-Discovery |
 | **Platform** | ESP32-C3 / ESP32-C6, ESP-IDF framework |
-| **License** | MIT |
+| **License** | BSD 3-Clause |
 
 ---
 
@@ -115,6 +115,69 @@ geappliances_bridge:
 4. Disconnect the adapter from your computer and connect it to your GE Appliance's serial port using a standard Ethernet cable (RJ45).
 5. The adapter should appear as **Online** in your ESPHome dashboard within a minute.
 
+<details>
+<summary>Example boot log (click to expand)</summary>
+
+The following is a representative boot log showing a normal startup after an OTA update. Personal identifiers have been replaced with placeholders.
+
+```
+[11:45:51][I][geappliances_bridge_startup_hsm]: Startup: Autodiscovery phase
+[11:45:51][I][autodiscovery]: Starting autodiscovery
+[11:45:51][I][autodiscovery]: Sent GEA3 broadcast (ERD 0x0008) to address 0xFF
+[11:45:51][D][autodiscovery]: GEA3 board discovered: address=0xC0 appliance_type=6
+[11:45:52][I][autodiscovery]: GEA3 board discovered at 0xC0, autodiscovery complete
+[11:45:52][I][device_identity]: No device_id configured, will auto-generate from identity ERDs
+[11:45:52][I][device_identity]: Read appliance type: 6
+[11:45:52][I][device_identity]: Read model number: PDT715SBN8TS
+[11:45:52][I][device_identity]: Read serial number: AB123456C
+[11:45:52][I][device_identity]: Generated device ID: Dishwasher_PDT715SBN8TS_AB123456C
+[11:45:52][I][erd_cache_mqtt_publisher]: ERD cache MQTT publisher initialized with device ID: Dishwasher_PDT715SBN8TS_AB123456C
+[11:45:52][I][feature_bit]: Reading appliance API feature bits...
+[11:45:52][I][geappliances_bridge_startup_hsm]: Startup: Feature bits phase
+[11:45:52][D][feature_bit]: Read feature ERD 0x0092 (1/11): 8 bytes
+[11:45:52][D][feature_bit]: Read feature ERD 0x0093 (2/11): 8 bytes
+[11:45:52][D][feature_bit]: Read feature ERD 0x0094 (3/11): 8 bytes
+[11:45:52][D][feature_bit]: Feature bit ERD 0x0095 failed or not supported, skipping
+[11:45:52][D][feature_bit]: Read feature ERD 0x0097 (6/11): 8 bytes
+[11:45:52][D][feature_bit]: Feature bit ERD 0x0109 failed or not supported, skipping
+[11:45:52][I][feature_bit]: Common feature API (0x0092) value: 0x00011DB7
+[11:45:52][I][feature_bit]:   [SET] Common feature: Primary (mask 0x00000001, 4 ERDs)
+[11:45:52][I][feature_bit]:   [SET] Common feature: Service Mode (mask 0x00000002, 2 ERDs)
+[11:45:52][I][feature_bit]:   [SET] Common feature: Control Lock (mask 0x00000020, 1 ERDs)
+[11:45:52][I][feature_bit]:   [SET] Common feature: Sabbath (mask 0x00000080, 1 ERDs)
+[11:45:52][I][feature_bit]:   [SET] Common feature: Brand Information (mask 0x00001000, 1 ERDs)
+[11:45:52][I][feature_bit]:   [SET] Common feature: Nonvolatile Usage Monitoring (mask 0x00010000, 3 ERDs)
+[11:45:52][I][feature_bit]: Appliance feature ERD 0x0093: type 0x0006, version 1, features 0x0E61BFE3
+[11:45:52][I][feature_bit]:   [SET] Dishwasher / Foundation (mask 0x00000001, 11 ERDs)
+[11:45:52][I][feature_bit]:   [SET] Dishwasher / Service (mask 0x00000002, 23 ERDs)
+[11:45:52][I][feature_bit]:   [SET] Dishwasher / Remote Cycle Control (mask 0x00000040, 2 ERDs)
+[11:45:52][I][feature_bit]:   [SET] Dishwasher / Cycle Definitions (mask 0x00008000, 10 ERDs)
+[11:45:52][I][feature_bit]:   [SET] Dishwasher / Inlet Flow Rate (mask 0x04000000, 1 ERDs)
+[11:45:52][I][feature_bit]: Feature bit parsing complete: 106 valid ERDs
+[11:45:52][D][geappliances_bridge_startup_hsm]: Startup: Bridge init phase
+[11:45:52][I][geappliances_bridge_bridge_init]: Initializing ERD bridge
+[11:45:52][I][geappliances_bridge_bridge_init]: Bridge mode: auto (subscription + custom ERD polling)
+[11:45:52][D][erd_cache]: ERD 0x0001 added to cache (32 bytes, arena offset 0)
+[11:45:52][I][geappliances_bridge]: Subscription bridge state: subscribed (ERDs cached: 1)
+[11:45:52][D][erd_cache]: ERD 0x0002 added to cache (32 bytes, arena offset 32)
+...
+[11:45:54][D][erd_cache]: ERD 0xD030 added to cache (4 bytes, arena offset 609)
+[11:45:56][I][geappliances_bridge]: Subscription bridge state: steady (ERDs cached: 151)
+[11:45:56][I][geappliances_bridge]: Appliance Bridge is in steady state (ERDs cached: 151, arena: 613/4096 bytes, 14%)
+```
+
+**Startup phases shown above:**
+
+| Phase | What happens |
+|---|---|
+| **Autodiscovery** | Broadcasts on GEA bus, finds appliance at address `0xC0` |
+| **Identity** | Reads appliance type, model number, serial number |
+| **Feature bits** | Probes ERDs `0x0092`–`0x010D` to determine supported features |
+| **Bridge init** | Subscribes to or polls ERDs based on mode |
+| **Steady state** | Bridge is running and reporting appliance data |
+
+</details>
+
 ---
 
 ## Home Assistant Discovery
@@ -143,4 +206,4 @@ HA discovery topics are published by the bridge and retained on the MQTT broker.
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+BSD 3-Clause — see [LICENSE](./LICENSE).
