@@ -90,10 +90,10 @@ void OtaCleanupManager::loop() {
     bool refresh_trigger = this->discovery_refresh_in_progress_;
 
     if (ota_trigger || refresh_trigger) {
-      if (ota_trigger) {
-        ESP_LOGI(TAG, "Starting OTA-triggered HA discovery cleanup...");
-      }
       if (this->start_cleanup_()) {
+        if (ota_trigger) {
+          ESP_LOGI(TAG, "Starting OTA-triggered HA discovery cleanup...");
+        }
         if (refresh_trigger) {
           this->discovery_refresh_in_progress_ = false;
         }
