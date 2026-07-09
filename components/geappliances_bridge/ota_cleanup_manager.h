@@ -76,6 +76,7 @@ class OtaCleanupManager {
 
 private:
   enum CleanupTrigger { NONE, OTA, DISCOVERY_REFRESH };
+  bool start_cleanup_();
 
   // State machine flags
   bool ota_cleanup_needed_{false};
