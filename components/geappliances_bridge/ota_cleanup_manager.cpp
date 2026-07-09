@@ -68,16 +68,17 @@ bool OtaCleanupManager::is_ready() const {
          this->device_identity_manager_->get_state() == DEVICE_ID_STATE_COMPLETE;
 }
 
-void OtaCleanupManager::start_cleanup_()
+bool OtaCleanupManager::start_cleanup_()
 {
   if (!this->is_ready()) {
-    return;
+    return false;
   }
   ha_discovery_cleanup_configure(&this->ha_discovery_manager_->cleanup,
       this->device_identity_manager_->get_device_id(),
       &this->mqtt_client_adapter_->interface, esphome::millis);
   ha_discovery_cleanup_start(&this->ha_discovery_manager_->cleanup);
   this->ota_cleanup_in_progress_ = true;
+  return true;
 }
 
 void OtaCleanupManager::loop() {
@@ -92,9 +93,10 @@ void OtaCleanupManager::loop() {
       if (ota_trigger) {
         ESP_LOGI(TAG, "Starting OTA-triggered HA discovery cleanup...");
       }
-      this->start_cleanup_();
-      if (refresh_trigger) {
-        this->discovery_refresh_in_progress_ = false;
+      if (this->start_cleanup_()) {
+        if (refresh_trigger) {
+          this->discovery_refresh_in_progress_ = false;
+        }
       }
     }
   }
