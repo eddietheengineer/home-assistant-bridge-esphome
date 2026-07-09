@@ -128,15 +128,18 @@ static void on_polling_cycle_complete(erd_bridge_poll_t* self, bool immediate)
 /* Send the next discovery-phase read request.  This operates on
  * appliance_erd_list / appliance_erd_list_count — NOT on erd_polling_list.
  * It is used by state_probe_list to advance one ERD at a time during
- * the probe phase.  For steady-state polling, see send_next_poll_read_request. */
+ * the probe phase.  For steady-state polling, see send_next_poll_read_request.
+ *
+ * Uses post-increment: erd_index points to the current ERD before the call,
+ * and is advanced after the read is queued.  Initialized to 0 on entry. */
 static bool send_next_read_request(erd_bridge_poll_t* self)
 {
   reset_lost_appliance_timer(self);
-  self->erd_index++;
   bool more_erds_to_try = (self->erd_index < self->appliance_erd_list_count);
   if (more_erds_to_try) {
     self->request_id++;
     tiny_gea3_erd_client_read(self->erd_client, &self->request_id, self->erd_host_address, self->appliance_erd_list[self->erd_index]);
+    self->erd_index++;
   }
   return more_erds_to_try;
 }
@@ -299,7 +302,7 @@ static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
     self->current_state = polling_state_probing;
     self->appliance_erd_list = self->probe_list;
     self->appliance_erd_list_count = self->probe_list_count;
-    self->erd_index = (uint16_t)-1;
+    self->erd_index = 0;
     // Clear discovery state on re-entry after appliance lost.
     if (self->polling_list_count > 0) {
       clear_discovery_state(self);
