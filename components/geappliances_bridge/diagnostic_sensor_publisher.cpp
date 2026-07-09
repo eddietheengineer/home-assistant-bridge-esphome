@@ -1,5 +1,4 @@
 #include "diagnostic_sensor_publisher.h"
-#include <functional>
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"
 
@@ -28,10 +27,11 @@ void DiagnosticSensorPublisher::init(
 
 // Helper: publish a group of sensors at the configured interval.
 // Returns true if any sensor in the group was published this call.
+// Templated to avoid std::function SBO/heap allocation risk on each loop().
+template<typename GetA, typename GetB>
 static bool publish_sensor_group(sensor::Sensor* a, sensor::Sensor* b,
                                  uint32_t* last_publish, uint32_t interval_ms,
-                                 std::function<uint32_t()> get_a,
-                                 std::function<uint32_t()> get_b)
+                                 GetA get_a, GetB get_b)
 {
   if ((a == nullptr) && (b == nullptr)) {
     return false;
