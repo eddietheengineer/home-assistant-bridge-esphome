@@ -419,38 +419,6 @@ void GeappliancesBridge::run_timer_only_iteration_()
   }
 }
 
-// Run a tight-loop for the given iteration function, bounded by a duration
-// and a hard cap.  In test builds the loop is replaced with a single call
-// because millis() is mocked.
-template<typename IterFn>
-void GeappliancesBridge::run_tight_loop_(IterFn iter_fn,
-                                          uint32_t duration_ms,
-                                          uint32_t hard_cap_ms,
-                                          const char* protocol_name)
-{
-#ifndef UNIT_TEST_BUILD
-  uint32_t loop_start_ms = millis();
-  while (millis() - loop_start_ms < duration_ms) {
-    if (millis() - loop_start_ms >= hard_cap_ms) {
-      ESP_LOGW(TAG, "%s tight loop exceeded hard cap (%u ms), breaking",
-               protocol_name, static_cast<unsigned>(hard_cap_ms));
-      break;
-    }
-#ifdef USE_ESP32
-    esp_task_wdt_reset();
-#endif
-    iter_fn();
-  }
-#else
-  // In test builds, millis() is mocked and doesn't advance,
-  // so the tight loops would hang.  Run a single iteration instead.
-  (void)duration_ms;
-  (void)hard_cap_ms;
-  (void)protocol_name;
-  iter_fn();
-#endif
-}
-
 void GeappliancesBridge::run_protocol_stack_()
 {
   // When GEA2 is active (or during GEA2 autodiscovery), run a 100 ms
