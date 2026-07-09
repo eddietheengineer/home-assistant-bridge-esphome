@@ -27,7 +27,7 @@
 #include "ha_discovery_cleanup.h"
 
 #ifndef USE_ESP_IDF
-#error "This component requires ESP-IDF. Define USE_ESP_IDF."
+#error "This component requires ESPHome with framework: type: esp-idf"
 #endif
 
 #ifdef USE_ESP_IDF_STUBS

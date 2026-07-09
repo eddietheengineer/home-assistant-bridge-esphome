@@ -69,7 +69,7 @@ void erd_cache_set_throttle_rate_seconds(erd_cache_t* self, uint8_t rate);
  * Reloads the publish_cooldown timer. Call after mqtt_client_publish_raw() succeeds.
  * Static inline — zero overhead when max_cooldown is 0 (early return).
  *
- * Thread safety: on ESP-IDF this is called from the background MQTT publisher
+ * Thread safety: with the ESP-IDF framework this is called from the background MQTT publisher
  * task while tick_cooldowns() runs from the main loop.  On single-core ESP32
  * uint8_t access is atomic and the tick→signal_work ordering in loop() ensures
  * the tick always runs before the task drains, so no additional locking is needed. */

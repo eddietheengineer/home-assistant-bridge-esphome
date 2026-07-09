@@ -16,7 +16,7 @@
 
 
 #ifndef USE_ESP_IDF
-#error "This component requires ESP-IDF. Define USE_ESP_IDF."
+#error "This component requires ESPHome with framework: type: esp-idf"
 #endif
 GEA_TAG(PUBLISHER_TAG) = "erd_cache_mqtt_publisher";
 #include "esp_task_wdt.h"

@@ -5,7 +5,7 @@
 #include "geappliances_bridge_log.h"
 
 #ifndef USE_ESP_IDF
-#error "This component requires ESP-IDF. Define USE_ESP_IDF."
+#error "This component requires ESPHome with framework: type: esp-idf"
 #endif
 
 #if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)

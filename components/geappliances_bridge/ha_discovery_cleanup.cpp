@@ -8,7 +8,7 @@
 #include "ha_discovery_cleanup.h"
 
 #ifndef USE_ESP_IDF
-#error "This component requires ESP-IDF. Define USE_ESP_IDF."
+#error "This component requires ESPHome with framework: type: esp-idf"
 #endif
 
 
@@ -37,7 +37,7 @@
  * to catch all retained discovery topics across all domains at once. */
 
 /* Idle timeout after last topic callback during cleanup.
- * The ESP-IDF MQTT inbound queue holds ~32 messages before dropping.
+ * The ESP-IDF framework MQTT inbound queue holds ~32 messages before dropping.
  * This must be long enough for the broker to finish delivering a batch
  * and for the MQTT task to process its queue before we flush. */
 
@@ -63,7 +63,7 @@ GEA_TAG(TAG) = "ha_cleanup";
 
 /* Flush queued cleanup topics: publish empty retained payloads to remove them.
  * Called from cleanup_run() during idle periods, not from the MQTT callback,
- * to avoid blocking the ESP-IDF MQTT task. Returns the number of topics
+ * to avoid blocking the ESP-IDF framework MQTT task. Returns the number of topics
  * remaining in the queue (0 means all flushed). */
 CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
 {
@@ -138,7 +138,7 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
  * Keeps the callback short — no outbound publish call — so the MQTT task's
  * inbound queue drains fast and retained message bursts don't overflow.
  *
- * THREAD SAFETY: This callback runs in the ESP-IDF MQTT task context (a separate
+ * THREAD SAFETY: This callback runs in the ESP-IDF framework MQTT task context (a separate
  * FreeRTOS task). Shared state (topic_buf, queue_write_pos, queue_count) is
  * protected by vPortEnterCritical()/vPortExitCritical(). This is safe on
  * single-core ESP32-C3 where critical sections disable interrupts. On dual-core

@@ -3,7 +3,7 @@
  * @brief Scans the shared ERD cache and publishes updated ERDs
  *        to MQTT topics with retain=true.
  *
- * On ESP-IDF platforms, publishing runs in a FreeRTOS background task
+ * With the ESP-IDF framework, publishing runs in a FreeRTOS background task
  * to avoid blocking the ESPHome main loop on the IDF MQTT mutex.
  *
  * Responsibilities:
@@ -29,7 +29,7 @@
 
 
 #ifndef USE_ESP_IDF
-#error "This component requires ESP-IDF. Define USE_ESP_IDF."
+#error "This component requires ESPHome with framework: type: esp-idf"
 #endif
 #ifdef USE_ESP_IDF_STUBS
   #include "esp-idf/freertos_stub.h"
@@ -103,7 +103,7 @@ void erd_cache_mqtt_publisher_signal_work(erd_cache_mqtt_publisher_t* self);
 /*!
  * Returns the number of ERDs actually published.
  * No-ops if MQTT is disconnected (increments missed_loops).
- * On ESP-IDF, this is called from the background task, not the main loop.
+ * With the ESP-IDF framework, this is called from the background task, not the main loop.
  */
 uint16_t erd_cache_mqtt_publisher_loop(
   erd_cache_mqtt_publisher_t* self,
@@ -145,19 +145,19 @@ void erd_cache_mqtt_publisher_set_time_fn(
 uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* self);
 /*!
  * Returns true if the publisher has completed a full cache round since the
- * last resume.  Thread-safe — acquires the state mutex on ESP-IDF.
+ * last resume.  Thread-safe — acquires the state mutex with the ESP-IDF framework.
  */
 bool erd_cache_mqtt_publisher_first_round_done(erd_cache_mqtt_publisher_t* self);
 
 /*!
  * Returns the total number of MQTT disconnects since init.
- * Thread-safe — acquires the state mutex on ESP-IDF.
+ * Thread-safe — acquires the state mutex with the ESP-IDF framework.
  */
 uint32_t erd_cache_mqtt_publisher_get_disconnect_count(erd_cache_mqtt_publisher_t* self);
 
 /*!
  * Returns the duration of the last MQTT disconnect in milliseconds.
- * Thread-safe — acquires the state mutex on ESP-IDF.
+ * Thread-safe — acquires the state mutex with the ESP-IDF framework.
  */
 uint32_t erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(erd_cache_mqtt_publisher_t* self);
 

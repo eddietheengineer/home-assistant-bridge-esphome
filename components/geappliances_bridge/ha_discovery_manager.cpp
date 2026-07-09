@@ -18,7 +18,7 @@
 #include "esphome/core/log.h"
 
 #ifndef USE_ESP_IDF
-#error "This component requires ESP-IDF. Define USE_ESP_IDF."
+#error "This component requires ESPHome with framework: type: esp-idf"
 #endif
 
 #include "esp_attr.h"

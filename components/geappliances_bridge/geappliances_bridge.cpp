@@ -14,7 +14,7 @@
 #endif
 
 #ifndef USE_ESP_IDF
-#error "This component requires ESP-IDF. Define USE_ESP_IDF."
+#error "This component requires ESPHome with framework: type: esp-idf"
 #endif
 
 GEA_TAG(TAG) = "geappliances_bridge";
@@ -862,7 +862,7 @@ void GeappliancesBridge::init_erd_cache_publisher_()
   if (this->erd_cache_publisher_.cache) return; // already initialized
 
   /* Apply rate limit configuration before starting the publisher.
-   * On ESP-IDF the background task starts immediately in init() and
+   * With the ESP-IDF framework the background task starts immediately in init() and
    * could drain cache entries before the rate limit takes effect. */
   erd_cache_set_throttle_rate_seconds(&this->erd_cache_, this->throttle_rate_seconds_);
 
@@ -872,7 +872,7 @@ void GeappliancesBridge::init_erd_cache_publisher_()
     &this->mqtt_client_adapter_.interface,
     this->device_identity_manager_.get_device_id());
 
-  // Start the background publishing task on ESP-IDF platforms.
+  // Start the background publishing task (ESP-IDF framework only).
   erd_cache_mqtt_publisher_start(&this->erd_cache_publisher_);
 
   // Initialize the HA discovery manager (lazy-started on steady state).
