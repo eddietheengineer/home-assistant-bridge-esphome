@@ -78,8 +78,6 @@ static void mqtt_publisher_task(void* arg)
       if (!entry) break;
       drained_any = true;
 
-      if (++published_this_wake >= MAX_PUBLISHES_PER_WAKE) break;
-
       /* Determine data pointer. */
       const uint8_t* data = erd_cache_entry_data(self->cache, entry);
 
@@ -114,6 +112,8 @@ static void mqtt_publisher_task(void* arg)
       // Update stats — already protected by the outer mutex hold.
       self->total_published++;
       self->publish_count_window++;
+
+      if (++published_this_wake >= MAX_PUBLISHES_PER_WAKE) break;
     }
 
     /* Detect full cache round: we drained entries and the index wrapped
