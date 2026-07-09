@@ -4,6 +4,28 @@
 
 - When a PR is updated with a new commit, the PR description and title must be updated to reflect the context of **all changes in the PR**, not just the changes from the latest commit or request.
 
+## Never Merge PRs
+
+**You must never merge a PR yourself. Only the user can merge a PR.**
+
+- Never run `gh pr merge`, `git merge`, or any command that merges a PR branch into the target branch.
+- Never delete a PR branch after merging.
+- If asked to "commit and push", only commit to the feature branch and push it. Stop there.
+
+## Verify ESPHome Compilation Before Committing
+
+**After making changes to component source files, verify the code compiles in the actual ESPHome build environment, not just the test harness.**
+
+The test harness (`make test`) uses mocked ESP-IDF stubs and may not catch header issues that surface in a real ESPHome build (e.g., file-scope variables like `TAG` that exist in the .cpp but not in the header context).
+
+Before committing changes to `.h` or `.cpp` files in `components/geappliances_bridge/`:
+
+```bash
+esphome compile /path/to/device.yaml
+```
+
+If the ESPHome build is not available, at minimum verify that any template or inline function in a header file does not reference file-scope variables (`TAG`, static globals) defined only in a .cpp file. Use literal strings or `static constexpr` instead.
+
 ## HA Discovery Pipeline
 
 **Any change to ERD definitions, overrides, or pipeline scripts requires a full pipeline rerun before committing.**

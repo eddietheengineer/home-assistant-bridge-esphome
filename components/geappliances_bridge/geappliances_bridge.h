@@ -172,7 +172,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
     uint32_t loop_start_ms = millis();
     while (millis() - loop_start_ms < duration_ms) {
       if (millis() - loop_start_ms >= hard_cap_ms) {
-        ESP_LOGW(TAG, "%s tight loop exceeded hard cap (%u ms), breaking",
+        ESP_LOGW("geappliances_bridge", "%s tight loop exceeded hard cap (%u ms), breaking",
                  protocol_name, static_cast<unsigned>(hard_cap_ms));
         break;
       }
