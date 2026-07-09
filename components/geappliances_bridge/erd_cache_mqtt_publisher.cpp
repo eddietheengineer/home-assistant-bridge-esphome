@@ -20,6 +20,7 @@
 #endif
 GEA_TAG(PUBLISHER_TAG) = "erd_cache_mqtt_publisher";
 #include "esp_task_wdt.h"
+static const uint16_t MAX_PUBLISHES_PER_WAKE = 5;
 
 static void mqtt_publisher_task(void* arg)
 {
@@ -67,9 +68,11 @@ static void mqtt_publisher_task(void* arg)
       continue;
     }
 
-    // Drain all available updates — no per-loop budget in background task.
+    // Drain updates with a per-wake budget to avoid flooding the broker
+    // after reconnect. The 100ms semaphore timeout provides natural pacing.
     // The mutex is held throughout to protect publish_index and cache access.
     bool drained_any = false;
+    uint16_t published_this_wake = 0;
     while (1) {
       erd_cache_entry_t* entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
       if (!entry) break;
@@ -109,6 +112,8 @@ static void mqtt_publisher_task(void* arg)
       // Update stats — already protected by the outer mutex hold.
       self->total_published++;
       self->publish_count_window++;
+
+      if (++published_this_wake >= MAX_PUBLISHES_PER_WAKE) break;
     }
 
     /* Detect full cache round: we drained entries and the index wrapped
