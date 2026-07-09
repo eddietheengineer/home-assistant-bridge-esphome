@@ -118,7 +118,7 @@ geappliances_bridge:
 <details>
 <summary>Example boot log (click to expand)</summary>
 
-The following is a representative boot log showing a normal startup after an OTA update. Personal identifiers have been replaced with placeholders.
+The following is a representative boot log showing a normal startup after an OTA update.
 
 ```
 [11:45:51][I][geappliances_bridge_startup_hsm]: Startup: Autodiscovery phase
