@@ -17,7 +17,10 @@
 
 #include "esphome/core/log.h"
 
-#ifdef USE_ESP_IDF
+#ifndef USE_ESP_IDF
+#error "This component requires ESP-IDF. Define USE_ESP_IDF."
+#endif
+
 #include "esp_attr.h"
 #include "esp_task_wdt.h"
 #include "esp_log.h"
@@ -30,7 +33,6 @@
 #define MINIZ_NO_STDIO
 #include "miniz.h"
 #endif
-#endif /* USE_ESP_IDF */
 
 GEA_TAG(TAG) = "ha_discovery";
 
@@ -255,7 +257,6 @@ static void build_device_json(ha_discovery_manager_t* self)
 /* Decompression helper                                               */
 /* ------------------------------------------------------------------ */
 
-#ifdef USE_ESP_IDF
 static int chunk_decompress(ha_discovery_manager_t* self, const uint8_t* compressed, size_t compressed_len,
                            uint8_t* output, size_t* output_len)
 {
@@ -282,7 +283,6 @@ static int chunk_decompress(ha_discovery_manager_t* self, const uint8_t* compres
     return 0;
 #endif
 }
-#endif /* USE_ESP_IDF */
 
 /* ------------------------------------------------------------------ */
 /* Runtime config topic filtering                                     */
@@ -402,7 +402,6 @@ static bool should_filter_config_topic(const char* name) {
 /* Process a single JSONL line: build topic/payload in shared buffers */
 /* ------------------------------------------------------------------ */
 
-#ifdef USE_ESP_IDF
 static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
 {
     if (self->device_id == NULL) return false;
@@ -725,7 +724,6 @@ too_large:
     self->total_filtered++;
     return false;
 }
-#endif
 
 /* ------------------------------------------------------------------ */
 /* Category filtering by appliance type                               */
@@ -849,12 +847,10 @@ static bool should_process_category(const char* category, uint8_t appliance_type
 /* Cleanup helper                                                     */
 /* ------------------------------------------------------------------ */
 
-#ifdef USE_ESP_IDF
 static void cleanup_resources(ha_discovery_manager_t* self)
 {
     ha_discovery_cleanup_destroy(&self->cleanup);
 }
-#endif
 
 /* ------------------------------------------------------------------ */
 /* run(): publish one entity per call                                 */
@@ -862,7 +858,6 @@ static void cleanup_resources(ha_discovery_manager_t* self)
 
 void ha_discovery_manager_run(ha_discovery_manager_t* self)
 {
-#ifdef USE_ESP_IDF
     if (self->state != ha_discovery_state_building &&
         self->state != ha_discovery_state_discovering) {
         return;
@@ -1007,9 +1002,6 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
             (unsigned)free_heap, (unsigned)largest_free,
             (free_heap > 0) ? (1.0 - (double)largest_free / free_heap) * 100.0 : 0.0);
     }
-#else
-    (void)self;
-#endif
 }
 
 /* ------------------------------------------------------------------ */
@@ -1021,9 +1013,7 @@ void ha_discovery_manager_init(ha_discovery_manager_t* self)
     memset(self, 0, sizeof(*self));
     self->state = ha_discovery_state_idle;
 
-#ifdef USE_ESP_IDF
     ha_discovery_cleanup_init(&self->cleanup);
-#endif
 }
 
 void ha_discovery_manager_configure(
@@ -1049,22 +1039,16 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
 {
     if (self->state != ha_discovery_state_idle) return;
 
-#ifdef USE_ESP_IDF
     /* Build sorted ERD list and device JSON inline. */
     build_sorted_erd_list(self);
     build_device_json(self);
 
     self->state = ha_discovery_state_building;
-#else
-    self->state = ha_discovery_state_complete;
-#endif
 }
 
 void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
 {
-#ifdef USE_ESP_IDF
     cleanup_resources(self);
-#endif
 
     memset(self, 0, sizeof(*self));
 }

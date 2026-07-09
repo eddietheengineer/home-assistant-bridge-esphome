@@ -4,6 +4,10 @@
 #include "esphome_time_source.h"
 #include "geappliances_bridge_log.h"
 
+#ifndef USE_ESP_IDF
+#error "This component requires ESP-IDF. Define USE_ESP_IDF."
+#endif
+
 #if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
 #include "esp_system.h"
 #include "esp_task_wdt.h"

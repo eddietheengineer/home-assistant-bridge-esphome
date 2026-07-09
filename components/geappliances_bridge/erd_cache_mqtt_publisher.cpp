@@ -14,12 +14,13 @@
 #include <cstdio>
 #include <string.h>
 
-GEA_TAG(PUBLISHER_TAG) = "erd_cache_mqtt_publisher";
-#ifdef USE_ESP_IDF
-#include "esp_task_wdt.h"
-#endif
 
-#ifdef USE_ESP_IDF
+#ifndef USE_ESP_IDF
+#error "This component requires ESP-IDF. Define USE_ESP_IDF."
+#endif
+GEA_TAG(PUBLISHER_TAG) = "erd_cache_mqtt_publisher";
+#include "esp_task_wdt.h"
+
 static void mqtt_publisher_task(void* arg)
 {
   erd_cache_mqtt_publisher_t* self = (erd_cache_mqtt_publisher_t*)arg;
@@ -127,7 +128,6 @@ static void mqtt_publisher_task(void* arg)
   }
   vTaskDelete(NULL);
 }
-#endif
 
 void erd_cache_mqtt_publisher_init(
   erd_cache_mqtt_publisher_t* self,
@@ -143,7 +143,6 @@ void erd_cache_mqtt_publisher_init(
   self->mqtt_connected = false;
   self->get_time_ms = esphome::millis;
 
-#ifdef USE_ESP_IDF
   self->work_semaphore = xSemaphoreCreateBinary();
   if (!self->work_semaphore) {
     ESP_LOGE(PUBLISHER_TAG, "Failed to create work semaphore");
@@ -157,7 +156,6 @@ void erd_cache_mqtt_publisher_init(
     ESP_LOGE(PUBLISHER_TAG, "Failed to create done semaphore");
   }
   self->task_running = false;
-#endif
 
   if (!mqtt_client) return;
   /* Subscribe to MQTT disconnect event */
@@ -209,7 +207,6 @@ void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self)
     mqtt_client_on_mqtt_connect(self->mqtt_client),
     &self->mqtt_connect_subscription);
 
-#ifdef USE_ESP_IDF
   if (self->work_semaphore) {
     vSemaphoreDelete(self->work_semaphore);
     self->work_semaphore = NULL;
@@ -222,14 +219,12 @@ void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self)
     vSemaphoreDelete(self->done_semaphore);
     self->done_semaphore = NULL;
   }
-#endif
 
   memset(self, 0, sizeof(*self));
 }
 
 void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
 {
-#ifdef USE_ESP_IDF
   if (self->task_handle != NULL) return; // already running
   if (self->work_semaphore == NULL) return; // semaphore creation failed in init
   self->task_running = true;
@@ -245,14 +240,10 @@ void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
     ESP_LOGE(PUBLISHER_TAG, "Failed to create MQTT publisher task");
     self->task_running = false;
   }
-#else
-  (void)self;
-#endif
 }
 
 void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
 {
-#ifdef USE_ESP_IDF
   if (self->task_handle == NULL) return;
   self->task_running = false;
   // Wake the task so it can exit.
@@ -288,21 +279,14 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
   esp_task_wdt_reset();
   vTaskDelay(pdMS_TO_TICKS(100));
   self->task_handle = NULL;
-#else
-  (void)self;
-#endif
 }
 
 void erd_cache_mqtt_publisher_signal_work(erd_cache_mqtt_publisher_t* self)
 {
-#ifdef USE_ESP_IDF
   if (self->work_semaphore != NULL) {
     // Non-blocking give — if task is already waiting, it will wake up.
     xSemaphoreGive(self->work_semaphore);
   }
-#else
-  (void)self;
-#endif
 }
 
 uint16_t erd_cache_mqtt_publisher_loop(
@@ -334,35 +318,19 @@ uint16_t erd_cache_mqtt_publisher_loop(
     const uint8_t* data = erd_cache_entry_data(self->cache, entry);
 
     /* Build topic: geappliances/{device_id}/erd/0x{ERD:04x}/value */
-#ifdef USE_ESP_IDF
     char topic[128];
-#else
-    char* topic = self->loop_topic;
-#endif
     int topic_len = snprintf(topic,
-#ifdef USE_ESP_IDF
         sizeof(topic)
-#else
-        sizeof(self->loop_topic)
-#endif
         , "geappliances/%s/erd/0x%04x/value", self->device_id, entry->erd);
     if (topic_len < 0 || (unsigned)topic_len >=
-#ifdef USE_ESP_IDF
         sizeof(topic)
-#else
-        sizeof(self->loop_topic)
-#endif
     ) {
       ESP_LOGW(PUBLISHER_TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
       return published;
     }
     /* Build hex payload: max data_size is 255 (uint8_t), so hex is 510 chars + null */
     size_t data_len = entry->data_size;
-#ifdef USE_ESP_IDF
     char hex[512];
-#else
-    char* hex = self->loop_hex;
-#endif
     for (size_t i = 0; i < data_len; i++) {
       snprintf(hex + i * 2, 3, "%02x", data[i]);
     }
@@ -402,7 +370,6 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
   bool was_long_disconnect = false;
   uint32_t disconnect_start = 0;
 
-#ifdef USE_ESP_IDF
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->mqtt_connected = true;
@@ -417,17 +384,10 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
     disconnect_start = self->disconnect_start_ms;
     self->disconnect_start_ms = 0;
   }
-#else
-  self->mqtt_connected = true;
-  self->first_round_done = false;
-  disconnect_start = self->disconnect_start_ms;
-  self->disconnect_start_ms = 0;
-#endif
 
   uint32_t now = self->get_time_ms ? self->get_time_ms() : 0;
   uint32_t duration = (disconnect_start != 0) ? (now - disconnect_start) : 0;
 
-#ifdef USE_ESP_IDF
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->last_disconnect_duration_ms = duration;
@@ -436,9 +396,6 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
   } else {
     self->last_disconnect_duration_ms = duration;
   }
-#else
-  self->last_disconnect_duration_ms = duration;
-#endif
 
   if (disconnect_start != 0 && duration >= RECONNECT_REPUBLISH_THRESHOLD_MS) {
     was_long_disconnect = true;
@@ -458,7 +415,6 @@ void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self)
 {
   uint32_t now = self->get_time_ms ? self->get_time_ms() : 0;
 
-#ifdef USE_ESP_IDF
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->mqtt_connected = false;
@@ -471,17 +427,11 @@ void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self)
     self->disconnect_start_ms = now;
     self->disconnect_count++;
   }
-#else
-  self->mqtt_connected = false;
-  self->disconnect_start_ms = now;
-  self->disconnect_count++;
-#endif
   ESP_LOGW(PUBLISHER_TAG, "MQTT disconnected — pausing ERD cache publishing");
 }
 
 void erd_cache_mqtt_publisher_pause(erd_cache_mqtt_publisher_t* self)
 {
-#ifdef USE_ESP_IDF
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->paused = true;
@@ -492,15 +442,10 @@ void erd_cache_mqtt_publisher_pause(erd_cache_mqtt_publisher_t* self)
     self->paused = true;
     self->first_round_done = false;
   }
-#else
-  self->paused = true;
-  self->first_round_done = false;
-#endif
 }
 
 void erd_cache_mqtt_publisher_resume(erd_cache_mqtt_publisher_t* self)
 {
-#ifdef USE_ESP_IDF
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->paused = false;
@@ -511,9 +456,6 @@ void erd_cache_mqtt_publisher_resume(erd_cache_mqtt_publisher_t* self)
   } else {
     self->paused = false;
   }
-#else
-  self->paused = false;
-#endif
 }
 
 void erd_cache_mqtt_publisher_set_time_fn(
@@ -526,7 +468,6 @@ void erd_cache_mqtt_publisher_set_time_fn(
 uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* self)
 {
   uint32_t count = 0;
-#ifdef USE_ESP_IDF
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       count = self->publish_count_window;
@@ -537,16 +478,11 @@ uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* s
     count = self->publish_count_window;
     self->publish_count_window = 0;
   }
-#else
-  count = self->publish_count_window;
-  self->publish_count_window = 0;
-#endif
   return count;
 }
 
 bool erd_cache_mqtt_publisher_first_round_done(erd_cache_mqtt_publisher_t* self)
 {
-#ifdef USE_ESP_IDF
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       bool done = self->first_round_done;
@@ -554,13 +490,11 @@ bool erd_cache_mqtt_publisher_first_round_done(erd_cache_mqtt_publisher_t* self)
       return done;
     }
   }
-#endif
   return self->first_round_done;
 }
 
 uint32_t erd_cache_mqtt_publisher_get_disconnect_count(erd_cache_mqtt_publisher_t* self)
 {
-#ifdef USE_ESP_IDF
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       uint32_t count = self->disconnect_count;
@@ -568,13 +502,11 @@ uint32_t erd_cache_mqtt_publisher_get_disconnect_count(erd_cache_mqtt_publisher_
       return count;
     }
   }
-#endif
   return self->disconnect_count;
 }
 
 uint32_t erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(erd_cache_mqtt_publisher_t* self)
 {
-#ifdef USE_ESP_IDF
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       uint32_t duration = self->last_disconnect_duration_ms;
@@ -582,6 +514,5 @@ uint32_t erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(erd_cache_mqtt
       return duration;
     }
   }
-#endif
   return self->last_disconnect_duration_ms;
 }

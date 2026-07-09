@@ -13,6 +13,10 @@
 #include "esp-idf/esp_task_wdt.h"
 #endif
 
+#ifndef USE_ESP_IDF
+#error "This component requires ESP-IDF. Define USE_ESP_IDF."
+#endif
+
 GEA_TAG(TAG) = "geappliances_bridge";
 
 namespace esphome {
@@ -370,11 +374,7 @@ void GeappliancesBridge::update_publisher_state_()
   }
 
   if (this->erd_cache_publisher_.cache != nullptr && !ha_discovery_active) {
-#ifdef USE_ESP_IDF
     erd_cache_mqtt_publisher_signal_work(&this->erd_cache_publisher_);
-#else
-    erd_cache_mqtt_publisher_loop(&this->erd_cache_publisher_, 5, 20);
-#endif
   }
 }
 
@@ -873,9 +873,7 @@ void GeappliancesBridge::init_erd_cache_publisher_()
     this->device_identity_manager_.get_device_id());
 
   // Start the background publishing task on ESP-IDF platforms.
-#ifdef USE_ESP_IDF
   erd_cache_mqtt_publisher_start(&this->erd_cache_publisher_);
-#endif
 
   // Initialize the HA discovery manager (lazy-started on steady state).
   ha_discovery_manager_init(&this->ha_discovery_manager_);

@@ -7,7 +7,10 @@
 
 #include "ha_discovery_cleanup.h"
 
-#ifdef USE_ESP_IDF
+#ifndef USE_ESP_IDF
+#error "This component requires ESP-IDF. Define USE_ESP_IDF."
+#endif
+
 
 #include <string.h>
 #include <stdio.h>
@@ -407,4 +410,3 @@ bool ha_discovery_cleanup_is_done(ha_discovery_cleanup_t* self)
     return self->state == ha_cleanup_state_done;
 }
 
-#endif /* USE_ESP_IDF */
