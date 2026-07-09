@@ -26,12 +26,14 @@
 #include "i_mqtt_client.h"
 #include "ha_discovery_cleanup.h"
 
-#ifdef USE_ESP_IDF
-#  ifdef USE_ESP_IDF_STUBS
-#    include "miniz_tinfl.h"
-#  else
-#    include "miniz.h"
-#  endif
+#ifndef USE_ESP_IDF
+#error "This component requires ESPHome with framework: type: esp-idf"
+#endif
+
+#ifdef USE_ESP_IDF_STUBS
+  #include "miniz_tinfl.h"
+#else
+  #include "miniz.h"
 #endif
 
 #ifdef __cplusplus
@@ -90,7 +92,6 @@ typedef struct {
   uint32_t total_published;        // Total discovery publishes
   uint32_t total_filtered;         // Entities filtered out (ERD not registered)
 
-#ifdef USE_ESP_IDF
 
   /* Sorted ERD array for binary search during discovery. */
   uint16_t sorted_erds[HA_DISCOVERY_MAX_ERDS];
@@ -153,7 +154,6 @@ typedef struct {
   char domain_topic_prefix[128];
   char current_domain_prefix_buf[32]; // Tracks current domain for prefix caching
 
-#endif
 } ha_discovery_manager_t;
 
 /*!
@@ -177,8 +177,8 @@ void ha_discovery_manager_configure(
 
 /*!
  * Start the discovery process.
- * On ESP-IDF, builds the sorted ERD list and device JSON inline, then
- * transitions to DISCOVERING state. On non-ESP-IDF, marks complete immediately.
+ * Builds the sorted ERD list and device JSON inline, then
+ * transitions to DISCOVERING state.
  */
 void ha_discovery_manager_start(ha_discovery_manager_t* self);
 

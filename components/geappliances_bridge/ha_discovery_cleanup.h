@@ -11,7 +11,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#ifdef USE_ESP_IDF
+
+#ifndef USE_ESP_IDF
+#error "This component requires ESPHome with framework: type: esp-idf"
+#endif
 
 #include "i_mqtt_client.h"
 
@@ -99,7 +102,5 @@ void cleanup_start(ha_discovery_cleanup_t* self);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* USE_ESP_IDF */
 
 #endif /* ha_discovery_cleanup_h */
