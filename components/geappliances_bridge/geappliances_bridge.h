@@ -157,6 +157,11 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void run_gea2_iteration_();
   void run_gea3_iteration_();
   void run_timer_only_iteration_();
+  // Run a tight-loop for the given iteration function, bounded by a duration
+  // and a hard cap.  In test builds the loop is replaced with a single call.
+  template<typename IterFn>
+  void run_tight_loop_(IterFn iter_fn, uint32_t duration_ms,
+                        uint32_t hard_cap_ms, const char* protocol_name);
   void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
   void update_publisher_state_();       // Publisher pause/resume + steady-state detection

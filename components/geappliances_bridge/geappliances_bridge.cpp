@@ -419,10 +419,42 @@ void GeappliancesBridge::run_timer_only_iteration_()
   }
 }
 
+// Run a tight-loop for the given iteration function, bounded by a duration
+// and a hard cap.  In test builds the loop is replaced with a single call
+// because millis() is mocked.
+template<typename IterFn>
+void GeappliancesBridge::run_tight_loop_(IterFn iter_fn,
+                                          uint32_t duration_ms,
+                                          uint32_t hard_cap_ms,
+                                          const char* protocol_name)
+{
+#ifndef UNIT_TEST_BUILD
+  uint32_t loop_start_ms = millis();
+  while (millis() - loop_start_ms < duration_ms) {
+    if (millis() - loop_start_ms >= hard_cap_ms) {
+      ESP_LOGW(TAG, "%s tight loop exceeded hard cap (%u ms), breaking",
+               protocol_name, static_cast<unsigned>(hard_cap_ms));
+      break;
+    }
+#ifdef USE_ESP32
+    esp_task_wdt_reset();
+#endif
+    iter_fn();
+  }
+#else
+  // In test builds, millis() is mocked and doesn't advance,
+  // so the tight loops would hang.  Run a single iteration instead.
+  (void)duration_ms;
+  (void)hard_cap_ms;
+  (void)protocol_name;
+  iter_fn();
+#endif
+}
+
 void GeappliancesBridge::run_protocol_stack_()
 {
   // When GEA2 is active (or during GEA2 autodiscovery), run a 100 ms
-  // wall-clock busy loop (with a 200 ms hard cap) so the full TX→RX cycle
+  // wall-clock busy loop (with a 200 ms hard cap) so the full TX->RX cycle
   // at 19200 baud completes within a single loop() call.
   bool need_gea2_loop = this->gea2_uart_ != nullptr && (
     this->autodiscovery_manager_.is_gea2_protocol() ||
@@ -442,43 +474,11 @@ void GeappliancesBridge::run_protocol_stack_()
   }
 
   if (need_gea2_loop) {
-#ifndef UNIT_TEST_BUILD
-    uint32_t loop_start_ms = millis();
-    while (millis() - loop_start_ms < GEA2_LOOP_DURATION_MS) {
-      if (millis() - loop_start_ms >= GEA2_LOOP_HARD_CAP_MS) {
-        ESP_LOGW(TAG, "GEA2 tight loop exceeded hard cap (%u ms), breaking",
-                 static_cast<unsigned>(GEA2_LOOP_HARD_CAP_MS));
-        break;
-      }
-#ifdef USE_ESP32
-      esp_task_wdt_reset();
-#endif
-      this->run_gea2_iteration_();
-    }
-#else
-    // In test builds, millis() is mocked and doesn't advance,
-    // so the tight loops would hang.  Run a single iteration instead.
-    this->run_gea2_iteration_();
-#endif
+    this->run_tight_loop_([this]() { this->run_gea2_iteration_(); },
+                           GEA2_LOOP_DURATION_MS, GEA2_LOOP_HARD_CAP_MS, "GEA2");
   } else if (this->uart_ != nullptr) {
-#ifndef UNIT_TEST_BUILD
-    uint32_t gea3_loop_start_ms = millis();
-    while (millis() - gea3_loop_start_ms < GEA3_LOOP_DURATION_MS) {
-      if (millis() - gea3_loop_start_ms >= GEA3_LOOP_HARD_CAP_MS) {
-        ESP_LOGW(TAG, "GEA3 tight loop exceeded hard cap (%u ms), breaking",
-                 static_cast<unsigned>(GEA3_LOOP_HARD_CAP_MS));
-        break;
-      }
-#ifdef USE_ESP32
-      esp_task_wdt_reset();
-#endif
-      this->run_gea3_iteration_();
-    }
-#else
-    // In test builds, millis() is mocked and doesn't advance,
-    // so the tight loops would hang.  Run a single iteration instead.
-    this->run_gea3_iteration_();
-#endif
+    this->run_tight_loop_([this]() { this->run_gea3_iteration_(); },
+                           GEA3_LOOP_DURATION_MS, GEA3_LOOP_HARD_CAP_MS, "GEA3");
   } else {
     this->run_timer_only_iteration_();
   }

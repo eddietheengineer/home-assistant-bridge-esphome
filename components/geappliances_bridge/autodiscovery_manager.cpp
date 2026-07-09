@@ -261,7 +261,7 @@ void AutodiscoveryManager::run()
                          AutodiscoveryManager::timer_callback_);
         this->state_ = AUTODISCOVERY_GEA3_BROADCAST_WAITING;
       }
-      // If read failed (queue full), stay in PENDING and retry next call.
+      ESP_LOGD(TAG, "Broadcast read failed (queue full), retrying next loop iteration");
       break;
     }
 
@@ -283,6 +283,7 @@ void AutodiscoveryManager::run()
                          AutodiscoveryManager::timer_callback_);
         this->state_ = AUTODISCOVERY_GEA2_BROADCAST_WAITING;
       }
+      ESP_LOGD(TAG, "Broadcast read failed (queue full), retrying next loop iteration");
       break;
     }
 
