@@ -207,10 +207,6 @@ async def to_code(config: dict[str, Any]) -> None:
             "The component now always publishes only on change."
 )
     await cg.register_component(var, config)
-    # Ensure USE_ESP_IDF is defined for ESP-IDF builds so that
-    # platform-specific code in our component compiles correctly.
-    cg.add_build_flag("-DUSE_ESP_IDF")
-
     # Get optional GEA3 UART component reference
     if CONF_GEA3_UART_ID in config:
         gea3_uart_component = await cg.get_variable(config[CONF_GEA3_UART_ID])
