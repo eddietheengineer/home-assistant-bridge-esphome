@@ -231,6 +231,7 @@ void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
 
 void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
 {
+  if (!self->task_running) return;
   /* Signal the semaphore first to wake the task, then set
    * task_running=false so the task sees the flag on wake. */
   if (self->work_semaphore != NULL) {
