@@ -101,14 +101,11 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self);
 void erd_cache_mqtt_publisher_signal_work(erd_cache_mqtt_publisher_t* self);
 
 /*!
- * Returns the number of ERDs actually published.
+ * Publish one pending ERD. Returns true if an entry was published.
  * No-ops if MQTT is disconnected (increments missed_loops).
- * With the ESP-IDF framework, this is called from the background task, not the main loop.
+ * With the ESP-IDF framework, publishing is handled by the background task.
  */
-uint16_t erd_cache_mqtt_publisher_loop(
-  erd_cache_mqtt_publisher_t* self,
-  uint16_t max_publishes,
-  uint32_t max_ms);
+bool erd_cache_mqtt_publisher_loop(erd_cache_mqtt_publisher_t* self);
 
 /*!
  * Called when MQTT broker connects.
