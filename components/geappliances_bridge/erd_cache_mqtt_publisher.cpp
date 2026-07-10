@@ -231,12 +231,12 @@ void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
 
 void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
 {
-  if (self->task_handle == NULL) return;
-  self->task_running = false;
-  // Wake the task so it can exit.
+  /* Signal the semaphore first to wake the task, then set
+   * task_running=false so the task sees the flag on wake. */
   if (self->work_semaphore != NULL) {
     xSemaphoreGive(self->work_semaphore);
   }
+  self->task_running = false;
   // Wait for the task to signal completion via done_semaphore.
   // The task gives this semaphore before calling vTaskDelete, so we
   // know it has entered the termination path.
