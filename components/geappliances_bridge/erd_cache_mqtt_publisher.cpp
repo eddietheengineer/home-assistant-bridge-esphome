@@ -32,9 +32,10 @@ static void mqtt_publisher_task(void* arg)
   }
 
   while (self->task_running) {
-    // Wait for work signal or timeout (100ms).
-    if (xSemaphoreTake(self->work_semaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
-      // Work was signalled — drain all available updates.
+    // Block until the main loop signals work. No timeout —
+    // the main loop controls pacing.
+    if (xSemaphoreTake(self->work_semaphore, portMAX_DELAY) != pdTRUE) {
+      continue;
     }
 
     // Acquire mutex to safely read shared state (mqtt_connected, cache pointers,
