@@ -89,9 +89,8 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self);
 ```
 
 On ESP-IDF:
-- Guard against no task (`task_handle == NULL`)
-- Set `task_running = false`
-- Signal `work_semaphore` to wake the task so it can exit its loop
+- Idempotency guard: returns immediately if `task_running` is already `false`
+- Signal `work_semaphore` first to wake the task, then set `task_running = false` so the task sees the flag on wake
 - Wait for the task to signal completion via `done_semaphore` (1 s timeout)
 - If `done_semaphore` is NULL (creation failed): fallback to polling with 10 ms delays, resetting the task watchdog each iteration, for up to 1 s
 - Log a warning if the task does not signal completion within 1 s
@@ -121,16 +120,18 @@ On ESP-IDF, the publisher runs as a FreeRTOS task (`mqtt_publisher_task`) with:
 - **Stack**: 2048 bytes, statically allocated via `xTaskCreateStatic` (no heap allocation)
 - **Priority**: 2
 - **Name**: `"erd_mqtt_pub"`
-- **Scheduling**: Waits on `work_semaphore` with a 100 ms timeout. The main loop signals work via `erd_cache_mqtt_publisher_signal_work()`. The timeout ensures the task wakes periodically even without explicit signals.
+- **Scheduling**: Blocks on `work_semaphore` with `portMAX_DELAY` (no timeout). The main loop controls pacing by calling `erd_cache_mqtt_publisher_signal_work()` when cache entries are updated.
 
 **Task loop:**
-1. Wait on `work_semaphore` (100 ms timeout)
-- Acquire `state_mutex` (100 ms timeout) to read `mqtt_connected`, `paused`, and validate dependency pointers (`cache`, `mqtt_client`, `device_id`, `get_time_ms`)
-- If not connected, paused, or dependencies are invalid: loop back to step 1
-4. Drain all available cache updates (no per-loop budget in the background task)
-5. On `task_running = false`: signal `done_semaphore`, call `vTaskDelete`
+1. Block on `work_semaphore` (`portMAX_DELAY`)
+2. Acquire `state_mutex` (100 ms timeout) to read `mqtt_connected`, `paused`, and validate dependency pointers (`cache`, `mqtt_client`, `device_id`, `get_time_ms`)
+3. If not connected, paused, or dependencies are invalid: release mutex and loop back to step 1
+4. Publish one cache entry: call `erd_cache_get_next_updated()`, build topic, encode hex, publish via `mqtt_client_publish_raw()` with `retain=true`, mark published, update stats
+5. If no entry was found and `first_round_done` is not yet set: set `first_round_done = true`
+6. Release `state_mutex` and loop back to step 1
+7. On `task_running = false`: signal `done_semaphore`, call `vTaskDelete`
 **Concurrent task safety:**
-- `state_mutex` protects shared state (`mqtt_connected`, `paused`, `first_round_done`, `disconnect_start_ms`, `cache`, `mqtt_client`, `device_id`, `get_time_ms`, `total_published`, `publish_count_window`) from torn reads during context switches between the background task and the main loop
+- `state_mutex` protects shared state (`mqtt_connected`, `paused`, `first_round_done`, `disconnect_start_ms`, `cache`, `mqtt_client`, `device_id`, `get_time_ms`, `total_published`, `publish_count_window`, `publish_index`) from torn reads during context switches between the background task and the main loop
 - `done_semaphore` provides a clean shutdown handshake: the task gives the semaphore before calling `vTaskDelete`, so `stop()` can wait for true termination before proceeding
 - Stats updates (`total_published`, `publish_count_window`) are performed inline under the outer `state_mutex` hold (100 ms timeout), not under a separate mutex acquisition
 
@@ -141,21 +142,13 @@ On ESP-IDF, the publisher runs as a FreeRTOS task (`mqtt_publisher_task`) with:
 
 ### 3.2 Non-ESP-IDF: Main Loop
 
-On non-ESP-IDF platforms, `erd_cache_mqtt_publisher_loop()` is called directly from the main loop with `max_publishes` and `max_ms` budget parameters. No background task, no semaphores, no mutex.
+On non-ESP-IDF platforms, `erd_cache_mqtt_publisher_loop()` is called directly from the main loop. No background task, no semaphores, no mutex. Publishes one entry per call.
 
 ```c
-uint16_t erd_cache_mqtt_publisher_loop(
-    erd_cache_mqtt_publisher_t* self,
-    uint16_t max_publishes,
-    uint32_t max_ms);
+bool erd_cache_mqtt_publisher_loop(erd_cache_mqtt_publisher_t* self);
 ```
 
-| Parameter | Description |
-|-----------|-------------|
-| `max_publishes` | Maximum number of ERDs to publish in this call. |
-| `max_ms` | Maximum time budget in milliseconds. |
-
-Returns the number of ERDs actually published.
+Returns `true` if an ERD was published, `false` otherwise (no updates available, MQTT disconnected, or missing dependencies). When no entry is found and `first_round_done` is not yet set, it is set to `true`.
 
 ---
 
@@ -175,10 +168,7 @@ Both the background task (ESP-IDF) and the main-loop function (non-ESP-IDF) foll
 6. Measure per-publish elapsed time; log a warning if ≥ 1000 ms
 7. Call `erd_cache_mark_published(self->cache, entry)` to reload the publish cooldown
 8. Update stats: increment `total_published` and `publish_count_window`
-**Budget enforcement (main-loop only):**
-- The loop respects `max_publishes` (count limit) and `max_ms` (time budget)
-- **Silent entry loss on budget expiry:** the time budget check (`self->get_time_ms() - start_ms >= max_ms`) occurs *after* `erd_cache_get_next_updated()` clears `update_required` but *before* the publish. If the budget expires at this point, the entry is silently skipped — `update_required` is already cleared and `erd_cache_mark_published()` is never called, so the entry will not be retried until the next update.
-- The background task has no per-loop budget — it drains all available updates in one pass
+**One entry per call:** both the background task and the main-loop function publish exactly one entry per invocation. The main loop controls pacing by calling `signal_work()` or `loop()` at its own cadence.
 
 ---
 
@@ -193,7 +183,7 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self);
 - Set `mqtt_connected = true` (under `state_mutex` on ESP-IDF)
 - Reset `first_round_done = false` (under `state_mutex` on ESP-IDF)
 - Record disconnect duration and reset `disconnect_start_ms` to 0
-- If disconnect duration ≥ 60 s: call `erd_cache_mark_all_updated()` to mark all valid cache entries as `update_required`, then log info with the disconnect duration
+- If disconnect duration ≥ 60 s: call `erd_cache_mark_all_updated()` to mark all valid cache entries as `update_required`, reset `publish_index` to 0, then log info with the disconnect duration
 - If disconnect duration < 60 s: log info: "MQTT reconnected — resuming ERD cache publishing"
 - Call `erd_cache_mqtt_publisher_signal_work()` to wake the background task
 
@@ -207,9 +197,9 @@ void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self);
 
 ### 5.3 Behavior While Disconnected
 
-- **Main-loop mode**: `erd_cache_mqtt_publisher_loop()` returns 0 immediately and increments `missed_loops`
-- **Background task**: the task checks `mqtt_connected` each iteration and skips publishing (loops back to wait)
-- **Conditional full re-publish after reconnect**: if the disconnect duration exceeded 60 s, all valid cache entries are marked as `update_required` on reconnect, forcing a full drain of retained values to the broker. Short blips (<60 s) resume normally with only newly updated entries published.
+- **Main-loop mode**: `erd_cache_mqtt_publisher_loop()` returns `false` immediately and increments `missed_loops`
+- **Background task**: the task checks `mqtt_connected` each iteration and skips publishing (loops back to block on `work_semaphore`)
+- **Conditional full re-publish after reconnect**: if the disconnect duration exceeded 60 s, all valid cache entries are marked as `update_required` on reconnect and `publish_index` is reset to 0, forcing a full drain of retained values to the broker. Short blips (<60 s) resume normally with only newly updated entries published.
 
 ---
 
@@ -220,10 +210,8 @@ To avoid heap allocation during publishing, the publisher uses fixed-size buffer
 |--------|------|---------|
 | `task_topic` | 128 bytes | MQTT topic string for the background task (ESP-IDF only). |
 | `task_hex` | 512 bytes | Hex-encoded payload for the background task (ESP-IDF only). |
-| `loop_topic` | 128 bytes | MQTT topic string for the main-loop function (non-ESP-IDF only). |
-| `loop_hex` | 512 bytes | Hex-encoded payload for the main-loop function (non-ESP-IDF only). |
 
-On ESP-IDF, the main-loop function `erd_cache_mqtt_publisher_loop()` declares local stack arrays (`char topic[128]`, `char hex[512]`) instead of using struct buffers. On non-ESP-IDF, the struct members `loop_topic` and `loop_hex` are used to avoid heap allocation.
+The `erd_cache_mqtt_publisher_loop()` function (non-ESP-IDF) declares local stack arrays (`char topic[128]`, `char hex[512]`) for each call.
 
 The 512-byte hex buffer supports up to 255 bytes of binary data (255 × 2 = 510 hex characters + null terminator), which matches the maximum `data_size` field width in the cache entry.
 
@@ -288,7 +276,7 @@ Override the time source (defaults to `esphome::millis`). Used for testing to co
 2. **No publish retry:** If `mqtt_client_publish_raw()` fails (e.g., internal queue full), the entry is not retried. `erd_cache_mark_published()` is called unconditionally after the publish attempt, and `erd_cache_get_next_updated()` already cleared `update_required` when it returned the entry. The entry will not be republished until the bridge updates it again.
 3. **Single device ID:** The publisher is configured with one device ID at init time. Supporting multiple devices would require multiple publisher instances.
 4. **Hex encoding is CPU-intensive:** Converting binary data to hex via `snprintf` per byte is simple but not optimal for large payloads. A lookup table or bit-manipulation approach would be faster.
-5. **Background task has no publish budget:** The ESP-IDF background task drains all available updates in one pass. If the cache has many updates, this could block the task for an extended period. The 1000 ms slow-publish warning provides visibility but no enforcement.
+5. **One publish per wake:** The ESP-IDF background task publishes exactly one entry per wake, then blocks on `work_semaphore` until the main loop signals more work. Pacing is controlled by the main loop via `signal_work()`.
 6. **Semaphore failure is degraded, not fatal:** If any semaphore creation fails in `init()`, the publisher continues with reduced safety (no mutex protection, no clean shutdown handshake). This is acceptable for the single-core ESP32-C3 target where context switches provide natural serialization, but could lead to data races on dual-core ESP32 variants.
 
 ---
@@ -307,7 +295,7 @@ void erd_cache_mqtt_publisher_pause(erd_cache_mqtt_publisher_t* self);
 - **Thread-safe on ESP-IDF**: acquires `state_mutex` (100 ms timeout) before modifying state; falls back to unprotected write if mutex creation failed
 - **Non-ESP-IDF**: sets `paused = true` and `first_round_done = false` directly (no mutex)
 - The `paused` flag is checked by the ESP-IDF background task in `mqtt_publisher_task()`: when `paused` is `true`, the task skips the drain loop and returns to waiting on `work_semaphore`
-- The non-ESP-IDF `erd_cache_mqtt_publisher_loop()` does **not** check `paused` — pause/resume has no effect in main-loop mode. This is intentional: the main loop controls its own pacing via `max_publishes` and `max_ms` budgets.
+- The non-ESP-IDF `erd_cache_mqtt_publisher_loop()` does **not** check `paused` — pause/resume has no effect in main-loop mode. This is intentional: the main loop controls its own pacing by calling `loop()` at its own cadence.
 
 ### 11.2 Resume
 
@@ -332,22 +320,22 @@ bool erd_cache_mqtt_publisher_first_round_done(erd_cache_mqtt_publisher_t* self)
 - **Non-ESP-IDF**: reads `first_round_done` directly
 
 **How `first_round_done` is set:**
-- The background task (ESP-IDF) sets `first_round_done = true` after a drain pass where `publish_index` wraps back to 0 (lines 120–122 in implementation)
-- The main-loop function (non-ESP-IDF) sets `first_round_done = true` after publishing entries and `publish_index` wraps to 0 (lines 379–381 in implementation)
+- The background task (ESP-IDF) sets `first_round_done = true` when `erd_cache_get_next_updated()` returns NULL (full cache scanned with no pending entries) and `first_round_done` is not yet true
+- The main-loop function (non-ESP-IDF) sets `first_round_done = true` under the same condition
 - `first_round_done` is reset to `false` by `pause()` and by `on_connected()` (MQTT reconnect), ensuring the flag reflects completion relative to the most recent pause or reconnect event
 
 ### 11.4 Interaction with the Publish Loop
 
 **ESP-IDF background task (`mqtt_publisher_task`):**
-- On each wake (from `work_semaphore` signal or 100 ms timeout), the task acquires `state_mutex` and reads `mqtt_connected`, `paused`, and dependency pointers
-- If `paused` is `true`, the task skips the drain loop entirely and returns to waiting on `work_semaphore` — no cache entries are published
+- On each wake (from `work_semaphore` signal), the task acquires `state_mutex` and reads `mqtt_connected`, `paused`, and dependency pointers
+- If `paused` is `true`, the task skips publishing and returns to waiting on `work_semaphore` — no cache entries are published
 - When `resume()` is called, it clears `paused` and signals `work_semaphore`, waking the task to resume immediately
-- After resuming, the task drains all available cache entries; when `publish_index` wraps to 0, `first_round_done` is set to `true`
+- The task publishes one entry per wake; when `erd_cache_get_next_updated()` returns NULL and `first_round_done` is not yet set, it is set to `true`
 
 **Non-ESP-IDF main loop (`erd_cache_mqtt_publisher_loop`):**
 - The loop checks `mqtt_connected` but does **not** check `paused`
 - `pause()` and `resume()` are no-ops in terms of publish gating on non-ESP-IDF platforms
-- `first_round_done` is still set by the loop when `publish_index` wraps to 0, so `first_round_done()` remains useful as a completion indicator even in main-loop mode
+- `first_round_done` is set when `erd_cache_get_next_updated()` returns NULL, so `first_round_done()` remains useful as a completion indicator even in main-loop mode
 
 ### 11.5 Use Case: Pausing During HA Discovery
 

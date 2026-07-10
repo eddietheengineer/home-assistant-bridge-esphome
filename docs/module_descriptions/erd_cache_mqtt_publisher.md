@@ -13,8 +13,8 @@ Scans the shared ERD cache and publishes updated ERDs to MQTT topics with `retai
 | `erd_cache_mqtt_publisher_start(self)` | Start the background publishing task (ESP-IDF only; no-op otherwise). |
 | `erd_cache_mqtt_publisher_stop(self)` | Stop the background publishing task (ESP-IDF only; no-op otherwise). Clean shutdown via `done_semaphore` handshake, then yields for idle task TCB cleanup. |
 | `erd_cache_mqtt_publisher_signal_work(self)` | Signal the background task that there is work to do (ESP-IDF only; no-op otherwise). |
-| `erd_cache_mqtt_publisher_loop(self, max_publishes, max_ms)` | Publish up to `max_publishes` updated ERDs within `max_ms` milliseconds. Used on non-ESP-IDF platforms; on ESP-IDF this runs inside the background task. |
-| `erd_cache_mqtt_publisher_on_connected(self)` | Called when MQTT broker connects. Sets `mqtt_connected = true`, resets `disconnect_start_ms`. If disconnect duration ≥ 60 s, marks all valid cache entries as `update_required` for full republish. |
+| `erd_cache_mqtt_publisher_loop(self)` | Publish one updated ERD. Returns `true` if published, `false` otherwise. Used on non-ESP-IDF platforms; on ESP-IDF this runs inside the background task. |
+| `erd_cache_mqtt_publisher_on_connected(self)` | Called when MQTT broker connects. Sets `mqtt_connected = true`, resets `first_round_done` and `disconnect_start_ms`. If disconnect duration ≥ 60 s, marks all valid cache entries as `update_required` and resets `publish_index` to 0 for full republish. |
 | `erd_cache_mqtt_publisher_on_disconnected(self)` | Called when MQTT broker disconnects. Sets `mqtt_connected = false`, records `disconnect_start_ms`. |
 | `erd_cache_mqtt_publisher_set_time_fn(self, get_time_ms)` | Override the time source (defaults to `esphome::millis`). Useful for testing. |
 | `erd_cache_mqtt_publisher_get_publish_rate(self)` | Returns the number of ERD publishes in the last 60 seconds, then resets the window. |
@@ -29,7 +29,7 @@ Scans the shared ERD cache and publishes updated ERDs to MQTT topics with `retai
 On ESP-IDF, the publisher runs as a FreeRTOS task (`erd_mqtt_pub`) with:
 - **Stack**: 2048 bytes (static allocation via `xTaskCreateStatic`)
 - **Priority**: 2
-- **Scheduling**: Waits on a binary semaphore (`work_semaphore`) with a 100 ms timeout. The main loop signals work via `erd_cache_mqtt_publisher_signal_work()`.
+- **Scheduling**: Blocks on `work_semaphore` with `portMAX_DELAY` (no timeout). The main loop controls pacing via `erd_cache_mqtt_publisher_signal_work()`.
 
 **Concurrent task safety:**
 - `state_mutex` protects shared state (`mqtt_connected`, `cache`, `mqtt_client`, `device_id`, `get_time_ms`) from torn reads during context switches between the background task and the main loop.
@@ -40,13 +40,13 @@ On ESP-IDF, the publisher runs as a FreeRTOS task (`erd_mqtt_pub`) with:
 2. `start()` creates the static task
 3. Main loop calls `signal_work()` when cache entries are updated
 4. Task wakes, acquires `state_mutex` to check `mqtt_connected` and dependency validity
-5. Task drains all available cache updates (no per-loop budget in background task)
-6. `stop()` sets `task_running = false`, signals work, waits on `done_semaphore` (1 s timeout), then yields for idle task TCB cleanup (100 ms)
+5. Task publishes one cache entry per wake, then blocks on `work_semaphore`
+6. `stop()` signals `work_semaphore` first, then sets `task_running = false`, waits on `done_semaphore` (1 s timeout), then yields for idle task TCB cleanup (100 ms). Idempotent — safe to call multiple times.
 7. `destroy()` calls `stop()`, unsubscribes events, deletes semaphores
 
 ### Non-ESP-IDF: Main Loop
 
-On non-ESP-IDF platforms, `erd_cache_mqtt_publisher_loop()` is called directly from the main loop with `max_publishes` and `max_ms` budget parameters.
+On non-ESP-IDF platforms, `erd_cache_mqtt_publisher_loop()` is called directly from the main loop. Publishes one entry per call, returns `bool`.
 
 ## Publishing Flow
 1. Iterate cache entries with `update_required = true` via `erd_cache_get_next_updated()`
@@ -62,7 +62,7 @@ On non-ESP-IDF platforms, `erd_cache_mqtt_publisher_loop()` is called directly f
 | Field | Type | Description |
 |-------|------|-------------|
 | `paused` | `bool` | True when publishing is temporarily paused (via `pause()`). Background task skips publishing while paused. |
-| `first_round_done` | `bool` | True after one full cache pass following resume. Set when `publish_index` wraps back to 0 after draining entries. |
+| `first_round_done` | `bool` | True after the publisher has scanned the full cache with no pending entries since the last `pause()` or `on_connected()`. Set when `erd_cache_get_next_updated()` returns NULL. |
 | `get_time_ms` | `uint32_t (*)(void)` | Time source function pointer. Defaults to `esphome::millis`. |
 | `disconnect_start_ms` | `uint32_t` | `millis()` when MQTT disconnected; 0 if connected. Used to determine if a full republish is needed on reconnect. |
 
@@ -79,9 +79,7 @@ The ESP-IDF background task uses pre-allocated buffers to avoid stack overflow:
 - `task_topic[128]` — MQTT topic string
 - `task_hex[512]` — hex payload (max 255 bytes of data = 510 hex chars + null)
 
-On non-ESP-IDF platforms, the struct also contains:
-- `loop_topic[128]` — MQTT topic string for `erd_cache_mqtt_publisher_loop()`
-- `loop_hex[512]` — hex payload for `erd_cache_mqtt_publisher_loop()`
+The `erd_cache_mqtt_publisher_loop()` function (non-ESP-IDF) uses local stack arrays (`char topic[128]`, `char hex[512]`) for each call.
 
 ## Stats
 
@@ -103,7 +101,7 @@ On non-ESP-IDF platforms, the struct also contains:
 - **Background task on ESP-IDF**: Publishing runs in a dedicated FreeRTOS task to avoid blocking the ESPHome main loop on the IDF MQTT mutex. This was a critical fix — synchronous publishing during startup (50+ ERDs to flush) caused task watchdog timeouts.
 - **Concurrent task safety**: The ESP32-C3 is single-core, but the background task and main loop share state through context switches. `state_mutex` protects shared state from torn reads, and `done_semaphore` ensures safe shutdown.
 - **Pre-allocated buffers**: The task uses stack-allocated buffers (`task_topic`, `task_hex`) to avoid heap allocation during publishing.
-- **Semaphore-based signaling**: The main loop signals work via `work_semaphore`; the task waits with a 100 ms timeout, so it wakes periodically even without explicit signals.
+- **Semaphore-based signaling**: The main loop signals work via `work_semaphore`; the task blocks with `portMAX_DELAY` (no timeout). The main loop controls pacing.
 - **Graceful degradation**: If semaphore creation fails, the task exits immediately. If `state_mutex` creation fails, the task reads shared state without protection (acceptable for single-core or low-contention scenarios).
 - **No cache ownership**: The publisher does not own the cache — it only reads from it. Cache lifecycle is managed by `GeappliancesBridge`.
 - **No MQTT lifecycle ownership**: The publisher does not manage MQTT connections — it reacts to connect/disconnect events from `EsphomeMqttClientAdapter`.
