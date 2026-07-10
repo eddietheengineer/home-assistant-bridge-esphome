@@ -285,6 +285,27 @@ def sanitize_name_for_cpp(name: str) -> str:
     return result.strip('_').lower()
 
 
+def make_array_names(valid_feature_apis):
+    """Return a dict mapping (api_key, ver, feature_index) -> unique array name."""
+    result = {}
+    for key, api in valid_feature_apis:
+        api_sanitized = sanitize_name_for_cpp(api['name'])
+        for ver, ver_data in api.get('versions', {}).items():
+            candidates = {}
+            for i, feature in enumerate(ver_data.get('features', [])):
+                feat_sanitized = sanitize_name_for_cpp(feature['name'])
+                base = f"appliance_api_{api_sanitized}_v{ver}_{feat_sanitized}_erds"
+                candidates.setdefault(base, []).append((i, int(feature['mask'], 16)))
+            for base, entries in candidates.items():
+                if len(entries) == 1:
+                    idx, _ = entries[0]
+                    result[(key, ver, idx)] = base
+                else:
+                    for idx, mask in entries:
+                        result[(key, ver, idx)] = f"{base[:-len('_erds')]}_m{mask:08x}_erds"
+    return result
+
+
 def collect_erds_for_feature(feature: Dict) -> List[int]:
     """Collect all ERD IDs for a single feature (required + optional)."""
     erds: Set[int] = set()
@@ -384,25 +405,6 @@ def generate_appliance_api_feature_lists_header(appliance_api_data: Dict) -> str
         if (api['featureType'] >> 8) <= 9
     ]
 
-    def make_array_names(valid_feature_apis):
-        """Return a dict mapping (api_key, ver, feature_index) -> unique array name."""
-        result = {}
-        for key, api in valid_feature_apis:
-            api_sanitized = sanitize_name_for_cpp(api['name'])
-            for ver, ver_data in api.get('versions', {}).items():
-                candidates = {}
-                for i, feature in enumerate(ver_data.get('features', [])):
-                    feat_sanitized = sanitize_name_for_cpp(feature['name'])
-                    base = f"appliance_api_{api_sanitized}_v{ver}_{feat_sanitized}_erds"
-                    candidates.setdefault(base, []).append((i, int(feature['mask'], 16)))
-                for base, entries in candidates.items():
-                    if len(entries) == 1:
-                        idx, _ = entries[0]
-                        result[(key, ver, idx)] = base
-                    else:
-                        for idx, mask in entries:
-                            result[(key, ver, idx)] = f"{base[:-len('_erds')]}_m{mask:08x}_erds"
-        return result
 
     array_names = make_array_names(valid_feature_apis)
 
@@ -493,25 +495,6 @@ def generate_appliance_api_feature_lists_cpp(appliance_api_data: Dict) -> str:
         if (api['featureType'] >> 8) <= 9
     ]
 
-    def make_array_names(valid_feature_apis):
-        """Return a dict mapping (api_key, ver, feature_index) -> unique array name."""
-        result = {}
-        for key, api in valid_feature_apis:
-            api_sanitized = sanitize_name_for_cpp(api['name'])
-            for ver, ver_data in api.get('versions', {}).items():
-                candidates = {}
-                for i, feature in enumerate(ver_data.get('features', [])):
-                    feat_sanitized = sanitize_name_for_cpp(feature['name'])
-                    base = f"appliance_api_{api_sanitized}_v{ver}_{feat_sanitized}_erds"
-                    candidates.setdefault(base, []).append((i, int(feature['mask'], 16)))
-                for base, entries in candidates.items():
-                    if len(entries) == 1:
-                        idx, _ = entries[0]
-                        result[(key, ver, idx)] = base
-                    else:
-                        for idx, mask in entries:
-                            result[(key, ver, idx)] = f"{base[:-len('_erds')]}_m{mask:08x}_erds"
-        return result
 
     array_names = make_array_names(valid_feature_apis)
 

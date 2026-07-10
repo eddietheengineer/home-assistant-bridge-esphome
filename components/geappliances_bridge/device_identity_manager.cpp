@@ -129,7 +129,7 @@ void DeviceIdentityManager::bytes_to_string_(const uint8_t* data, size_t size,
     return;
   }
   // GE API model/serial are plain ASCII, null-terminated or padded with 0x00.
-  // Some appliances use 0x7F (DEL) as trailing padding; strip it.
+  // Some appliances pad trailing bytes with '_' (underscore); strip it.
   size_t i = 0;
   for (; i < size && i < out_size - 1; i++) {
     uint8_t raw = data[i];

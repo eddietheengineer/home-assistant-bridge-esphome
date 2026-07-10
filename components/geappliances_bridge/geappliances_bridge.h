@@ -41,6 +41,12 @@
 #include "esphome/core/application.h"
 #include <string>
 #include <cstring>
+#include "esphome/core/log.h"
+#include "esphome/core/hal.h"
+
+#ifdef USE_ESP32
+#include "esp_task_wdt.h"
+#endif
 
 extern "C" {
 #include "erd_cache.h"
@@ -157,6 +163,31 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void run_gea2_iteration_();
   void run_gea3_iteration_();
   void run_timer_only_iteration_();
+  // Run a tight-loop for the given iteration function, bounded by a duration
+  // and a hard cap.  In test builds the loop is replaced with a single call.
+  template<typename IterFn>
+  void run_tight_loop_(IterFn iter_fn, uint32_t duration_ms,
+                        uint32_t hard_cap_ms, const char* protocol_name) {
+#ifndef UNIT_TEST_BUILD
+    uint32_t loop_start_ms = millis();
+    while (millis() - loop_start_ms < duration_ms) {
+      if (millis() - loop_start_ms >= hard_cap_ms) {
+        ESP_LOGW("geappliances_bridge", "%s tight loop exceeded hard cap (%u ms), breaking",
+                 protocol_name, static_cast<unsigned>(hard_cap_ms));
+        break;
+      }
+#ifdef USE_ESP32
+      esp_task_wdt_reset();
+#endif
+      iter_fn();
+    }
+#else
+    (void)duration_ms;
+    (void)hard_cap_ms;
+    (void)protocol_name;
+    iter_fn();
+#endif
+  }
   void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
   void log_poll_state_transitions_(); // Debug: log polling HSM state changes
   void update_publisher_state_();       // Publisher pause/resume + steady-state detection
