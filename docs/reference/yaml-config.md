@@ -61,6 +61,12 @@ Complete reference for the `geappliances_bridge` ESPHome component configuration
 | **Range** | 0–255 |
 | **Description** | Minimum interval in seconds between MQTT publishes for any individual ERD. Set to `0` to disable throttling (publish on every update). Useful for reducing MQTT traffic when the appliance generates frequent updates. |
 
+### `generate_device_config`
+
+| **Type** | `bool` |
+| **Default** | `true` |
+| **Description** | When `true` (default), the bridge runs HA discovery on OTA reboot. The Discovery Refresh button always works regardless of this flag. Normal boots skip discovery (topics retained by MQTT broker). |
+
 ### `filter_config_topics`
 
 | Property | Value |
@@ -69,28 +75,6 @@ Complete reference for the `geappliances_bridge` ESPHome component configuration
 | **Default** | `true` |
 | **Description** | When `true`, filters out internal/diagnostic entities (firmware metadata, commissioning state, usage profiles, cycle definitions, fault data) from Home Assistant MQTT discovery. Reduces entity count by approximately 19%. |
 
-### `adapter_address`
-
-| Property | Value |
-|---|---|
-| **Type** | `int` (hex) |
-| **Default** | `0xE4` |
-| **Description** | The bridge's address on the GEA bus. Should not conflict with the appliance's address. |
-
-### `custom_erds`
-
-| Property | Value |
-|---|---|
-| **Type** | `list` of `int` (hex) |
-| **Default** | Empty |
-| **Description** | Additional ERD IDs to poll beyond the standard list. Useful for ERDs not yet documented in the appliance API. Always included in the poll list regardless of `appliance_api_parsing`. |
-| **Example** | `[0x7100, 0x7101, 0x7102]` |
-
-### `generate_device_config`
-
-| **Type** | `bool` |
-| **Default** | `true` |
-| **Description** | When `true` (default), the bridge runs HA discovery on OTA reboot. The Discovery Refresh button always works regardless of this flag. Normal boots skip discovery (topics retained by MQTT broker). |
 
 ## Diagnostic Sensors
 
@@ -143,10 +127,6 @@ geappliances_bridge:
   appliance_api_parsing: true      # restrict to supported ERDs
   throttle_rate_seconds: 1         # 0-255, 0=disabled
   filter_config_topics: true       # filter diagnostic entities
-  adapter_address: 0xE4            # bridge bus address
-  custom_erds:                     # additional ERDs to poll
-    - 0x7100
-    - 0x7101
   erd_publish_rate_sensor:
     name: "ERD Publish Rate"
   erd_cache_entries_sensor: true
