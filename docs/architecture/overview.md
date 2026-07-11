@@ -178,12 +178,17 @@ bridge as a replacement.
 
 ### Shared ERD cache
 
-Both the subscription bridge and polling bridge write to a single shared
-`erd_cache_t` instance owned by the bridge class. In AUTO mode, subscription
-publications and custom-ERD polling results coexist in the same cache — later
-writes overwrite earlier values by ERD ID. The MQTT publisher drains
-`update_required` entries from this shared cache each loop via a round-robin
-index, ensuring fair distribution across all ERDs.
+The ERD cache serves as the decoupling boundary between the appliance-facing
+and MQTT-facing halves of the system. The appliance side (subscription bridge,
+polling bridge, write bridge) interacts exclusively with the cache: it writes
+new values on reads and reads cached values on writes. The MQTT side (publisher,
+discovery) interacts exclusively with the cache: it drains `update_required`
+entries for publishing and reads cached values for discovery payloads. Neither
+side knows about the other — the appliance side has no MQTT dependency and the
+MQTT side has no appliance protocol dependency. In AUTO mode, subscription
+publications and custom-ERD polling results coexist in the same cache; later
+writes overwrite earlier values by ERD ID. The publisher drains the cache via
+a round-robin index, ensuring fair distribution across all ERDs.
 
 ### Round-robin publishing with background task
 
