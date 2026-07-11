@@ -7,6 +7,7 @@ The GE Appliances Bridge is an ESPHome custom component that runs on an ESP32 mi
 ## C4 Level 1 — System Context
 
 ```mermaid
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","clusterBkg":"#f5f5f5","clusterBorder":"#cccccc","fontFamily":"monospace","nodeBorder":"#555555","edgeLabelBackground":"#ffffff","actorBkg":"#e8e8e8","actorBorder":"#666666","actorTextColor":"#1a1a1a"}}}%%
 graph TB
     USER["User<br/>(Home Assistant UI)"]
     HA["Home Assistant"]
@@ -19,9 +20,9 @@ graph TB
     BROKER -->|"Publishes ERD values<br/>Forwards write requests"| BRIDGE
     BRIDGE -->|"Reads/writes ERDs<br/>GEA2 (19200 baud) / GEA3 (230400 baud)"| APPLIANCE
 
-    classDef actor fill:#f5f5f5,stroke:#616161
-    classDef system fill:#fff3e0,stroke:#e65100
-    classDef external fill:#e1f5fe,stroke:#01579b
+    classDef actor fill:#e8e8e8,stroke:#666666
+    classDef system fill:#d9e8f5,stroke:#2c6a9e
+    classDef external fill:#e8f5e8,stroke:#388e3c
 
     class USER actor
     class BRIDGE system
@@ -39,6 +40,7 @@ The system has four external actors and one system boundary:
 ## C4 Level 2 — Container
 
 ```mermaid
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","clusterBkg":"#f5f5f5","clusterBorder":"#cccccc","fontFamily":"monospace","nodeBorder":"#555555","edgeLabelBackground":"#ffffff","actorBkg":"#e8e8e8","actorBorder":"#666666","actorTextColor":"#1a1a1a"}}}%%
 graph TB
     subgraph ESP32["ESP32 Microcontroller"]
         ESPHOME["ESPHome Framework<br/>(YAML Config, UART, MQTT Client)"]
@@ -58,9 +60,9 @@ graph TB
     BROKER -->|"Write requests on geappliances/{device_id}/erd/.../write"| BRIDGE_COMP
 
     classDef hardware fill:#fff3e0,stroke:#e65100
-    classDef framework fill:#e1f5fe,stroke:#01579b
-    classDef component fill:#f3e5f5,stroke:#4a148c
-    classDef submodule fill:#e8f5e9,stroke:#1b5e20
+    classDef framework fill:#e8e8f0,stroke:#5c6bc0
+    classDef component fill:#f3e5f5,stroke:#7b1fa2
+    classDef submodule fill:#e8f5e9,stroke:#2e7d32
     classDef external fill:#fce4ec,stroke:#880e4f
 
     class ESP32 hardware

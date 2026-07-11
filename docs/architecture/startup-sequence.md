@@ -9,6 +9,7 @@ timeout guards.
 
 ## Sequence Diagram
 
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","actorBkg":"#e8e8e8","actorBorder":"#666666","actorTextColor":"#1a1a1a","noteBkgColor":"#fff9c4","noteBorderColor":"#f9a825","noteTextColor":"#1a1a1a"}}}%%
 ```mermaid
 sequenceDiagram
     autonumber
@@ -22,34 +23,34 @@ sequenceDiagram
     participant RUN as Running State
 
     HSM->>HSM: startup_delay (10s wait)
-    Note over HSM: Wait for appliance to stabilize
+    Note right of HSM: Wait for appliance to stabilize
 
     HSM->>AD: run_autodiscovery()
     AD-->>HSM: signal_autodiscovery_complete
-    Note over AD: Broadcast scan, retry indefinitely
+    Note right of AD: Broadcast scan, retry indefinitely
 
     HSM->>DI: init_device_id_reading()
     DI-->>HSM: signal_device_id_complete
-    Note over DI: Read ERDs 0x0001, 0x0002, 0x0008
+    Note right of DI: Read ERDs 0x0001, 0x0002, 0x0008
 
     HSM->>MQTT: initialize_mqtt_client()
     HSM->>MQTT: initialize_erd_cache_publisher()
-    Note over MQTT: Adapter init (does not wait for connection)
+    Note right of MQTT: Adapter init (does not wait for connection)
 
     HSM->>FB: start_feature_bit_reading()
     FB-->>HSM: signal_feature_bits_complete
-    Note over FB: Parse ERDs 0x0092–0x0097, 0x0109–0x010D
+    Note right of FB: Parse ERDs 0x0092–0x0097, 0x0109–0x010D
 
     HSM->>BR: initialize_erd_bridge()
     BR-->>HSM: signal_bridge_ready
-    Note over BR: Polling or subscription mode
+    Note right of BR: Polling or subscription mode
 
     HSM->>SW: Monitor subscription state
     SW-->>HSM: signal_subscription_fallback
-    Note over SW: AUTO mode only; no-op for POLL/SUBSCRIBE
+    Note right of SW: AUTO mode only; no-op for POLL/SUBSCRIBE
 
     HSM->>RUN: Entering steady-state operation
-    Note over RUN: Recurring tasks every loop()
+    Note right of RUN: Recurring tasks every loop()
 ```
 
 ## Phase-by-Phase Breakdown
@@ -181,6 +182,7 @@ steady-state check fires once on first detection and logs the transition.
 The state hierarchy is flat — all states have `startup_state_top` as their
 parent. Unhandled signals bubble up to the top state, which consumes them.
 
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","clusterBkg":"#f5f5f5","clusterBorder":"#cccccc","fontFamily":"monospace","nodeBorder":"#555555"}}}%%
 ```mermaid
 graph TB
     TOP["startup_state_top<br/>(root)"]
@@ -192,6 +194,14 @@ graph TB
     BI["startup_state_bridge_init"]
     SW["startup_state_subscription_watch"]
     RN["startup_state_running"]
+
+    classDef root fill:#d9e8f5,stroke:#2c6a9e,stroke-width:2px
+    classDef state fill:#e8e8e8,stroke:#666666
+    classDef terminal fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+
+    class TOP root
+    class SD,AD,DI,MC,FB,BI,SW state
+    class RN terminal
 
     TOP --> SD
     TOP --> AD
