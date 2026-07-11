@@ -2,84 +2,47 @@
 
 ## Overview
 
-This component is designed for use with the **FirstBuild Home Assistant Adapter** featuring the SeeedStudio Xiao ESP32-C3 microcontroller, and is also compatible with the ESP32-C6. It supports the GEA2 and GEA3 serial interfaces.
-
-## Target Platform
-
-This component is designed for the **ESP32-C3** (Xiao ESP32C3 module) and **ESP32-C6** running **ESP-IDF**.
-
-### ESP32-C3 (Primary Target)
-
-| Property | Value |
-|----------|-------|
-| Core | Single-core RISC-V 32-bit
-| Max clock | 160 MHz |
-| SRAM | 320 KB (shared IRAM/DRAM) |
-| PSRAM | None |
-| Flash | 4 MB (module), typically 2 MB usable for app partition |
-
-### ESP32-C6 (Secondary Target)
-
-| Property | Value |
-|----------|-------|
-| Core | Single-core RISC-V 32-bit |
-| Max clock | 160 MHz |
-| SRAM | 320 KB (shared IRAM/DRAM) |
-| PSRAM | None (on most modules) |
-| Flash | 4–16 MB depending on module |
-
-### Design Constraints
-
-All architectural decisions in this component are driven by the single-core, no-PSRAM constraints of the ESP32-C3:
-
-- **No dual-core concurrency.** The ESP32-C3 and ESP32-C6 each have a single CPU core. FreeRTOS tasks share the core through preemptive context switches — they never run in parallel. Synchronization primitives (`state_mutex`, `done_semaphore`) protect against torn reads/writes during context switches, not against true parallel access.
-- **No PSRAM.** All data structures, buffers, and task stacks must fit in the 320 KB of on-chip SRAM shared with the OS and ESPHome framework. This is why the MQTT publisher task uses a statically allocated 2 KB stack (`xTaskCreateStatic`) and why ERD data is hex-encoded into fixed-size buffers.
-- **DRAM budget:** ~275 KB of 320 KB total. ESPHome's core services (WiFi, MQTT, HTTP) consume ~100 KB of DRAM. The bridge component targets ~175 KB maximum, leaving headroom for the OS and future features.
-- **Flash budget:** ~1.5 MB of 1.8 MB app partition. Any new embedded data must be balanced against this ceiling.
-
-> **Note:** The original ESP32 (WROOM) is dual-core with 520 KB SRAM and optional PSRAM. This component is **not** designed for the original ESP32 — the pinout, module form factor, and carrier board are specific to the Xiao ESP32-C3.
+This component is designed for use with the **FirstBuild Home Assistant Adapter**
 
 ## FirstBuild Home Assistant Adapter
 
 The FirstBuild Home Assistant Adapter consists of:
 - [Xiao ESP32C3](https://wiki.seeedstudio.com/XIAO_ESP32C3_Getting_Started/) microcontroller
-- Custom carrier board with RJ45 jack for GEA3 serial connection
+- Custom carrier board with RJ45 jack for GEA3 or GEA2 serial connection
 - Available from [FirstBuild](https://firstbuild.com/inventions/home-assistant-adapter/)
 
 Reference repository: [geappliances/home-assistant-adapter](https://github.com/geappliances/home-assistant-adapter)
 
-## Pin Configuration
 
-### GEA3 (Newer Appliances)
+## Target Platform
 
-The FirstBuild adapter uses the following pins for GEA3 communication:
+This component can work with many of the Xiao ESP32 form factor microcontrollers if you want to try a different variant. They must be able to run the **ESP-IDF** platform.
+
+### ESP32-C3 
+
+The [Seeedstudio Xiao ESP32-C3](https://www.seeedstudio.com/Seeed-XIAO-ESP32C3-p-5431.html) is the microcontroller included with the Firstbuild Adapter:
 
 ```yaml
+esp32:
+  board: seeed_xiao_esp32c3
+  framework: 
+    type: esp-idf
+
+# UART configuration
 uart:
+  # GEA3 UART (newer appliances)
   - id: gea3_uart
     tx_pin: GPIO21  # D6 on Xiao ESP32-C3
     rx_pin: GPIO20  # D7 on Xiao ESP32-C3
     baud_rate: 230400
-```
 
-**Pin Mapping:**
-- GPIO21 = TX (to appliance RX)
-- GPIO20 = RX (from appliance TX)
-
-### GEA2 (Older Appliances, 19200 baud)
-
-GEA2 appliances communicate at 19200 baud.  Add `rx_full_threshold: 1` and
-`rx_timeout: 1` to your GEA2 UART block — these settings are required on both
-ESP-IDF and Arduino frameworks for reliable GEA2 communication:
-
-```yaml
-uart:
+  # GEA2 UART (newer appliances)
   - id: gea2_uart
-    tx_pin: GPIOX
-    rx_pin: GPIOY
+    tx_pin: GPIO9   # D9 on Xiao ESP32-C3
+    rx_pin: GPIO10  # D10 on Xiao ESP32-C3
     baud_rate: 19200
-    rx_full_threshold: 1   # required: deliver each byte immediately
-    rx_timeout: 1          # required: minimise idle-flush latency
+    rx_full_threshold: 1
+    rx_timeout: 1
 ```
 
 > **Why these settings matter:** GEA2's inter-byte timeout is 6 ms.  At
@@ -90,14 +53,42 @@ uart:
 > `rx_full_threshold: 1` every byte is delivered to software within ~0.1 ms
 > of arrival, keeping the inter-byte gap well below the 6 ms limit.
 
-## GEA3 Serial Connection
+### ESP32-C6
 
-The GEA3 protocol requires:
-- **Baud rate:** 230400 bps
-- **Configuration:** 8 data bits, no parity, 1 stop bit (8N1)
-- **Voltage level:** 3.3V TTL
+The [Seeedstudio Xiao ESP32-C6](https://www.seeedstudio.com/Seeed-Studio-XIAO-ESP32C6-p-5884.html) has been validated to work with this component as well:
 
-The FirstBuild adapter carrier board handles the RJ45-to-serial conversion automatically.
+```yaml
+esp32:
+  board: seeed_xiao_esp32c6
+  framework: 
+    type: esp-idf
+
+# UART configuration
+uart:
+  # GEA3 UART (newer appliances)
+  - id: gea3_uart
+    tx_pin: GPIO16  # D6 on Xiao ESP32-C6
+    rx_pin: GPIO17  # D7 on Xiao ESP32-C6
+    baud_rate: 230400
+
+  # GEA2 UART (newer appliances)
+  - id: gea2_uart
+    tx_pin: GPIO20  # D9 on Xiao ESP32-C6
+    rx_pin: GPIO18  # D10 on Xiao ESP32-C6
+    baud_rate: 19200
+    rx_full_threshold: 1
+    rx_timeout: 1
+```
+
+### Design Constraints
+
+All architectural decisions in this component are driven by the single-core, no-PSRAM constraints of the ESP32-C3:
+
+- **No dual-core concurrency.** The ESP32-C3 and ESP32-C6 each have a single CPU core. FreeRTOS tasks share the core through preemptive context switches — they never run in parallel. Synchronization primitives (`state_mutex`, `done_semaphore`) protect against torn reads/writes during context switches, not against true parallel access.
+- **No PSRAM.** All data structures, buffers, and task stacks must fit in the 320 KB of on-chip SRAM shared with the OS and ESPHome framework. This is why the MQTT publisher task uses a statically allocated 2 KB stack (`xTaskCreateStatic`) and why ERD data is hex-encoded into fixed-size buffers.
+- **DRAM budget:** ~275 KB of 320 KB total. ESPHome's core services (WiFi, MQTT, HTTP) consume ~100 KB of DRAM. The bridge component targets ~175 KB maximum, leaving headroom for the OS and future features.
+- **Flash budget:** ~1.5 MB of 1.8 MB app partition. Any new embedded data must be balanced against this ceiling.
+
 
 ## Physical Connection
 
@@ -109,22 +100,10 @@ Connect the FirstBuild adapter to your GE Appliance's GEA3 port using a standard
 
 1. **Check physical connection** - Ensure RJ45 cable is firmly seated
 2. **Verify appliance compatibility** - Confirm appliance uses GEA3 protocol
-3. **Check power** - Ensure both adapter and appliance are powered on
+3. **Check power** - Verify that the lights on the ESP32 board are lit
 4. **Review logs** - Enable DEBUG logging to see UART activity and autodiscovery results
 
-### Testing Configuration
-
-Enable DEBUG logging to verify UART activity:
-
-```yaml
-logger:
-  level: DEBUG
-```
-
-Look for:
-- UART initialization messages
-- Autodiscovery broadcast results (board address and appliance type)
-- ERD value updates
+If the logs show that no GEA2 or GEA3 boards can be identified, try another ethernet cable.
 
 ## Additional Resources
 

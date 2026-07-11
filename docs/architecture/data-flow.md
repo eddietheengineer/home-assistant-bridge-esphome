@@ -10,6 +10,7 @@ The read path carries sensor values, status flags, and other appliance data from
 the serial bus into Home Assistant as live state.
 
 ```mermaid
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","clusterBkg":"#f5f5f5","clusterBorder":"#aaaaaa","fontFamily":"monospace","nodeBorder":"#888888","edgeLabelBackground":"#ffffff"}}}%%
 graph LR
     APPLIANCE["Appliance"] --> UART["UART Adapter<br/>(esphome_uart_adapter)"]
     UART --> PROTOCOL["GEA3/GEA2<br/>Protocol Stack"]
@@ -20,11 +21,11 @@ graph LR
     MQTT --> BROKER["MQTT Broker"]
     BROKER --> HA["Home Assistant"]
 
-    classDef appliance fill:#f5f5f5,stroke:#616161
-    classDef protocol fill:#e8f5e9,stroke:#1b5e20
-    classDef bridge fill:#fff3e0,stroke:#e65100
-    classDef cache fill:#f3e5f5,stroke:#4a148c
-    classDef mqtt fill:#e1f5fe,stroke:#01579b
+    classDef appliance fill:#e8e8e8,stroke:#999999
+    classDef protocol fill:#e8f5e9,stroke:#2e7d32
+    classDef bridge fill:#d9e8f5,stroke:#2c6a9e
+    classDef cache fill:#f3e5f5,stroke:#7b1fa2
+    classDef mqtt fill:#e8e8f0,stroke:#5c6bc0
     classDef ha fill:#fce4ec,stroke:#880e4f
 
     class APPLIANCE appliance
@@ -54,6 +55,7 @@ The write path carries user commands from Home Assistant back to the appliance
 over the serial bus.
 
 ```mermaid
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","clusterBkg":"#f5f5f5","clusterBorder":"#aaaaaa","fontFamily":"monospace","nodeBorder":"#888888","edgeLabelBackground":"#ffffff"}}}%%
 graph LR
     HA["Home Assistant"] --> BROKER["MQTT Broker"]
     BROKER --> MQTT["MQTT Client<br/>Adapter"]
@@ -62,10 +64,10 @@ graph LR
     PROTOCOL --> UART["UART Adapter<br/>(esphome_uart_adapter)"]
     UART --> APPLIANCE["Appliance"]
 
-    classDef appliance fill:#f5f5f5,stroke:#616161
-    classDef protocol fill:#e8f5e9,stroke:#1b5e20
-    classDef bridge fill:#fff3e0,stroke:#e65100
-    classDef mqtt fill:#e1f5fe,stroke:#01579b
+    classDef appliance fill:#e8e8e8,stroke:#999999
+    classDef protocol fill:#e8f5e9,stroke:#2e7d32
+    classDef bridge fill:#d9e8f5,stroke:#2c6a9e
+    classDef mqtt fill:#e8e8f0,stroke:#5c6bc0
     classDef ha fill:#fce4ec,stroke:#880e4f
 
     class APPLIANCE appliance
@@ -127,6 +129,7 @@ Entity definitions are embedded as compressed JSONL chunks in `ha_discovery_data
 and streamed through a main-loop pipeline:
 
 ```mermaid
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","clusterBkg":"#f5f5f5","clusterBorder":"#aaaaaa","fontFamily":"monospace","nodeBorder":"#888888","edgeLabelBackground":"#ffffff"}}}%%
 graph LR
     EMBEDDED["Embedded JSONL<br/>(ha_discovery_data.h)"] --> DECOMPRESS["Decompress<br/>(tinfl/miniz)"]
     DECOMPRESS --> PARSE["Parse JSONL<br/>(zero-allocation parser)"]
@@ -136,12 +139,12 @@ graph LR
     MQTT --> BROKER["MQTT Broker"]
     BROKER --> HA["Home Assistant"]
 
-    classDef embedded fill:#fff8e1,stroke:#ff6f00
-    classDef decompress fill:#e8f5e9,stroke:#1b5e20
-    classDef parse fill:#e3f2fd,stroke:#0d47a1
+    classDef embedded fill:#fff3e0,stroke:#e65100
+    classDef decompress fill:#e8f5e9,stroke:#2e7d32
+    classDef parse fill:#e8e8f0,stroke:#5c6bc0
     classDef filter fill:#fce4ec,stroke:#880e4f
-    classDef mqtt fill:#e1f5fe,stroke:#01579b
-    classDef ha fill:#f3e5f5,stroke:#4a148c
+    classDef mqtt fill:#e8e8f0,stroke:#5c6bc0
+    classDef ha fill:#fce4ec,stroke:#880e4f
 
     class EMBEDDED embedded
     class DECOMPRESS decompress
@@ -168,7 +171,7 @@ graph LR
      names matching diagnostic keywords (e.g. "linux diagnostics", "reset
      reason") are skipped.
 5. **Publish HA Discovery Topics** — Each entity is published to
-   `homeassistant/{domain}/{device_id}/{category}/{field_id}/config` with a
+  `homeassistant/{domain}/{device_id}/{erd_id}_{field_id}/config` with a
    JSON payload containing the device info, state topic, command topic (for
    writable ERDs), and entity metadata.
 6. **Home Assistant** receives the discovery messages and auto-registers the

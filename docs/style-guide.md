@@ -77,6 +77,30 @@ Diagrams (mermaid) with supporting text. C4 model: context → container → com
 - Use `graph TB` or `graph LR` for structure; `sequenceDiagram` for flows.
 - Every diagram must have a caption describing what it shows.
 - Keep diagrams to one screen height; split complex diagrams into focused views.
+- Every mermaid code block must start with a theme config line for consistent
+  light/dark mode rendering:
+
+  ```
+  %%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","fontFamily":"monospace","nodeBorder":"#888888"}}}%%
+  ```
+- For sequence diagrams, also include `actorBkg`, `actorBorder`, and
+  `actorTextColor` in themeVariables (e.g. `#e8e8e8`, `#999999`, `#1a1a1a`).
+- Use `classDef` for node styling with the shared color palette:
+
+  | Category | Fill | Stroke |
+  |---|---|---|
+  | Actor / Appliance | `#e8e8e8` | `#999999` |
+  | System / Bridge | `#d9e8f5` | `#2c6a9e` |
+  | Protocol / External | `#e8f5e8` | `#388e3c` |
+  | Framework / MQTT | `#e8e8f0` | `#5c6bc0` |
+  | Component / Cache | `#f3e5f5` | `#7b1fa2` |
+  | Hardware / Embedded | `#fff3e0` | `#e65100` |
+  | Submodule / Terminal | `#e8f5e9` | `#2e7d32` |
+  | Home Assistant / External | `#fce4ec` | `#880e4f` |
+- In sequence diagrams, use self-messages (`X->>X: annotation`) for
+  annotations instead of `Note` statements, which are unreliable across
+  Mermaid versions. Avoid `*` italic markers in message text — GitHub's
+  Mermaid parser treats them as line continuation.
 
 ### Tables
 

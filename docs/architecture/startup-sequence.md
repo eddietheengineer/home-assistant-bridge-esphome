@@ -10,6 +10,7 @@ timeout guards.
 ## Sequence Diagram
 
 ```mermaid
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","actorBkg":"#e8e8e8","actorBorder":"#999999","actorTextColor":"#1a1a1a"}}}%%
 sequenceDiagram
     autonumber
     participant HSM as Startup HSM
@@ -22,43 +23,43 @@ sequenceDiagram
     participant RUN as Running State
 
     HSM->>HSM: startup_delay (10s wait)
-    Note over HSM: Wait for appliance to stabilize
+    HSM->>HSM: Wait for appliance to stabilize
 
     HSM->>AD: run_autodiscovery()
     AD-->>HSM: signal_autodiscovery_complete
-    Note over AD: Broadcast scan, retry indefinitely
+    AD->>AD: Broadcast scan, retry indefinitely
 
     HSM->>DI: init_device_id_reading()
     DI-->>HSM: signal_device_id_complete
-    Note over DI: Read ERDs 0x0001, 0x0002, 0x0008
+    DI->>DI: Read ERDs 0x0008, 0x0001, 0x0002
 
     HSM->>MQTT: initialize_mqtt_client()
     HSM->>MQTT: initialize_erd_cache_publisher()
-    Note over MQTT: Adapter init (does not wait for connection)
-
+    MQTT->>MQTT: Adapter init (does not wait for connection)
     HSM->>FB: start_feature_bit_reading()
+
     FB-->>HSM: signal_feature_bits_complete
-    Note over FB: Parse ERDs 0x0092–0x0097, 0x0109–0x010D
+    FB->>FB: Parse ERDs 0x0092-0x0097, 0x0109-0x010D
 
     HSM->>BR: initialize_erd_bridge()
     BR-->>HSM: signal_bridge_ready
-    Note over BR: Polling or subscription mode
+    BR->>BR: Polling or subscription mode
 
     HSM->>SW: Monitor subscription state
     SW-->>HSM: signal_subscription_fallback
-    Note over SW: AUTO mode only; no-op for POLL/SUBSCRIBE
+    SW->>SW: AUTO mode only, no-op for POLL—SUBSCRIBE
 
     HSM->>RUN: Entering steady-state operation
-    Note over RUN: Recurring tasks every loop()
+    RUN->>RUN: Recurring tasks every loop()
 ```
 
 ## Phase-by-Phase Breakdown
 
 ### Phase 1: Startup Delay
 
-Initializes UART adapters and GEA2/GEA3 protocol interfaces, then waits
-`AUTODISCOVERY_STARTUP_DELAY_MS` (10 seconds) for the appliance board to
-stabilize before beginning broadcast discovery. The HSM polls
+Waits `AUTODISCOVERY_STARTUP_DELAY_MS` (10 seconds) for the appliance board
+to stabilize before beginning broadcast discovery. UART and protocol
+initialization occur earlier in `setup()`. The HSM polls
 `is_startup_delay_elapsed()` on each `signal_run_loop` iteration.
 
 | Detail | Value |
@@ -88,9 +89,10 @@ this state will not transition until a valid board address is found.
 Runs the `DeviceIdentityManager` to read three identity ERDs in sequence:
 `0x0008` (appliance type), `0x0001` (model number), `0x0002` (serial number).
 Raw values are sanitized into MQTT-safe strings and concatenated into the
-device ID. If a `device_id` is pre-configured in YAML, the manager completes
-synchronously and transitions immediately. On read failure, the manager
-retries indefinitely.
+device ID. The manager always reads all three identity ERDs in sequence,
+even when a device_id is pre-configured in YAML (the preconfigured value
+is used as a fallback by get_device_id() but does not skip the reads). On
+read failure, the manager retries indefinitely.
 
 | Detail | Value |
 |---|---|
@@ -126,7 +128,7 @@ client queue is full, it schedules a retry timer (`QUEUE_RETRY_MS = 50 ms`).
 | **Source** | `geappliances_bridge_startup_hsm.cpp` `startup_state_feature_bits` |
 | **Duration** | Variable (depends on queue availability and appliance response) |
 | **Failure behavior** | Queue-full retries at 50 ms intervals; otherwise retries indefinitely |
-| **Signals** | `signal_feature_bits_complete`, `signal_mqtt_connected` |
+| **Signals** | `signal_feature_bits_complete` |
 | **Transition** | `bridge_init` |
 
 ### Phase 6: Bridge Init
@@ -182,6 +184,7 @@ The state hierarchy is flat — all states have `startup_state_top` as their
 parent. Unhandled signals bubble up to the top state, which consumes them.
 
 ```mermaid
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","clusterBkg":"#f5f5f5","clusterBorder":"#aaaaaa","fontFamily":"monospace","nodeBorder":"#888888"}}}%%
 graph TB
     TOP["startup_state_top<br/>(root)"]
     SD["startup_state_startup_delay"]
@@ -192,6 +195,14 @@ graph TB
     BI["startup_state_bridge_init"]
     SW["startup_state_subscription_watch"]
     RN["startup_state_running"]
+
+    classDef root fill:#d9e8f5,stroke:#2c6a9e,stroke-width:2px
+    classDef state fill:#e8e8e8,stroke:#999999
+    classDef terminal fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+
+    class TOP root
+    class SD,AD,DI,MC,FB,BI,SW state
+    class RN terminal
 
     TOP --> SD
     TOP --> AD
@@ -210,7 +221,6 @@ graph TB
 | `signal_run_loop` | HSM `loop()` dispatch | All states (drives ongoing work) |
 | `signal_autodiscovery_complete` | `AutodiscoveryManager` callback | `startup_state_autodiscovery` |
 | `signal_device_id_complete` | `DeviceIdentityManager` callback | `startup_state_device_id` |
-| `signal_mqtt_connected` | MQTT client adapter | `startup_state_feature_bits` |
 | `signal_feature_bits_complete` | `FeatureBitManager` callback | `startup_state_feature_bits` |
 | `signal_bridge_ready` | ERD polling bridge | `startup_state_bridge_init` |
 | `signal_subscription_fallback` | Subscription watchdog | `startup_state_subscription_watch` |
