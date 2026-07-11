@@ -146,6 +146,72 @@ across ~5 timer callbacks for common features, plus ~10 more for appliance-speci
 ERDs. The polling bridge budgets MQTT operations per loop tick. The main loop
 feeds the watchdog around startup HSM phase transitions via `esp_task_wdt_reset()`.
 
+### C/C++ split by layer
+
+The codebase follows a strict convention: data-path components (ERD cache,
+bridges, interfaces, publishers, discovery) use C structs with vtable-style
+function pointers for polymorphism (`i_tiny_gea3_erd_client_t`, `i_mqtt_client_t`,
+`i_tiny_uart_t`), keeping them portable and testable without C++ overhead. The
+ESPHome integration layer uses C++ adapter classes that implement these C
+interfaces, bridging ESPHome APIs to the data path. The `IBridgeServices`
+abstract class decouples the startup HSM from the concrete `GeappliancesBridge`.
+
+### Event-driven architecture
+
+Components are wired together via a lightweight pub-sub event system
+(`tiny_event_subscribe`) rather than direct function pointers. The ERD client
+publishes activity events (`read_completed`, `read_failed`,
+`subscription_publication_received`); the bridge subscribes with lambda callbacks
+that route data to the appropriate manager. The GEA2-to-GEA3 adapter normalizes
+GEA2 events into the same GEA3 activity interface, so the bridge's event
+handlers are protocol-agnostic.
+
+### Bridge mode selection
+
+The bridge supports three operating modes — POLL, SUBSCRIBE, and AUTO — selected
+at initialization time. GEA2 appliances are forced into polling mode since they
+lack subscription support. AUTO mode attempts subscription first and falls back
+to polling if the appliance does not respond with subscription publications
+within a 2-second quiet period or after three consecutive subscribe failures.
+The fallback tears down the subscription bridge and re-initializes a polling
+bridge as a replacement.
+
+### Shared ERD cache
+
+Both the subscription bridge and polling bridge write to a single shared
+`erd_cache_t` instance owned by the bridge class. In AUTO mode, subscription
+publications and custom-ERD polling results coexist in the same cache — later
+writes overwrite earlier values by ERD ID. The MQTT publisher drains
+`update_required` entries from this shared cache each loop via a round-robin
+index, ensuring fair distribution across all ERDs.
+
+### Round-robin publishing with background task
+
+Publishing runs in a dedicated FreeRTOS background task created with
+`xTaskCreateStatic` (zero heap allocation). The task blocks on a binary semaphore
+signaled by the main loop, acquires a state mutex to safely read shared fields,
+publishes one entry per wake, then releases the mutex. Pre-allocated buffers on
+the struct avoid stack overflow. On MQTT disconnect the publisher pauses; on
+reconnect after more than 60 seconds it forces a full republish of all cached
+ERDs to handle broker restarts that lose their retained store.
+
+### GEA2 tick-counter time source
+
+The GEA2 interface requires millisecond-accurate timers, but ESPHome's `loop()`
+calls arrive at ~50 ms intervals. A tick-counter time source increments a
+counter once per real millisecond inside the GEA2 tight loop (100 ms wall-clock,
+200 ms hard cap), catching up missed milliseconds by publishing a
+`msec_interrupt` event for each. This keeps GEA2 timers advancing by at most
+1 ms per event regardless of the framework's loop cadence.
+
+### Write bridge gating
+
+The write bridge gates all ERD write requests on whether the appliance host
+address has been resolved from discovery. If the host address is still the
+broadcast address (`0xFF`), writes are rejected with a "not supported" error.
+The write bridge uses a two-state HSM (ready/writing) with request-id tracking
+to handle out-of-order completions and stale responses.
+
 ## Detailed Documentation
 
 | Document | Description |
