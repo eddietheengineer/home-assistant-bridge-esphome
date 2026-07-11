@@ -31,7 +31,7 @@ sequenceDiagram
 
     HSM->>DI: init_device_id_reading()
     DI-->>HSM: signal_device_id_complete
-    DI->>DI: Read ERDs 0x0001, 0x0002, 0x0008
+    DI->>DI: Read ERDs 0x0008, 0x0001, 0x0002
 
     HSM->>MQTT: initialize_mqtt_client()
     HSM->>MQTT: initialize_erd_cache_publisher()
@@ -89,9 +89,10 @@ this state will not transition until a valid board address is found.
 Runs the `DeviceIdentityManager` to read three identity ERDs in sequence:
 `0x0008` (appliance type), `0x0001` (model number), `0x0002` (serial number).
 Raw values are sanitized into MQTT-safe strings and concatenated into the
-device ID. If a `device_id` is pre-configured in YAML, the manager completes
-synchronously and transitions immediately. On read failure, the manager
-retries indefinitely.
+device ID. The manager always reads all three identity ERDs in sequence,
+even when a device_id is pre-configured in YAML (the preconfigured value
+is used as a fallback by get_device_id() but does not skip the reads). On
+read failure, the manager retries indefinitely.
 
 | Detail | Value |
 |---|---|

@@ -116,7 +116,7 @@ delay response processing past the appliance's timeout window.
 
 The codebase avoids `std::set`, `std::vector`, and other heap-allocating containers.
 Fixed-capacity arrays replace them: the ERD cache holds 200 entries in a static
-array; ERD sets use sorted arrays with linear search; the custom ERD list caps at
+array; ERD sets use sorted arrays with binary search; the custom ERD list caps at
 64 entries; the polling list uses a fixed buffer. This eliminates heap fragmentation
 risk and makes memory usage predictable.
 
@@ -173,9 +173,10 @@ handlers are protocol-agnostic.
 
 The bridge supports three operating modes — POLL, SUBSCRIBE, and AUTO — selected
 at initialization time. GEA2 appliances are forced into polling mode since they
-AUTO mode attempts subscription first and falls back to polling via two
-independent triggers: (a) no subscription publications within a 2-second quiet
-period, or (b) three consecutive subscription retention failures.
+do not support subscriptions. AUTO mode attempts subscription first and falls
+back to polling via two independent triggers: (a) no subscription publications
+within a 2-second quiet period, or (b) three consecutive subscription retention
+failures.
 The fallback tears down the subscription bridge and re-initializes a polling
 bridge as a replacement.
 
