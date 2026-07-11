@@ -23,34 +23,34 @@ sequenceDiagram
     participant RUN as Running State
 
     HSM->>HSM: startup_delay (10s wait)
-    HSM->>HSM: *Wait for appliance to stabilize*
+    HSM->>HSM: Wait for appliance to stabilize
 
     HSM->>AD: run_autodiscovery()
     AD-->>HSM: signal_autodiscovery_complete
-    AD->>AD: *Broadcast scan, retry indefinitely*
+    AD->>AD: Broadcast scan, retry indefinitely
 
     HSM->>DI: init_device_id_reading()
     DI-->>HSM: signal_device_id_complete
-    DI->>DI: *Read ERDs 0x0001, 0x0002, 0x0008*
+    DI->>DI: Read ERDs 0x0001, 0x0002, 0x0008
 
     HSM->>MQTT: initialize_mqtt_client()
     HSM->>MQTT: initialize_erd_cache_publisher()
-    MQTT->>MQTT: *Adapter init (does not wait for connection)*
+    MQTT->>MQTT: Adapter init (does not wait for connection)
 
     HSM->>FB: start_feature_bit_reading()
     FB-->>HSM: signal_feature_bits_complete
-    FB->>FB: *Parse ERDs 0x0092-0x0097, 0x0109-0x010D*
+    FB->>FB: Parse ERDs 0x0092-0x0097, 0x0109-0x010D
 
     HSM->>BR: initialize_erd_bridge()
     BR-->>HSM: signal_bridge_ready
-    BR->>BR: *Polling or subscription mode*
+    BR->>BR: Polling or subscription mode
 
     HSM->>SW: Monitor subscription state
     SW-->>HSM: signal_subscription_fallback
-    SW->>SW: *AUTO mode only; no-op for POLL/SUBSCRIBE*
+    SW->>SW: AUTO mode only; no-op for POLL/SUBSCRIBE
 
     HSM->>RUN: Entering steady-state operation
-    RUN->>RUN: *Recurring tasks every loop()*
+    RUN->>RUN: Recurring tasks every loop()
 ```
 
 ## Phase-by-Phase Breakdown
