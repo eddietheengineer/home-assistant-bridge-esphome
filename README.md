@@ -177,8 +177,8 @@ The following is a representative boot log showing a normal startup after an OTA
 | **Feature bits** | Probes ERDs `0x0092`–`0x010D` to determine supported features |
 | **Bridge init** | Subscribes to or polls ERDs based on mode |
 | **Steady state** | Bridge is running and reporting appliance data |
-| **Discovery Cleanup** | Removes previous/old MQTT Discovery topics |
-| **Discovery Publish** | Publishes new MQTT Discovery topics based on the latest appliance definitions |
+| **Discovery Cleanup** | Removes previous/old MQTT Discovery topics (After OTA Only) |
+| **Discovery Publish** | Publishes new MQTT Discovery topics based on the latest appliance definitions (After OTA Only) |
 
 
 MQTT discovery topics are published by the bridge and retained on the MQTT broker. On normal boots, discovery is skipped — the broker retains the topics from the previous session. Discovery runs in two scenarios:
