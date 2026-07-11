@@ -261,6 +261,10 @@ void GeappliancesBridge::setup() {
         if (strcmp(reboot_source, "esphome.ota") == 0) {
           this->ota_cleanup_manager_.trigger_ota_cleanup();
           ESP_LOGI(TAG, "Detected OTA reboot, will clean old discovery topics on startup");
+          // Clear the reboot source so a subsequent software reboot (e.g., from
+          // the OTA cleanup's own reboot) doesn't re-trigger the cleanup cycle.
+          memset(reboot_source, 0, REBOOT_MAX_LEN);
+          pref.save(reboot_source);
         }
       }
     }
