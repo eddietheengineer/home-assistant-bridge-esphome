@@ -145,8 +145,8 @@ TEST(erd_cache_mqtt_publisher_pause, loop_resumes_publishing_after_resume)
   CHECK_FALSE(publisher.paused);
 
   /* After resume, loop should be able to publish. */
-  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
-  CHECK_EQUAL(1u, published);
+  bool published = erd_cache_mqtt_publisher_loop(&publisher);
+  CHECK_TRUE(published);
 }
 
 /* ------------------------------------------------------------------ */
@@ -173,10 +173,14 @@ TEST(erd_cache_mqtt_publisher_pause, first_round_done_false_after_resume_true_af
 
   CHECK_FALSE(erd_cache_mqtt_publisher_first_round_done(&publisher));
 
-  /* Run loop to publish the ERD.  With a single entry, publish_index
-   * wraps to 0, setting first_round_done = true. */
-  uint16_t published = erd_cache_mqtt_publisher_loop(&publisher, 10, 100);
-  CHECK_EQUAL(1u, published);
+  /* Run loop to publish the ERD, then again to scan the empty cache
+   * and set first_round_done = true. */
+  bool published = erd_cache_mqtt_publisher_loop(&publisher);
+  CHECK_TRUE(published);
+
+  /* Second call finds no pending entries, setting first_round_done. */
+  published = erd_cache_mqtt_publisher_loop(&publisher);
+  CHECK_FALSE(published);
 
   CHECK_TRUE(erd_cache_mqtt_publisher_first_round_done(&publisher));
 }

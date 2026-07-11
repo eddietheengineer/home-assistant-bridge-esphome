@@ -133,7 +133,7 @@ CONFIG_SCHEMA = cv.Schema(
             upper=False
         ),
         cv.Optional(CONF_POLLING_INTERVAL, default=10000): cv.positive_int,
-        cv.Optional(CONF_POLLING_ONLY_PUBLISH_ON_CHANGE, default=True): cv.boolean,
+        cv.Optional(CONF_POLLING_ONLY_PUBLISH_ON_CHANGE): cv.boolean,
         cv.Optional(CONF_APPLIANCE_API_PARSING, default=True): cv.boolean,
         cv.Optional(CONF_GENERATE_DEVICE_CONFIG, default=True): cv.boolean,
         cv.Optional(CONF_CUSTOM_ERDS, default=[]): cv.All(cv.ensure_list(

@@ -20,7 +20,6 @@
 #endif
 GEA_TAG(PUBLISHER_TAG) = "erd_cache_mqtt_publisher";
 #include "esp_task_wdt.h"
-static const uint16_t MAX_PUBLISHES_PER_WAKE = 5;
 
 static void mqtt_publisher_task(void* arg)
 {
@@ -33,9 +32,10 @@ static void mqtt_publisher_task(void* arg)
   }
 
   while (self->task_running) {
-    // Wait for work signal or timeout (100ms).
-    if (xSemaphoreTake(self->work_semaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
-      // Work was signalled — drain all available updates.
+    // Block until the main loop signals work. No timeout —
+    // the main loop controls pacing.
+    if (xSemaphoreTake(self->work_semaphore, portMAX_DELAY) != pdTRUE) {
+      continue;
     }
 
     // Acquire mutex to safely read shared state (mqtt_connected, cache pointers,
@@ -68,57 +68,39 @@ static void mqtt_publisher_task(void* arg)
       continue;
     }
 
-    // Drain updates with a per-wake budget to avoid flooding the broker
-    // after reconnect. The 100ms semaphore timeout provides natural pacing.
-    // The mutex is held throughout to protect publish_index and cache access.
-    bool drained_any = false;
-    uint16_t published_this_wake = 0;
-    while (1) {
-      erd_cache_entry_t* entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
-      if (!entry) break;
-      drained_any = true;
-
-      /* Determine data pointer. */
+    /* Publish one entry per wake. The 100ms semaphore timeout provides
+     * natural pacing. The mutex is held throughout to protect
+     * publish_index and cache access. */
+    erd_cache_entry_t* entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
+    if (entry) {
       const uint8_t* data = erd_cache_entry_data(self->cache, entry);
 
-      /* Build topic using pre-allocated buffer. */
       int topic_len = snprintf(self->task_topic, sizeof(self->task_topic),
           "geappliances/%s/erd/0x%04x/value", self->device_id, entry->erd);
-      if (topic_len < 0 || (unsigned)topic_len >= sizeof(self->task_topic)) {
+      if (topic_len >= 0 && (unsigned)topic_len < sizeof(self->task_topic)) {
+        size_t data_len = entry->data_size;
+        for (size_t i = 0; i < data_len; i++) {
+          snprintf(self->task_hex + i * 2, 3, "%02x", data[i]);
+        }
+        self->task_hex[data_len * 2] = '\0';
+
+        uint32_t t_publish = self->get_time_ms();
+        mqtt_client_publish_raw(self->mqtt_client, self->task_topic,
+            self->task_hex, data_len * 2, true);
+        uint32_t elapsed = self->get_time_ms() - t_publish;
+
+        if (elapsed >= 1000) {
+          ESP_LOGW(PUBLISHER_TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
+        }
+
+        erd_cache_mark_published(self->cache, entry);
+        self->total_published++;
+        self->publish_count_window++;
+      } else if (topic_len >= (int)sizeof(self->task_topic)) {
         ESP_LOGW(PUBLISHER_TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
-        break;
       }
-
-      /* Build hex payload using pre-allocated buffer. */
-      size_t data_len = entry->data_size;
-      for (size_t i = 0; i < data_len; i++) {
-        snprintf(self->task_hex + i * 2, 3, "%02x", data[i]);
-      }
-      self->task_hex[data_len * 2] = '\0';
-
-      /* Publish through the interface. */
-      uint32_t t_publish = self->get_time_ms();
-      mqtt_client_publish_raw(self->mqtt_client, self->task_topic,
-          self->task_hex, data_len * 2, true);
-      uint32_t elapsed = self->get_time_ms() - t_publish;
-
-      if (elapsed >= 1000) {
-        ESP_LOGW(PUBLISHER_TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
-      }
-
-      /* Reload the publish cooldown after successful MQTT publish. */
-      erd_cache_mark_published(self->cache, entry);
-
-      // Update stats — already protected by the outer mutex hold.
-      self->total_published++;
-      self->publish_count_window++;
-
-      if (++published_this_wake >= MAX_PUBLISHES_PER_WAKE) break;
-    }
-
-    /* Detect full cache round: we drained entries and the index wrapped
-     * back to 0, meaning we've scanned the entire cache. */
-    if (drained_any && self->publish_index == 0) {
+    } else if (!self->first_round_done) {
+      /* Scanned full cache with no pending entries — first round is done. */
       self->first_round_done = true;
     }
 
@@ -249,12 +231,13 @@ void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
 
 void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
 {
-  if (self->task_handle == NULL) return;
-  self->task_running = false;
-  // Wake the task so it can exit.
+  if (!self->task_running) return;
+  /* Signal the semaphore first to wake the task, then set
+   * task_running=false so the task sees the flag on wake. */
   if (self->work_semaphore != NULL) {
     xSemaphoreGive(self->work_semaphore);
   }
+  self->task_running = false;
   // Wait for the task to signal completion via done_semaphore.
   // The task gives this semaphore before calling vTaskDelete, so we
   // know it has entered the termination path.
@@ -294,74 +277,55 @@ void erd_cache_mqtt_publisher_signal_work(erd_cache_mqtt_publisher_t* self)
   }
 }
 
-uint16_t erd_cache_mqtt_publisher_loop(
-  erd_cache_mqtt_publisher_t* self,
-  uint16_t max_publishes,
-  uint32_t max_ms)
+bool erd_cache_mqtt_publisher_loop(erd_cache_mqtt_publisher_t* self)
 {
   if (!self->cache || !self->mqtt_client || !self->device_id || !self->get_time_ms) {
-    return 0;
+    return false;
   }
 
   if (!self->mqtt_connected) {
     self->missed_loops++;
-    return 0;
-  }
-  uint32_t start_ms = self->get_time_ms();
-  uint16_t published = 0;
-
-  while (published < max_publishes) {
-    erd_cache_entry_t* entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
-    if (!entry) {
-      break;
-    }
-
-    if (self->get_time_ms() - start_ms >= max_ms) {
-      break;
-    }
-    /* Determine data pointer. */
-    const uint8_t* data = erd_cache_entry_data(self->cache, entry);
-
-    /* Build topic: geappliances/{device_id}/erd/0x{ERD:04x}/value */
-    char topic[128];
-    int topic_len = snprintf(topic,
-        sizeof(topic)
-        , "geappliances/%s/erd/0x%04x/value", self->device_id, entry->erd);
-    if (topic_len < 0 || (unsigned)topic_len >=
-        sizeof(topic)
-    ) {
-      ESP_LOGW(PUBLISHER_TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
-      return published;
-    }
-    /* Build hex payload: max data_size is 255 (uint8_t), so hex is 510 chars + null */
-    size_t data_len = entry->data_size;
-    char hex[512];
-    for (size_t i = 0; i < data_len; i++) {
-      snprintf(hex + i * 2, 3, "%02x", data[i]);
-    }
-    hex[data_len * 2] = '\0';
-
-    uint32_t t_publish = self->get_time_ms();
-    mqtt_client_publish_raw(self->mqtt_client, topic, hex, data_len * 2, true);
-    uint32_t elapsed = self->get_time_ms() - t_publish;
-
-    if (elapsed >= 1000) {
-      ESP_LOGW(PUBLISHER_TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
-    }
-
-    /* Reload the publish cooldown after successful MQTT publish. */
-    erd_cache_mark_published(self->cache, entry);
-
-    self->total_published++;
-    self->publish_count_window++;
-    published++;
-  }
-  /* Detect full cache round: drained entries and index wrapped to 0. */
-  if (published > 0 && self->publish_index == 0) {
-    self->first_round_done = true;
+    return false;
   }
 
-  return published;
+  erd_cache_entry_t* entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
+  if (!entry) {
+    if (!self->first_round_done) {
+      self->first_round_done = true;
+    }
+    return false;
+  }
+
+  const uint8_t* data = erd_cache_entry_data(self->cache, entry);
+
+  char topic[128];
+  int topic_len = snprintf(topic, sizeof(topic),
+      "geappliances/%s/erd/0x%04x/value", self->device_id, entry->erd);
+  if (topic_len < 0 || (unsigned)topic_len >= sizeof(topic)) {
+    ESP_LOGW(PUBLISHER_TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
+    return false;
+  }
+
+  char hex[512];
+  size_t data_len = entry->data_size;
+  for (size_t i = 0; i < data_len; i++) {
+    snprintf(hex + i * 2, 3, "%02x", data[i]);
+  }
+  hex[data_len * 2] = '\0';
+
+  uint32_t t_publish = self->get_time_ms();
+  mqtt_client_publish_raw(self->mqtt_client, topic, hex, data_len * 2, true);
+  uint32_t elapsed = self->get_time_ms() - t_publish;
+
+  if (elapsed >= 1000) {
+    ESP_LOGW(PUBLISHER_TAG, "Slow publish: %ums for ERD 0x%04x", elapsed, entry->erd);
+  }
+
+  erd_cache_mark_published(self->cache, entry);
+  self->total_published++;
+  self->publish_count_window++;
+
+  return true;
 }
 
 void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
@@ -380,14 +344,16 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
       self->mqtt_connected = true;
       self->first_round_done = false;
       disconnect_start = self->disconnect_start_ms;
-      self->disconnect_start_ms = 0;
+      /* Don't reset disconnect_start_ms here — it may be set from a prior
+       * disconnect and we want to measure the cumulative outage duration
+       * across multiple ESPHome reconnect attempts. Reset only on the final
+       * successful reconnect (when we know we're stable). */
       xSemaphoreGive(self->state_mutex);
     }
   } else {
     self->mqtt_connected = true;
     self->first_round_done = false;
     disconnect_start = self->disconnect_start_ms;
-    self->disconnect_start_ms = 0;
   }
 
   uint32_t now = self->get_time_ms ? self->get_time_ms() : 0;
@@ -410,6 +376,14 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
     ESP_LOGI(PUBLISHER_TAG, "MQTT reconnected after %lu s — republishing all cached ERDs",
              (unsigned long)((now - disconnect_start) / 1000));
     erd_cache_mark_all_updated(self->cache);
+    if (self->state_mutex) {
+      if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        self->publish_index = 0;
+        xSemaphoreGive(self->state_mutex);
+      }
+    } else {
+      self->publish_index = 0;
+    }
   } else {
     ESP_LOGI(PUBLISHER_TAG, "MQTT reconnected — resuming ERD cache publishing");
   }
@@ -422,14 +396,20 @@ void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self)
 
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      bool was_connected = self->mqtt_connected;
       self->mqtt_connected = false;
-      self->disconnect_start_ms = now;
+      if (was_connected || self->disconnect_start_ms == 0) {
+        self->disconnect_start_ms = now;
+      }
       self->disconnect_count++;
       xSemaphoreGive(self->state_mutex);
     }
   } else {
+    bool was_connected = self->mqtt_connected;
     self->mqtt_connected = false;
-    self->disconnect_start_ms = now;
+    if (was_connected || self->disconnect_start_ms == 0) {
+      self->disconnect_start_ms = now;
+    }
     self->disconnect_count++;
   }
   ESP_LOGW(PUBLISHER_TAG, "MQTT disconnected — pausing ERD cache publishing");
