@@ -3,6 +3,8 @@
 #include "esphome/core/hal.h"
 #include "esphome_time_source.h"
 #include "geappliances_bridge_log.h"
+#include <inttypes.h>
+#include "ha_discovery_data.h"
 
 #ifndef USE_ESP_IDF
 #error "This component requires ESPHome with framework: type: esp-idf"
@@ -63,6 +65,24 @@ void OtaCleanupManager::trigger_discovery_refresh() {
   ESP_LOGI(TAG, "Discovery refresh queued, will execute when appliance is ready");
 }
 
+void OtaCleanupManager::trigger_initial_discovery() {
+  if (this->initial_discovery_done_) {
+    return;
+  }
+  if (this->ota_cleanup_needed_ ||
+      this->ota_cleanup_in_progress_ ||
+      this->ota_discovery_publishing_ ||
+      this->ota_reboot_pending_ ||
+      this->discovery_refresh_in_progress_ ||
+      this->initial_discovery_needed_) {
+    ESP_LOGW(TAG, "Initial discovery already queued or another operation in progress, ignoring");
+    return;
+  }
+  this->initial_discovery_needed_ = true;
+  this->cleanup_trigger_ = CleanupTrigger::INITIAL;
+  ESP_LOGI(TAG, "Initial HA discovery publish queued, will execute when appliance is ready");
+}
+
 bool OtaCleanupManager::is_ready() const {
   return this->steady_state_reached_ != nullptr &&
          *this->steady_state_reached_ &&
@@ -87,6 +107,31 @@ bool OtaCleanupManager::start_cleanup_()
 
 void OtaCleanupManager::loop() {
 #if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
+  // ── Initial discovery publish (fresh install, no cleanup or reboot) ──────
+  if (!this->ota_cleanup_in_progress_ &&
+      !this->ota_discovery_publishing_ && !this->ota_reboot_pending_) {
+    if (this->initial_discovery_needed_ &&
+        this->generate_device_config_ &&
+        this->is_ready()) {
+      ESP_LOGI(TAG, "Starting initial HA discovery publish...");
+      ha_discovery_manager_init(this->ha_discovery_manager_);
+
+      ha_discovery_manager_configure(
+        this->ha_discovery_manager_,
+        this->device_identity_manager_->get_device_id(),
+        this->device_identity_manager_->get_model_number(),
+        this->device_identity_manager_->get_serial_number(),
+        this->device_identity_manager_->get_appliance_type(),
+        this->filter_config_topics_,
+        this->erd_cache_,
+        &this->mqtt_client_adapter_->interface);
+      ha_discovery_manager_start(this->ha_discovery_manager_);
+      this->ota_discovery_publishing_ = true;
+      this->cleanup_trigger_ = CleanupTrigger::INITIAL;
+      this->initial_discovery_needed_ = false;
+    }
+  }
+
   // ── Start cleanup (OTA or DiscoveryRefresh) ──────────────────────────────
   if (!this->ota_cleanup_in_progress_ &&
       !this->ota_discovery_publishing_ && !this->ota_reboot_pending_) {
@@ -132,26 +177,46 @@ void OtaCleanupManager::loop() {
     }
   }
 
-  // ── Drive OTA discovery publishing ───────────────────────────────────────
+  // ── Drive discovery publishing ───────────────────────────────────────────
   if (this->ota_discovery_publishing_) {
     if (ha_discovery_manager_is_processing(this->ha_discovery_manager_)) {
       ha_discovery_manager_run(this->ha_discovery_manager_);
     } else {
       this->ota_discovery_publishing_ = false;
-      this->cleanup_trigger_ = CleanupTrigger::NONE;
-      ESP_LOGI(TAG, "OTA HA discovery publish complete, preparing reboot...");
 
-      // Clear safe mode counter and mark OTA valid before reboot.
-      uint32_t val = 0;
-      static constexpr uint32_t SAFE_MODE_RTC_KEY = 233825507UL;
-      ESPPreferenceObject rtc_pref = global_preferences->make_preference<uint32_t>(SAFE_MODE_RTC_KEY, false);
-      rtc_pref.save(&val);
-      global_preferences->sync();
-      esp_ota_mark_app_valid_cancel_rollback();
-      ESP_LOGI(TAG, "Safe mode counter cleared, OTA rollback cancelled");
+      if (this->cleanup_trigger_ == CleanupTrigger::INITIAL) {
+        // Initial publish: no reboot, no safe-mode clearing.
+        this->initial_discovery_done_ = true;
+        this->cleanup_trigger_ = CleanupTrigger::NONE;
+        ESP_LOGI(TAG, "Initial HA discovery publish complete");
+      } else {
+        // OTA or DiscoveryRefresh: prepare for reboot.
+        this->cleanup_trigger_ = CleanupTrigger::NONE;
+        ESP_LOGI(TAG, "OTA HA discovery publish complete, preparing reboot...");
 
-      this->ota_reboot_pending_ = true;
-      this->ota_reboot_start_ms_ = esphome::millis();
+        // Clear safe mode counter and mark OTA valid before reboot.
+        uint32_t val = 0;
+        static constexpr uint32_t SAFE_MODE_RTC_KEY = 233825507UL;
+        ESPPreferenceObject rtc_pref = global_preferences->make_preference<uint32_t>(SAFE_MODE_RTC_KEY, false);
+        rtc_pref.save(&val);
+        global_preferences->sync();
+        esp_ota_mark_app_valid_cancel_rollback();
+        ESP_LOGI(TAG, "Safe mode counter cleared, OTA rollback cancelled");
+
+        this->ota_reboot_pending_ = true;
+        this->ota_reboot_start_ms_ = esphome::millis();
+      }
+
+      // Store current discovery data hash in NVS for change detection on
+      // next boot. This is done for both INITIAL and OTA/DiscoveryRefresh
+      // paths, so we can detect when discovery definitions change.
+      {
+        static const uint32_t DISCOVERY_HASH_KEY = 0x64697363u; // "disc"
+        auto pref = global_preferences->make_preference<uint32_t>(DISCOVERY_HASH_KEY);
+        uint32_t current_hash = HA_DISCOVERY_DATA_HASH;
+        pref.save(&current_hash);
+        ESP_LOGD(TAG, "Stored discovery data hash 0x%08" PRIx32, current_hash);
+      }
     }
   }
 

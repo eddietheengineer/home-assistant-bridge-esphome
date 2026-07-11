@@ -4,6 +4,8 @@
 #include "esphome/core/hal.h"
 #include "esphome_time_source.h"
 #include "erd_cache.h"
+#include <inttypes.h>
+#include "ha_discovery_data.h"
 
 #ifdef USE_ESP32
 #include "esp_system.h"
@@ -242,29 +244,26 @@ void GeappliancesBridge::setup() {
       this->erd_cache_,
       this->erd_cache_publisher_);
 
-  // Detect OTA reboot by reading the reboot source from NVS.
-  // ESPHome's debug component stores the component's log string before
-  // App.reboot() — OTA stores "esphome.ota", bridge stores "geappliances_bridge".
-  // Only trigger cleanup for OTA, not for our own reboot or other software resets.
+  // Detect discovery data changes by comparing stored hash with current.
+  // HA_DISCOVERY_DATA_HASH is computed at build time from the discovery
+  // definitions. After each successful discovery publish, we store the
+  // hash in NVS. On software reboot, if the stored hash differs from
+  // current, we know the discovery data changed and need to republish.
+  // This works regardless of whether the debug component is present.
 #if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
   {
     esp_reset_reason_t reset = esp_reset_reason();
     if (reset == ESP_RST_SW) {
-      static const char* REBOOT_KEY = "reboot_source";
-      static const size_t REBOOT_MAX_LEN = 24;
-      auto pref = global_preferences->make_preference(
-          REBOOT_MAX_LEN,
-          fnv1_hash_extend(fnv1_hash(REBOOT_KEY), App.get_name().c_str()));
-      char reboot_source[REBOOT_MAX_LEN]{};
-      if (pref.load(&reboot_source)) {
-        reboot_source[REBOOT_MAX_LEN - 1] = '\0';
-        if (strcmp(reboot_source, "esphome.ota") == 0) {
+      static const uint32_t DISCOVERY_HASH_KEY = 0x64697363u; // "disc"
+      auto pref = global_preferences->make_preference<uint32_t>(DISCOVERY_HASH_KEY);
+      uint32_t stored_hash = 0;
+      if (pref.load(&stored_hash)) {
+        if (stored_hash != HA_DISCOVERY_DATA_HASH) {
           this->ota_cleanup_manager_.trigger_ota_cleanup();
-          ESP_LOGI(TAG, "Detected OTA reboot, will clean old discovery topics on startup");
-          // Clear the reboot source so a subsequent software reboot (e.g., from
-          // the OTA cleanup's own reboot) doesn't re-trigger the cleanup cycle.
-          memset(reboot_source, 0, REBOOT_MAX_LEN);
-          pref.save(reboot_source);
+          ESP_LOGI(TAG, "Discovery data hash changed (stored=0x%08" PRIx32
+                   ", current=0x%08" PRIx32
+                   "), cleaning old discovery topics",
+                   stored_hash, static_cast<uint32_t>(HA_DISCOVERY_DATA_HASH));
         }
       }
     }
@@ -800,6 +799,11 @@ bool GeappliancesBridge::check_steady_state()
              erd_cache_get_arena_usage(&this->erd_cache_),
              ERD_CACHE_ARENA_SIZE,
              erd_cache_get_arena_usage_percent(&this->erd_cache_));
+
+    // Trigger initial HA discovery publish on first boot (fresh install).
+    if (this->generate_device_config_) {
+      this->ota_cleanup_manager_.trigger_initial_discovery();
+    }
   }
 
   return steady;

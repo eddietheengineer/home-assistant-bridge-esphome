@@ -71,11 +71,14 @@ class OtaCleanupManager {
   /// Trigger discovery refresh (called from DiscoveryRefreshButton or poll discovery complete).
   void trigger_discovery_refresh();
 
+  /// Trigger initial HA discovery publish (called when steady state is first reached on a fresh install).
+  void trigger_initial_discovery();
+
   /// Check if the appliance is ready for cleanup (steady state, MQTT, device ID).
   bool is_ready() const;
 
 private:
-  enum CleanupTrigger { NONE, OTA, DISCOVERY_REFRESH };
+  enum CleanupTrigger { NONE, OTA, DISCOVERY_REFRESH, INITIAL };
   bool start_cleanup_();
 
   // State machine flags
@@ -83,8 +86,9 @@ private:
   bool ota_cleanup_in_progress_{false};
   bool ota_discovery_publishing_{false};
   bool ota_reboot_pending_{false};
-  uint32_t ota_reboot_start_ms_{0};
   bool discovery_refresh_in_progress_{false};
+  bool initial_discovery_needed_{false};
+  bool initial_discovery_done_{false};
   CleanupTrigger cleanup_trigger_{NONE};
 
   // References to bridge state

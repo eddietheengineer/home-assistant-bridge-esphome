@@ -95,4 +95,8 @@ extern const ha_discovery_category_t ha_discovery_categories[];
 
 extern const uint16_t ha_discovery_category_count;
 
+// FNV-1a hash of all discovery data for change detection.
+// Changes when discovery definitions are updated.
+#define HA_DISCOVERY_DATA_HASH 0x6b048871u
+
 #endif
