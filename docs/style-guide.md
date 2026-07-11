@@ -81,13 +81,13 @@ Diagrams (mermaid) with supporting text. C4 model: context → container → com
   light/dark mode rendering:
 
   ```
-  %%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","fontFamily":"monospace","nodeBorder":"#555555"}}}%%
+  %%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","fontFamily":"monospace","nodeBorder":"#888888"}}}%%
   ```
 - Use `classDef` for node styling with the shared color palette:
 
   | Category | Fill | Stroke |
   |---|---|---|
-  | Actor / Appliance | `#e8e8e8` | `#666666` |
+  | Actor / Appliance | `#e8e8e8` | `#999999` |
   | System / Bridge | `#d9e8f5` | `#2c6a9e` |
   | Protocol / External | `#e8f5e8` | `#388e3c` |
   | Framework / MQTT | `#e8e8f0` | `#5c6bc0` |

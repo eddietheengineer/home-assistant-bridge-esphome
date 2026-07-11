@@ -7,7 +7,7 @@ The GE Appliances Bridge is an ESPHome custom component that runs on an ESP32 mi
 ## C4 Level 1 — System Context
 
 ```mermaid
-%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","clusterBkg":"#f5f5f5","clusterBorder":"#cccccc","fontFamily":"monospace","nodeBorder":"#555555","edgeLabelBackground":"#ffffff","actorBkg":"#e8e8e8","actorBorder":"#666666","actorTextColor":"#1a1a1a"}}}%%
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","clusterBkg":"#f5f5f5","clusterBorder":"#aaaaaa","fontFamily":"monospace","nodeBorder":"#888888","edgeLabelBackground":"#ffffff","actorBkg":"#e8e8e8","actorBorder":"#999999","actorTextColor":"#1a1a1a"}}}%%
 graph TB
     USER["User<br/>(Home Assistant UI)"]
     HA["Home Assistant"]
@@ -20,7 +20,7 @@ graph TB
     BROKER -->|"Publishes ERD values<br/>Forwards write requests"| BRIDGE
     BRIDGE -->|"Reads/writes ERDs<br/>GEA2 (19200 baud) / GEA3 (230400 baud)"| APPLIANCE
 
-    classDef actor fill:#e8e8e8,stroke:#666666
+    classDef actor fill:#e8e8e8,stroke:#999999
     classDef system fill:#d9e8f5,stroke:#2c6a9e
     classDef external fill:#e8f5e8,stroke:#388e3c
 
@@ -40,7 +40,7 @@ The system has four external actors and one system boundary:
 ## C4 Level 2 — Container
 
 ```mermaid
-%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","clusterBkg":"#f5f5f5","clusterBorder":"#cccccc","fontFamily":"monospace","nodeBorder":"#555555","edgeLabelBackground":"#ffffff","actorBkg":"#e8e8e8","actorBorder":"#666666","actorTextColor":"#1a1a1a"}}}%%
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","clusterBkg":"#f5f5f5","clusterBorder":"#aaaaaa","fontFamily":"monospace","nodeBorder":"#888888","edgeLabelBackground":"#ffffff","actorBkg":"#e8e8e8","actorBorder":"#999999","actorTextColor":"#1a1a1a"}}}%%
 graph TB
     subgraph ESP32["ESP32 Microcontroller"]
         ESPHOME["ESPHome Framework<br/>(YAML Config, UART, MQTT Client)"]

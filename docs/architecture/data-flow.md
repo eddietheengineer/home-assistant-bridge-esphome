@@ -10,7 +10,7 @@ The read path carries sensor values, status flags, and other appliance data from
 the serial bus into Home Assistant as live state.
 
 ```mermaid
-%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","clusterBkg":"#f5f5f5","clusterBorder":"#cccccc","fontFamily":"monospace","nodeBorder":"#555555","edgeLabelBackground":"#ffffff"}}}%%
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","clusterBkg":"#f5f5f5","clusterBorder":"#aaaaaa","fontFamily":"monospace","nodeBorder":"#888888","edgeLabelBackground":"#ffffff"}}}%%
 graph LR
     APPLIANCE["Appliance"] --> UART["UART Adapter<br/>(esphome_uart_adapter)"]
     UART --> PROTOCOL["GEA3/GEA2<br/>Protocol Stack"]
@@ -21,7 +21,7 @@ graph LR
     MQTT --> BROKER["MQTT Broker"]
     BROKER --> HA["Home Assistant"]
 
-    classDef appliance fill:#e8e8e8,stroke:#666666
+    classDef appliance fill:#e8e8e8,stroke:#999999
     classDef protocol fill:#e8f5e9,stroke:#2e7d32
     classDef bridge fill:#d9e8f5,stroke:#2c6a9e
     classDef cache fill:#f3e5f5,stroke:#7b1fa2
@@ -55,7 +55,7 @@ The write path carries user commands from Home Assistant back to the appliance
 over the serial bus.
 
 ```mermaid
-%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","clusterBkg":"#f5f5f5","clusterBorder":"#cccccc","fontFamily":"monospace","nodeBorder":"#555555","edgeLabelBackground":"#ffffff"}}}%%
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","clusterBkg":"#f5f5f5","clusterBorder":"#aaaaaa","fontFamily":"monospace","nodeBorder":"#888888","edgeLabelBackground":"#ffffff"}}}%%
 graph LR
     HA["Home Assistant"] --> BROKER["MQTT Broker"]
     BROKER --> MQTT["MQTT Client<br/>Adapter"]
@@ -64,7 +64,7 @@ graph LR
     PROTOCOL --> UART["UART Adapter<br/>(esphome_uart_adapter)"]
     UART --> APPLIANCE["Appliance"]
 
-    classDef appliance fill:#e8e8e8,stroke:#666666
+    classDef appliance fill:#e8e8e8,stroke:#999999
     classDef protocol fill:#e8f5e9,stroke:#2e7d32
     classDef bridge fill:#d9e8f5,stroke:#2c6a9e
     classDef mqtt fill:#e8e8f0,stroke:#5c6bc0
@@ -129,7 +129,7 @@ Entity definitions are embedded as compressed JSONL chunks in `ha_discovery_data
 and streamed through a main-loop pipeline:
 
 ```mermaid
-%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","clusterBkg":"#f5f5f5","clusterBorder":"#cccccc","fontFamily":"monospace","nodeBorder":"#555555","edgeLabelBackground":"#ffffff"}}}%%
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","clusterBkg":"#f5f5f5","clusterBorder":"#aaaaaa","fontFamily":"monospace","nodeBorder":"#888888","edgeLabelBackground":"#ffffff"}}}%%
 graph LR
     EMBEDDED["Embedded JSONL<br/>(ha_discovery_data.h)"] --> DECOMPRESS["Decompress<br/>(tinfl/miniz)"]
     DECOMPRESS --> PARSE["Parse JSONL<br/>(zero-allocation parser)"]
