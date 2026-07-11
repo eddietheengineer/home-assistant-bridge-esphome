@@ -2,15 +2,7 @@
 
 ## System Summary
 
-The GE Appliances Bridge is an ESPHome custom component that runs on an ESP32
-microcontroller and bridges GE appliances (via GEA2/GEA3 serial bus protocols) to
-Home Assistant (via MQTT). The component owns the full lifecycle: discovering the
-appliance on the serial bus, reading its identity, determining which ERDs
-(Entity-Relationship Data points) are available through feature bit parsing, and
-then continuously publishing those values to MQTT while accepting write commands
-from Home Assistant. Data flows in both directions — appliance state is published
-to `geappliances/{device_id}/erd/0x{ERD}/value` topics, and write commands are
-accepted on `geappliances/{device_id}/erd/0x{ERD}/write` topics.
+The GE Appliances Bridge is an ESPHome custom component that runs on an ESP32 microcontroller and bridges GE appliances (via GEA2/GEA3 serial bus protocols) to Home Assistant (via MQTT). The component owns the full lifecycle: discovering the appliance on the serial bus, reading its identity, determining which ERDs are available through feature bit parsing, and then continuously publishing those values to MQTT while accepting write commands from Home Assistant. Data flows in both directions — appliance state is published to `geappliances/{device_id}/erd/0x{ERD}/value` topics, and write commands are accepted on `geappliances/{device_id}/erd/0x{ERD}/write` topics.
 
 ## C4 Level 1 — System Context
 
