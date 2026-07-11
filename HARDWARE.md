@@ -36,6 +36,7 @@ uart:
     rx_pin: GPIO20  # D7 on Xiao ESP32-C3
     baud_rate: 230400
 
+  # GEA2 UART (newer appliances)
   - id: gea2_uart
     tx_pin: GPIO9   # D9 on Xiao ESP32-C3
     rx_pin: GPIO10  # D10 on Xiao ESP32-C3
@@ -70,6 +71,7 @@ uart:
     rx_pin: GPIO17  # D7 on Xiao ESP32-C6
     baud_rate: 230400
 
+  # GEA2 UART (newer appliances)
   - id: gea2_uart
     tx_pin: GPIO20  # D9 on Xiao ESP32-C6
     rx_pin: GPIO18  # D10 on Xiao ESP32-C6
