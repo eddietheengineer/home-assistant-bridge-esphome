@@ -10,7 +10,7 @@ timeout guards.
 ## Sequence Diagram
 
 ```mermaid
-%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","actorBkg":"#e8e8e8","actorBorder":"#666666","actorTextColor":"#1a1a1a","noteBkgColor":"#fff9c4","noteBorderColor":"#f9a825","noteTextColor":"#1a1a1a"}}}%%
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","actorBkg":"#e8e8e8","actorBorder":"#666666","actorTextColor":"#1a1a1a"}}}%%
 sequenceDiagram
     autonumber
     participant HSM as Startup HSM
@@ -23,34 +23,34 @@ sequenceDiagram
     participant RUN as Running State
 
     HSM->>HSM: startup_delay (10s wait)
-    Note right of HSM: Wait for appliance to stabilize
+    HSM->>HSM: *Wait for appliance to stabilize*
 
     HSM->>AD: run_autodiscovery()
     AD-->>HSM: signal_autodiscovery_complete
-    Note right of AD: Broadcast scan, retry indefinitely
+    AD->>AD: *Broadcast scan, retry indefinitely*
 
     HSM->>DI: init_device_id_reading()
     DI-->>HSM: signal_device_id_complete
-    Note right of DI: Read ERDs 0x0001, 0x0002, 0x0008
+    DI->>DI: *Read ERDs 0x0001, 0x0002, 0x0008*
 
     HSM->>MQTT: initialize_mqtt_client()
     HSM->>MQTT: initialize_erd_cache_publisher()
-    Note right of MQTT: Adapter init (does not wait for connection)
+    MQTT->>MQTT: *Adapter init (does not wait for connection)*
 
     HSM->>FB: start_feature_bit_reading()
     FB-->>HSM: signal_feature_bits_complete
-    Note right of FB: Parse ERDs 0x0092–0x0097, 0x0109–0x010D
+    FB->>FB: *Parse ERDs 0x0092-0x0097, 0x0109-0x010D*
 
     HSM->>BR: initialize_erd_bridge()
     BR-->>HSM: signal_bridge_ready
-    Note right of BR: Polling or subscription mode
+    BR->>BR: *Polling or subscription mode*
 
     HSM->>SW: Monitor subscription state
     SW-->>HSM: signal_subscription_fallback
-    Note right of SW: AUTO mode only; no-op for POLL/SUBSCRIBE
+    SW->>SW: *AUTO mode only; no-op for POLL/SUBSCRIBE*
 
     HSM->>RUN: Entering steady-state operation
-    Note right of RUN: Recurring tasks every loop()
+    RUN->>RUN: *Recurring tasks every loop()*
 ```
 
 ## Phase-by-Phase Breakdown

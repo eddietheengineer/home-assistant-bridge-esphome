@@ -94,8 +94,9 @@ Diagrams (mermaid) with supporting text. C4 model: context → container → com
   | Component / Cache | `#f3e5f5` | `#7b1fa2` |
   | Hardware / Embedded | `#fff3e0` | `#e65100` |
   | Submodule / Terminal | `#e8f5e9` | `#2e7d32` |
-- In sequence diagrams, use `Note right of X:` or `Note left of X:` instead of
-  `Note over X:` to avoid rendering issues in some Mermaid versions.
+- In sequence diagrams, use self-messages (`X->>X: *annotation*`) for
+  annotations instead of `Note` statements, which are unreliable across
+  Mermaid versions.
 
 ### Tables
 
