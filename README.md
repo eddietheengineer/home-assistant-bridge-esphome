@@ -42,19 +42,14 @@ api_encryption_key: "QLeW3ueZeYgKFtgAUnWAroo9DwDko/aIqYcblAX/9vs="
 
 ### 2. Create a New Device
 
-In the ESPHome dashboard, click **Add Device** in the lower right, then select **Advanced Options** → **Empty Configuration**. Set a unique device name and friendly name, then paste the configuration below into the editor.
+In the ESPHome dashboard, click **Add Device** in the lower right, then select **Advanced Options** → **Empty Configuration**. Set a unique device name and friendly name, then paste the configuration below into the editor, replacing all preexisting text
 
 ### 3. Paste the Configuration
 
 ```yaml
-substitutions:
+esphome:
   name: gea-esphome
   friendly_name: gea-esphome
-
-esphome:
-  name: ${name}
-  friendly_name: ${friendly_name}
-  name_add_mac_suffix: false
 
 api:
   encryption:
