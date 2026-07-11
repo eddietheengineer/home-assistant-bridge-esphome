@@ -83,6 +83,8 @@ Diagrams (mermaid) with supporting text. C4 model: context → container → com
   ```
   %%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","fontFamily":"monospace","nodeBorder":"#888888"}}}%%
   ```
+- For sequence diagrams, also include `actorBkg`, `actorBorder`, and
+  `actorTextColor` in themeVariables (e.g. `#e8e8e8`, `#999999`, `#1a1a1a`).
 - Use `classDef` for node styling with the shared color palette:
 
   | Category | Fill | Stroke |

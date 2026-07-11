@@ -106,7 +106,9 @@ critical sections in the discovery cleanup path, and `xSemaphoreCreateMutex`
 for the ERD cache MQTT publisher's state fields (`mqtt_connected`, `paused`,
 `publish_index`). ERD cache entries themselves require no locking — the main
 loop writes and the background publisher reads, with ordering guaranteed by
-the round-robin index. The protocol stack tight loop always runs before MQTT
+the round-robin index. The `mark_published()` and `tick_cooldowns()` functions
+operate on disjoint entry sets (cleared vs. pending `update_required`), so they
+also require no locking. The protocol stack tight loop always runs before MQTT
 operations to avoid starving UART processing — a blocking MQTT call could
 delay response processing past the appliance's timeout window.
 
@@ -142,9 +144,10 @@ as topics are retained by the MQTT broker.
 
 Long-running operations are split across multiple timer ticks to avoid triggering
 the ESP32 Task Watchdog Timer. Feature bit parsing processes ~4 bitmasks per call
-across ~5 timer callbacks for common features, plus ~10 more for appliance-specific
-ERDs. The polling bridge budgets MQTT operations per loop tick. The main loop
-feeds the watchdog around startup HSM phase transitions via `esp_task_wdt_reset()`.
+across ~5 timer callbacks for the common feature ERD (0x0092), plus ~10 more
+callbacks for appliance-specific ERDs (0x0093–0x0097, 0x0109–0x010D). The polling
+bridge budgets MQTT operations per loop tick. The main loop feeds the watchdog
+around startup HSM phase transitions via `esp_task_wdt_reset()`.
 
 ### C/C++ split by layer
 
@@ -170,9 +173,9 @@ handlers are protocol-agnostic.
 
 The bridge supports three operating modes — POLL, SUBSCRIBE, and AUTO — selected
 at initialization time. GEA2 appliances are forced into polling mode since they
-lack subscription support. AUTO mode attempts subscription first and falls back
-to polling if the appliance does not respond with subscription publications
-within a 2-second quiet period or after three consecutive subscribe failures.
+AUTO mode attempts subscription first and falls back to polling via two
+independent triggers: (a) no subscription publications within a 2-second quiet
+period, or (b) three consecutive subscription retention failures.
 The fallback tears down the subscription bridge and re-initializes a polling
 bridge as a replacement.
 

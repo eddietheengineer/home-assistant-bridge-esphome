@@ -196,7 +196,7 @@ graph TB
     RN["startup_state_running"]
 
     classDef root fill:#d9e8f5,stroke:#2c6a9e,stroke-width:2px
-    classDef state fill:#e8e8e8,stroke:#666666
+    classDef state fill:#e8e8e8,stroke:#999999
     classDef terminal fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
 
     class TOP root
