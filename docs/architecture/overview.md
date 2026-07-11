@@ -147,7 +147,8 @@ the ESP32 Task Watchdog Timer. Feature bit parsing processes ~4 bitmasks per cal
 across ~5 timer callbacks for the common feature ERD (0x0092), plus ~10 more
 callbacks for appliance-specific ERDs (0x0093–0x0097, 0x0109–0x010D). The polling
 bridge budgets MQTT operations per loop tick. The main loop feeds the watchdog
-around startup HSM phase transitions via `esp_task_wdt_reset()`.
+after the protocol stack tight loop and after the HSM run_loop signal via
+`esp_task_wdt_reset()`.
 
 ### C/C++ split by layer
 
@@ -175,8 +176,8 @@ The bridge supports three operating modes — POLL, SUBSCRIBE, and AUTO — sele
 at initialization time. GEA2 appliances are forced into polling mode since they
 do not support subscriptions. AUTO mode attempts subscription first and falls
 back to polling via two independent triggers: (a) no subscription publications
-within a 2-second quiet period, or (b) three consecutive subscription retention
-failures.
+within a 2-second quiet period, or (b) three consecutive subscription request
+failures (`subscribe_failure_count >= 3`).
 The fallback tears down the subscription bridge and re-initializes a polling
 bridge as a replacement.
 

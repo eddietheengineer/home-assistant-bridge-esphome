@@ -144,7 +144,7 @@ graph LR
     classDef parse fill:#e8e8f0,stroke:#5c6bc0
     classDef filter fill:#fce4ec,stroke:#880e4f
     classDef mqtt fill:#e8e8f0,stroke:#5c6bc0
-    classDef ha fill:#f3e5f5,stroke:#7b1fa2
+    classDef ha fill:#fce4ec,stroke:#880e4f
 
     class EMBEDDED embedded
     class DECOMPRESS decompress
@@ -171,7 +171,7 @@ graph LR
      names matching diagnostic keywords (e.g. "linux diagnostics", "reset
      reason") are skipped.
 5. **Publish HA Discovery Topics** — Each entity is published to
-   `homeassistant/{domain}/{device_id}/{category}/{field_id}/config` with a
+  `homeassistant/{domain}/{device_id}/{erd_id}_{field_id}/config` with a
    JSON payload containing the device info, state topic, command topic (for
    writable ERDs), and entity metadata.
 6. **Home Assistant** receives the discovery messages and auto-registers the

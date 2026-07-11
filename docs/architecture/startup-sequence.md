@@ -36,8 +36,8 @@ sequenceDiagram
     HSM->>MQTT: initialize_mqtt_client()
     HSM->>MQTT: initialize_erd_cache_publisher()
     MQTT->>MQTT: Adapter init (does not wait for connection)
-
     HSM->>FB: start_feature_bit_reading()
+
     FB-->>HSM: signal_feature_bits_complete
     FB->>FB: Parse ERDs 0x0092-0x0097, 0x0109-0x010D
 
@@ -57,9 +57,9 @@ sequenceDiagram
 
 ### Phase 1: Startup Delay
 
-Initializes UART adapters and GEA2/GEA3 protocol interfaces, then waits
-`AUTODISCOVERY_STARTUP_DELAY_MS` (10 seconds) for the appliance board to
-stabilize before beginning broadcast discovery. The HSM polls
+Waits `AUTODISCOVERY_STARTUP_DELAY_MS` (10 seconds) for the appliance board
+to stabilize before beginning broadcast discovery. UART and protocol
+initialization occur earlier in `setup()`. The HSM polls
 `is_startup_delay_elapsed()` on each `signal_run_loop` iteration.
 
 | Detail | Value |
@@ -128,7 +128,7 @@ client queue is full, it schedules a retry timer (`QUEUE_RETRY_MS = 50 ms`).
 | **Source** | `geappliances_bridge_startup_hsm.cpp` `startup_state_feature_bits` |
 | **Duration** | Variable (depends on queue availability and appliance response) |
 | **Failure behavior** | Queue-full retries at 50 ms intervals; otherwise retries indefinitely |
-| **Signals** | `signal_feature_bits_complete`, `signal_mqtt_connected` |
+| **Signals** | `signal_feature_bits_complete` |
 | **Transition** | `bridge_init` |
 
 ### Phase 6: Bridge Init
@@ -221,7 +221,6 @@ graph TB
 | `signal_run_loop` | HSM `loop()` dispatch | All states (drives ongoing work) |
 | `signal_autodiscovery_complete` | `AutodiscoveryManager` callback | `startup_state_autodiscovery` |
 | `signal_device_id_complete` | `DeviceIdentityManager` callback | `startup_state_device_id` |
-| `signal_mqtt_connected` | MQTT client adapter | `startup_state_feature_bits` |
 | `signal_feature_bits_complete` | `FeatureBitManager` callback | `startup_state_feature_bits` |
 | `signal_bridge_ready` | ERD polling bridge | `startup_state_bridge_init` |
 | `signal_subscription_fallback` | Subscription watchdog | `startup_state_subscription_watch` |
