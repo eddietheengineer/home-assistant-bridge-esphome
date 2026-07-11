@@ -100,12 +100,14 @@ pressed — normal boots skip discovery since topics are retained by the MQTT br
 
 ### Single-core constraints
 
-The bridge targets ESP32-C3 and other single-core ESP32 variants. All shared state
-between the main loop and the background MQTT publisher task relies on interrupt
-disabling (`vPortEnterCritical`/`vPortExitCritical`) rather than mutexes. On
-single-core ESP32, critical sections disable interrupts, providing atomicity for
-`uint8_t` and pointer accesses. The protocol stack tight loop always runs before
-MQTT operations to avoid starving UART processing — a blocking MQTT call could
+The bridge targets ESP32-C3 and other single-core ESP32 variants. Synchronization
+uses a mixed strategy: `vPortEnterCritical`/`vPortExitCritical` for short
+critical sections in the discovery cleanup path, and `xSemaphoreCreateMutex`
+for the ERD cache MQTT publisher's state fields (`mqtt_connected`, `paused`,
+`publish_index`). ERD cache entries themselves require no locking — the main
+loop writes and the background publisher reads, with ordering guaranteed by
+the round-robin index. The protocol stack tight loop always runs before MQTT
+operations to avoid starving UART processing — a blocking MQTT call could
 delay response processing past the appliance's timeout window.
 
 ### No dynamic collections
@@ -116,12 +118,14 @@ array; ERD sets use sorted arrays with linear search; the custom ERD list caps a
 64 entries; the polling list uses a fixed buffer. This eliminates heap fragmentation
 risk and makes memory usage predictable.
 
-### Inline vs. heap data storage
+### Static arena data storage
 
-ERD values of 4 bytes or less are stored inline within the cache entry (zero heap
-allocation). Larger values use `new[]` for a heap buffer, allocated once at
-registration time. Subsequent updates are in-place `memcpy` — no alloc or free.
-This keeps the common case (small sensor readings) entirely off the heap.
+All ERD data is stored in a 4 KB static arena (bump allocator) within the
+cache struct, regardless of value size. Each cache entry holds an offset and
+size into the arena. At registration, a new entry claims a contiguous slice
+via a bump pointer. Subsequent updates are in-place `memcpy` — no alloc or
+free. This keeps all ERD data entirely off the heap with a single allocation
+strategy.
 
 ### Embedded discovery data
 
@@ -138,8 +142,9 @@ as topics are retained by the MQTT broker.
 
 Long-running operations are split across multiple timer ticks to avoid triggering
 the ESP32 Task Watchdog Timer. Feature bit parsing processes ~4 bitmasks per call
-across ~5 timer callbacks. The polling bridge budgets MQTT operations per loop
-tick. The startup HSM feeds the watchdog between phases.
+across ~5 timer callbacks for common features, plus ~10 more for appliance-specific
+ERDs. The polling bridge budgets MQTT operations per loop tick. The main loop
+feeds the watchdog around startup HSM phase transitions via `esp_task_wdt_reset()`.
 
 ## Detailed Documentation
 
