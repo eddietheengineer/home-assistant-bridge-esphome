@@ -14,7 +14,7 @@
 // NOT responsible for:
 //   - HA discovery manager lifecycle (init/configure/start/destroy) —
 //     those are called by this class but the struct is owned by the bridge.
-//   - Reading reboot source from NVS — that happens in GeappliancesBridge::setup().
+//   - Reading discovery data hash from NVS — that happens in GeappliancesBridge::setup().
 //
 // Dependencies:
 //   - ha_discovery_manager_t (owned by bridge, passed by reference)
