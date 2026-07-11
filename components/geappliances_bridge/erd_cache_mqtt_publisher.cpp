@@ -344,14 +344,16 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
       self->mqtt_connected = true;
       self->first_round_done = false;
       disconnect_start = self->disconnect_start_ms;
-      self->disconnect_start_ms = 0;
+      /* Don't reset disconnect_start_ms here — it may be set from a prior
+       * disconnect and we want to measure the cumulative outage duration
+       * across multiple ESPHome reconnect attempts. Reset only on the final
+       * successful reconnect (when we know we're stable). */
       xSemaphoreGive(self->state_mutex);
     }
   } else {
     self->mqtt_connected = true;
     self->first_round_done = false;
     disconnect_start = self->disconnect_start_ms;
-    self->disconnect_start_ms = 0;
   }
 
   uint32_t now = self->get_time_ms ? self->get_time_ms() : 0;
@@ -394,14 +396,20 @@ void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self)
 
   if (self->state_mutex) {
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      bool was_connected = self->mqtt_connected;
       self->mqtt_connected = false;
-      self->disconnect_start_ms = now;
+      if (was_connected || self->disconnect_start_ms == 0) {
+        self->disconnect_start_ms = now;
+      }
       self->disconnect_count++;
       xSemaphoreGive(self->state_mutex);
     }
   } else {
+    bool was_connected = self->mqtt_connected;
     self->mqtt_connected = false;
-    self->disconnect_start_ms = now;
+    if (was_connected || self->disconnect_start_ms == 0) {
+      self->disconnect_start_ms = now;
+    }
     self->disconnect_count++;
   }
   ESP_LOGW(PUBLISHER_TAG, "MQTT disconnected — pausing ERD cache publishing");

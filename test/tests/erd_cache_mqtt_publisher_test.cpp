@@ -939,10 +939,11 @@ TEST(erd_cache_mqtt_publisher, last_disconnect_duration_reflects_gap)
 
   CHECK_EQUAL(4000u, erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(&publisher));
 
-  /* Reset for other tests. */
+  /* disconnect_start_ms is not reset on reconnect — verify it's still set. */
+  CHECK(publisher.disconnect_start_ms != 0u);
+
   fake_time = 2000;
 }
-
 TEST(erd_cache_mqtt_publisher, last_disconnect_duration_overwritten_on_subsequent_reconnect)
 {
   static uint32_t fake_time = 1000;
@@ -959,7 +960,9 @@ TEST(erd_cache_mqtt_publisher, last_disconnect_duration_overwritten_on_subsequen
   erd_cache_mqtt_publisher_on_connected(&publisher);
   CHECK_EQUAL(100u, erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(&publisher));
 
-  /* Second disconnect/reconnect: 500ms gap. */
+  /* disconnect_start_ms is not reset on reconnect, but the second disconnect
+   * sees was_connected=true (set by on_connected) and resets it to current time.
+   * Duration is 1600 - 1100 = 500ms (measures the second outage independently). */
   erd_cache_mqtt_publisher_on_disconnected(&publisher);
   fake_time = 1600;
   erd_cache_mqtt_publisher_on_connected(&publisher);
@@ -967,3 +970,37 @@ TEST(erd_cache_mqtt_publisher, last_disconnect_duration_overwritten_on_subsequen
 
   fake_time = 1000;
 }
+
+/* Cumulative disconnect duration across multiple ESPHome reconnect attempts */
+TEST(erd_cache_mqtt_publisher, cumulative_disconnect_duration_across_reconnect_attempts)
+{
+  static uint32_t fake_time = 1000;
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device");
+  erd_cache_mqtt_publisher_set_time_fn(&publisher, +[]() -> uint32_t { return fake_time; });
+
+  /* Simulate a prolonged outage with ESPHome reconnect attempts every ~15s.
+   * Disconnect at t=1000, then rapid connect/disconnect cycles. */
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+
+  /* First reconnect attempt at t=1015000 (15s later). */
+  fake_time = 1015000;
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+  CHECK_EQUAL(1014000u, erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(&publisher));
+
+  /* Immediate disconnect again (ESPHome lost connection again).
+   * was_connected=true so disconnect_start_ms is reset to current time. */
+  erd_cache_mqtt_publisher_on_disconnected(&publisher);
+
+  /* Second reconnect attempt at t=1030000 (15s after second disconnect). */
+  fake_time = 1030000;
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+  /* Duration measures from the second disconnect: 1030000 - 1015000 = 15000ms. */
+  CHECK_EQUAL(15000u, erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(&publisher));
+
+  fake_time = 1000;
+}
+
