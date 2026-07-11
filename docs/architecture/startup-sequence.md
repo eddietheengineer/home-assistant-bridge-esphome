@@ -9,8 +9,8 @@ timeout guards.
 
 ## Sequence Diagram
 
-%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","actorBkg":"#e8e8e8","actorBorder":"#666666","actorTextColor":"#1a1a1a","noteBkgColor":"#fff9c4","noteBorderColor":"#f9a825","noteTextColor":"#1a1a1a"}}}%%
 ```mermaid
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","actorBkg":"#e8e8e8","actorBorder":"#666666","actorTextColor":"#1a1a1a","noteBkgColor":"#fff9c4","noteBorderColor":"#f9a825","noteTextColor":"#1a1a1a"}}}%%
 sequenceDiagram
     autonumber
     participant HSM as Startup HSM
@@ -182,8 +182,8 @@ steady-state check fires once on first detection and logs the transition.
 The state hierarchy is flat — all states have `startup_state_top` as their
 parent. Unhandled signals bubble up to the top state, which consumes them.
 
-%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","clusterBkg":"#f5f5f5","clusterBorder":"#cccccc","fontFamily":"monospace","nodeBorder":"#555555"}}}%%
 ```mermaid
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#666666","clusterBkg":"#f5f5f5","clusterBorder":"#cccccc","fontFamily":"monospace","nodeBorder":"#555555"}}}%%
 graph TB
     TOP["startup_state_top<br/>(root)"]
     SD["startup_state_startup_delay"]
