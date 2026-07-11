@@ -47,7 +47,7 @@ sequenceDiagram
 
     HSM->>SW: Monitor subscription state
     SW-->>HSM: signal_subscription_fallback
-    SW->>SW: AUTO mode only; no-op for POLL—SUBSCRIBE
+    SW->>SW: AUTO mode only, no-op for POLL—SUBSCRIBE
 
     HSM->>RUN: Entering steady-state operation
     RUN->>RUN: Recurring tasks every loop()
