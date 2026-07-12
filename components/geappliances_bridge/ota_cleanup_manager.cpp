@@ -185,16 +185,18 @@ void OtaCleanupManager::loop() {
       this->ota_discovery_publishing_ = false;
 
       if (this->cleanup_trigger_ == CleanupTrigger::INITIAL) {
-        // Initial publish: no reboot, no safe-mode clearing.
+        // Initial publish: no cleanup needed, but still reboot after.
         this->initial_discovery_done_ = true;
         this->cleanup_trigger_ = CleanupTrigger::NONE;
-        ESP_LOGI(TAG, "Initial HA discovery publish complete");
+        ESP_LOGI(TAG, "Initial HA discovery publish complete, preparing reboot...");
       } else {
         // OTA or DiscoveryRefresh: prepare for reboot.
         this->cleanup_trigger_ = CleanupTrigger::NONE;
         ESP_LOGI(TAG, "OTA HA discovery publish complete, preparing reboot...");
+      }
 
-        // Clear safe mode counter and mark OTA valid before reboot.
+      // Clear safe mode counter and mark OTA valid before reboot.
+      {
         uint32_t val = 0;
         static constexpr uint32_t SAFE_MODE_RTC_KEY = 233825507UL;
         ESPPreferenceObject rtc_pref = global_preferences->make_preference<uint32_t>(SAFE_MODE_RTC_KEY, false);
@@ -202,10 +204,10 @@ void OtaCleanupManager::loop() {
         global_preferences->sync();
         esp_ota_mark_app_valid_cancel_rollback();
         ESP_LOGI(TAG, "Safe mode counter cleared, OTA rollback cancelled");
-
-        this->ota_reboot_pending_ = true;
-        this->ota_reboot_start_ms_ = esphome::millis();
       }
+
+      this->ota_reboot_pending_ = true;
+      this->ota_reboot_start_ms_ = esphome::millis();
 
       // Store current discovery data hash in NVS for change detection on
       // next boot. This is done for both INITIAL and OTA/DiscoveryRefresh
