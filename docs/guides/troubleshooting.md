@@ -121,7 +121,7 @@ Diagnostic flow for common issues with the GE Appliances Bridge.
    - `MQTT connect failed` — wrong credentials or broker unreachable.
    - `MQTT disconnected` — network issue or broker restart.
 
-5. **After OTA update, entities may briefly disappear:** After an OTA update, the bridge detects the reboot source, cleans old discovery topics, publishes fresh ones, and reboots. During this cycle, entities may temporarily disappear from Home Assistant. They will reappear after the bridge completes the cleanup → publish → reboot cycle.
+5. **After firmware update, entities may briefly disappear:** After a firmware update, the bridge detects discovery data changes (hash or device ID) at steady state, cleans old discovery topics, publishes fresh ones, and reboots. During this cycle, entities may temporarily disappear from Home Assistant. They will reappear after the bridge completes the cleanup → publish → reboot cycle.
 
 ## Low Memory / WDT Reset
 
@@ -144,23 +144,24 @@ Diagnostic flow for common issues with the GE Appliances Bridge.
 
 4. **See [HARDWARE.md](../../HARDWARE.md)** for detailed memory constraints.
 
-## OTA Reboot & Discovery Refresh
+## Discovery Change Detection & Refresh
 
 ### Symptoms
 
-- After an OTA update, entities briefly disappear from Home Assistant.
+- After a firmware update, entities briefly disappear from Home Assistant.
 - The Discovery Refresh button does not seem to do anything immediately.
 
 ### Explanation
 
-- **After OTA update:** The bridge detects the OTA reboot source, cleans old discovery topics, publishes fresh ones, and reboots. During this cycle, entities may temporarily disappear. They will reappear after the bridge completes the cleanup → publish → reboot cycle.
+- **After firmware update:** The bridge detects discovery data changes (hash or device ID) at steady state, cleans old discovery topics, publishes fresh ones, and reboots. During this cycle, entities may temporarily disappear. They will reappear after the bridge completes the cleanup → publish → reboot cycle.
 - **Discovery Refresh button:** When pressed, the request is queued. If the bridge is not yet ready (steady state, MQTT connected, device ID complete), the request waits until those conditions are met. Check logs for "Discovery refresh queued, will execute when appliance is ready".
 
 ### Diagnostic Steps
 
-1. **Check logs for OTA detection:** Look for "Detected OTA reboot, will clean old discovery topics on startup".
+1. **Check logs for change detection:** Look for "Discovery state changed (hash=changed, device_id=same), cleaning old topics" or "Discovery state changed (hash=same, device_id=changed), cleaning old topics".
 2. **Check logs for discovery refresh:** Look for "Discovery refresh queued, will execute when appliance is ready" followed by "HA discovery cleanup complete, publishing fresh discovery...".
-3. **Wait for the cycle to complete:** The cleanup → publish → reboot cycle can take 1–2 minutes depending on the number of entities.
+3. **Check logs for fresh install:** Look for "Starting initial HA discovery publish..." on first boot.
+4. **Wait for the cycle to complete:** The cleanup → publish → reboot cycle can take 1–2 minutes depending on the number of entities.
 
 
 ## Write Commands Fail

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The main ESPHome component class that orchestrates the entire GE Appliances bridge. It manages UART interfaces for GEA2/GEA3 protocols, drives the startup state machine, handles MQTT connection lifecycle, and coordinates all sub-managers (autodiscovery, device identity, feature bits, OTA cleanup, diagnostic sensor publishing).
+The main ESPHome component class that orchestrates the entire GE Appliances bridge. It manages UART interfaces for GEA2/GEA3 protocols, drives the startup state machine, handles MQTT connection lifecycle, and coordinates all sub-managers (autodiscovery, device identity, feature bits, discovery change detection/cleanup, diagnostic sensor publishing).
 
 ## Public API
 
@@ -24,7 +24,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `set_mode(mode)` | Set bridge mode: POLL (0), SUBSCRIBE (1), or AUTO (2) |
 | `set_polling_interval(ms)` | Set polling interval (default 10000 ms) |
 | `set_appliance_api_parsing(bool)` | Enable feature bit-based ERD filtering (default true) |
-| `set_generate_device_config(bool)` | Enable/disable HA device config generation (default true). When enabled, HA discovery runs on OTA reboot. The Discovery Refresh button always works regardless of this flag. Normal boots skip discovery (topics retained by MQTT broker). |
+| `set_generate_device_config(bool)` | Enable/disable HA device config generation (default true). When enabled, the bridge checks for discovery changes (hash or device ID) at steady state and runs cleanup + republish if needed; also enables initial discovery publish on fresh installs. The Discovery Refresh button always works regardless of this flag. Normal boots skip discovery (topics retained by MQTT broker). |
 | `set_erd_publish_rate_sensor(sensor)` | Set sensor for ERD publish rate monitoring |
 | `set_erd_cache_entries_sensor(sensor)` | Set sensor for ERD cache entries count |
 | `set_erd_cache_updates_sensor(sensor)` | Set sensor for ERD cache updates count |
@@ -82,7 +82,7 @@ During `startup_state_bridge_init`, `initialize_erd_bridge_()` runs:
 - `erd_registry` — single owner of valid-ERD filter, string-type set, and registered-ERD tracking
 - `erd_cache_mqtt_publisher` — drains ERD cache updates to MQTT each `loop()`
 - `erd_bridge_common.h` — shared signals, timing constants, and utility templates
-- `OtaCleanupManager` — owns the OTA-triggered cleanup → republish → reboot state machine and the DiscoveryRefresh path
+- `OtaCleanupManager` — owns the discovery change detection, cleanup → republish → reboot state machine, initial discovery publish, and the DiscoveryRefresh path
 - `DiagnosticSensorPublisher` — owns periodic publishing of diagnostic sensor values (ERD/MQTT publish rate, cache stats, disconnect stats)
 - `tiny_hsm`, `tiny_timer` — state machine and timer infrastructure
 
@@ -93,7 +93,7 @@ During `startup_state_bridge_init`, `initialize_erd_bridge_()` runs:
 - **IBridgeServices interface**: `GeappliancesBridge` implements `IBridgeServices`, the abstract contract consumed by the startup HSM. This eliminates `friend` declarations and lets the HSM be unit-tested with a mock.
 - **Phase timeouts**: Device ID phase has a 30 s timeout, feature bits phase has a 60 s timeout — both prevent the startup HSM from stalling indefinitely.
 - **Probe list ownership**: The `poll_probe_list_` member stores the built probe list so the pointer passed to `erd_bridge_poll_init()` remains valid across the probe phase.
-- **loop() delegation:** `loop()` delegates ongoing work to `ota_cleanup_manager_.loop()` (OTA cleanup, discovery refresh, reboot) and `diagnostic_sensor_publisher_.loop()` (periodic diagnostic sensor publishing) instead of driving them inline.
+- **loop() delegation:** `loop()` delegates ongoing work to `ota_cleanup_manager_.loop()` (discovery change detection, cleanup, republish, initial publish, reboot) and `diagnostic_sensor_publisher_.loop()` (periodic diagnostic sensor publishing) instead of driving them inline.
 
 ## Testing
 

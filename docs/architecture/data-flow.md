@@ -2,7 +2,7 @@
 
 This document describes the three primary data paths through the bridge: reading
 appliance state to Home Assistant, writing commands from Home Assistant to the
-appliance, and publishing Home Assistant MQTT discovery entities on OTA reboot or Discovery Refresh.
+and publishing Home Assistant MQTT discovery entities on discovery data changes or Discovery Refresh.
 
 ## Read Path (Appliance → Home Assistant)
 
@@ -89,23 +89,34 @@ graph LR
    transmits it over UART to the appliance.
 
 
-## Discovery Path (OTA Reboot / Discovery Refresh → Home Assistant)
+## Discovery Path (Discovery Changes / Discovery Refresh → Home Assistant)
 
 Home Assistant MQTT discovery topics are retained on the MQTT broker, so normal
-boots skip discovery entirely. Discovery runs in two scenarios:
+boots skip discovery entirely. Discovery runs in four scenarios:
 
-1. **OTA reboot:** After an OTA update, the bridge detects the reboot source,
-   cleans old discovery topics, publishes fresh ones, and reboots to defragment
-   the heap.
-2. **Discovery Refresh button:** When pressed, the button queues a cleanup +
+1. **Discovery Refresh button:** When pressed, the button queues a cleanup +
    republish + reboot cycle. If pressed before the bridge is ready (steady state,
    MQTT connected, device ID complete), the request is queued and executes once
    the bridge is ready.
+2. **Discovery data hash change:** After a firmware update that changes discovery
+   definitions, the bridge detects the hash mismatch at steady state, cleans old
+   discovery topics, publishes fresh ones, and reboots to defragment the heap.
+3. **Device ID change:** If the device ID changes (e.g. appliance swap or
+   configuration change), the bridge detects the mismatch at steady state, cleans
+   old discovery topics, publishes fresh ones, and reboots.
+4. **Fresh install:** On first boot with no stored discovery state, the bridge
+   publishes discovery topics only (no cleanup or reboot).
 
-### OTA Reboot Flow
+### Discovery Change Detection
+
+At steady state, the bridge compares the current `HA_DISCOVERY_DATA_HASH` (computed
+by the build-time pipeline) and the current device ID against the stored
+`DiscoveryNVS {hash, device_id}` struct in NVS. If either differs, it triggers
+cleanup → publish → reboot. The stored state is updated after each successful
+publish so subsequent boots detect no change.
 
 ```
-OTA reboot → detect "esphome.ota" → wait for steady state
+Firmware update → steady state → detect discovery hash/device_id change
   → cleanup old discovery topics
   → publish fresh discovery topics
   → mark boot successful (clear safe mode counter, cancel OTA rollback)

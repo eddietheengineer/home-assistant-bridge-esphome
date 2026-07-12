@@ -65,7 +65,7 @@ Complete reference for the `geappliances_bridge` ESPHome component configuration
 
 | **Type** | `bool` |
 | **Default** | `true` |
-| **Description** | When `true` (default), the bridge runs HA discovery on OTA reboot. The Discovery Refresh button always works regardless of this flag. Normal boots skip discovery (topics retained by MQTT broker). |
+| **Description** | When `true` (default), the bridge runs HA discovery on discovery data changes (hash or device ID) and on fresh install. The Discovery Refresh button always works regardless of this flag. Normal boots skip discovery (topics retained by MQTT broker). |
 
 ### `filter_config_topics`
 
@@ -104,7 +104,7 @@ geappliances_bridge:
 |---|---|---|
 | `discovery_refresh_button` | `button` or `bool` | Auto-created with `discovery: false` |
 
-Exposes an ESPHome button entity that triggers a Home Assistant MQTT discovery cleanup when pressed. Useful for clearing stale discovery topics after firmware updates or configuration changes.
+Exposes an ESPHome button entity that triggers a Home Assistant MQTT discovery cleanup when pressed. This shares the same cleanup → publish → reboot path as automatic discovery change detection (hash or device ID change). Useful for clearing stale discovery topics after firmware updates or configuration changes.
 
 ```yaml
 geappliances_bridge:
