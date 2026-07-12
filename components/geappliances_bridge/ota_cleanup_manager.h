@@ -74,10 +74,21 @@ class OtaCleanupManager {
   /// Trigger initial HA discovery publish (called when steady state is first reached on a fresh install).
   void trigger_initial_discovery();
 
+  /// Check for discovery changes (hash or device ID) and trigger cleanup if needed.
+  /// Called from check_steady_state() when steady state is first reached.
+  void check_discovery_changes(const char* current_device_id);
+
   /// Check if the appliance is ready for cleanup (steady state, MQTT, device ID).
   bool is_ready() const;
 
 private:
+  // NVS struct stored after each successful discovery publish.
+  // Compared on next boot to detect changes requiring cleanup+republish.
+  struct DiscoveryNVS {
+    uint32_t hash;
+    char device_id[92];
+  };
+
   enum CleanupTrigger { NONE, OTA, DISCOVERY_REFRESH, INITIAL };
   bool start_cleanup_();
 

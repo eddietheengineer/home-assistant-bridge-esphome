@@ -244,31 +244,8 @@ void GeappliancesBridge::setup() {
       this->erd_cache_,
       this->erd_cache_publisher_);
 
-  // Detect discovery data changes by comparing stored hash with current.
-  // HA_DISCOVERY_DATA_HASH is computed at build time from the discovery
-  // definitions. After each successful discovery publish, we store the
-  // hash in NVS. On software reboot, if the stored hash differs from
-  // current, we know the discovery data changed and need to republish.
-  // This works regardless of whether the debug component is present.
-#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
-  {
-    esp_reset_reason_t reset = esp_reset_reason();
-    if (reset == ESP_RST_SW) {
-      static const uint32_t DISCOVERY_HASH_KEY = 0x64697363u; // "disc"
-      auto pref = global_preferences->make_preference<uint32_t>(DISCOVERY_HASH_KEY);
-      uint32_t stored_hash = 0;
-      if (pref.load(&stored_hash)) {
-        if (stored_hash != HA_DISCOVERY_DATA_HASH) {
-          this->ota_cleanup_manager_.trigger_ota_cleanup();
-          ESP_LOGI(TAG, "Discovery data hash changed (stored=0x%08" PRIx32
-                   ", current=0x%08" PRIx32
-                   "), cleaning old discovery topics",
-                   stored_hash, static_cast<uint32_t>(HA_DISCOVERY_DATA_HASH));
-        }
-      }
-    }
-  }
-#endif
+  // NOTE: Discovery change detection (hash + device ID) is now done in
+  // check_steady_state() where the device identity is available.
 
   ESP_LOGCONFIG(TAG, "GE Appliances Bridge setup complete");
 }
@@ -800,34 +777,15 @@ bool GeappliancesBridge::check_steady_state()
              ERD_CACHE_ARENA_SIZE,
              erd_cache_get_arena_usage_percent(&this->erd_cache_));
 
-    // Trigger initial HA discovery publish on first boot (fresh install).
     if (this->generate_device_config_) {
-      this->ota_cleanup_manager_.trigger_initial_discovery();
+      // Check for discovery changes (hash or device ID) vs. last published state.
+      this->ota_cleanup_manager_.check_discovery_changes(
+          this->device_identity_manager_.get_device_id());
     }
   }
 
   return steady;
 }
-
-
-void GeappliancesBridge::maybe_start_custom_erd_polling()
-{
-  maybe_start_custom_erd_polling_();
-}
-
-
-void GeappliancesBridge::log_poll_state_transitions()
-{
-  log_poll_state_transitions_();
-}
-
-// -- ERD cache MQTT publisher ------------------------------------------------
-
-void GeappliancesBridge::initialize_erd_cache_publisher()
-{
-  init_erd_cache_publisher_();
-}
-
 bool GeappliancesBridge::is_erd_cache_publisher_initialized() const
 {
   return erd_cache_publisher_.cache != nullptr;
@@ -858,6 +816,23 @@ void GeappliancesBridge::init_erd_cache_publisher_()
 void GeappliancesBridge::trigger_discovery_refresh()
 {
   this->ota_cleanup_manager_.trigger_discovery_refresh();
+}
+
+void GeappliancesBridge::maybe_start_custom_erd_polling()
+{
+  maybe_start_custom_erd_polling_();
+}
+
+
+void GeappliancesBridge::log_poll_state_transitions()
+{
+  log_poll_state_transitions_();
+}
+
+
+void GeappliancesBridge::initialize_erd_cache_publisher()
+{
+  init_erd_cache_publisher_();
 }
 
 }  // namespace geappliances_bridge

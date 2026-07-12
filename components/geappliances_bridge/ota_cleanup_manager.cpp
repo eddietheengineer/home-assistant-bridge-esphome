@@ -83,6 +83,51 @@ void OtaCleanupManager::trigger_initial_discovery() {
   ESP_LOGI(TAG, "Initial HA discovery publish queued, will execute when appliance is ready");
 }
 
+void OtaCleanupManager::check_discovery_changes(const char* current_device_id) {
+#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
+  if (this->ota_cleanup_needed_ ||
+      this->ota_cleanup_in_progress_ ||
+      this->ota_discovery_publishing_ ||
+      this->ota_reboot_pending_ ||
+      this->discovery_refresh_in_progress_ ||
+      this->initial_discovery_needed_) {
+    ESP_LOGW(TAG, "Discovery operation already in progress, skipping change check");
+    return;
+  }
+
+  if (!this->generate_device_config_) {
+    return;
+  }
+
+  static const uint32_t DISCOVERY_NVS_KEY = 0x64697363u; // "disc"
+  auto pref = global_preferences->make_preference<DiscoveryNVS>(DISCOVERY_NVS_KEY);
+  DiscoveryNVS stored{};
+
+  if (!pref.load(&stored)) {
+    // No stored state — fresh install, trigger initial discovery.
+    this->trigger_initial_discovery();
+    return;
+  }
+
+  // Compare hash and device ID.
+  bool hash_changed = (stored.hash != HA_DISCOVERY_DATA_HASH);
+  bool device_id_changed = (stored.device_id[0] != '\0' &&
+                            strcmp(stored.device_id, current_device_id) != 0);
+
+  if (hash_changed || device_id_changed) {
+    ESP_LOGI(TAG, "Discovery state changed (hash=%s, device_id=%s), cleaning old topics",
+             hash_changed ? "changed" : "same",
+             device_id_changed ? "changed" : "same");
+    this->trigger_ota_cleanup();
+    return;
+  }
+
+  // No changes — nothing to do.
+#else
+  (void)current_device_id;
+#endif
+}
+
 bool OtaCleanupManager::is_ready() const {
   return this->steady_state_reached_ != nullptr &&
          *this->steady_state_reached_ &&
@@ -209,15 +254,20 @@ void OtaCleanupManager::loop() {
       this->ota_reboot_pending_ = true;
       this->ota_reboot_start_ms_ = esphome::millis();
 
-      // Store current discovery data hash in NVS for change detection on
-      // next boot. This is done for both INITIAL and OTA/DiscoveryRefresh
-      // paths, so we can detect when discovery definitions change.
+      // Store current discovery state (hash + device ID) in NVS for
+      // change detection on next boot.
       {
-        static const uint32_t DISCOVERY_HASH_KEY = 0x64697363u; // "disc"
-        auto pref = global_preferences->make_preference<uint32_t>(DISCOVERY_HASH_KEY);
-        uint32_t current_hash = HA_DISCOVERY_DATA_HASH;
-        pref.save(&current_hash);
-        ESP_LOGD(TAG, "Stored discovery data hash 0x%08" PRIx32, current_hash);
+        static const uint32_t DISCOVERY_NVS_KEY = 0x64697363u; // "disc"
+        auto pref = global_preferences->make_preference<DiscoveryNVS>(DISCOVERY_NVS_KEY);
+        DiscoveryNVS state{};
+        state.hash = HA_DISCOVERY_DATA_HASH;
+        strncpy(state.device_id,
+                this->device_identity_manager_->get_device_id(),
+                sizeof(state.device_id) - 1);
+        state.device_id[sizeof(state.device_id) - 1] = '\0';
+        pref.save(&state);
+        ESP_LOGD(TAG, "Stored discovery state hash=0x%08" PRIx32
+                 " device_id=%s", state.hash, state.device_id);
       }
     }
   }
