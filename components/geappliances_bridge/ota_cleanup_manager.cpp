@@ -84,6 +84,9 @@ void OtaCleanupManager::trigger_initial_discovery() {
 }
 
 void OtaCleanupManager::check_discovery_changes(const char* current_device_id) {
+  if (current_device_id == nullptr) {
+    return;
+  }
 #if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
   if (this->ota_cleanup_needed_ ||
       this->ota_cleanup_in_progress_ ||
@@ -266,6 +269,7 @@ void OtaCleanupManager::loop() {
                 sizeof(state.device_id) - 1);
         state.device_id[sizeof(state.device_id) - 1] = '\0';
         pref.save(&state);
+        global_preferences->sync();
         ESP_LOGD(TAG, "Stored discovery state hash=0x%08" PRIx32
                  " device_id=%s", state.hash, state.device_id);
       }
