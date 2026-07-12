@@ -43,7 +43,7 @@ In the bridge's `loop()`, `ota_cleanup_manager_.loop()` is called, which checks 
 6. **On discovery complete:** `mark_boot_successful_for_reboot()` clears the safe mode counter and cancels OTA rollback, then `ota_reboot_pending_` is set.
 7. **Wait then reboot:** After a 5-second delay, `esphome::App.safe_reboot()` performs a graceful reboot (disconnects from MQTT before resetting).
 
-The cleanup → publish → reboot flow is driven by `OtaCleanupManager`. The OTA reboot flow follows the same path, triggered automatically when the bridge detects an OTA reboot source in `setup()`.
+The cleanup → publish → reboot flow is driven by `OtaCleanupManager`. The same path is used for automatic discovery change detection (hash or device ID change detected at steady state) and fresh install discovery publish.
 
 ## ESPHome Configuration
 
@@ -77,7 +77,7 @@ geappliances_bridge:
 - **Null-safe**: The `press_action()` method checks `bridge_ != nullptr` before calling through, protecting against use-after-free if the bridge is destroyed before the button.
 - **Auto-created**: The button is created by default (`discovery_refresh_button: true`) so users get the functionality without explicit configuration. It can be disabled by setting `discovery_refresh_button: false`.
 - **Queued execution**: The request is queued if pressed before the bridge is ready. This eliminates guard checks and allows the user to press the button at any time.
-- **Shared cleanup path with OTA**: Both OTA reboot and Discovery Refresh use the same cleanup → publish → reboot flow (state `ota_cleanup_in_progress_`, `ota_discovery_publishing_`, `ota_reboot_pending_` owned by `OtaCleanupManager`).
+- **Shared cleanup path**: Discovery Refresh, automatic discovery change detection (hash/device_id change at steady state), and fresh install all share the same cleanup → publish → reboot flow (state `ota_cleanup_in_progress_`, `ota_discovery_publishing_`, `ota_reboot_pending_` owned by `OtaCleanupManager`). Fresh install publishes only (no cleanup or reboot).
 - **`safe_reboot()` instead of `App.reboot()`**: Uses `App.safe_reboot()` to gracefully disconnect from MQTT before resetting, ensuring a clean session end.
 - **`mark_boot_successful_for_reboot()`**: Clears the safe mode boot loop counter and cancels OTA rollback before rebooting, preventing the device from entering safe mode due to rapid reboots.
 - **5-second pre-reboot delay**: Allows final discovery messages to transmit and the heap to stabilize before rebooting. The reboot also defragments the heap after the memory-intensive cleanup and publish cycle.

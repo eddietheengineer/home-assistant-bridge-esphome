@@ -4,6 +4,8 @@
 #include "esphome/core/hal.h"
 #include "esphome_time_source.h"
 #include "erd_cache.h"
+#include <inttypes.h>
+#include "ha_discovery_data.h"
 
 #ifdef USE_ESP32
 #include "esp_system.h"
@@ -242,34 +244,8 @@ void GeappliancesBridge::setup() {
       this->erd_cache_,
       this->erd_cache_publisher_);
 
-  // Detect OTA reboot by reading the reboot source from NVS.
-  // ESPHome's debug component stores the component's log string before
-  // App.reboot() — OTA stores "esphome.ota", bridge stores "geappliances_bridge".
-  // Only trigger cleanup for OTA, not for our own reboot or other software resets.
-#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
-  {
-    esp_reset_reason_t reset = esp_reset_reason();
-    if (reset == ESP_RST_SW) {
-      static const char* REBOOT_KEY = "reboot_source";
-      static const size_t REBOOT_MAX_LEN = 24;
-      auto pref = global_preferences->make_preference(
-          REBOOT_MAX_LEN,
-          fnv1_hash_extend(fnv1_hash(REBOOT_KEY), App.get_name().c_str()));
-      char reboot_source[REBOOT_MAX_LEN]{};
-      if (pref.load(&reboot_source)) {
-        reboot_source[REBOOT_MAX_LEN - 1] = '\0';
-        if (strcmp(reboot_source, "esphome.ota") == 0) {
-          this->ota_cleanup_manager_.trigger_ota_cleanup();
-          ESP_LOGI(TAG, "Detected OTA reboot, will clean old discovery topics on startup");
-          // Clear the reboot source so a subsequent software reboot (e.g., from
-          // the OTA cleanup's own reboot) doesn't re-trigger the cleanup cycle.
-          memset(reboot_source, 0, REBOOT_MAX_LEN);
-          pref.save(reboot_source);
-        }
-      }
-    }
-  }
-#endif
+  // NOTE: Discovery change detection (hash + device ID) is now done in
+  // check_steady_state() where the device identity is available.
 
   ESP_LOGCONFIG(TAG, "GE Appliances Bridge setup complete");
 }
@@ -800,30 +776,16 @@ bool GeappliancesBridge::check_steady_state()
              erd_cache_get_arena_usage(&this->erd_cache_),
              ERD_CACHE_ARENA_SIZE,
              erd_cache_get_arena_usage_percent(&this->erd_cache_));
+
+    if (this->generate_device_config_) {
+      // Check for discovery changes (hash or device ID) vs. last published state.
+      this->ota_cleanup_manager_.check_discovery_changes(
+          this->device_identity_manager_.get_device_id());
+    }
   }
 
   return steady;
 }
-
-
-void GeappliancesBridge::maybe_start_custom_erd_polling()
-{
-  maybe_start_custom_erd_polling_();
-}
-
-
-void GeappliancesBridge::log_poll_state_transitions()
-{
-  log_poll_state_transitions_();
-}
-
-// -- ERD cache MQTT publisher ------------------------------------------------
-
-void GeappliancesBridge::initialize_erd_cache_publisher()
-{
-  init_erd_cache_publisher_();
-}
-
 bool GeappliancesBridge::is_erd_cache_publisher_initialized() const
 {
   return erd_cache_publisher_.cache != nullptr;
@@ -854,6 +816,23 @@ void GeappliancesBridge::init_erd_cache_publisher_()
 void GeappliancesBridge::trigger_discovery_refresh()
 {
   this->ota_cleanup_manager_.trigger_discovery_refresh();
+}
+
+void GeappliancesBridge::maybe_start_custom_erd_polling()
+{
+  maybe_start_custom_erd_polling_();
+}
+
+
+void GeappliancesBridge::log_poll_state_transitions()
+{
+  log_poll_state_transitions_();
+}
+
+
+void GeappliancesBridge::initialize_erd_cache_publisher()
+{
+  init_erd_cache_publisher_();
 }
 
 }  // namespace geappliances_bridge

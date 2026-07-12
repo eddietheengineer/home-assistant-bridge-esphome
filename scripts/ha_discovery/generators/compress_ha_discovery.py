@@ -17,6 +17,21 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from pipeline.ha_constants import CATEGORIES_LIST as CATEGORIES
 
+
+# FNV-1a 32-bit hash constants
+FNV1A_32_PRIME = 0x01000193
+FNV1A_32_OFFSET = 0x811c9dc5
+
+
+def fnv1a_32(data: bytes) -> int:
+    """Compute FNV-1a 32-bit hash."""
+    h = FNV1A_32_OFFSET
+    for b in data:
+        h ^= b
+        h = (h * FNV1A_32_PRIME) & 0xFFFFFFFF
+    return h
+
+
 # Target decompressed chunk size (must fit in decompress_buf: 18KB).
 CHUNK_TARGET_DECOMPRESSED = 4000
 
@@ -152,16 +167,27 @@ def generate_header(input_dir: Path, header_name: str = "ha_discovery_data") -> 
         lines.append(f'// {info["category"]}.jsonl compressed data ({len(info["all_compressed"])} bytes from {info["raw_size"]} bytes)')
         lines.append(f'extern const uint8_t ha_discovery_data_{cpp_name}[];')
         lines.append('')
-    
+
+    # Compute FNV-1a hash of all discovery data for change detection.
+    # Hash is computed over all compressed data in category order,
+    # so any change to discovery definitions changes the hash.
+    hash_input = b''.join(info['all_compressed'] for info in category_data.values())
+    discovery_hash = fnv1a_32(hash_input)
+    print(f"  Discovery data hash: 0x{discovery_hash:08x}", file=sys.stderr)
+
     # Generate category array (extern declaration)
     lines.append('/* Category table */')
     lines.append('extern const ha_discovery_category_t ha_discovery_categories[];')
     lines.append('')
     lines.append(f'extern const uint16_t ha_discovery_category_count;')
     lines.append('')
+    lines.append(f'// FNV-1a hash of all discovery data for change detection.')
+    lines.append(f'// Changes when discovery definitions are updated.')
+    lines.append(f'#define HA_DISCOVERY_DATA_HASH 0x{discovery_hash:08x}u')
+    lines.append('')
     lines.append('#endif')
     lines.append('')
-    
+
     return '\n'.join(lines)
 def generate_cpp(input_dir: Path, header_name: str = "ha_discovery_data") -> str:
     """Generate a .cpp companion file with actual array definitions.

@@ -14,7 +14,7 @@
 // NOT responsible for:
 //   - HA discovery manager lifecycle (init/configure/start/destroy) —
 //     those are called by this class but the struct is owned by the bridge.
-//   - Reading reboot source from NVS — that happens in GeappliancesBridge::setup().
+//   - Reading discovery data hash from NVS — that happens in GeappliancesBridge::setup().
 //
 // Dependencies:
 //   - ha_discovery_manager_t (owned by bridge, passed by reference)
@@ -71,11 +71,25 @@ class OtaCleanupManager {
   /// Trigger discovery refresh (called from DiscoveryRefreshButton or poll discovery complete).
   void trigger_discovery_refresh();
 
+  /// Trigger initial HA discovery publish (called when steady state is first reached on a fresh install).
+  void trigger_initial_discovery();
+
+  /// Check for discovery changes (hash or device ID) and trigger cleanup if needed.
+  /// Called from check_steady_state() when steady state is first reached.
+  void check_discovery_changes(const char* current_device_id);
+
   /// Check if the appliance is ready for cleanup (steady state, MQTT, device ID).
   bool is_ready() const;
 
 private:
-  enum CleanupTrigger { NONE, OTA, DISCOVERY_REFRESH };
+  // NVS struct stored after each successful discovery publish.
+  // Compared on next boot to detect changes requiring cleanup+republish.
+  struct DiscoveryNVS {
+    uint32_t hash;
+    char device_id[92];
+  };
+
+  enum CleanupTrigger { NONE, OTA, DISCOVERY_REFRESH, INITIAL };
   bool start_cleanup_();
 
   // State machine flags
@@ -85,6 +99,8 @@ private:
   bool ota_reboot_pending_{false};
   uint32_t ota_reboot_start_ms_{0};
   bool discovery_refresh_in_progress_{false};
+  bool initial_discovery_needed_{false};
+  bool initial_discovery_done_{false};
   CleanupTrigger cleanup_trigger_{NONE};
 
   // References to bridge state
