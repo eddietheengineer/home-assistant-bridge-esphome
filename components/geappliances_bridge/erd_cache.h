@@ -40,6 +40,10 @@ typedef struct erd_cache_t {
   uint32_t required_update_count_window; /* such updates since last get_required_update_rate() call */
   uint8_t max_cooldown;                /* configured rate limit in seconds; 0 = disabled */
   bool initialized;                    /* true after first successful erd_cache_init() */
+  /* Optional callback fired when ERD data changes (data_changed=true or new entry).
+   * Called with the ERD ID, the new data pointer, and data size.
+   * The callback may use this to log user-selectable mode changes. */
+  void (*on_update)(tiny_erd_t erd, const uint8_t* data, uint8_t data_size);
 } erd_cache_t;
 
 #ifdef __cplusplus

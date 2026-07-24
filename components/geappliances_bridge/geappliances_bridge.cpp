@@ -6,6 +6,7 @@
 #include "erd_cache.h"
 #include <inttypes.h>
 #include "ha_discovery_data.h"
+#include "erd_user_selectable_names.h"
 
 #ifdef USE_ESP32
 #include "esp_system.h"
@@ -20,6 +21,24 @@
 #endif
 
 GEA_TAG(TAG) = "geappliances_bridge";
+
+// -----------------------------------------------------------------------
+// ERD cache update callback: log user-selectable mode changes
+// -----------------------------------------------------------------------
+static void erd_cache_on_update(tiny_erd_t erd, const uint8_t* data, uint8_t data_size)
+{
+  const char* name = erd_user_selectable_name(erd);
+  if (name == NULL) {
+    return;  // Not a user-selectable ERD
+  }
+
+  const char* decoded = erd_user_selectable_decode(erd, data, data_size);
+  if (decoded == NULL) {
+    return;  // ERD not found in decode table
+  }
+
+  ESP_LOGI(TAG, "Mode: %s = %s", name, decoded);
+}
 
 namespace esphome {
 namespace geappliances_bridge {
@@ -108,6 +127,7 @@ void GeappliancesBridge::setup() {
 
   // Initialize the shared ERD cache before any component uses it.
   erd_cache_init(&this->erd_cache_);
+  this->erd_cache_.on_update = erd_cache_on_update;
   // Initialize the fixed-capacity set for tracking seen subscription ERDs.
   erd_set_init(&this->custom_erd_subscription_seen_erds_);
   // Initialize GEA3 components if GEA3 UART is configured

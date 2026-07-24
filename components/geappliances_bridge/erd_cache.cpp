@@ -50,6 +50,7 @@ void erd_cache_init(erd_cache_t* self)
   self->required_update_count = 0;
   self->required_update_count_window = 0;
   self->max_cooldown = 0;
+  self->on_update = NULL;
   self->initialized = true;
 }
 
@@ -114,6 +115,9 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
       self->required_update_count++;
       self->required_update_count_window++;
     }
+    if (self->on_update != NULL) {
+      self->on_update(erd, data, data_size);
+    }
     return existing->update_required;
   }
 
@@ -161,9 +165,12 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   slot->valid = true;
   slot->update_required = true;
   slot->publish_cooldown = 0;
-
   ESP_LOGD(TAG, "ERD 0x%04X added to cache (%u bytes, arena offset %u)",
            erd, data_size, slot->data_offset);
+
+  if (self->on_update != NULL) {
+    self->on_update(erd, data, data_size);
+  }
 
   return true;
 }
