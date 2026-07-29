@@ -50,6 +50,7 @@ void AutodiscoveryManager::init(tiny_timer_group_t* timer_group,
   this->target_address_       = 0;
   this->target_address_set_   = false;
   this->active_erd_client_    = nullptr;
+  this->gea2_protocol_active_ = false;
   this->gea3_rx_              = discover_rx_t{};
   this->gea2_rx_              = discover_rx_t{};
 

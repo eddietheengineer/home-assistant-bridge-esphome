@@ -259,7 +259,7 @@ async def to_code(config: dict[str, Any]) -> None:
     # Set adapter address (defaults to 0xE4)
     cg.add(var.set_client_address(config[CONF_ADAPTER_ADDRESS]))
 
-    # Set board address if provided (skips autodiscovery broadcast)
+    # Set board address if provided (probes specific address instead of broadcast)
     if CONF_BOARD_ADDRESS in config:
         cg.add(var.set_board_address(config[CONF_BOARD_ADDRESS]))
 
