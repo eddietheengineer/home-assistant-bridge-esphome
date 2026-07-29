@@ -97,6 +97,11 @@ class AutodiscoveryManager {
   /// Used by UART receive callbacks and tests.
   void feed_byte(uint8_t byte, bool is_gea3) { process_byte_(byte, is_gea3); }
 
+  /// Set the target board address for discovery probes.
+  /// When configured, discovery sends to this address instead of 0xFF broadcast.
+  /// The normal GEA3→GEA2 fallback still applies.
+  void set_target_address(uint8_t address);
+
  private:
   /// Drive the state machine forward (called from timer callbacks).
   void run();
@@ -134,6 +139,8 @@ class AutodiscoveryManager {
   tiny_timer_t broadcast_window_timer_;
 
   uint8_t  host_address_       = 0;
+  uint8_t  target_address_     = 0;
+  bool target_address_set_     = false;
   uint8_t  client_address_     = 0xE4;
   i_tiny_gea3_erd_client_t* active_erd_client_ = nullptr;
   bool gea2_protocol_active_ = false;

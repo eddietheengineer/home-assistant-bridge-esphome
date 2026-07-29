@@ -249,3 +249,23 @@ TEST(geappliances_bridge, is_discovered_gea2_protocol_default_false)
   IBridgeServices* services = &bridge;
   CHECK_FALSE(services->is_discovered_gea2_protocol());
 }
+
+/* ------------------------------------------------------------------ */
+/* Board address configuration                                         */
+/* ------------------------------------------------------------------ */
+
+TEST(geappliances_bridge, set_board_address_does_not_crash)
+{
+  bridge.set_board_address(0xC0);
+  bridge.set_board_address(0x00);
+  bridge.set_board_address(0xFF);
+}
+
+TEST(geappliances_bridge, board_address_is_optional)
+{
+  // Not calling set_board_address() should leave the bridge in a valid
+  // state — autodiscovery should proceed normally (broadcast path).
+  IBridgeServices* services = &bridge;
+  CHECK_EQUAL(0, services->get_discovered_host_address());
+  CHECK_FALSE(services->is_autodiscovery_complete());
+}

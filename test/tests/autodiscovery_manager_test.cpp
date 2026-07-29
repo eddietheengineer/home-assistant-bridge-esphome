@@ -492,3 +492,160 @@ TEST(autodiscovery_manager, non_default_client_address_rejects_wrong_destination
   CHECK(manager.get_state() != AUTODISCOVERY_COMPLETE);
   CHECK_FALSE(callback_called);
 }
+
+/* ------------------------------------------------------------------ */
+/* set_target_address (targeted probe instead of broadcast)            */
+/* ------------------------------------------------------------------ */
+
+TEST(autodiscovery_manager, set_target_address_stores_target_without_completing)
+{
+  init_both_uart();
+  CHECK_EQUAL(AUTODISCOVERY_IDLE, manager.get_state());
+
+  manager.set_target_address(0xC0);
+
+  // set_target_address only stores the target — state remains IDLE.
+  CHECK_EQUAL(AUTODISCOVERY_IDLE, manager.get_state());
+  CHECK(manager.get_active_erd_client() == nullptr);
+  CHECK_FALSE(callback_called);
+}
+
+TEST(autodiscovery_manager, targeted_gea3_probe_sends_to_configured_address)
+{
+  init_both_uart();
+  manager.set_target_address(0xC0);
+
+  // Expect the GEA3 client to read from the configured address, not broadcast.
+  mock().expectOneCall("read")
+    .onObject(&gea3_client.interface)
+    .withParameter("address", 0xC0)
+    .withParameter("erd", ERD_APPLIANCE_TYPE)
+    .ignoreOtherParameters()
+    .andReturnValue(true);
+
+  manager.start();
+  CHECK_EQUAL(AUTODISCOVERY_GEA3_BROADCAST_WAITING, manager.get_state());
+}
+
+TEST(autodiscovery_manager, targeted_probe_completes_on_response)
+{
+  init_both_uart();
+  manager.set_target_address(0xC0);
+
+  mock().expectOneCall("read")
+    .onObject(&gea3_client.interface)
+    .withParameter("address", 0xC0)
+    .withParameter("erd", ERD_APPLIANCE_TYPE)
+    .ignoreOtherParameters()
+    .andReturnValue(true);
+
+  manager.start();  /* -> GEA3_BROADCAST_WAITING */
+
+  // Simulate a response from the configured address.
+  simulate_broadcast_response(0xC0, 0x03, true);
+
+  // Advance timers to trigger the broadcast window expiry.
+  esphome_hal_double_set_millis(AUTODISCOVERY_BROADCAST_WINDOW_MS + 100);
+  advance_timers();
+
+  CHECK_EQUAL(AUTODISCOVERY_COMPLETE, manager.get_state());
+  CHECK_EQUAL(0xC0, manager.get_host_address());
+  CHECK_EQUAL(&gea3_client.interface, manager.get_active_erd_client());
+  CHECK_FALSE(manager.is_gea2_protocol());
+  CHECK_TRUE(callback_called);
+}
+
+TEST(autodiscovery_manager, targeted_probe_falls_back_to_gea2)
+{
+  init_both_uart();
+  manager.set_target_address(0xC0);
+
+  // GEA3 probe — no response.
+  mock().expectOneCall("read")
+    .onObject(&gea3_client.interface)
+    .withParameter("address", 0xC0)
+    .withParameter("erd", ERD_APPLIANCE_TYPE)
+    .ignoreOtherParameters()
+    .andReturnValue(true);
+
+  manager.start();  /* -> GEA3_BROADCAST_WAITING */
+
+  // After GEA3 timeout, schedule_next_broadcast_ transitions to GEA2_PENDING
+  // and calls run() synchronously, which does the GEA2 read immediately.
+  // Set up the GEA2 mock before advancing timers.
+  mock().expectOneCall("read")
+    .onObject(&gea2_client.interface)
+    .withParameter("address", 0xC0)
+    .withParameter("erd", ERD_APPLIANCE_TYPE)
+    .ignoreOtherParameters()
+    .andReturnValue(true);
+
+  // No response on GEA3 — timer fires, falls back to GEA2.
+  esphome_hal_double_set_millis(AUTODISCOVERY_BROADCAST_WINDOW_MS + 100);
+  advance_timers();
+
+  CHECK_EQUAL(AUTODISCOVERY_GEA2_BROADCAST_WAITING, manager.get_state());
+
+  // Simulate a GEA2 response from the configured address.
+  simulate_broadcast_response(0xC0, 0x03, false);
+
+  esphome_hal_double_set_millis(AUTODISCOVERY_BROADCAST_WINDOW_MS * 2 + 100);
+  advance_timers();
+
+  CHECK_EQUAL(AUTODISCOVERY_COMPLETE, manager.get_state());
+  CHECK_EQUAL(0xC0, manager.get_host_address());
+  CHECK_EQUAL(&gea2_adapter.interface, manager.get_active_erd_client());
+  CHECK_TRUE(manager.is_gea2_protocol());
+  CHECK_TRUE(callback_called);
+}
+
+TEST(autodiscovery_manager, targeted_probe_with_zero_address)
+{
+  // board_address: 0x00 should probe address 0x00, not fall back to broadcast.
+  init_both_uart();
+  manager.set_target_address(0x00);
+
+  mock().expectOneCall("read")
+    .onObject(&gea3_client.interface)
+    .withParameter("address", 0x00)
+    .withParameter("erd", ERD_APPLIANCE_TYPE)
+    .ignoreOtherParameters()
+    .andReturnValue(true);
+
+  manager.start();
+  CHECK_EQUAL(AUTODISCOVERY_GEA3_BROADCAST_WAITING, manager.get_state());
+}
+
+TEST(autodiscovery_manager, targeted_probe_rejects_wrong_source_address)
+{
+  // In targeted mode, a response from a different address should be ignored.
+  init_gea3_only();
+  manager.set_target_address(0xC0);
+
+  mock().expectOneCall("read")
+    .onObject(&gea3_client.interface)
+    .withParameter("address", 0xC0)
+    .withParameter("erd", ERD_APPLIANCE_TYPE)
+    .ignoreOtherParameters()
+    .andReturnValue(true);
+
+  manager.start();
+
+  // Simulate a response from a different address (0xB8, not 0xC0).
+  simulate_broadcast_response(0xB8, 0x03, true);
+
+  // After timeout, the manager retries GEA3. Mock the retry.
+  mock().expectOneCall("read")
+    .onObject(&gea3_client.interface)
+    .withParameter("address", 0xC0)
+    .withParameter("erd", ERD_APPLIANCE_TYPE)
+    .ignoreOtherParameters()
+    .andReturnValue(true);
+
+  esphome_hal_double_set_millis(AUTODISCOVERY_BROADCAST_WINDOW_MS + 100);
+  advance_timers();
+
+  // Discovery should NOT have completed — wrong source address was ignored.
+  CHECK(manager.get_state() != AUTODISCOVERY_COMPLETE);
+  CHECK_FALSE(callback_called);
+}

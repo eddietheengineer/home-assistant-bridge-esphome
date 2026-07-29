@@ -47,8 +47,9 @@ void AutodiscoveryManager::init(tiny_timer_group_t* timer_group,
   this->on_complete_cb_       = std::move(on_complete_cb);
   this->state_                = AUTODISCOVERY_IDLE;
   this->host_address_         = 0;
+  this->target_address_       = 0;
+  this->target_address_set_   = false;
   this->active_erd_client_    = nullptr;
-  this->gea2_protocol_active_ = false;
   this->gea3_rx_              = discover_rx_t{};
   this->gea2_rx_              = discover_rx_t{};
 
@@ -361,6 +362,13 @@ void AutodiscoveryManager::on_broadcast_response(uint8_t address, uint8_t applia
   if (this->state_ == AUTODISCOVERY_COMPLETE) return;
   if (this->active_erd_client_ != nullptr)    return;  // single response wins
 
+  // In targeted mode, only accept responses from the expected address.
+  if (this->target_address_set_ && address != this->target_address_) {
+    ESP_LOGD(TAG, "Ignoring response from 0x%02X (expected 0x%02X)",
+             address, this->target_address_);
+    return;
+  }
+
   bool in_gea3_waiting = (this->state_ == AUTODISCOVERY_GEA3_BROADCAST_WAITING);
   bool in_gea2_waiting = (this->state_ == AUTODISCOVERY_GEA2_BROADCAST_WAITING);
 
@@ -371,6 +379,16 @@ void AutodiscoveryManager::on_broadcast_response(uint8_t address, uint8_t applia
     this->host_address_       = address;
     this->active_erd_client_  = this->gea2_adapter_client_;
   }
+}
+
+// =============================================================================
+// Public: set target board address for discovery probes
+// =============================================================================
+
+void AutodiscoveryManager::set_target_address(uint8_t address)
+{
+  this->target_address_ = address;
+  this->target_address_set_ = true;
 }
 
 // =============================================================================
@@ -411,13 +429,19 @@ void AutodiscoveryManager::run()
       break;
 
     case AUTODISCOVERY_GEA3_BROADCAST_PENDING: {
+      uint8_t dest = this->target_address_set_ ? this->target_address_ : GEA_BROADCAST_ADDRESS;
       tiny_gea3_erd_client_request_id_t req_id;
       if (tiny_gea3_erd_client_read(this->gea3_erd_client_, &req_id,
-                                     GEA_BROADCAST_ADDRESS, ERD_APPLIANCE_TYPE)) {
-        ESP_LOGI(TAG, "Sent GEA3 broadcast (ERD 0x%04X) to address 0x%02X",
-                 ERD_APPLIANCE_TYPE, GEA_BROADCAST_ADDRESS);
+                                     dest, ERD_APPLIANCE_TYPE)) {
+        if (dest == GEA_BROADCAST_ADDRESS) {
+          ESP_LOGI(TAG, "Sent GEA3 broadcast (ERD 0x%04X) to address 0x%02X",
+                   ERD_APPLIANCE_TYPE, GEA_BROADCAST_ADDRESS);
+        } else {
+          ESP_LOGI(TAG, "Sent GEA3 targeted probe (ERD 0x%04X) to address 0x%02X",
+                   ERD_APPLIANCE_TYPE, dest);
+        }
       } else {
-        ESP_LOGW(TAG, "GEA3 broadcast read failed (queue full), will retry after timeout");
+        ESP_LOGW(TAG, "GEA3 probe read failed (queue full), will retry after timeout");
       }
       // Always start the timer and transition to WAITING so the state
       // machine keeps moving even if the broadcast couldn't be queued.
@@ -436,13 +460,19 @@ void AutodiscoveryManager::run()
       break;
 
     case AUTODISCOVERY_GEA2_BROADCAST_PENDING: {
+      uint8_t dest = this->target_address_set_ ? this->target_address_ : GEA_BROADCAST_ADDRESS;
       tiny_gea2_erd_client_request_id_t req_id;
       if (tiny_gea2_erd_client_read(this->gea2_erd_client_, &req_id,
-                                     GEA_BROADCAST_ADDRESS, ERD_APPLIANCE_TYPE)) {
-        ESP_LOGI(TAG, "Sent GEA2 broadcast (ERD 0x%04X) to address 0x%02X",
-                 ERD_APPLIANCE_TYPE, GEA_BROADCAST_ADDRESS);
+                                     dest, ERD_APPLIANCE_TYPE)) {
+        if (dest == GEA_BROADCAST_ADDRESS) {
+          ESP_LOGI(TAG, "Sent GEA2 broadcast (ERD 0x%04X) to address 0x%02X",
+                   ERD_APPLIANCE_TYPE, GEA_BROADCAST_ADDRESS);
+        } else {
+          ESP_LOGI(TAG, "Sent GEA2 targeted probe (ERD 0x%04X) to address 0x%02X",
+                   ERD_APPLIANCE_TYPE, dest);
+        }
       } else {
-        ESP_LOGW(TAG, "GEA2 broadcast read failed (queue full), will retry after timeout");
+        ESP_LOGW(TAG, "GEA2 probe read failed (queue full), will retry after timeout");
       }
       // Always start the timer and transition to WAITING so the state
       // machine keeps moving even if the broadcast couldn't be queued.

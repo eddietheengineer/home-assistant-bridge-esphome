@@ -42,6 +42,7 @@ CONF_THROTTLE_RATE_SECONDS = "throttle_rate_seconds"
 CONF_FILTER_CONFIG_TOPICS = "filter_config_topics"
 CONF_DISCOVERY_REFRESH_BUTTON = "discovery_refresh_button"
 CONF_CUSTOM_HA_DISCOVERY_FILE = "custom_ha_discovery_file"
+CONF_BOARD_ADDRESS = "board_address"
 
 
 
@@ -121,12 +122,26 @@ def validate_at_least_one_uart(config: dict[str, Any]) -> dict[str, Any]:
     return config
 
 
+def validate_board_address_not_adapter_address(config: dict[str, Any]) -> dict[str, Any]:
+    """Validate that board_address does not collide with adapter_address."""
+    if CONF_BOARD_ADDRESS in config:
+        board_addr = config[CONF_BOARD_ADDRESS]
+        adapter_addr = config.get(CONF_ADAPTER_ADDRESS, 0xE4)
+        if board_addr == adapter_addr:
+            raise cv.Invalid(
+                f"board_address (0x{board_addr:02X}) must not match "
+                f"adapter_address (0x{adapter_addr:02X}) — the bridge would probe itself"
+            )
+    return config
+
+
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(GeappliancesBridge),
         cv.Optional(CONF_GEA3_UART_ID): cv.use_id(uart.UARTComponent),
         cv.Optional(CONF_GEA2_UART_ID): cv.use_id(uart.UARTComponent),
         cv.Optional(CONF_ADAPTER_ADDRESS, default=0xE4): cv.int_range(min=0x00, max=0xFF),
+        cv.Optional(CONF_BOARD_ADDRESS): cv.int_range(min=0x00, max=0xFF),
         cv.Optional(CONF_DEVICE_ID): cv.All(cv.string, cv.Length(max=91)),
         cv.Optional(CONF_MODE, default=MODE_AUTO): cv.enum(
             {
@@ -190,7 +205,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_CUSTOM_HA_DISCOVERY_FILE): cv.file_,
     }
 ).extend(cv.COMPONENT_SCHEMA)
-CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
+CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart, validate_board_address_not_adapter_address)
 
 
 async def to_code(config: dict[str, Any]) -> None:
@@ -243,6 +258,10 @@ async def to_code(config: dict[str, Any]) -> None:
 
     # Set adapter address (defaults to 0xE4)
     cg.add(var.set_client_address(config[CONF_ADAPTER_ADDRESS]))
+
+    # Set board address if provided (skips autodiscovery broadcast)
+    if CONF_BOARD_ADDRESS in config:
+        cg.add(var.set_board_address(config[CONF_BOARD_ADDRESS]))
 
     # Set bridge mode configuration (config[CONF_MODE] is now an integer from cv.enum)
     cg.add(var.set_mode(config[CONF_MODE]))
