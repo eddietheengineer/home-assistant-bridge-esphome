@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import logging
+import re
+import zlib
 from typing import Any
+from pathlib import Path
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
@@ -13,7 +16,7 @@ from esphome.core import CORE, EnumValue, ID
 _LOGGER = logging.getLogger(__name__)
 
 CODEOWNERS = ["@joshualongenecker"]
-DEPENDENCIES = ["uart"]
+DEPENDENCIES = ["uart", "mqtt"]
 AUTO_LOAD = ["sensor", "button"]
 
 # UART configuration keys
@@ -38,6 +41,7 @@ CONF_MQTT_DISCONNECT_DURATION_SENSOR = "mqtt_disconnect_duration_sensor"
 CONF_THROTTLE_RATE_SECONDS = "throttle_rate_seconds"
 CONF_FILTER_CONFIG_TOPICS = "filter_config_topics"
 CONF_DISCOVERY_REFRESH_BUTTON = "discovery_refresh_button"
+CONF_CUSTOM_HA_DISCOVERY_FILE = "custom_ha_discovery_file"
 
 
 
@@ -183,6 +187,7 @@ CONFIG_SCHEMA = cv.Schema(
                 cv.Optional("name", default="Discovery Refresh"): cv.string,
             })),
         ),
+        cv.Optional(CONF_CUSTOM_HA_DISCOVERY_FILE): cv.file_,
     }
 ).extend(cv.COMPONENT_SCHEMA)
 CONFIG_SCHEMA = cv.All(CONFIG_SCHEMA, validate_at_least_one_uart)
@@ -246,6 +251,42 @@ async def to_code(config: dict[str, Any]) -> None:
     cg.add(var.set_generate_device_config(config[CONF_GENERATE_DEVICE_CONFIG]))
     cg.add(var.set_throttle_rate_seconds(config[CONF_THROTTLE_RATE_SECONDS]))
     cg.add(var.set_filter_config_topics(config[CONF_FILTER_CONFIG_TOPICS]))
+    if CONF_CUSTOM_HA_DISCOVERY_FILE in config:
+        custom_file = CORE.relative_config_path(config[CONF_CUSTOM_HA_DISCOVERY_FILE])
+        contents = Path(custom_file).read_text(encoding="utf-8")
+        required = ("custom_ha_discovery_data", "custom_ha_discovery_chunks",
+                    "CUSTOM_HA_DISCOVERY_CHUNK_COUNT", "CUSTOM_HA_DISCOVERY_MAX_CHUNK",
+                    "custom_ha_discovery_erds", "CUSTOM_HA_DISCOVERY_ERD_COUNT")
+        if not all(token in contents for token in required):
+            raise cv.Invalid(
+                "custom_ha_discovery_file must be a generated header containing "
+                "custom_ha_discovery_data, custom_ha_discovery_chunks, "
+                "CUSTOM_HA_DISCOVERY_CHUNK_COUNT, CUSTOM_HA_DISCOVERY_MAX_CHUNK, "
+                "custom_ha_discovery_erds, and CUSTOM_HA_DISCOVERY_ERD_COUNT. "
+                "See the project documentation for the custom profile generator.")
+        cg.add_global(cg.RawStatement(contents))
+        if "CUSTOM_HA_DISCOVERY_DATA_HASH" not in contents:
+            # Headers generated before hash support remain valid. Hash their
+            # contents at compile time so replacing the file still triggers a
+            # cleanup and HA discovery republish on the next firmware boot.
+            legacy_hash = zlib.crc32(contents.encode("utf-8")) & 0xFFFFFFFF
+            cg.add_global(cg.RawStatement(
+                f"#define CUSTOM_HA_DISCOVERY_DATA_HASH 0x{legacy_hash:08x}u"))
+        cg.add(var.set_custom_ha_discovery_data(
+            cg.RawExpression("custom_ha_discovery_data"),
+            cg.RawExpression("custom_ha_discovery_chunks"),
+            cg.RawExpression("CUSTOM_HA_DISCOVERY_CHUNK_COUNT"),
+            cg.RawExpression("CUSTOM_HA_DISCOVERY_MAX_CHUNK"),
+            cg.RawExpression("CUSTOM_HA_DISCOVERY_DATA_HASH")))
+        match = re.search(r"#define\\s+CUSTOM_HA_DISCOVERY_ERD_COUNT\\s+(\\d+)", contents)
+        generated_erd_count = int(match.group(1)) if match else 0
+        if generated_erd_count + len(config[CONF_CUSTOM_ERDS]) > 128:
+            raise cv.Invalid(
+                f"custom_ha_discovery_file contains {generated_erd_count} ERDs; together with custom_erds "
+                "this exceeds the 128 ERD polling limit")
+        cg.add(var.add_custom_erds(
+            cg.RawExpression("custom_ha_discovery_erds"),
+            cg.RawExpression("CUSTOM_HA_DISCOVERY_ERD_COUNT")))
     # Create diagnostic sensors (auto-created by default, set to false to disable)
     await _create_diagnostic_sensor(config, CONF_ERD_PUBLISH_RATE_SENSOR, "ERD Publish Rate", "erd_publish_rate", "measurement", var, "set_erd_publish_rate_sensor")
     await _create_diagnostic_sensor(config, CONF_ERD_CACHE_ENTRIES_SENSOR, "ERD Cache Entries", "erd_cache_entries", "measurement", var, "set_erd_cache_entries_sensor", {"accuracy_decimals": 0})

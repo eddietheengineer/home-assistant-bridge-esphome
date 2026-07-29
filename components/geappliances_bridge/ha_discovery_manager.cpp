@@ -852,6 +852,19 @@ static void cleanup_resources(ha_discovery_manager_t* self)
     ha_discovery_cleanup_destroy(&self->cleanup);
 }
 
+static uint16_t discovery_category_count(const ha_discovery_manager_t* self)
+{
+    return ha_discovery_category_count + (self->custom_data ? 1 : 0);
+}
+
+static ha_discovery_category_t discovery_category_at(const ha_discovery_manager_t* self, uint16_t index)
+{
+    if (index < ha_discovery_category_count) return ha_discovery_categories[index];
+    return { "custom", self->custom_data,
+      reinterpret_cast<const ha_discovery_chunk_t*>(self->custom_chunks),
+      self->custom_num_chunks, self->custom_max_decompressed_chunk };
+}
+
 /* ------------------------------------------------------------------ */
 /* run(): publish one entity per call                                 */
 /* ------------------------------------------------------------------ */
@@ -880,10 +893,10 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
     /* Discovering state: decompress chunks and publish one entity per call. */
     while (self->state == ha_discovery_state_discovering) {
         /* Find the next category to process. */
-        while (self->current_category < ha_discovery_category_count) {
-            const ha_discovery_category_t* cat = &ha_discovery_categories[self->current_category];
+        while (self->current_category < discovery_category_count(self)) {
+            ha_discovery_category_t cat = discovery_category_at(self, self->current_category);
 
-            if (!should_process_category(cat->name, self->appliance_type)) {
+            if (strcmp(cat.name, "custom") != 0 && !should_process_category(cat.name, self->appliance_type)) {
                 /* Skip unneeded category. Return to main loop; next run()
                  * will try the next category. */
                 self->current_category++;
@@ -895,7 +908,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 
             /* Decompress the current chunk if needed. */
             if (self->current_decomp_size == 0) {
-                if (self->current_chunk >= cat->num_chunks) {
+                if (self->current_chunk >= cat.num_chunks) {
                     /* Done with this category. Return to main loop; next
                      * run() will try the next category. */
                     self->current_category++;
@@ -905,15 +918,15 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                     return;
                 }
 
-                const ha_discovery_chunk_t* chunk = &cat->chunks[self->current_chunk];
+                const ha_discovery_chunk_t* chunk = &cat.chunks[self->current_chunk];
                 ESP_LOGD(TAG, "Decompressing chunk %u/%u for category '%s' (compressed %u bytes)",
-                    self->current_chunk, cat->num_chunks, cat->name, chunk->size);
-                const uint8_t* src = cat->data + chunk->offset;
+                    self->current_chunk, cat.num_chunks, cat.name, chunk->size);
+                const uint8_t* src = cat.data + chunk->offset;
 
                 size_t dst_size = sizeof(self->decomp_buf);
                 if (chunk_decompress(self, src, chunk->size, self->decomp_buf, &dst_size) != 0) {
                     ESP_LOGE(TAG, "Decompression failed for category '%s' chunk %u (offset %lu, size %u)",
-                        cat->name, self->current_chunk, (unsigned long)chunk->offset, chunk->size);
+                        cat.name, self->current_chunk, (unsigned long)chunk->offset, chunk->size);
                     self->state = ha_discovery_state_failed;
                     return;
                 }
@@ -970,7 +983,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                     /* Log category progress periodically. */
                     if (self->total_published % 50 == 0) {
                         ESP_LOGI(TAG, "Category %s: %lu discovered, %lu published",
-                            cat->name, (unsigned long)self->total_discovered, (unsigned long)self->total_published);
+                            cat.name, (unsigned long)self->total_discovered, (unsigned long)self->total_published);
                     }
 
                     /* One entity per call — return to main loop. */
@@ -990,7 +1003,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         }
 
         /* Check if all categories are done. */
-        if (self->current_category >= ha_discovery_category_count) {
+        if (self->current_category >= discovery_category_count(self)) {
             self->state = ha_discovery_state_complete;
             break;
         }
@@ -1018,10 +1031,34 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
 
 void ha_discovery_manager_init(ha_discovery_manager_t* self)
 {
-    memset(self, 0, sizeof(*self));
-    self->state = ha_discovery_state_idle;
+    /* Preserve custom data pointers; they are set by codegen and survive reinit. */
+    const uint8_t* custom_data = self->custom_data;
+    const void* custom_chunks = self->custom_chunks;
+    uint16_t custom_num_chunks = self->custom_num_chunks;
+    uint16_t custom_max_chunk = self->custom_max_decompressed_chunk;
+    uint32_t custom_data_hash = self->custom_data_hash;
 
+    /* Zero all runtime state. */
+    memset(self, 0, sizeof(*self));
+
+    /* Restore custom data pointers. */
+    self->custom_data = custom_data;
+    self->custom_chunks = custom_chunks;
+    self->custom_num_chunks = custom_num_chunks;
+    self->custom_max_decompressed_chunk = custom_max_chunk;
+    self->custom_data_hash = custom_data_hash;
+
+    self->state = ha_discovery_state_idle;
     ha_discovery_cleanup_init(&self->cleanup);
+}
+void ha_discovery_manager_set_custom_data(ha_discovery_manager_t* self,
+    const uint8_t* data, const void* chunks, uint16_t num_chunks, uint16_t max_chunk, uint32_t data_hash)
+{
+    self->custom_data = data;
+    self->custom_chunks = chunks;
+    self->custom_num_chunks = num_chunks;
+    self->custom_max_decompressed_chunk = max_chunk;
+    self->custom_data_hash = data_hash;
 }
 
 void ha_discovery_manager_configure(
@@ -1072,4 +1109,3 @@ ha_discovery_state_t ha_discovery_manager_get_state(ha_discovery_manager_t* self
 {
     return self->state;
 }
-

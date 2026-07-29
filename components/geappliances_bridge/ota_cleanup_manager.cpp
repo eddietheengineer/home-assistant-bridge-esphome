@@ -21,6 +21,18 @@
 
 GEA_TAG(TAG) = "ota_cleanup_manager";
 
+#if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
+static uint32_t discovery_data_hash(const ha_discovery_manager_t* manager)
+{
+  // Mix the optional custom-profile hash with the built-in discovery hash.
+  // A profile change therefore follows the same cleanup/republish path.
+  uint32_t custom = manager->custom_data_hash;
+  if (custom == 0) return HA_DISCOVERY_DATA_HASH;
+  return HA_DISCOVERY_DATA_HASH ^ (custom + 0x9e3779b9u +
+      (HA_DISCOVERY_DATA_HASH << 6) + (HA_DISCOVERY_DATA_HASH >> 2));
+}
+#endif
+
 namespace esphome {
 namespace geappliances_bridge {
 
@@ -105,6 +117,9 @@ void OtaCleanupManager::check_discovery_changes(const char* current_device_id) {
   }
 
   static const uint32_t DISCOVERY_NVS_KEY = 0x64697363u; // "disc"
+  // Version 3 adds persisted discovery-affecting config flags. Older records
+  // (including version 2 custom-header hashes) are republished once.
+  static const uint32_t DISCOVERY_HASH_VERSION = 3;
   auto pref = global_preferences->make_preference<DiscoveryNVS>(DISCOVERY_NVS_KEY);
   DiscoveryNVS stored{};
 
@@ -114,8 +129,15 @@ void OtaCleanupManager::check_discovery_changes(const char* current_device_id) {
     return;
   }
 
-  // Compare hash, device ID, and config flags.
-  bool hash_changed = (stored.hash != HA_DISCOVERY_DATA_HASH);
+  // Older records have no compatible combined custom hash/config state.
+  if (stored.version != DISCOVERY_HASH_VERSION) {
+    ESP_LOGI(TAG, "Discovery hash version changed; cleaning old topics");
+    this->trigger_ota_cleanup();
+    return;
+  }
+
+  // Compare the combined discovery hash, device ID, and config flags.
+  bool hash_changed = (stored.hash != discovery_data_hash(this->ha_discovery_manager_));
   bool device_id_changed = (stored.device_id[0] != '\0' &&
                             strcmp(stored.device_id, current_device_id) != 0);
   bool api_parsing_changed = (stored.appliance_api_parsing != this->appliance_api_parsing_);
@@ -269,7 +291,8 @@ void OtaCleanupManager::loop() {
         static const uint32_t DISCOVERY_NVS_KEY = 0x64697363u; // "disc"
         auto pref = global_preferences->make_preference<DiscoveryNVS>(DISCOVERY_NVS_KEY);
         DiscoveryNVS state{};
-        state.hash = HA_DISCOVERY_DATA_HASH;
+        state.version = 3;
+        state.hash = discovery_data_hash(this->ha_discovery_manager_);
         strncpy(state.device_id,
                 this->device_identity_manager_->get_device_id(),
                 sizeof(state.device_id) - 1);
