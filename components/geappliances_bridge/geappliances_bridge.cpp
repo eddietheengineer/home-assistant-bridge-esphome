@@ -537,8 +537,10 @@ void GeappliancesBridge::dump_config() {
     }
   }
   ESP_LOGCONFIG(TAG, "  Client Address: 0x%02X", this->client_address_);
-  ESP_LOGCONFIG(TAG, "  Host Address: 0x%02X%s", this->autodiscovery_manager_.get_host_address(),
-                this->board_address_configured_ ? " (configured)" : "");
+  if (this->board_address_configured_) {
+    ESP_LOGCONFIG(TAG, "  Board Address: 0x%02X (configured)", (unsigned)this->board_address_);
+  }
+  ESP_LOGCONFIG(TAG, "  Host Address: 0x%02X", this->autodiscovery_manager_.get_host_address());
   if (this->uart_ != nullptr) {
     ESP_LOGCONFIG(TAG, "  GEA3 UART: configured (baud %lu)", baud);
   }
