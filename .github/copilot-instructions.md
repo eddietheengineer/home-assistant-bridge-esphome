@@ -12,6 +12,14 @@
 - Never delete a PR branch after merging.
 - If asked to "commit and push", only commit to the feature branch and push it. Stop there.
 
+## Never Force Push
+
+**You must never force push (`git push --force` or `git push --force-with-lease`) unless the user explicitly instructs you to do so.**
+
+- Always push regular commits to feature branches.
+- If squashing is needed, ask the user first.
+- Never rewrite shared history without explicit permission.
+
 ## Verify ESPHome Compilation Before Committing
 
 **After making changes to component source files, verify the code compiles in the actual ESPHome build environment, not just the test harness.**
