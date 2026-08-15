@@ -6,8 +6,8 @@
  * change detection, iterators, rate counters,
  * cache full, size change detection.
  *
- * Note: erd_cache_find() is internal (static in .cpp), so tests use
- * erd_cache_get_next_entry() to locate entries by iterating the cache.
+ * Note: erd_cache_find() is internal (not exposed in the public header), so tests
+ * use erd_cache_get_next_entry() to locate entries by iterating the cache.
  */
 
 #include "CppUTest/TestHarness.h"

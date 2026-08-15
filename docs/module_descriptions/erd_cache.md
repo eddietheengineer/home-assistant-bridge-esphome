@@ -46,7 +46,7 @@ Storage is determined on **registration only**. ERD data size is invariant after
 
 `erd_cache_update()` handles both new entries and updates to existing entries:
 
-1. **Find existing entry** via `erd_cache_find()` (linear scan of `entries[]`)
+1. **Find existing entry** via `erd_cache_find()` (binary search of the sorted `erd_index[]`)
 2. **If found:**
     - Increment `update_count` and `update_count_window`
     - Check if data has changed via `erd_data_changed()` (memcmp only — size is invariant)
@@ -92,6 +92,8 @@ typedef struct erd_cache_t {
   uint32_t required_update_count_window; // such updates since last get_required_update_rate() call
   uint8_t max_cooldown;              // configured rate limit in seconds; 0 = disabled
   bool initialized;                   // true after first successful erd_cache_init()
+  tiny_erd_t erd_index[ERD_CACHE_CAPACITY]; // sorted index of ERD values for valid entries
+  uint16_t erd_index_count;           // number of valid entries in erd_index[]
 } erd_cache_t;
 ```
 
@@ -112,6 +114,7 @@ typedef struct erd_cache_t {
 - **Early exit on unchanged data**: When data hasn't changed, the update returns immediately without touching storage.
 - **Change detection at update time**: `update_required` is set during `erd_cache_update()`, not during iteration. This eliminates per-read `memcmp` overhead in the publisher loop.
 - **Two iterators**: `erd_cache_get_next_updated()` for the publisher (clears `update_required` flag) and `erd_cache_get_next_entry()` for read-only iteration.
+- **Sorted ERD index**: `erd_index[]` is a sorted array of ERD values for valid entries, maintained on insert. `erd_cache_find()` uses binary search (O(log n)) instead of a linear scan. Insertion is O(n) due to shifting, but this only happens once per unique ERD.
 - **Rate counters**: `update_count_window` and `required_update_count_window` accumulate updates and are reset by `get_update_rate()` and `get_required_update_rate()`. The window is determined by the call interval of the consumer (e.g. ~60s if called once per minute).
 - **No eviction**: The cache has a fixed capacity with no eviction policy. If the cache is full and a new ERD arrives that isn't already cached, the update is silently dropped. This is acceptable because the ERD set is bounded by the appliance's supported ERDs, which is typically well under 200.
 - **Arena usage monitoring**: The arena usage (bytes and percentage) is logged when the appliance reaches steady state, providing visibility into memory utilization.

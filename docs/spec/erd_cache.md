@@ -37,7 +37,8 @@ Initializes the cache for use. Safe to call on a previously-initialized cache (r
 1. Explicitly zeroes all entry fields (erd, data_offset, data_size, update_required, publish_cooldown, valid) — avoids UBSan issues with bool fields after `memset`
 2. Resets `arena_offset` to 0 (arena is not cleared, just the pointer)
 3. Resets all counters (`update_count`, `update_count_window`, `required_update_count`, `required_update_count_window`) to zero
-4. Sets `self->initialized = true`
+4. Resets `erd_index_count` to 0 (clears the sorted ERD index)
+5. Sets `self->initialized = true`
 
 No heap deallocation is needed — the arena is static memory.
 
@@ -95,7 +96,7 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
 
 ### 4.1 Existing Entry
 
-1. Find existing entry via `erd_cache_find()` (linear scan of `entries[]`)
+1. Find existing entry via `erd_cache_find()` (binary search of the sorted `erd_index[]`)
 2. Increment `update_count` and `update_count_window`
 3. **Size check:** If `data_size != existing->data_size`: log error, return `false` (appliance lost)
 4. **Change detection:** Call `erd_data_changed()` — `memcmp` of new data against existing buffer using `existing->data_size`
@@ -115,7 +116,8 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
 6. Initialize entry: set `erd`, `data_offset = arena_offset`, `data_size`, `valid = true`, `update_required = true`, `publish_cooldown = 0`
 7. `memcpy(&arena[arena_offset], data, data_size)`
 8. Advance `arena_offset += data_size`
-9. Return `true`
+9. Insert `erd` into the sorted `erd_index[]` (shifts existing entries right; O(n) worst case)
+10. Return `true`
 
 ---
 
@@ -171,7 +173,8 @@ typedef struct erd_cache_t {
   uint32_t required_update_count_window; // such updates since last get_required_update_rate() call
   uint8_t max_cooldown;              // configured rate limit in seconds; 0 = disabled
   bool initialized;                   // true after first successful erd_cache_init()
-} erd_cache_t;
+  tiny_erd_t erd_index[ERD_CACHE_CAPACITY]; // sorted index of ERD values for valid entries
+  uint16_t erd_index_count;           // number of valid entries in erd_index[]
 ```
 
 | Field | Type | Description |
@@ -185,6 +188,8 @@ typedef struct erd_cache_t {
 | `required_update_count_window` | `uint32_t` | Such updates since last `get_required_update_rate()` call |
 | `max_cooldown` | `uint8_t` | Configured rate limit in seconds; 0 = disabled |
 | `initialized` | `bool` | Guard for safe init/destroy |
+| `erd_index` | `tiny_erd_t[300]` | Sorted array of ERD values for valid entries; used by `erd_cache_find()` for O(log n) binary-search lookup |
+| `erd_index_count` | `uint16_t` | Number of valid entries in `erd_index[]` (equals `erd_cache_get_count()`) |
 
 ---
 
@@ -253,6 +258,8 @@ The window is determined by the call interval of the consumer (e.g., ~60 s if ca
 
 10. **Safe init/destroy:** `erd_cache_init()` and `erd_cache_destroy()` guard against non-initialized structs.
 
+11. **Sorted index invariant:** `erd_index[0..erd_index_count)` is always sorted ascending and contains exactly the ERD values of all valid entries. Maintained by `erd_cache_init()` (reset) and `erd_cache_update()` (insert on new entry).
+
 ---
 
 ## 9. Dependencies
@@ -273,7 +280,7 @@ The window is determined by the call interval of the consumer (e.g., ~60 s if ca
 
 3. **Max ERD size limit:** ERDs exceeding 248 bytes (GEA3 max payload) are rejected. This is a protocol limitation, not a cache limitation.
 
-4. **Linear scan for lookup:** `erd_cache_find()` scans entries sequentially. With 300 entries this is bounded and fast, but a hash map would be O(1).
+4. **O(n) index insertion:** New entry insertion into the sorted `erd_index[]` shifts existing entries right, which is O(n) in the worst case. Lookup via `erd_cache_find()` is O(log n).
 
 5. **Linear scan for free slot:** New entry insertion scans for the first invalid slot, which is O(n) in the worst case.
 
