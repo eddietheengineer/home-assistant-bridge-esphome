@@ -45,6 +45,12 @@ typedef struct erd_cache_t {
   uint32_t required_update_count_window; /* such updates since last get_required_update_rate() call */
   uint8_t max_cooldown;                /* configured rate limit in seconds; 0 = disabled */
   bool initialized;                    /* true after first successful erd_cache_init() */
+  /* Sorted index of ERD values for valid entries, used by erd_cache_find()
+   * for O(log n) binary-search lookup instead of an O(n) linear scan.
+   * The first erd_index_count elements are sorted ascending; the remainder
+   * is unused. Maintained in erd_cache_init() and erd_cache_update(). */
+  tiny_erd_t erd_index[ERD_CACHE_CAPACITY];
+  uint16_t erd_index_count;
 } erd_cache_t;
 
 #ifdef __cplusplus

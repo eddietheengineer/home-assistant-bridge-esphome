@@ -50,6 +50,7 @@ void erd_cache_init(erd_cache_t* self)
   self->required_update_count = 0;
   self->required_update_count_window = 0;
   self->max_cooldown = 0;
+  self->erd_index_count = 0;
   self->initialized = true;
 }
 
@@ -59,13 +60,23 @@ void erd_cache_destroy(erd_cache_t* self)
   erd_cache_init(self);
   self->initialized = false;
 }
-
+/* Binary search the sorted ERD index for the given ERD.
+ * Returns the cache entry whose erd matches, or NULL if not present.
+ * The index (erd_index[0..erd_index_count)) is kept sorted ascending and
+ * in sync with the valid entries by erd_cache_update(), so a hit is
+ * guaranteed to be a valid entry. O(log n) vs. the previous O(n) scan. */
 erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd)
 {
-  for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
-    erd_cache_entry_t* e = &self->entries[i];
-    if (e->valid && e->erd == erd) {
-      return e;
+  uint16_t lo = 0;
+  uint16_t hi = self->erd_index_count;
+  while (lo < hi) {
+    uint16_t mid = lo + (hi - lo) / 2;
+    if (self->erd_index[mid] < erd) {
+      lo = mid + 1;
+    } else if (self->erd_index[mid] > erd) {
+      hi = mid;
+    } else {
+      return &self->entries[mid];
     }
   }
   return nullptr;
@@ -161,6 +172,19 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, ui
   slot->valid = true;
   slot->update_required = true;
   slot->publish_cooldown = 0;
+
+  /* Insert the ERD into the sorted index (shifts existing entries right).
+   * The index is only ever appended to (entries are never removed), so it
+   * stays sorted and in sync with the valid entries. */
+  if (self->erd_index_count < ERD_CACHE_CAPACITY) {
+    uint16_t pos = self->erd_index_count;
+    while (pos > 0 && self->erd_index[pos - 1] > erd) {
+      self->erd_index[pos] = self->erd_index[pos - 1];
+      pos--;
+    }
+    self->erd_index[pos] = erd;
+    self->erd_index_count++;
+  }
 
   ESP_LOGD(TAG, "ERD 0x%04X added to cache (%u bytes, arena offset %u)",
            erd, data_size, slot->data_offset);
