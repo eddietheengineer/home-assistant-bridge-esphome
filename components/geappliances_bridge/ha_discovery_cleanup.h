@@ -18,6 +18,14 @@
 
 #include "i_mqtt_client.h"
 
+/* portMUX_TYPE for the per-instance critical section mux.
+ * Matches the include pattern in ha_discovery_cleanup.cpp. */
+#ifdef USE_ESP_IDF_STUBS
+#include "esp-idf/freertos_stub.h"
+#else
+#include "freertos/FreeRTOS.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -72,6 +80,11 @@ typedef struct {
 
   /* Drain */
   uint32_t drain_start_ms;
+
+  /* Critical section mux — per-instance, protects shared state between
+   * the MQTT task callback and the main loop. Works on both single-core
+   * (RISC-V: interrupt disable) and dual-core (Xtensa: spinlock). */
+  portMUX_TYPE mux;
 } ha_discovery_cleanup_t;
 
 /* API */
