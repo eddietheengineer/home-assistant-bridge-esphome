@@ -46,12 +46,14 @@ static tiny_hsm_result_t state_ready(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, 
     case signal_write_requested: {
       auto args = reinterpret_cast<const mqtt_client_on_write_request_args_t*>(data);
 
-      // Resolve the target board: prefer the board address stored in the
-      // ERD cache for this ERD; fall back to the detected primary host.
-      // Primary-board entries (0xFF sentinel) resolve to the detected host
-      // address; explicit secondary-board addresses are used as-is.
+      // Resolve the target board, in priority order:
+      //   1. Explicit board address from the MQTT topic (per-board write topic)
+      //   2. Board address stored in the ERD cache for this ERD
+      //   3. Detected primary host address
       uint8_t target_address = self->erd_host_address;
-      if (self->erd_cache != NULL) {
+      if (args->board_address != PROBE_ENTRY_DEFAULT_ADDRESS) {
+        target_address = args->board_address;
+      } else if (self->erd_cache != NULL) {
         erd_cache_entry_t* entry = erd_cache_find_by_erd(self->erd_cache, args->erd);
         if (entry != NULL && entry->board_address != PROBE_ENTRY_DEFAULT_ADDRESS) {
           target_address = entry->board_address;
@@ -61,7 +63,7 @@ static tiny_hsm_result_t state_ready(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, 
       if (target_address == tiny_gea_broadcast_address) {
         ESP_LOGW(TAG, "Write request for ERD 0x%04x dropped: appliance not identified", args->erd);
         mqtt_client_update_erd_write_result(self->mqtt_client, args->erd, false,
-          tiny_gea3_erd_client_write_failure_reason_not_supported);
+          tiny_gea3_erd_client_write_failure_reason_not_supported, PROBE_ENTRY_DEFAULT_ADDRESS);
         break;
       }
 
@@ -72,12 +74,17 @@ static tiny_hsm_result_t state_ready(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, 
          args->erd, args->value, args->size)) {
         ESP_LOGW(TAG, "Write request for ERD 0x%04x failed to queue", args->erd);
         mqtt_client_update_erd_write_result(self->mqtt_client, args->erd, false,
-          tiny_gea3_erd_client_write_failure_reason_retries_exhausted);
+          tiny_gea3_erd_client_write_failure_reason_retries_exhausted, PROBE_ENTRY_DEFAULT_ADDRESS);
         break;
       }
 
       self->pending_request_id = request_id;
       self->pending_erd = args->erd;
+      // The result topic mirrors the board the write was routed to: the
+      // primary sentinel when the target is the detected host, otherwise the
+      // explicit secondary-board address.
+      self->pending_board_address = (target_address == self->erd_host_address)
+        ? PROBE_ENTRY_DEFAULT_ADDRESS : target_address;
       tiny_hsm_transition(hsm, state_writing);
     } break;
 
@@ -107,7 +114,7 @@ static tiny_hsm_result_t state_writing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         break;
       }
       mqtt_client_update_erd_write_result(self->mqtt_client, self->pending_erd, true,
-        0);
+        0, self->pending_board_address);
       tiny_hsm_transition(hsm, state_ready);
     } break;
 
@@ -119,7 +126,7 @@ static tiny_hsm_result_t state_writing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         break;
       }
       mqtt_client_update_erd_write_result(self->mqtt_client, self->pending_erd, false,
-        args->write_failed.reason);
+        args->write_failed.reason, self->pending_board_address);
       tiny_hsm_transition(hsm, state_ready);
     } break;
     default:
@@ -162,6 +169,7 @@ void erd_write_bridge_init(
   self->erd_host_address = host_address;
   self->pending_request_id = 0;
   self->pending_erd = 0;
+  self->pending_board_address = PROBE_ENTRY_DEFAULT_ADDRESS;
 
   // Subscribe to MQTT write requests
   tiny_event_subscription_init(

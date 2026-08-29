@@ -7,6 +7,7 @@ extern "C" {
 #include "tiny_utils.h"
 #include "tiny_event.h"
 }
+#include "erd_bridge_common.h"
 
 #include <cstdio>
 #include <cstring>
@@ -27,15 +28,23 @@ static void update_erd_write_result(
   i_mqtt_client_t* _self,
   tiny_erd_t erd,
   bool success,
-  tiny_gea3_erd_client_write_failure_reason_t failure_reason)
+  tiny_gea3_erd_client_write_failure_reason_t failure_reason,
+  uint8_t board_address)
 {
   auto self = reinterpret_cast<esphome_mqtt_client_adapter_t*>(_self);
   auto mqtt_client = esphome::mqtt::global_mqtt_client;
   if (mqtt_client == nullptr || !mqtt_client->is_connected()) return;
 
+  // Mirror the board the write was routed to: unprefixed topic for the
+  // primary/detected host (0xFF sentinel), per-board topic otherwise.
   char topic[128];
-  snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/write_result",
-          self->device_id, erd);
+  if (board_address == PROBE_ENTRY_DEFAULT_ADDRESS) {
+    snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/write_result",
+            self->device_id, erd);
+  } else {
+    snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%02x_0x%04x/write_result",
+            self->device_id, board_address, erd);
+  }
 
   // Use a stack buffer to avoid heap allocation.
   // Max error payload: "{\"error\":\"retries_exhausted\"}" = 28 chars + null.
@@ -140,14 +149,37 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
   self->write_topic_[sizeof(self->write_topic_) - 1] = '\0';
 
   mqtt_client->subscribe(topic, [self](const std::string& topic, const std::string& payload) {
-    // Parse ERD from topic: geappliances/{device_id}/erd/0x{ERD}/write
+    // Parse the ERD and optional board address from the topic segment after
+    // "erd/":
+    //   "0x{ERD}"            -> primary board (board_address = 0xFF)
+    //   "0x{ADDR}_0x{ERD}"  -> explicit secondary board
     auto pos = topic.find("/erd/0x");
     if (pos == std::string::npos) return;
 
-    const char* erd_str = topic.c_str() + pos + 5; // skip "erd/"
+    const char* seg = topic.c_str() + pos + 5; // points at "0x..."
+    size_t seg_len = 0;
+    while (seg[seg_len] != '\0' && seg[seg_len] != '/') seg_len++;
+    if (seg_len == 0 || seg_len > 15) return; // longest valid segment: "0x12_0x7701"
+    char segment[16];
+    memcpy(segment, seg, seg_len);
+    segment[seg_len] = '\0';
 
     unsigned erd = 0;
-    if (sscanf(erd_str, "%x", &erd) != 1) return;
+    uint8_t board_address = PROBE_ENTRY_DEFAULT_ADDRESS; // 0xFF = primary/unspecified
+    const char* sep = strstr(segment, "_0x");
+    if (sep != nullptr) {
+      // Per-board form: 0x{ADDR}_0x{ERD}
+      char addr_str[8];
+      size_t n = static_cast<size_t>(sep - segment);
+      if (n >= sizeof(addr_str)) return;
+      memcpy(addr_str, segment, n);
+      addr_str[n] = '\0';
+      unsigned addr = 0;
+      if (sscanf(addr_str, "%x", &addr) != 1 || sscanf(sep + 3, "%x", &erd) != 1) return;
+      board_address = static_cast<uint8_t>(addr);
+    } else {
+      if (sscanf(segment, "%x", &erd) != 1) return;
+    }
 
     // Decode hex payload to a local stack buffer to avoid race condition:
     // if a new MQTT message arrives before tiny_event_publish() delivers
@@ -168,6 +200,7 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
     args.erd = static_cast<tiny_erd_t>(erd);
     args.size = local_size;
     args.value = local_buffer;
+    args.board_address = board_address;
 
     // tiny_event_publish() is synchronous (subscriber callback runs to
     // completion before return), so the stack buffer is valid for the

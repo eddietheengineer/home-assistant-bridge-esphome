@@ -10,9 +10,9 @@ Implement the `i_mqtt_client_t` interface for the ESPHome bridge, providing the 
 
 - Implement the `i_mqtt_client_t` vtable interface (`i_mqtt_client_api_t`)
 - Publish ERD value updates to `geappliances/{device_id}/erd/0x{ERD}/value` topics via ESPHome's MQTT client
-- Publish write results to `geappliances/{device_id}/erd/0x{ERD}/write_result` topics
+- Publish write results to `geappliances/{device_id}/erd/0x{ERD}/write_result` topics (or the per-board `erd/0x{ADDR}_0x{ERD}/write_result` topic when the write was routed to a secondary board)
 - Provide MQTT connect/disconnect events (`tiny_event_t`) for publisher coordination
-- Accept write commands through a single wildcard subscription topic rather than per-ERD subscriptions
+- Accept write commands through a single wildcard subscription topic, parsing both the unprefixed (`erd/0x{ERD}/write`) and per-board (`erd/0x{ADDR}_0x{ERD}/write`) topic forms
 - Queue ERD updates during MQTT disconnect and flush on reconnect with a settle delay *(aspirational; not yet implemented)*
 - Delegate ERD registration tracking and valid-ERD filtering to `ErdRegistry`
 - Provide a `publish()` helper for arbitrary MQTT message publishing
@@ -112,7 +112,7 @@ Publish the `on_mqtt_connect_event` to notify subscribers that MQTT is up. Calle
 ```c
 void esphome_mqtt_client_adapter_subscribe_write_topic(
   esphome_mqtt_client_adapter_t* self);
-Subscribe to the wildcard write topic `geappliances/{device_id}/erd/+/write`. The constructed topic is saved in `write_topic_` for later unsubscribe. When a message arrives, the adapter parses the ERD ID from the topic path (e.g., `0x7701` from `.../erd/0x7701/write`), decodes the hex-encoded payload into a **local stack buffer** `local_buffer[32]` inside the lambda (not `write_payload_buffer_`), and publishes `on_write_request_event` with the decoded data. The local buffer is safe because `tiny_event_publish()` is synchronous — the subscriber callback runs to completion before the lambda returns, so the stack buffer remains valid for the duration of event delivery. The `erd_write_bridge` receives the event and dispatches the write to the ERD client.
+Subscribe to the wildcard write topic `geappliances/{device_id}/erd/+/write`. The constructed topic is saved in `write_topic_` for later unsubscribe. When a message arrives, the adapter parses the topic segment after `erd/`, which is either `0x{ERD}` (unprefixed; `board_address` is set to the `0xFF` primary sentinel) or `0x{ADDR}_0x{ERD}` (per-board; `board_address` is set to the explicit address). The hex-encoded payload is decoded into a **local stack buffer** `local_buffer[32]` inside the lambda (not `write_payload_buffer_`), and `on_write_request_event` is published with the decoded data and the parsed `board_address`. The local buffer is safe because `tiny_event_publish()` is synchronous — the subscriber callback runs to completion before the lambda returns, so the stack buffer remains valid for the duration of event delivery. The `erd_write_bridge` receives the event and dispatches the write to the ERD client.
 
 **Note:** The header file doc comment for this function incorrectly states it is a "No-op". The implementation is fully functional and actively subscribes to the wildcard write topic.
 
@@ -189,10 +189,11 @@ void update_erd_write_result(
   i_mqtt_client_t* self,
   tiny_erd_t erd,
   bool success,
-  tiny_gea3_erd_client_write_failure_reason_t failure_reason);
+  tiny_gea3_erd_client_write_failure_reason_t failure_reason,
+  uint8_t board_address);
 ```
 
-Publish the result of a write request to `geappliances/{device_id}/erd/0x{ERD}/write_result`. On success, the payload is `"ok"`. On failure, the payload is a JSON object: `{"error":"<reason>"}` where `<reason>` is one of `retries_exhausted`, `not_supported`, `incorrect_size`, or `unknown`. The message is published with retain flag set. Guards against null or disconnected MQTT client.
+Publish the result of a write request. The result topic mirrors the board the write was routed to: `geappliances/{device_id}/erd/0x{ERD}/write_result` when `board_address` is the `0xFF` primary sentinel (detected host), and `geappliances/{device_id}/erd/0x{ADDR}_0x{ERD}/write_result` for an explicit secondary board. On success, the payload is `"ok"`. On failure, the payload is a JSON object: `{"error":"<reason>"}` where `<reason>` is one of `retries_exhausted`, `not_supported`, `incorrect_size`, or `unknown`. The message is published with retain flag set. Guards against null or disconnected MQTT client.
 
 ### 4.3 `on_write_request`
 
@@ -290,7 +291,7 @@ Instead of subscribing to individual write topics for each ERD (e.g., `geapplian
 geappliances/{device_id}/erd/+/write
 ```
 
-The `+` wildcard matches any single topic level, covering all possible ERD identifiers.
+The `+` wildcard matches any single topic level, covering both the unprefixed ERD segment (`0x{ERD}`) and the per-board segment (`0x{ADDR}_0x{ERD}`), so one subscription covers all write topics.
 
 ### 6.2 Benefits
 

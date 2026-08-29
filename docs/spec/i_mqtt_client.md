@@ -37,7 +37,7 @@ The handle wraps a pointer to the vtable. Callers interact with the interface th
 typedef struct i_mqtt_client_api_t {
   void (*register_erd)(i_mqtt_client_t* self, tiny_erd_t erd);
 
-  void (*update_erd_write_result)(i_mqtt_client_t* self, tiny_erd_t erd, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason);
+  void (*update_erd_write_result)(i_mqtt_client_t* self, tiny_erd_t erd, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason, uint8_t board_address);
 
   i_tiny_event_t* (*on_write_request)(i_mqtt_client_t* self);
 
@@ -71,10 +71,11 @@ void mqtt_client_update_erd_write_result(
     i_mqtt_client_t* self,
     tiny_erd_t erd,
     bool success,
-    tiny_gea3_erd_client_write_failure_reason_t failure_reason);
+    tiny_gea3_erd_client_write_failure_reason_t failure_reason,
+    uint8_t board_address);
 ```
 
-Provide the result for the most recently completed write request to an ERD.
+Provide the result for the most recently completed write request to an ERD. `board_address` is the board the write was routed to, in sentinel form: `0xFF` (the primary sentinel) means the detected host, so the result is published to the unprefixed topic; any other value is a secondary board, so the result is published to the per-board topic.
 ### 3.3 `mqtt_client_on_write_request`
 
 ```c
@@ -135,7 +136,7 @@ Each vtable method has a corresponding `static inline` wrapper in the header:
 | Wrapper | Vtable Call |
 |---------|-------------|
 | `mqtt_client_register_erd(self, erd)` | `self->api->register_erd(self, erd)` |
-| `mqtt_client_update_erd_write_result(self, erd, success, failure_reason)` | `self->api->update_erd_write_result(self, erd, success, failure_reason)` |
+| `mqtt_client_update_erd_write_result(self, erd, success, failure_reason, board_address)` | `self->api->update_erd_write_result(self, erd, success, failure_reason, board_address)` |
 | `mqtt_client_on_write_request(self)` | `self->api->on_write_request(self)` |
 | `mqtt_client_on_mqtt_disconnect(self)` | `self->api->on_mqtt_disconnect(self)` |
 | `mqtt_client_on_mqtt_connect(self)` | `self->api->on_mqtt_connect(self)` |
@@ -157,6 +158,7 @@ typedef struct {
   tiny_erd_t erd;
   uint8_t size;
   const void* value;
+  uint8_t board_address;
 } mqtt_client_on_write_request_args_t;
 ```
 
@@ -165,6 +167,7 @@ typedef struct {
 | `erd` | `tiny_erd_t` | The target ERD to write |
 | `size` | `uint8_t` | Payload length in bytes |
 | `value` | `const void*` | The write payload |
+| `board_address` | `uint8_t` | The board named by the write topic. `0xFF` (the primary sentinel) means the topic did not name a board; the write bridge resolves the target from the ERD cache / detected host. Any other value is an explicit secondary-board address that takes routing priority. |
 
 Carried by the event returned from `mqtt_client_on_write_request`. The `erd_write_bridge` subscribes to this event and forwards the write to the ERD client.
 

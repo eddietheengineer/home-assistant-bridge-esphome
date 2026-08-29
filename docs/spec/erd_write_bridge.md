@@ -9,7 +9,7 @@ The ERD write bridge relays write requests from MQTT to the GEA3 ERD client and 
 ### 1.2 Responsibilities
 
 - Subscribe to `mqtt_client_on_write_request` events
-- Route each write to the board address stored in the ERD cache for that ERD (primary-board entries resolve to the detected host address; uncached ERDs fall back to the detected host address)
+- Route each write to a board resolved in priority order: an explicit board address from the MQTT topic (per-board write topic), else the board address stored in the ERD cache for that ERD, else the detected host address (primary-board and uncached ERDs resolve to the detected host address)
 - Forward write requests to the ERD client via `tiny_gea3_erd_client_write()`
 - Gate writes on appliance identification (the resolved target address must not be the broadcast address)
 - Correlate completion/failure events by `request_id`, rejecting stale responses
@@ -79,11 +79,14 @@ Defers all signals to child states.
 Initial state. Accepts new write requests.
 
 **On `signal_write_requested`:**
-- Resolves the target board address: looks up the ERD in the ERD cache via `erd_cache_find_by_erd()`. If the cached entry carries an explicit (non-primary) board address, that address is the target; otherwise (primary-board entry, uncached ERD, or no cache) the detected `erd_host_address` is the target.
-- If the resolved target is `tiny_gea_broadcast_address`: logs a warning, publishes a failure result via `mqtt_client_update_erd_write_result(erd, false, not_supported)`, stays in `state_ready`.
+- Resolves the target board address in priority order:
+  1. An explicit board address carried in the write request args (`board_address != 0xFF`) — set by the MQTT adapter when the request arrived on a per-board write topic (`erd/0x{ADDR}_0x{ERD}/write`).
+  2. The board address stored in the ERD cache for the ERD (`erd_cache_find_by_erd()`), when the entry carries an explicit (non-primary) board address.
+  3. The detected `erd_host_address` (primary-board entry, uncached ERD, or no cache).
+- If the resolved target is `tiny_gea_broadcast_address`: logs a warning, publishes a failure result via `mqtt_client_update_erd_write_result(erd, false, not_supported, 0xFF)`, stays in `state_ready`.
 - Otherwise: calls `tiny_gea3_erd_client_write(erd_client, &request_id, target_address, erd, value, size)`.
-  - If write fails to queue (returns false): logs a warning, publishes a failure result via `mqtt_client_update_erd_write_result(erd, false, retries_exhausted)`, stays in `state_ready`.
-  - If write succeeds: stores `request_id` in `pending_request_id` and `erd` in `pending_erd`, transitions to `state_writing`.
+  - If write fails to queue (returns false): logs a warning, publishes a failure result via `mqtt_client_update_erd_write_result(erd, false, retries_exhausted, 0xFF)`, stays in `state_ready`.
+  - If write succeeds: stores `request_id` in `pending_request_id`, `erd` in `pending_erd`, and the result board in `pending_board_address` (the primary sentinel `0xFF` when the target is the detected host, otherwise the explicit secondary-board address), then transitions to `state_writing`.
 
 #### `state_writing`
 
@@ -95,12 +98,12 @@ One write is in progress. New write requests are dropped.
 **On `signal_write_completed`:**
 - Validates `args->write_completed.request_id` against `pending_request_id`.
 - If request IDs do not match: logs a warning and ignores the stale event.
-- If request IDs match: publishes a success result via `mqtt_client_update_erd_write_result(pending_erd, true, 0)`, transitions to `state_ready`.
+- If request IDs match: publishes a success result via `mqtt_client_update_erd_write_result(pending_erd, true, 0, pending_board_address)`, transitions to `state_ready`.
 
 **On `signal_write_failed`:**
 - Validates `args->write_failed.request_id` against `pending_request_id`.
 - If request IDs do not match: logs a warning and ignores the stale event.
-- If request IDs match: publishes a failure result via `mqtt_client_update_erd_write_result(pending_erd, false, args->write_failed.reason)`, transitions to `state_ready`.
+- If request IDs match: publishes a failure result via `mqtt_client_update_erd_write_result(pending_erd, false, args->write_failed.reason, pending_board_address)`, transitions to `state_ready`.
 
 ### 3.3 State Diagram
 
@@ -123,15 +126,15 @@ write_state_top (parent — defers all signals)
 
 ## 4. Write Flow
 
-1. MQTT client receives a write request (e.g., from Home Assistant on `geappliances/{deviceId}/erd/0x{ERD}/set`)
-2. `mqtt_client_on_write_request` fires with `mqtt_client_on_write_request_args_t` (erd, value, size)
+1. MQTT client receives a write request (e.g., from Home Assistant on `geappliances/{deviceId}/erd/0x{ERD}/write` or the per-board `geappliances/{deviceId}/erd/0x{ADDR}_0x{ERD}/write`)
+2. `mqtt_client_on_write_request` fires with `mqtt_client_on_write_request_args_t` (erd, value, size, board_address)
 3. Write bridge receives `signal_write_requested` in `state_ready`
-4. Resolves the target board address from the ERD cache: an explicit (non-primary) cached board address is used as-is; a primary-board entry or an uncached ERD resolves to the detected `erd_host_address`
+4. Resolves the target board address: an explicit topic board address wins; otherwise an explicit (non-primary) cached board address is used as-is; otherwise the detected `erd_host_address`
 5. If the resolved target is `tiny_gea_broadcast_address`: log warning, publish failure result, stay in `state_ready`
 6. Otherwise: call `tiny_gea3_erd_client_write()` with the resolved target address, transition to `state_writing`
 7. ERD client fires `write_completed` or `write_failed` activity event
 8. Write bridge validates `request_id` against `pending_request_id`
-9. If valid: publishes result to MQTT, transitions back to `state_ready`
+9. If valid: publishes the result to the result topic mirroring the board the write was routed to (unprefixed for the detected host, per-board otherwise), transitions back to `state_ready`
 10. If stale: logs warning, ignores the event
 
 ---
@@ -151,6 +154,7 @@ typedef struct {
     // Pending write state (one write at a time)
     tiny_gea3_erd_client_request_id_t pending_request_id;
     tiny_erd_t pending_erd;
+    uint8_t pending_board_address;
 } erd_write_bridge_t;
 ```
 
@@ -214,8 +218,9 @@ The write bridge publishes results via `mqtt_client_update_erd_write_result()`. 
 
 | Result | Topic |
 |--------|-------|
-| Success | `geappliances/{deviceId}/erd/0x{ERD}/set` with payload `"ok"` |
-| Failure | `geappliances/{deviceId}/erd/0x{ERD}/set` with payload `"error:{reason}"` |
+| Success (primary host) | `geappliances/{deviceId}/erd/0x{ERD}/write_result` with payload `"ok"` |
+| Success (secondary board) | `geappliances/{deviceId}/erd/0x{ADDR}_0x{ERD}/write_result` with payload `"ok"` |
+| Failure | Same topic as the success case, with payload `{"error":"<reason>"}` where `<reason>` is one of `retries_exhausted`, `not_supported`, `incorrect_size`, or `unknown` |
 
 ---
 
@@ -223,7 +228,7 @@ The write bridge publishes results via `mqtt_client_update_erd_write_result()`. 
 
 1. **One write at a time:** A new write is never accepted while a previous write is in progress.
 2. **Request ID correlation:** Completion and failure events are only processed if their `request_id` matches `pending_request_id`. Stale events are logged and ignored.
-3. **Write gated on identification:** Writes are never forwarded when the resolved target address is `tiny_gea_broadcast_address`. An explicit secondary-board address from the cache is a valid target even if the primary host is unidentified.
+3. **Write gated on identification:** Writes are never forwarded when the resolved target address is `tiny_gea_broadcast_address`. An explicit board address from the topic or the cache is a valid target even if the primary host is unidentified.
 4. **Success has no failure reason:** A successful write reports `failure_reason = 0` (no error), not a failure enum value.
 5. **Clean destroy:** All event subscriptions are removed before freeing state. Null guards prevent crashes on partial init.
 
@@ -246,5 +251,5 @@ The write bridge publishes results via `mqtt_client_update_erd_write_result()`. 
 
 1. **No write queue:** If multiple writes arrive rapidly, only the first is processed; subsequent writes are dropped. A write queue could be added to buffer requests.
 2. **No write timeout:** If the ERD client never responds to a write, the bridge remains in `state_writing` indefinitely. A timeout timer could transition back to `state_ready` and publish a timeout failure.
-3. **Single appliance, multiple boards:** The write bridge targets one appliance but can route writes to any board of that appliance, based on the board address stored in the ERD cache. If the same ERD ID is cached on multiple boards, the primary-board entry wins (matching the unprefixed MQTT topic). Supporting multiple appliances would require multiple write bridge instances.
+3. **Single appliance, multiple boards:** The write bridge targets one appliance but can route writes to any board of that appliance: an explicit board address in the MQTT topic takes priority, then the board address stored in the ERD cache, then the detected host. If the same ERD ID is cached on multiple boards, the primary-board entry wins (matching the unprefixed MQTT topic). Supporting multiple appliances would require multiple write bridge instances.
 4. **No batch writes:** Each write is sent individually. If the ERD client supports batch writes, the bridge could accumulate writes and send them together.

@@ -144,15 +144,13 @@ TEST(write_flow_integration, should_drop_write_when_host_is_broadcast)
 
   tiny_erd_t erd = 0x7701;
 
-  mock()
-    .expectOneCall("update_erd_write_result")
-    .onObject(&adapter.interface)
-    .withParameter("erd", erd)
-    .withParameter("success", false)
-    .withParameter("failure_reason",
-      tiny_gea3_erd_client_write_failure_reason_not_supported);
-
   when_home_assistant_publishes_write(erd, "01");
+
+  // The dropped write is reported on the unprefixed result topic.
+  CHECK_EQUAL(std::string("geappliances/test_device/erd/0x7701/write_result"),
+    mqtt_double.last_published_topic_);
+  CHECK_EQUAL(std::string("{\"error\":\"not_supported\"}"),
+    mqtt_double.last_published_payload_);
 }
 
 TEST(write_flow_integration, should_report_write_result_on_completion)
@@ -185,14 +183,13 @@ TEST(write_flow_integration, should_report_write_result_on_completion)
   args.write_completed.data = &dummy;
   args.write_completed.data_size = 1;
 
-  mock()
-    .expectOneCall("publish_raw")
-    .withParameter("topic", "geappliances/test_device/erd/0x7701/write_result")
-    .withParameterOfType("const char*", "payload", "ok")
-    .withParameter("payload_len", 2)
-    .withParameter("retain", true);
-
   tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
+
+  // The result is published to the unprefixed topic (write went to the
+  // detected host).
+  CHECK_EQUAL(std::string("geappliances/test_device/erd/0x7701/write_result"),
+    mqtt_double.last_published_topic_);
+  CHECK_EQUAL(std::string("ok"), mqtt_double.last_published_payload_);
 }
 
 TEST(write_flow_integration, should_report_write_failure_to_mqtt)
@@ -226,12 +223,12 @@ TEST(write_flow_integration, should_report_write_failure_to_mqtt)
   args.write_failed.data_size = 1;
   args.write_failed.reason = tiny_gea3_erd_client_write_failure_reason_incorrect_size;
 
-  mock()
-    .expectOneCall("publish_raw")
-    .withParameter("topic", "geappliances/test_device/erd/0x7701/write_result")
-    .withParameter("retain", true);
-
   tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
+
+  CHECK_EQUAL(std::string("geappliances/test_device/erd/0x7701/write_result"),
+    mqtt_double.last_published_topic_);
+  CHECK_EQUAL(std::string("{\"error\":\"incorrect_size\"}"),
+    mqtt_double.last_published_payload_);
 }
 
 TEST(write_flow_integration, should_route_write_to_secondary_board_from_cache)
@@ -257,4 +254,60 @@ TEST(write_flow_integration, should_route_write_to_secondary_board_from_cache)
     .andReturnValue(true);
 
   when_home_assistant_publishes_write(erd, "01");
+
+  // Simulate write completion.
+  uint8_t dummy = 0;
+  tiny_gea3_erd_client_on_activity_args_t args;
+  args.type = tiny_gea3_erd_client_activity_type_write_completed;
+  args.address = 0x12;
+  args.write_completed.request_id = mock_request_id;
+  args.write_completed.erd = erd;
+  args.write_completed.data = &dummy;
+  args.write_completed.data_size = 1;
+
+  tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
+
+  // The result mirrors the per-board topic the write was routed to.
+  CHECK_EQUAL(std::string("geappliances/test_device/erd/0x12_0x7701/write_result"),
+    mqtt_double.last_published_topic_);
+  CHECK_EQUAL(std::string("ok"), mqtt_double.last_published_payload_);
+}
+
+TEST(write_flow_integration, should_route_write_to_secondary_board_from_topic)
+{
+  uint8_t host = 0xC0;
+  init_all(host);
+
+  uint8_t value = 0x01;
+  tiny_erd_t erd = 0x7701;
+  tiny_gea3_erd_client_request_id_t mock_request_id{1};
+
+  mock()
+    .expectOneCall("write")
+    .onObject(&erd_client)
+    .withParameter("address", 0x12)
+    .withParameter("erd", erd)
+    .withMemoryBufferParameter("data", &value, 1)
+    .withOutputParameterReturning("request_id", &mock_request_id, sizeof(mock_request_id))
+    .andReturnValue(true);
+
+  // Per-board write topic: the board address in the topic names the target.
+  mqtt_double.simulate_message("geappliances/test_device/erd/0x12_0x7701/write", "01");
+
+  // Simulate write completion.
+  uint8_t dummy = 0;
+  tiny_gea3_erd_client_on_activity_args_t args;
+  args.type = tiny_gea3_erd_client_activity_type_write_completed;
+  args.address = 0x12;
+  args.write_completed.request_id = mock_request_id;
+  args.write_completed.erd = erd;
+  args.write_completed.data = &dummy;
+  args.write_completed.data_size = 1;
+
+  tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
+
+  // The result mirrors the per-board topic the write was routed to.
+  CHECK_EQUAL(std::string("geappliances/test_device/erd/0x12_0x7701/write_result"),
+    mqtt_double.last_published_topic_);
+  CHECK_EQUAL(std::string("ok"), mqtt_double.last_published_payload_);
 }

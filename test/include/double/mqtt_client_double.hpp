@@ -26,12 +26,15 @@ void mqtt_client_double_init(mqtt_client_double_t* self);
 
 /*!
  * Trigger publication via the on_write_request event.
+ * `board_address` is the board named by the (simulated) write topic;
+ * 0xFF (the default) means the topic did not name a board.
  */
 void mqtt_client_double_trigger_write_request(
   mqtt_client_double_t* self,
   tiny_erd_t erd,
   uint8_t size,
-  const void* value);
+  const void* value,
+  uint8_t board_address = 0xFF);
 
 /*!
  * Trigger publication via the on_mqtt_disconnect event.

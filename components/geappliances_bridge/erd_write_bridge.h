@@ -55,6 +55,10 @@ typedef struct {
   // Pending write state (one write at a time)
   tiny_gea3_erd_client_request_id_t pending_request_id;
   tiny_erd_t pending_erd;
+  /* Board the in-flight write was routed to, in sentinel form: 0xFF
+   * (PROBE_ENTRY_DEFAULT_ADDRESS) = primary/detected host (unprefixed
+   * result topic), otherwise the explicit secondary-board address. */
+  uint8_t pending_board_address;
 } erd_write_bridge_t;
 
 /*!

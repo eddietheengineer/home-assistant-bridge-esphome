@@ -64,9 +64,9 @@ TEST_GROUP_BASE(erd_write_bridge, simulation_test_base)
     mock().enable();
   }
 
-  void when_a_write_request_is_received(tiny_erd_t erd, const uint8_t* value, uint8_t size)
+  void when_a_write_request_is_received(tiny_erd_t erd, const uint8_t* value, uint8_t size, uint8_t board_address = 0xFF)
   {
-    mqtt_client_double_trigger_write_request(&mqtt_client, erd, size, value);
+    mqtt_client_double_trigger_write_request(&mqtt_client, erd, size, value, board_address);
   }
 
   void when_a_write_is_completed(tiny_gea3_erd_client_request_id_t request_id, tiny_erd_t erd)
@@ -98,14 +98,15 @@ TEST_GROUP_BASE(erd_write_bridge, simulation_test_base)
   }
 
   void should_report_write_result(tiny_erd_t erd, bool success,
-    tiny_gea3_erd_client_write_failure_reason_t reason)
+    tiny_gea3_erd_client_write_failure_reason_t reason, uint8_t board_address = 0xFF)
   {
     mock()
       .expectOneCall("update_erd_write_result")
       .onObject(&mqtt_client)
       .withParameter("erd", erd)
       .withParameter("success", success)
-      .withParameter("failure_reason", reason);
+      .withParameter("failure_reason", reason)
+      .withParameter("board_address", board_address);
   }
 
   void expect_write_succeeds()
@@ -291,6 +292,44 @@ TEST(erd_write_bridge, should_route_write_to_host_when_cache_is_null)
   uint8_t value = 0x01;
   expect_write_to_address(0xC0);
   when_a_write_request_is_received(0x3001, &value, sizeof(value));
+}
+
+TEST(erd_write_bridge, should_route_write_to_board_address_from_topic)
+{
+  given_that_the_bridge_has_been_initialized();
+
+  uint8_t value = 0x01;
+  expect_write_to_address(0x12);
+  when_a_write_request_is_received(0x3001, &value, sizeof(value), 0x12);
+
+  should_report_write_result(0x3001, true, 0, 0x12);
+  when_a_write_is_completed(mock_request_id, 0x3001);
+}
+
+TEST(erd_write_bridge, should_prefer_topic_board_address_over_cache)
+{
+  given_that_the_bridge_has_been_initialized();
+
+  given_that_erd_is_cached(0x3001, 0x20);
+
+  uint8_t value = 0x01;
+  expect_write_to_address(0x12);
+  when_a_write_request_is_received(0x3001, &value, sizeof(value), 0x12);
+
+  should_report_write_result(0x3001, true, 0, 0x12);
+  when_a_write_is_completed(mock_request_id, 0x3001);
+}
+
+TEST(erd_write_bridge, should_report_write_failure_to_per_board_topic)
+{
+  given_that_the_bridge_has_been_initialized();
+
+  uint8_t value = 0x01;
+  expect_write_to_address(0x12);
+  when_a_write_request_is_received(0x3001, &value, sizeof(value), 0x12);
+
+  should_report_write_result(0x3001, false, tiny_gea3_erd_client_write_failure_reason_not_supported, 0x12);
+  when_a_write_fails(mock_request_id, 0x3001, tiny_gea3_erd_client_write_failure_reason_not_supported);
 }
 
 TEST(erd_write_bridge, should_not_crash_on_destroy_without_init)
