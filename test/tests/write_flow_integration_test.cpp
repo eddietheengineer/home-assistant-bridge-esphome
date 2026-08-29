@@ -311,3 +311,44 @@ TEST(write_flow_integration, should_route_write_to_secondary_board_from_topic)
     mqtt_double.last_published_topic_);
   CHECK_EQUAL(std::string("ok"), mqtt_double.last_published_payload_);
 }
+
+TEST(write_flow_integration, should_route_write_to_board_0x62_erd_0xf408_from_field_report_topic)
+{
+  uint8_t host = 0xC0;
+  init_all(host);
+
+  uint8_t value = 0x01;
+  tiny_erd_t erd = 0xf408;
+  tiny_gea3_erd_client_request_id_t mock_request_id{1};
+
+  mock()
+    .expectOneCall("write")
+    .onObject(&erd_client)
+    .withParameter("address", 0x62)
+    .withParameter("erd", erd)
+    .withMemoryBufferParameter("data", &value, 1)
+    .withOutputParameterReturning("request_id", &mock_request_id, sizeof(mock_request_id))
+    .andReturnValue(true);
+
+  // Exact topic from the field report: per-board write for board 0x62, ERD 0xf408.
+  // The device ID in the topic is irrelevant to parsing (the wildcard subscription
+  // matches it); the segment after "erd/" is what routes the write.
+  mqtt_double.simulate_message("geappliances/WaterHeater_PF80S10FPY01_ZA601071X/erd/0x62_0xf408/write", "01");
+
+  // Simulate write completion.
+  uint8_t dummy = 0;
+  tiny_gea3_erd_client_on_activity_args_t args;
+  args.type = tiny_gea3_erd_client_activity_type_write_completed;
+  args.address = 0x62;
+  args.write_completed.request_id = mock_request_id;
+  args.write_completed.erd = erd;
+  args.write_completed.data = &dummy;
+  args.write_completed.data_size = 1;
+
+  tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
+
+  // The result mirrors the per-board topic the write was routed to.
+  CHECK_EQUAL(std::string("geappliances/test_device/erd/0x62_0xf408/write_result"),
+    mqtt_double.last_published_topic_);
+  CHECK_EQUAL(std::string("ok"), mqtt_double.last_published_payload_);
+}
