@@ -11,6 +11,7 @@ extern "C" {
 #include "CppUTestExt/MockSupport.h"
 #include "double/mqtt_client_double.hpp"
 #include "simulation_test_base.h"
+#include "erd_bridge_common.h"
 #include "tiny_gea_constants.h"
 
 TEST_GROUP_BASE(erd_write_bridge, simulation_test_base)
@@ -35,12 +36,18 @@ TEST_GROUP_BASE(erd_write_bridge, simulation_test_base)
 
   void when_the_bridge_is_initialized(uint8_t host_address = 0xC0)
   {
+    when_the_bridge_is_initialized_with_cache(host_address, &test_cache);
+  }
+
+  void when_the_bridge_is_initialized_with_cache(uint8_t host_address, erd_cache_t* cache)
+  {
     erd_write_bridge_init(
       &self,
       &timer_group.timer_group,
       &erd_client.interface,
       &mqtt_client.interface,
-      host_address);
+      host_address,
+      cache);
   }
 
   void given_that_the_bridge_has_been_initialized()
@@ -109,6 +116,23 @@ TEST_GROUP_BASE(erd_write_bridge, simulation_test_base)
       .withOutputParameterReturning("request_id", &mock_request_id, sizeof(mock_request_id))
       .ignoreOtherParameters()
       .andReturnValue(true);
+  }
+
+  void expect_write_to_address(uint8_t address)
+  {
+    mock()
+      .expectOneCall("write")
+      .onObject(&erd_client)
+      .withParameter("address", address)
+      .withOutputParameterReturning("request_id", &mock_request_id, sizeof(mock_request_id))
+      .ignoreOtherParameters()
+      .andReturnValue(true);
+  }
+
+  void given_that_erd_is_cached(tiny_erd_t erd, uint8_t board_address)
+  {
+    uint8_t data = 0x00;
+    erd_cache_update(&test_cache, erd, board_address, &data, 1);
   }
 };
 
@@ -202,6 +226,71 @@ TEST(erd_write_bridge, should_handle_write_with_large_data)
   uint8_t value[] = {0x01, 0x02, 0x03, 0x04, 0x05};
   expect_write_succeeds();
   when_a_write_request_is_received(0x3001, value, sizeof(value));
+}
+
+TEST(erd_write_bridge, should_route_write_to_board_address_from_erd_cache)
+{
+  given_that_the_bridge_has_been_initialized();
+
+  given_that_erd_is_cached(0x3001, 0x12);
+
+  uint8_t value = 0x01;
+  expect_write_to_address(0x12);
+  when_a_write_request_is_received(0x3001, &value, sizeof(value));
+}
+
+TEST(erd_write_bridge, should_route_write_to_host_for_primary_board_entry)
+{
+  given_that_the_bridge_has_been_initialized();
+
+  given_that_erd_is_cached(0x3001, PROBE_ENTRY_DEFAULT_ADDRESS);
+
+  uint8_t value = 0x01;
+  expect_write_to_address(0xC0);
+  when_a_write_request_is_received(0x3001, &value, sizeof(value));
+}
+
+TEST(erd_write_bridge, should_route_write_to_host_when_erd_not_in_cache)
+{
+  given_that_the_bridge_has_been_initialized();
+
+  uint8_t value = 0x01;
+  expect_write_to_address(0xC0);
+  when_a_write_request_is_received(0x3001, &value, sizeof(value));
+}
+
+TEST(erd_write_bridge, should_prefer_primary_board_when_erd_cached_on_multiple_boards)
+{
+  given_that_the_bridge_has_been_initialized();
+
+  given_that_erd_is_cached(0x3001, 0x12);
+  given_that_erd_is_cached(0x3001, PROBE_ENTRY_DEFAULT_ADDRESS);
+
+  uint8_t value = 0x01;
+  expect_write_to_address(0xC0);
+  when_a_write_request_is_received(0x3001, &value, sizeof(value));
+}
+
+TEST(erd_write_bridge, should_write_to_secondary_board_when_host_is_broadcast)
+{
+  given_that_the_bridge_has_been_initialized_with_broadcast_address();
+
+  given_that_erd_is_cached(0x3001, 0x12);
+
+  uint8_t value = 0x01;
+  expect_write_to_address(0x12);
+  when_a_write_request_is_received(0x3001, &value, sizeof(value));
+}
+
+TEST(erd_write_bridge, should_route_write_to_host_when_cache_is_null)
+{
+  mock().disable();
+  when_the_bridge_is_initialized_with_cache(0xC0, nullptr);
+  mock().enable();
+
+  uint8_t value = 0x01;
+  expect_write_to_address(0xC0);
+  when_a_write_request_is_received(0x3001, &value, sizeof(value));
 }
 
 TEST(erd_write_bridge, should_not_crash_on_destroy_without_init)

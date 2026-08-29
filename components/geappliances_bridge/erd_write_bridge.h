@@ -12,9 +12,11 @@
 //
 // Responsibilities:
 //   - Subscribe to mqtt_client_on_write_request
+//   - Route each write to the board address stored in the ERD cache for
+//     that ERD (primary-board entries resolve to the detected host address)
 //   - Forward writes to the ERD client via tiny_gea3_erd_client_write
 //   - Report write results back to MQTT via mqtt_client_update_erd_write_result
-//   - Gate writes on appliance identification (host address must not be broadcast)
+//   - Gate writes on appliance identification (target address must not be broadcast)
 //
 // NOT responsible for:
 //   - ERD discovery or polling
@@ -29,6 +31,7 @@
 #ifndef erd_write_bridge_h
 #define erd_write_bridge_h
 
+#include "erd_cache.h"
 #include "i_mqtt_client.h"
 #include "i_tiny_gea3_erd_client.h"
 
@@ -44,6 +47,7 @@ typedef struct {
   tiny_timer_group_t* timer_group;
   i_tiny_gea3_erd_client_t* erd_client;
   i_mqtt_client_t* mqtt_client;
+  erd_cache_t* erd_cache;
   uint8_t erd_host_address;
   tiny_hsm_t hsm;
   tiny_event_subscription_t mqtt_write_request_subscription;
@@ -61,7 +65,8 @@ void erd_write_bridge_init(
   tiny_timer_group_t* timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t* mqtt_client,
-  uint8_t host_address);
+  uint8_t host_address,
+  erd_cache_t* erd_cache);
 
 /*!
  * Destroy the ERD write bridge.

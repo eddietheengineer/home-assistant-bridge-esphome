@@ -46,15 +46,29 @@ static tiny_hsm_result_t state_ready(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, 
     case signal_write_requested: {
       auto args = reinterpret_cast<const mqtt_client_on_write_request_args_t*>(data);
 
-      if(self->erd_host_address == tiny_gea_broadcast_address) {
+      // Resolve the target board: prefer the board address stored in the
+      // ERD cache for this ERD; fall back to the detected primary host.
+      // Primary-board entries (0xFF sentinel) resolve to the detected host
+      // address; explicit secondary-board addresses are used as-is.
+      uint8_t target_address = self->erd_host_address;
+      if (self->erd_cache != NULL) {
+        erd_cache_entry_t* entry = erd_cache_find_by_erd(self->erd_cache, args->erd);
+        if (entry != NULL && entry->board_address != PROBE_ENTRY_DEFAULT_ADDRESS) {
+          target_address = entry->board_address;
+        }
+      }
+
+      if (target_address == tiny_gea_broadcast_address) {
         ESP_LOGW(TAG, "Write request for ERD 0x%04x dropped: appliance not identified", args->erd);
         mqtt_client_update_erd_write_result(self->mqtt_client, args->erd, false,
           tiny_gea3_erd_client_write_failure_reason_not_supported);
         break;
       }
 
+      ESP_LOGI(TAG, "Writing ERD 0x%04x to board 0x%02x", args->erd, target_address);
+
       tiny_gea3_erd_client_request_id_t request_id;
-      if(!tiny_gea3_erd_client_write(self->erd_client, &request_id, self->erd_host_address,
+      if(!tiny_gea3_erd_client_write(self->erd_client, &request_id, target_address,
          args->erd, args->value, args->size)) {
         ESP_LOGW(TAG, "Write request for ERD 0x%04x failed to queue", args->erd);
         mqtt_client_update_erd_write_result(self->mqtt_client, args->erd, false,
@@ -138,11 +152,13 @@ void erd_write_bridge_init(
   tiny_timer_group_t* timer_group,
   i_tiny_gea3_erd_client_t* erd_client,
   i_mqtt_client_t* mqtt_client,
-  uint8_t host_address)
+  uint8_t host_address,
+  erd_cache_t* erd_cache)
 {
   self->timer_group = timer_group;
   self->erd_client = erd_client;
   self->mqtt_client = mqtt_client;
+  self->erd_cache = erd_cache;
   self->erd_host_address = host_address;
   self->pending_request_id = 0;
   self->pending_erd = 0;

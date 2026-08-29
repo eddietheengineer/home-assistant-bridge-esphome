@@ -80,7 +80,8 @@ TEST_GROUP(write_flow_integration)
       &timer_group.timer_group,
       &erd_client.interface,
       &adapter.interface,
-      host_address);
+      host_address,
+      &test_cache);
 
     esphome_mqtt_client_adapter_subscribe_write_topic(&adapter);
 
@@ -231,4 +232,29 @@ TEST(write_flow_integration, should_report_write_failure_to_mqtt)
     .withParameter("retain", true);
 
   tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
+}
+
+TEST(write_flow_integration, should_route_write_to_secondary_board_from_cache)
+{
+  uint8_t host = 0xC0;
+  init_all(host);
+
+  // The ERD is cached on a secondary board (not the primary host).
+  uint8_t cached_data = 0x00;
+  erd_cache_update(&test_cache, 0x7701, 0x12, &cached_data, 1);
+
+  uint8_t value = 0x01;
+  tiny_erd_t erd = 0x7701;
+  tiny_gea3_erd_client_request_id_t mock_request_id{1};
+
+  mock()
+    .expectOneCall("write")
+    .onObject(&erd_client)
+    .withParameter("address", 0x12)
+    .withParameter("erd", erd)
+    .withMemoryBufferParameter("data", &value, 1)
+    .withOutputParameterReturning("request_id", &mock_request_id, sizeof(mock_request_id))
+    .andReturnValue(true);
+
+  when_home_assistant_publishes_write(erd, "01");
 }

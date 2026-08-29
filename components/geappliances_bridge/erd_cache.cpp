@@ -5,6 +5,7 @@
 
 #include "erd_cache.h"
 #include "geappliances_bridge_log.h"
+#include "erd_bridge_common.h"
 #include "esphome/core/log.h"
 #include <cstring>
 
@@ -69,6 +70,22 @@ erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd, uint8_t boa
     }
   }
   return nullptr;
+}
+
+erd_cache_entry_t* erd_cache_find_by_erd(erd_cache_t* self, tiny_erd_t erd)
+{
+  erd_cache_entry_t* explicit_match = nullptr;
+  for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
+    erd_cache_entry_t* e = &self->entries[i];
+    if (!e->valid || e->erd != erd) continue;
+    if (e->board_address == PROBE_ENTRY_DEFAULT_ADDRESS) {
+      return e;
+    }
+    if (explicit_match == nullptr) {
+      explicit_match = e;
+    }
+  }
+  return explicit_match;
 }
 
 bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, uint8_t board_address, const uint8_t* data, uint8_t data_size)

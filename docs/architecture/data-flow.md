@@ -81,10 +81,12 @@ graph LR
    `geappliances/{device_id}/erd/0x{ERD}/write`.
 2. **MQTT Adapter** receives the command via wildcard subscription and fires the
    `on_write_request` event.
-3. **Write Bridge** (`erd_write_bridge`) forwards the write to the ERD Client
-   via `tiny_gea3_erd_client_write`, gates writes on appliance identification
-   (host address must not be broadcast `0xFF`), and reports the result back to
-   MQTT via `mqtt_client_update_erd_write_result`.
+3. **Write Bridge** (`erd_write_bridge`) resolves the target board from the ERD
+   Cache (the board address stored for that ERD; primary-board and uncached
+   ERDs resolve to the detected host address), forwards the write to the ERD
+   Client via `tiny_gea3_erd_client_write`, gates writes on appliance
+   identification (resolved target must not be broadcast `0xFF`), and reports
+   the result back to MQTT via `mqtt_client_update_erd_write_result`.
 4. The **Protocol Stack** packages the write into a GEA3/GEA2 message and
    transmits it over UART to the appliance.
 

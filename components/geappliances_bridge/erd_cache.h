@@ -132,6 +132,12 @@ uint16_t erd_cache_get_count(erd_cache_t* self);
  * Unlike erd_cache_get_next_updated(), this does NOT require update_required=true
  * and does NOT clear any flags — it is a read-only iteration. */
 erd_cache_entry_t* erd_cache_get_next_entry(erd_cache_t* self, uint16_t* iterator);
+/* Finds the entry for a given ERD regardless of board address.
+ * If the same ERD is cached on multiple boards, the primary-board entry
+ * (board_address == 0xFF) is preferred, matching the unprefixed MQTT topic
+ * convention; otherwise the first explicit-address entry is returned.
+ * Returns NULL if the ERD is not in the cache. */
+erd_cache_entry_t* erd_cache_find_by_erd(erd_cache_t* self, tiny_erd_t erd);
 
 /* Returns the number of cache updates since the last call, then resets the window counter. */
 uint32_t erd_cache_get_update_rate(erd_cache_t* self);

@@ -142,8 +142,9 @@ static bool erd_data_changed(const erd_cache_t* self,
 ```c
 typedef struct {
   tiny_erd_t erd;
-  uint16_t data_offset;     /* offset into arena (0 = not allocated) */
-  uint8_t data_size;        /* invariant after registration, max 248 */
+  uint8_t board_address;    /* board address; 0xFF = primary host */
+  uint16_t data_offset;    /* offset into arena (0 = not allocated) */
+  uint8_t data_size;       /* invariant after registration, max 248 */
   bool update_required;
   uint8_t publish_cooldown; /* counts down from max_cooldown to 0; 0 = eligible */
   bool valid;
@@ -153,6 +154,7 @@ typedef struct {
 | Field | Type | Description |
 |-------|------|-------------|
 | `erd` | `tiny_erd_t` | ERD identifier |
+| `board_address` | `uint8_t` | Board the data was read from. `0xFF` (the primary sentinel) for the detected primary host; the physical address for secondary boards |
 | `data_offset` | `uint16_t` | Offset into arena where data is stored |
 | `data_size` | `uint8_t` | Actual data size (invariant after registration, max 248) |
 | `update_required` | `bool` | Set during update; cleared by `get_next_updated()` |
@@ -201,9 +203,15 @@ typedef struct erd_cache_t {
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `erd_cache_update` | `bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, const uint8_t* data, uint8_t data_size)` | Update or insert ERD data. Returns `true` if `update_required` was set (or entry was new). Returns `false` if data_size > 248, cache is full, arena is full, data is unchanged, or ERD size changed. |
+| `erd_cache_update` | `bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, uint8_t board_address, const uint8_t* data, uint8_t data_size)` | Update or insert ERD data for the given (ERD, board address) pair. Returns `true` if `update_required` was set (or entry was new). Returns `false` if data_size > 248, cache is full, arena is full, data is unchanged, or ERD size changed. |
 
-### 7.3 Iteration
+### 7.3 Lookup
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `erd_cache_find_by_erd` | `erd_cache_entry_t* erd_cache_find_by_erd(erd_cache_t* self, tiny_erd_t erd)` | Finds the entry for a given ERD regardless of board address. If the same ERD is cached on multiple boards, the primary-board entry (`board_address == 0xFF`) is preferred, matching the unprefixed MQTT topic convention; otherwise the first explicit-address entry is returned. Returns `NULL` if the ERD is not in the cache. Used by the write bridge to route writes to the board that owns each ERD. |
+
+### 7.4 Iteration
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
@@ -212,7 +220,7 @@ typedef struct erd_cache_t {
 | `erd_cache_get_next_entry` | `erd_cache_entry_t* erd_cache_get_next_entry(erd_cache_t* self, uint16_t* iterator)` | Returns the next valid entry in the cache, iterating all entries. Does NOT require `update_required = true` and does NOT clear any flags — it is a read-only iteration. Resets iterator to 0 when exhausted. |
 | `erd_cache_mark_all_updated` | `void erd_cache_mark_all_updated(erd_cache_t* self)` | Marks all valid entries as `update_required = true`. Used after a long MQTT disconnect to force a full drain of retained values to the broker. |
 
-### 7.4 Rate Counters
+### 7.5 Rate Counters
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
@@ -221,7 +229,7 @@ typedef struct erd_cache_t {
 
 The window is determined by the call interval of the consumer (e.g., ~60 s if called once per minute).
 
-### 7.5 Data Access
+### 7.6 Data Access
 
 | Function | Signature | Description |
 |----------|-----------|-------------|

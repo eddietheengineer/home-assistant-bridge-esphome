@@ -794,3 +794,61 @@ TEST(erd_cache, update_existing_entry_by_erd_and_address)
   CHECK_EQUAL(0x02, d1[0]);
   CHECK_EQUAL(0x02, d2[0]);
 }
+
+/* ------------------------------------------------------------------ */
+/* erd_cache_find_by_erd tests                                         */
+/* ------------------------------------------------------------------ */
+
+TEST(erd_cache, find_by_erd_returns_null_when_absent)
+{
+  uint8_t data[] = { 0x01 };
+  CHECK_TRUE(erd_cache_update(&cache, 0x1000, 0x10, data, 1));
+
+  CHECK(NULL == erd_cache_find_by_erd(&cache, 0x9999));
+}
+
+TEST(erd_cache, find_by_erd_returns_primary_entry)
+{
+  uint8_t data[] = { 0x01 };
+  CHECK_TRUE(erd_cache_update(&cache, 0x1000, 0xFF, data, 1));
+
+  erd_cache_entry_t* found = erd_cache_find_by_erd(&cache, 0x1000);
+  CHECK(NULL != found);
+  CHECK_EQUAL(0xFF, found->board_address);
+}
+
+TEST(erd_cache, find_by_erd_returns_explicit_address_entry)
+{
+  uint8_t data[] = { 0x01 };
+  CHECK_TRUE(erd_cache_update(&cache, 0x1000, 0x12, data, 1));
+
+  erd_cache_entry_t* found = erd_cache_find_by_erd(&cache, 0x1000);
+  CHECK(NULL != found);
+  CHECK_EQUAL(0x12, found->board_address);
+}
+
+TEST(erd_cache, find_by_erd_prefers_primary_when_cached_on_multiple_boards)
+{
+  uint8_t data1[] = { 0xAA };
+  uint8_t data2[] = { 0xBB };
+  CHECK_TRUE(erd_cache_update(&cache, 0x1000, 0x12, data1, 1));
+  CHECK_TRUE(erd_cache_update(&cache, 0x1000, 0xFF, data2, 1));
+
+  erd_cache_entry_t* found = erd_cache_find_by_erd(&cache, 0x1000);
+  CHECK(NULL != found);
+  CHECK_EQUAL(0xFF, found->board_address);
+  const uint8_t* data = erd_cache_entry_data(&cache, found);
+  CHECK_EQUAL(0xBB, data[0]);
+}
+
+TEST(erd_cache, find_by_erd_returns_first_explicit_entry_when_no_primary)
+{
+  uint8_t data1[] = { 0xAA };
+  uint8_t data2[] = { 0xBB };
+  CHECK_TRUE(erd_cache_update(&cache, 0x1000, 0x12, data1, 1));
+  CHECK_TRUE(erd_cache_update(&cache, 0x1000, 0x20, data2, 1));
+
+  erd_cache_entry_t* found = erd_cache_find_by_erd(&cache, 0x1000);
+  CHECK(NULL != found);
+  CHECK_EQUAL(0x12, found->board_address);
+}
