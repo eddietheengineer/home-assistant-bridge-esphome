@@ -2,6 +2,7 @@
 #include "geappliances_bridge_log.h"
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
+#include "erd_cache.h"
 
 extern "C" {
 #include "tiny_utils.h"
@@ -152,7 +153,7 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
     // Decode hex payload to a local stack buffer to avoid race condition:
     // if a new MQTT message arrives before tiny_event_publish() delivers
     // this one, the local buffer is already consumed by the event handler.
-    uint8_t local_buffer[32];
+    uint8_t local_buffer[ERD_CACHE_MAX_DATA_SIZE];
     size_t decoded = 0;
     for (size_t i = 0; i + 1 < payload.size() && decoded < sizeof(local_buffer); i += 2) {
       unsigned byte = 0;
