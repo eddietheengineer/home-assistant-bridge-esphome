@@ -196,12 +196,14 @@ a round-robin index, ensuring fair distribution across all ERDs.
 ### Round-robin publishing with background task
 
 Publishing runs in a dedicated FreeRTOS background task created with
-`xTaskCreateStaticPinnedToCore` on dual-core ESP32 (pinned to Core 1,
-matching ESPHome's main loop) or `xTaskCreateStatic` on single-core
+`xTaskCreateStaticPinnedToCore` on dual-core ESP32 (pinned to Core 0, off
+ESPHome's loop core, priority 1) or `xTaskCreateStatic` on single-core
 (zero heap allocation in both cases). The task blocks on a binary semaphore
 signaled by the main loop, acquires a state mutex to safely read shared fields,
-publishes one entry per wake, then releases the mutex. Pre-allocated buffers on
-the struct avoid stack overflow. On MQTT disconnect the publisher pauses; on
+then takes the cache's own mutex to atomically snapshot one entry's payload out
+of the arena, publishes it, and marks it published — the cache mutex is never
+held across the slow MQTT publish. Pre-allocated buffers on the struct avoid
+stack overflow. On MQTT disconnect the publisher pauses; on
 reconnect after more than 60 seconds it forces a full republish of all cached
 ERDs to handle broker restarts that lose their retained store.
 

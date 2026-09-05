@@ -39,12 +39,11 @@ static void mqtt_publisher_task(void* arg)
       continue;
     }
 
-    // Acquire mutex to safely read shared state (mqtt_connected, cache pointers,
-    // publish_index) and protect the entire drain loop. These fields can be
-    // modified by the main loop during preemptive context switches. The mutex
-    // protects against interleaving on the same core — cross-core parallelism
-    // is prevented by pinning both tasks to Core 1 (dual-core) or by
-    // single-core hardware (C3, C6).
+    // Acquire the state mutex to safely read shared state (mqtt_connected,
+    // cache pointers, paused). These fields can be modified by the main loop
+    // during preemptive context switches. Cache access is separately protected
+    // by the cache's own mutex (erd_cache_t.lock) inside the snapshot and mark
+    // functions, so the state mutex is only held for this short read.
     bool connected = false;
     bool has_deps = false;
     bool paused = false;
@@ -72,23 +71,38 @@ static void mqtt_publisher_task(void* arg)
       continue;
     }
 
-    /* Publish one entry per wake. The 100ms semaphore timeout provides
-     * natural pacing. The mutex is held throughout to protect
-     * publish_index and cache access. */
-    erd_cache_entry_t* entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
-    if (entry) {
-      const uint8_t* data = erd_cache_entry_data(self->cache, entry);
+    /* Release the state mutex before the snapshot + publish. The cache lock
+     * (inside erd_cache_snapshot_next_updated and the mark functions) protects
+     * cache access; the state mutex only guarded the short read of shared state.
+     * The cache/client/device_id/get_time_ms pointers are set once at init and
+     * never changed, so they are safe to use without the state mutex. */
+    if (mutex_held) {
+      xSemaphoreGive(self->state_mutex);
+      mutex_held = false;
+    }
 
+    /* Publish one entry per wake. The snapshot atomically copies the payload
+     * out of the arena under the cache lock, so the main loop cannot overwrite
+     * it during the slow MQTT publish. */
+    uint8_t snap_data[ERD_CACHE_MAX_DATA_SIZE];
+    erd_cache_entry_t* entry = NULL;
+    tiny_erd_t snap_erd = 0;
+    uint8_t snap_addr = 0;
+    uint8_t snap_size = 0;
+    bool have_entry = erd_cache_snapshot_next_updated(self->cache, &self->publish_index,
+                                                      &entry, &snap_erd, &snap_addr,
+                                                      snap_data, &snap_size);
+    if (have_entry) {
       int topic_len;
-      if (entry->board_address == PROBE_ENTRY_DEFAULT_ADDRESS) {
-        topic_len = snprintf(self->task_topic, sizeof(self->task_topic), "geappliances/%s/erd/0x%04x/value", self->device_id, entry->erd);
+      if (snap_addr == PROBE_ENTRY_DEFAULT_ADDRESS) {
+        topic_len = snprintf(self->task_topic, sizeof(self->task_topic), "geappliances/%s/erd/0x%04x/value", self->device_id, snap_erd);
       } else {
-        topic_len = snprintf(self->task_topic, sizeof(self->task_topic), "geappliances/%s/erd/0x%02x_0x%04x/value", self->device_id, entry->board_address, entry->erd);
+        topic_len = snprintf(self->task_topic, sizeof(self->task_topic), "geappliances/%s/erd/0x%02x_0x%04x/value", self->device_id, snap_addr, snap_erd);
       }
       if (topic_len >= 0 && (unsigned)topic_len < sizeof(self->task_topic)) {
-        size_t data_len = entry->data_size;
+        size_t data_len = snap_size;
         for (size_t i = 0; i < data_len; i++) {
-          snprintf(self->task_hex + i * 2, 3, "%02x", data[i]);
+          snprintf(self->task_hex + i * 2, 3, "%02x", snap_data[i]);
         }
         self->task_hex[data_len * 2] = '\0';
 
@@ -98,7 +112,7 @@ static void mqtt_publisher_task(void* arg)
         uint32_t elapsed = self->get_time_ms() - t_publish;
 
         if (elapsed >= 1000) {
-          ESP_LOGW(PUBLISHER_TAG, "Slow publish: %lums for ERD 0x%04x addr 0x%02x", (unsigned long)elapsed, entry->erd, entry->board_address);
+          ESP_LOGW(PUBLISHER_TAG, "Slow publish: %lums for ERD 0x%04x addr 0x%02x", (unsigned long)elapsed, snap_erd, snap_addr);
         }
 
         if (sent) {
@@ -116,10 +130,6 @@ static void mqtt_publisher_task(void* arg)
     } else if (!self->first_round_done) {
       /* Scanned full cache with no pending entries — first round is done. */
       self->first_round_done = true;
-    }
-
-    if (mutex_held) {
-      xSemaphoreGive(self->state_mutex);
     }
   }
 
@@ -229,21 +239,21 @@ void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
   if (self->task_handle != NULL) return; // already running
   if (self->work_semaphore == NULL) return; // semaphore creation failed in init
   self->task_running = true;
-  /* Pin the publisher task to the same core as ESPHome's main loop.
-   * ESPHome pins its loop task to Core 1 on dual-core ESP32
-   * (esphome/components/esp32/core.cpp: xTaskCreateStaticPinnedToCore(..., 1)).
-   * On dual-core ESP32-S3 the erd_cache_t is accessed from both the
-   * main loop and this task.  The cache has no mutex — thread safety
-   * relies on single-core ordering (tick → signal_work → drain).
-   * Running on the same core as the main loop restores that guarantee.
-   * On single-core chips (C3, C6) the coreID is ignored. */
+  /* Pin the publisher task to Core 0 (dual-core) with priority 1 (below the
+   * main loop). The cache is now protected by its own mutex (erd_cache_t.lock),
+   * so the publisher no longer needs to share a core with the main loop for
+   * thread safety.  Core 0 keeps the publisher off ESPHome's loop core (Core 1)
+   * so it cannot starve the loopTask watchdog, and priority 1 ensures the main
+   * loop (higher priority) always preempts the publisher when it needs the CPU.
+   * On single-core chips (C3, C6) the coreID is ignored and the mutex provides
+   * the safety. */
 #if CONFIG_FREERTOS_UNICORE
   self->task_handle = xTaskCreateStatic(
       mqtt_publisher_task,
       "erd_mqtt_pub",
       ERD_MQTT_PUBLISHER_TASK_STACK_BYTES / sizeof(StackType_t),  /* words, matching task_stack[] size */
       self,
-      2,
+      1,
       self->task_stack,
       &self->task_tcb);
 #else
@@ -252,10 +262,10 @@ void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
       "erd_mqtt_pub",
       ERD_MQTT_PUBLISHER_TASK_STACK_BYTES / sizeof(StackType_t),  /* words, matching task_stack[] size */
       self,
-      2,
+      1,
       self->task_stack,
       &self->task_tcb,
-      1);  /* Core 1 — same core as ESPHome's main loop task */
+      0);  /* Core 0 — off ESPHome's loop core (Core 1) to avoid starving the watchdog */
 #endif
   if (self->task_handle == NULL) {
     ESP_LOGE(PUBLISHER_TAG, "Failed to create MQTT publisher task");
@@ -322,22 +332,26 @@ bool erd_cache_mqtt_publisher_loop(erd_cache_mqtt_publisher_t* self)
     return false;
   }
 
-  erd_cache_entry_t* entry = erd_cache_get_next_updated(self->cache, &self->publish_index);
-  if (!entry) {
+  uint8_t snap_data[ERD_CACHE_MAX_DATA_SIZE];
+  erd_cache_entry_t* entry = NULL;
+  tiny_erd_t snap_erd = 0;
+  uint8_t snap_addr = 0;
+  uint8_t snap_size = 0;
+  if (!erd_cache_snapshot_next_updated(self->cache, &self->publish_index,
+                                       &entry, &snap_erd, &snap_addr,
+                                       snap_data, &snap_size)) {
     if (!self->first_round_done) {
       self->first_round_done = true;
     }
     return false;
   }
 
-  const uint8_t* data = erd_cache_entry_data(self->cache, entry);
-
   char topic[128];
   int topic_len;
-  if (entry->board_address == PROBE_ENTRY_DEFAULT_ADDRESS) {
-    topic_len = snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/value", self->device_id, entry->erd);
+  if (snap_addr == PROBE_ENTRY_DEFAULT_ADDRESS) {
+    topic_len = snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/value", self->device_id, snap_erd);
   } else {
-    topic_len = snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%02x_0x%04x/value", self->device_id, entry->board_address, entry->erd);
+    topic_len = snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%02x_0x%04x/value", self->device_id, snap_addr, snap_erd);
   }
   if (topic_len < 0 || (unsigned)topic_len >= sizeof(topic)) {
     ESP_LOGW(PUBLISHER_TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
@@ -345,9 +359,9 @@ bool erd_cache_mqtt_publisher_loop(erd_cache_mqtt_publisher_t* self)
   }
 
   char hex[512];
-  size_t data_len = entry->data_size;
+  size_t data_len = snap_size;
   for (size_t i = 0; i < data_len; i++) {
-    snprintf(hex + i * 2, 3, "%02x", data[i]);
+    snprintf(hex + i * 2, 3, "%02x", snap_data[i]);
   }
   hex[data_len * 2] = '\0';
 
@@ -356,7 +370,7 @@ bool erd_cache_mqtt_publisher_loop(erd_cache_mqtt_publisher_t* self)
   uint32_t elapsed = self->get_time_ms() - t_publish;
 
   if (elapsed >= 1000) {
-    ESP_LOGW(PUBLISHER_TAG, "Slow publish: %lums for ERD 0x%04x addr 0x%02x", (unsigned long)elapsed, entry->erd, entry->board_address);
+    ESP_LOGW(PUBLISHER_TAG, "Slow publish: %lums for ERD 0x%04x addr 0x%02x", (unsigned long)elapsed, snap_erd, snap_addr);
   }
 
   if (sent) {

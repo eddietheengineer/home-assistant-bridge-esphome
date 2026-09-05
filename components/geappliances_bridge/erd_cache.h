@@ -8,11 +8,12 @@
  * updates are in-place memcpy with no allocation or deallocation. Change
  * detection is done at insert/update time, eliminating per-read memcmp overhead.
  *
- * Thread safety: The cache is accessed from both the main loop and
- * the background MQTT publisher task. On dual-core ESP32 the publisher
- * is pinned to Core 1 (same core as ESPHome's main loop task) via
- * xTaskCreateStaticPinnedToCore, so both access paths run on the same
- * core and cannot execute in parallel. No mutex is needed. */
+ * Thread safety: The cache is accessed from both the main loop (writes ERD
+ * updates) and the background MQTT publisher task (drains update_required
+ * entries). A single mutex (lock) guards entries[] + arena[] + arena_offset,
+ * so the two paths are safe on single-core (C3/C6) and dual-core (S3) alike.
+ * Every public accessor takes the lock; it is held only for the short
+ * read/copy or write of an entry, never across the slow MQTT publish. */
 
 #ifndef erd_cache_h
 #define erd_cache_h
@@ -21,6 +22,16 @@
 #include <stdbool.h>
 
 #include "tiny_gea3_erd_client.h"
+
+#ifndef USE_ESP_IDF
+#error "This component requires ESPHome with framework: type: esp-idf"
+#endif
+#ifdef USE_ESP_IDF_STUBS
+  #include "esp-idf/freertos_stub.h"
+#else
+  #include "freertos/FreeRTOS.h"
+  #include "freertos/semphr.h"
+#endif
 
 #define ERD_CACHE_CAPACITY 300
 #define ERD_CACHE_MAX_DATA_SIZE 248    /* GEA3 max payload: 255 - 7 byte overhead */
@@ -46,6 +57,7 @@ typedef struct erd_cache_t {
   uint32_t required_update_count_window; /* such updates since last get_required_update_rate() call */
   uint8_t max_cooldown;                /* configured rate limit in seconds; 0 = disabled */
   bool initialized;                    /* true after first successful erd_cache_init() */
+  SemaphoreHandle_t lock;              /* guards entries[] + arena[] + arena_offset */
 } erd_cache_t;
 
 #ifdef __cplusplus
@@ -74,48 +86,18 @@ void erd_cache_set_throttle_rate_seconds(erd_cache_t* self, uint8_t rate);
 
 /* Mark an ERD entry as successfully published to MQTT.
  * Reloads the publish_cooldown timer. Call after mqtt_client_publish_raw() succeeds.
- * Static inline — zero overhead when max_cooldown is 0 (early return).
- *
- * Thread safety: with the ESP-IDF framework this is called from the background MQTT publisher
- * task while tick_cooldowns() runs from the main loop.  On dual-core ESP32 the publisher
- * is pinned to Core 1 (same core as ESPHome's main loop) via
- * xTaskCreateStaticPinnedToCore, so both access paths run on the same core.
- * The tick→signal_work ordering in loop() ensures the tick always runs before
- * the task drains. No additional locking is needed. */
-static inline void erd_cache_mark_published(erd_cache_t* self, erd_cache_entry_t* entry) {
-  if (self->max_cooldown == 0 || entry == NULL) return;
-  entry->publish_cooldown = self->max_cooldown;
-}
+ * Takes the cache lock; safe to call from the publisher task. */
+void erd_cache_mark_published(erd_cache_t* self, erd_cache_entry_t* entry);
 
 /* Mark an ERD entry as NOT published (publish failed or was dropped).
  * Re-sets update_required so the entry is picked up on the next iteration.
  * Call when mqtt_client_publish_raw() returns false.
- * Static inline — trivial operation, no locking needed (same thread that
- * cleared update_required via erd_cache_get_next_updated() is the only
- * caller). */
-static inline void erd_cache_mark_unpublished(erd_cache_t* self, erd_cache_entry_t* entry) {
-  (void)self;
-  if (entry != NULL) {
-    entry->update_required = true;
-  }
-}
+ * Takes the cache lock; safe to call from the publisher task. */
+void erd_cache_mark_unpublished(erd_cache_t* self, erd_cache_entry_t* entry);
 
 /* Decrement publish_cooldown for all entries with update_required=true.
- * Call once per second. Static inline — zero overhead when max_cooldown is 0.
- *
- * Thread safety: see erd_cache_mark_published() above.  On dual-core ESP32 both the
- * publisher task and the main loop run on Core 1 (task is pinned), so they cannot
- * execute in parallel. tick_cooldowns touches entries with update_required=true;
- * mark_published touches entries whose update_required was just cleared — disjoint sets. */
-static inline void erd_cache_tick_cooldowns(erd_cache_t* self) {
-  if (self->max_cooldown == 0) return;
-  for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
-    erd_cache_entry_t* e = &self->entries[i];
-    if (e->valid && e->update_required && e->publish_cooldown > 0) {
-      e->publish_cooldown--;
-    }
-  }
-}
+ * Call once per second from the main loop. Takes the cache lock. */
+void erd_cache_tick_cooldowns(erd_cache_t* self);
 
 /* Returns the next entry with update_required=true, then clears the flag.
  * Caller provides an iterator (uint16_t) initialized to 0.
@@ -123,6 +105,18 @@ static inline void erd_cache_tick_cooldowns(erd_cache_t* self) {
  * NOTE: Declared for future use (e.g., batch republish after MQTT reconnect).
  *       Not used in the initial implementation. */
 erd_cache_entry_t* erd_cache_get_next_updated(erd_cache_t* self, uint16_t* iterator);
+
+/* Atomically fetch the next update_required entry AND copy its payload out of
+ * the arena in one lock hold. This is the publisher's safe read path: the
+ * arena slice is copied into data_out (capacity >= ERD_CACHE_MAX_DATA_SIZE)
+ * while the lock is held, so the main loop cannot overwrite it mid-publish.
+ * Returns true and fills the out-params if an entry was found; false otherwise.
+ * entry_out receives the stable entry pointer (cache never removes entries) for
+ * use with erd_cache_mark_published/unpublished. Other out-params may be NULL. */
+bool erd_cache_snapshot_next_updated(erd_cache_t* self, uint16_t* iterator,
+                                     erd_cache_entry_t** entry_out,
+                                     tiny_erd_t* erd_out, uint8_t* addr_out,
+                                     uint8_t* data_out, uint8_t* size_out);
 
 /* Returns the number of valid entries currently in the cache. */
 uint16_t erd_cache_get_count(erd_cache_t* self);
@@ -143,24 +137,16 @@ uint32_t erd_cache_get_required_update_rate(erd_cache_t* self);
 void erd_cache_mark_all_updated(erd_cache_t* self);
 
 /* Returns a pointer to the ERD data in the arena.
- * Static inline — zero overhead, direct pointer arithmetic.
+ * RAW accessor: does NOT take the lock. The caller must hold the cache lock
+ * (see erd_cache_snapshot_next_updated) or be single-threaded (tests).
  * Returns NULL if entry is NULL or entry is not valid. */
-static inline const uint8_t* erd_cache_entry_data(const erd_cache_t* self, const erd_cache_entry_t* entry) {
-  if (entry == NULL || !entry->valid) return NULL;
-  return &self->arena[entry->data_offset];
-}
+const uint8_t* erd_cache_entry_data(const erd_cache_t* self, const erd_cache_entry_t* entry);
 
-/* Returns the number of bytes currently used in the arena.
- * Useful for monitoring arena utilization. */
-static inline uint16_t erd_cache_get_arena_usage(const erd_cache_t* self) {
-  return self->arena_offset;
-}
+/* Returns the number of bytes currently used in the arena. Read-only, no lock. */
+uint16_t erd_cache_get_arena_usage(const erd_cache_t* self);
 
-/* Returns the arena usage as a percentage (0-100).
- * Useful for monitoring arena utilization. */
-static inline uint8_t erd_cache_get_arena_usage_percent(const erd_cache_t* self) {
-  return (uint8_t)((self->arena_offset * 100) / ERD_CACHE_ARENA_SIZE);
-}
+/* Returns the arena usage as a percentage (0-100). Read-only, no lock. */
+uint8_t erd_cache_get_arena_usage_percent(const erd_cache_t* self);
 
 #ifdef __cplusplus
 }
