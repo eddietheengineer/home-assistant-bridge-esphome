@@ -14,9 +14,11 @@ static bool s_slot_overflow_warned = false;
 static bool s_arena_overflow_warned = false;
 static bool s_size_rejected_warned = false;
 
-/* Acquire the cache lock. No-op if the lock was not created (e.g. test stubs
- * where xSemaphoreCreateMutex returns a sentinel). Blocks until available; the
- * critical section is a short entry read/copy or write, never the MQTT publish. */
+/* Acquire the cache lock. No-op if the lock was never created (self->lock is
+ * NULL, e.g. before erd_cache_init). Under the test stubs the handle is a
+ * non-NULL sentinel and take/give are no-ops, so this is effectively a no-op
+ * there too. Blocks until available; the critical section is a short entry
+ * read/copy or write, never the MQTT publish. */
 static void erd_cache_lock(erd_cache_t* self) {
   if (self->lock) {
     xSemaphoreTake(self->lock, portMAX_DELAY);
@@ -89,7 +91,7 @@ void erd_cache_destroy(erd_cache_t* self)
   self->initialized = false;
 }
 
-erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd, uint8_t board_address)
+static erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd, uint8_t board_address)
 {
   for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
     erd_cache_entry_t* e = &self->entries[i];

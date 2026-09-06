@@ -71,11 +71,13 @@ static void mqtt_publisher_task(void* arg)
       continue;
     }
 
-    /* Release the state mutex before the snapshot + publish. The cache lock
-     * (inside erd_cache_snapshot_next_updated and the mark functions) protects
-     * cache access; the state mutex only guarded the short read of shared state.
-     * The cache/client/device_id/get_time_ms pointers are set once at init and
-     * never changed, so they are safe to use without the state mutex. */
+    /* Release the state mutex before the snapshot + publish so it is never
+     * held across the slow MQTT publish. Cache access is separately protected
+     * by the cache's own mutex (inside erd_cache_snapshot_next_updated and the
+     * mark functions). The cache/client/device_id/get_time_ms pointers are set
+     * once at init and never changed, so they are safe to use without the state
+     * mutex. The state mutex is re-acquired after the publish to update the
+     * publisher's own counters/flag (see below). */
     if (mutex_held) {
       xSemaphoreGive(self->state_mutex);
       mutex_held = false;
@@ -92,6 +94,7 @@ static void mqtt_publisher_task(void* arg)
     bool have_entry = erd_cache_snapshot_next_updated(self->cache, &self->publish_index,
                                                       &entry, &snap_erd, &snap_addr,
                                                       snap_data, &snap_size);
+    bool published_ok = false;
     if (have_entry) {
       int topic_len;
       if (snap_addr == PROBE_ENTRY_DEFAULT_ADDRESS) {
@@ -117,19 +120,41 @@ static void mqtt_publisher_task(void* arg)
 
         if (sent) {
           erd_cache_mark_published(self->cache, entry);
-          self->total_published++;
-          self->publish_count_window++;
+          published_ok = true;
         } else {
-          /* Publish dropped (queue full or not connected) — re-set
+          /* Publish dropped (queue full or not connected) - re-set
            * update_required so the entry is picked up on the next wake. */
           erd_cache_mark_unpublished(self->cache, entry);
         }
       } else if (topic_len >= (int)sizeof(self->task_topic)) {
         ESP_LOGW(PUBLISHER_TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
       }
-    } else if (!self->first_round_done) {
-      /* Scanned full cache with no pending entries — first round is done. */
-      self->first_round_done = true;
+    }
+
+    /* Update the publisher's own state under the state mutex. Re-acquired here
+     * (never held across the slow publish above) so this task and the main
+     * loop's readers (get_publish_rate, first_round_done, on_connected) see a
+     * consistent view. publish_index is intentionally left alone: it is the scan
+     * iterator advanced by the snapshot under the cache lock, and its only other
+     * writer is on_connected's reset-to-0 - a benign race (aligned uint16_t,
+     * idempotent). */
+    if (self->state_mutex) {
+      if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (published_ok) {
+          self->total_published++;
+          self->publish_count_window++;
+        } else if (!have_entry && !self->first_round_done) {
+          self->first_round_done = true;
+        }
+        xSemaphoreGive(self->state_mutex);
+      }
+    } else {
+      if (published_ok) {
+        self->total_published++;
+        self->publish_count_window++;
+      } else if (!have_entry && !self->first_round_done) {
+        self->first_round_done = true;
+      }
     }
   }
 
