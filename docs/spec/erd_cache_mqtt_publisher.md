@@ -77,7 +77,7 @@ On ESP-IDF:
 - Guard against already-running task (`task_handle != NULL`)
 - Guard against failed semaphore creation (`work_semaphore == NULL`)
 - Set `task_running = true`
-- Create the static task via `xTaskCreateStaticPinnedToCore()` (Core 1, dual-core) or `xTaskCreateStatic()` (single-core) with a 4096-byte stack, priority 2, name `"erd_mqtt_pub"`. The larger stack accommodates the ESPHome/IDF MQTT publish call chain under queue pressure.
+- Create the static task via `xTaskCreateStaticPinnedToCore()` (Core 0, dual-core) or `xTaskCreateStatic()` (single-core) with a 4096-byte stack, priority 1, name `"erd_mqtt_pub"`. Core 0 keeps the publisher off ESPHome's loop core (Core 1) so it cannot starve the loopTask watchdog; priority 1 keeps it below the main loop. The larger stack accommodates the ESPHome/IDF MQTT publish call chain under queue pressure.
 - On task creation failure: log error, set `task_running = false`
 
 On non-ESP-IDF: no-op.
@@ -142,7 +142,7 @@ On ESP-IDF, the publisher runs as a FreeRTOS task (`mqtt_publisher_task`) with:
 
 ### 3.2 Non-ESP-IDF: Main Loop
 
-On non-ESP-IDF platforms, `erd_cache_mqtt_publisher_loop()` is called directly from the main loop. No background task, no semaphores, no mutex. Publishes one entry per call.
+On non-ESP-IDF platforms, `erd_cache_mqtt_publisher_loop()` is called directly from the main loop. No background task, no semaphores, no state mutex. The cache's own mutex still guards the arena but is uncontended in single-threaded use. Publishes one entry per call.
 
 ```c
 bool erd_cache_mqtt_publisher_loop(erd_cache_mqtt_publisher_t* self);
