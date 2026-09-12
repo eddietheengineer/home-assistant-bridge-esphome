@@ -62,11 +62,6 @@
 
 GEA_TAG(TAG) = "ha_cleanup";
 
-/* Critical section mux for protecting shared state between the MQTT task
- * callback and the main loop. ESP-IDF 5.5.5 requires a portMUX_TYPE* on
- * the Xtensa port; passing it on RISC-V is harmless. */
-static portMUX_TYPE cleanup_mux = portMUX_INITIALIZER_UNLOCKED;
-
 /* Flush queued cleanup topics: publish empty retained payloads to remove them.
  * Called from cleanup_run() during idle periods, not from the MQTT callback,
  * to avoid blocking the ESP-IDF framework MQTT task. Returns the number of topics
@@ -84,9 +79,9 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
     uint16_t consumed;
     uint16_t remaining;
 
-    taskENTER_CRITICAL(&cleanup_mux);
+    taskENTER_CRITICAL(&self->mux);
     if (self->queue_count == 0) {
-        taskEXIT_CRITICAL(&cleanup_mux);
+        taskEXIT_CRITICAL(&self->mux);
         return 0;
     }
 
@@ -109,7 +104,7 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
         self->queue_write_pos -= consumed;
         self->queue_count--;
         remaining = self->queue_count;
-        taskEXIT_CRITICAL(&cleanup_mux);
+        taskEXIT_CRITICAL(&self->mux);
         return remaining;
     }
     consumed = (uint16_t)(strlen(self->topic_buf) + 1);
@@ -128,19 +123,19 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
     self->queue_write_pos -= consumed;
     self->queue_count--;
     self->pass_removed_count++;
-    taskEXIT_CRITICAL(&cleanup_mux);
+    taskEXIT_CRITICAL(&self->mux);
 
     if (!mqtt_client_publish_raw(self->mqtt_client, topic, "", 0, true)) {
         /* Publish dropped (queue full) — undo the compact using saved
          * state. The saved values were captured inside the critical
          * section so they are consistent even if the callback fires
          * during the publish attempt. */
-        taskENTER_CRITICAL(&cleanup_mux);
+        taskENTER_CRITICAL(&self->mux);
         self->queue_write_pos = saved_write_pos;
         self->queue_count = saved_count;
         self->pass_removed_count--;
         remaining = self->queue_count;
-        taskEXIT_CRITICAL(&cleanup_mux);
+        taskEXIT_CRITICAL(&self->mux);
         ESP_LOGW(TAG, "Cleanup publish dropped, will retry: %s", topic);
         return remaining;
     }
@@ -148,9 +143,9 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
     ESP_LOGD(TAG, "Removed old topic: %s", topic);
 
     /* Read remaining count after successful publish. */
-    taskENTER_CRITICAL(&cleanup_mux);
+    taskENTER_CRITICAL(&self->mux);
     remaining = self->queue_count;
-    taskEXIT_CRITICAL(&cleanup_mux);
+    taskEXIT_CRITICAL(&self->mux);
 
     return remaining;
 }
@@ -160,11 +155,30 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
  * Keeps the callback short — no outbound publish call — so the MQTT task's
  * inbound queue drains fast and retained message bursts don't overflow.
  *
- * THREAD SAFETY: This callback runs in the ESP-IDF framework MQTT task context (a separate
- * FreeRTOS task). Shared state (topic_buf, queue_write_pos, queue_count) is
- * protected by taskENTER_CRITICAL()/taskEXIT_CRITICAL(). This is safe on
- * single-core ESP32-C3 where critical sections disable interrupts. On dual-core
- * ESP32, a mutex would be needed instead. The code assumes single-core. */
+ * THREAD SAFETY: This callback runs in the ESP-IDF framework MQTT task
+ * context (a separate FreeRTOS task). Shared state (topic_buf,
+ * queue_write_pos, queue_count) is protected by
+ * taskENTER_CRITICAL()/taskEXIT_CRITICAL() on the per-instance mux
+ * (self->mux).
+ *
+ * On single-core (ESP32-C3/C6, RISC-V): the critical section disables
+ * interrupts, preventing preemption.
+ *
+ * On dual-core (ESP32-S3, Xtensa): the portMUX_TYPE contains a spinlock.
+ * taskENTER_CRITICAL disables interrupts on the calling core AND acquires
+ * the spinlock, which prevents the other core from entering the same
+ * critical section. The other core spins until the lock is released.
+ * This is the standard ESP-IDF SMP critical section mechanism — no mutex
+ * needed.
+ *
+ * The ESP-IDF framework MQTT task is not pinned to a specific core and may
+ * run on either core. The spinlock handles cross-core contention
+ * correctly regardless of core assignment.
+ *
+ * DESTROY SAFETY: ha_discovery_cleanup_destroy() poisons get_time_ms (NULL)
+ * before unsubscribing, then waits 50 ms for any in-flight callback that
+ * passed the guard to finish its critical section, before memsetting the
+ * struct. This prevents the callback from writing to a zeroed struct. */
 CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     (void)payload;
@@ -189,7 +203,7 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     }
     uint16_t needed = (uint16_t)(topic_len + 1);
 
-    taskENTER_CRITICAL(&cleanup_mux);
+    taskENTER_CRITICAL(&self->mux);
     /* Diagnostic: count all callbacks received (inside critical section to avoid race). */
     self->pass_received_count++;
 
@@ -206,7 +220,7 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
 
     self->pass_found_topics = true;
     self->last_activity_ms = self->get_time_ms();
-    taskEXIT_CRITICAL(&cleanup_mux);
+    taskEXIT_CRITICAL(&self->mux);
 }
 
 CLEANUP_FN void cleanup_start(ha_discovery_cleanup_t* self)
@@ -243,6 +257,7 @@ void ha_discovery_cleanup_init(ha_discovery_cleanup_t* self)
 {
     memset(self, 0, sizeof(*self));
     self->state = ha_cleanup_state_idle;
+    self->mux = portMUX_INITIALIZER_UNLOCKED;
 }
 
 void ha_discovery_cleanup_configure(ha_discovery_cleanup_t* self,
@@ -417,6 +432,20 @@ void ha_discovery_cleanup_destroy(ha_discovery_cleanup_t* self)
             mqtt_client_unsubscribe(client, sub_topic);
         }
         self->subscribed = false;
+
+        /* Wait for any callback that passed the get_time_ms guard BEFORE
+         * we poisoned it (above) to finish its critical section.
+         *
+         * The dangerous window is a single callback that read get_time_ms
+         * (non-NULL) before destroy() nulled it, then entered
+         * taskENTER_CRITICAL and is writing to topic_buf. That critical
+         * section takes microseconds on ESP32-C3. Messages dequeued
+         * AFTER the poison return at the guard (get_time_ms == NULL)
+         * without touching the struct — they are irrelevant to the memset.
+         *
+         * 50 ms is a conservative margin (~1000x the actual CS duration).
+         * It matches the 100 ms pattern in erd_cache_mqtt_publisher_stop(). */
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
     memset(self, 0, sizeof(*self));
 }
