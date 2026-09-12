@@ -186,14 +186,16 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     (void)payload;
     ha_discovery_cleanup_t* self = (ha_discovery_cleanup_t*)arg;
 
-    /* Guard against callback firing after destroy (memset zeroes struct). */
-    if (self == NULL || self->get_time_ms == NULL) return;
+    if (self == NULL) return;
 
-    /* Snapshot the time function after the guard: destroy() may null
-     * self->get_time_ms (and later memset the struct) before we reach the
-     * call below. Calling through the local copy avoids a NULL
-     * function-pointer call if that happens. */
+    /* Read the time function exactly once and use that value for both the
+     * guard and the later call: destroy() may null self->get_time_ms (and
+     * later memset the struct) at any point. A single read is airtight at
+     * any optimization level - a second, separate read could observe the
+     * post-poison NULL even when the guard's read was non-NULL, and only
+     * the optimizer's read-merging happens to close that window at -O2. */
     uint32_t (*get_time)(void) = self->get_time_ms;
+    if (get_time == NULL) return;
 
     /* Only remove config topics. */
     size_t topic_len = strlen(topic);
