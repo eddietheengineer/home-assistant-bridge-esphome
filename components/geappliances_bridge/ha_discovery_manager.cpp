@@ -1150,6 +1150,12 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
     cleanup_resources(self);
 
     memset(self, 0, sizeof(*self));
+
+    /* The memset above re-zeroes the embedded cleanup struct's spinlock to
+     * an invalid state (owner=0, not SPINLOCK_FREE).
+     * ha_discovery_cleanup_destroy() had left it valid; restore that so the
+     * struct never holds an invalid mux. */
+    portMUX_INITIALIZE(&self->cleanup.mux);
 }
 
 
