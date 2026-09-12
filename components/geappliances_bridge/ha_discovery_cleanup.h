@@ -16,6 +16,12 @@
 #error "This component requires ESPHome with framework: type: esp-idf"
 #endif
 
+#ifdef USE_ESP_IDF_STUBS
+#include "esp-idf/freertos_stub.h"
+#else
+#include "freertos/FreeRTOS.h"
+#endif
+
 #include "i_mqtt_client.h"
 
 #ifdef __cplusplus
@@ -72,6 +78,10 @@ typedef struct {
 
   /* Drain */
   uint32_t drain_start_ms;
+
+  /* Critical section mux — per-instance, protects shared state between
+   * the MQTT task callback and the main loop. */
+  portMUX_TYPE mux;
 } ha_discovery_cleanup_t;
 
 /* API */
