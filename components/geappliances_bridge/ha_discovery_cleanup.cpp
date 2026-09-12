@@ -187,6 +187,12 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     /* Guard against callback firing after destroy (memset zeroes struct). */
     if (self == NULL || self->get_time_ms == NULL) return;
 
+    /* Snapshot the time function after the guard: destroy() may null
+     * self->get_time_ms (and later memset the struct) before we reach the
+     * call below. Calling through the local copy avoids a NULL
+     * function-pointer call if that happens. */
+    uint32_t (*get_time)(void) = self->get_time_ms;
+
     /* Only remove config topics. */
     size_t topic_len = strlen(topic);
     if (topic_len < 7) return;
@@ -219,7 +225,7 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     }
 
     self->pass_found_topics = true;
-    self->last_activity_ms = self->get_time_ms();
+    self->last_activity_ms = get_time();
     taskEXIT_CRITICAL(&self->mux);
 }
 
