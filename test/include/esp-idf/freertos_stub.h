@@ -92,6 +92,7 @@ static inline void vSemaphoreDelete(SemaphoreHandle_t) { }
 /* ---------- Critical section ---------- */
 typedef void* portMUX_TYPE;
 #define portMUX_INITIALIZER_UNLOCKED (NULL)
+#define portMUX_INITIALIZE(x) do { (void)(x); } while (0)
 #define taskENTER_CRITICAL(x) do { (void)(x); } while (0)
 #define taskEXIT_CRITICAL(x) do { (void)(x); } while (0)
 

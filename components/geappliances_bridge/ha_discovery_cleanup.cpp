@@ -176,9 +176,11 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
  * correctly regardless of core assignment.
  *
  * DESTROY SAFETY: ha_discovery_cleanup_destroy() poisons get_time_ms (NULL)
- * before unsubscribing, then waits 50 ms for any in-flight callback that
- * passed the guard to finish its critical section, before memsetting the
- * struct. This prevents the callback from writing to a zeroed struct. */
+ * before unsubscribing, waits 50 ms for any in-flight callback that passed
+ * the guard to finish its critical section, then memsets the struct and
+ * re-initializes the per-instance spinlock (portMUX_INITIALIZE) so a late
+ * callback on the dead struct acquires a valid lock instead of spinning on
+ * the zeroed one. */
 CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     (void)payload;
@@ -263,7 +265,7 @@ void ha_discovery_cleanup_init(ha_discovery_cleanup_t* self)
 {
     memset(self, 0, sizeof(*self));
     self->state = ha_cleanup_state_idle;
-    self->mux = portMUX_INITIALIZER_UNLOCKED;
+    portMUX_INITIALIZE(&self->mux);
 }
 
 void ha_discovery_cleanup_configure(ha_discovery_cleanup_t* self,
@@ -454,6 +456,14 @@ void ha_discovery_cleanup_destroy(ha_discovery_cleanup_t* self)
         vTaskDelay(pdMS_TO_TICKS(50));
     }
     memset(self, 0, sizeof(*self));
+
+    /* Re-initialize the per-instance spinlock: the memset zeroed it to
+     * owner=0, an invalid state (neither SPINLOCK_FREE nor a core ID). A
+     * delayed callback that fires on the dead struct would otherwise spin
+     * forever in spinlock_acquire (deadlock -> watchdog reset) on
+     * dual-core. With a valid FREE lock, a late callback just performs the
+     * pre-patch harmless data race on the about-to-be-reinitialized struct. */
+    portMUX_INITIALIZE(&self->mux);
 }
 ha_cleanup_state_t ha_discovery_cleanup_get_state(ha_discovery_cleanup_t* self)
 {
