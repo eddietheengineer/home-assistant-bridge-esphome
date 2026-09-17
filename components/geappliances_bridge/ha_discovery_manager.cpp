@@ -269,7 +269,7 @@ static int chunk_decompress(ha_discovery_manager_t* self, const uint8_t* compres
     size_t src_size = compressed_len;
     size_t dst_size = *output_len;
 
-    tinfl_status status = tinfl_decompress(
+    tinfl_status status = gea_tinfl_decompress(
         &self->decomp_state,
         compressed, &src_size,
         output, output, &dst_size,
