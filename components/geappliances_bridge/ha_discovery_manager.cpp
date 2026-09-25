@@ -647,8 +647,11 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             n = snprintf(payload + pos, space, "\"value_template\":\"");
             if (n < 0 || n >= space) goto too_large;
             pos += n; space -= n;
+            /* Reserve room for the template plus the closing ", so an
+             * oversized template is rejected (too_large) before the copy
+             * instead of being silently truncated into malformed JSON. */
+            if (len + 3 > (size_t)space) goto too_large;
             int reescaped = json_embed_value(val, len, payload + pos, space);
-            if (reescaped >= space) goto too_large;
             pos += reescaped; space -= reescaped;
             n = snprintf(payload + pos, space, "\",");
             if (n < 0 || n >= space) goto too_large;
@@ -660,8 +663,11 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             n = snprintf(payload + pos, space, "\"command_topic\":\"%s\",\"command_template\":\"", self->actual_command_topic_buf);
             if (n < 0 || n >= space) goto too_large;
             pos += n; space -= n;
+            /* Reserve room for the template plus the closing ", so an
+             * oversized template is rejected (too_large) before the copy
+             * instead of being silently truncated into malformed JSON. */
+            if (len + 3 > (size_t)space) goto too_large;
             int reescaped = json_embed_value(val, len, payload + pos, space);
-            if (reescaped >= space) goto too_large;
             pos += reescaped; space -= reescaped;
             n = snprintf(payload + pos, space, "\",");
             if (n < 0 || n >= space) goto too_large;

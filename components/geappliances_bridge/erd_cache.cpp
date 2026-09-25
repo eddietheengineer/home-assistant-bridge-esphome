@@ -210,7 +210,9 @@ bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, uint8_t board_address, 
 
 void erd_cache_set_throttle_rate_seconds(erd_cache_t* self, uint8_t rate)
 {
+  erd_cache_lock(self);
   self->max_cooldown = rate;
+  erd_cache_unlock(self);
 }
 
 /* Internal (lock-free) get_next_updated. Caller must hold the cache lock. */
