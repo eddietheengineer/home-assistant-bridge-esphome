@@ -124,7 +124,6 @@ void OtaCleanupManager::check_discovery_changes(const char* current_device_id) {
   DiscoveryNVS stored{};
 
   if (!pref.load(&stored)) {
-    // No stored state — fresh install, trigger initial discovery.
     this->trigger_initial_discovery();
     return;
   }
@@ -136,7 +135,6 @@ void OtaCleanupManager::check_discovery_changes(const char* current_device_id) {
     return;
   }
 
-  // Compare the combined discovery hash, device ID, and config flags.
   bool hash_changed = (stored.hash != discovery_data_hash(this->ha_discovery_manager_));
   bool device_id_changed = (stored.device_id[0] != '\0' &&
                             strcmp(stored.device_id, current_device_id) != 0);
@@ -153,7 +151,6 @@ void OtaCleanupManager::check_discovery_changes(const char* current_device_id) {
     return;
   }
 
-  // No changes — nothing to do.
 #else
   (void)current_device_id;
 #endif
@@ -183,7 +180,6 @@ bool OtaCleanupManager::start_cleanup_()
 
 void OtaCleanupManager::loop() {
 #if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
-  // ── Initial discovery publish (fresh install, no cleanup or reboot) ──────
   if (!this->ota_cleanup_in_progress_ &&
       !this->ota_discovery_publishing_ && !this->ota_reboot_pending_) {
     if (this->initial_discovery_needed_ &&
@@ -208,7 +204,6 @@ void OtaCleanupManager::loop() {
     }
   }
 
-  // ── Start cleanup (OTA or DiscoveryRefresh) ──────────────────────────────
   if (!this->ota_cleanup_in_progress_ &&
       !this->ota_discovery_publishing_ && !this->ota_reboot_pending_) {
     bool ota_trigger = this->generate_device_config_ && this->ota_cleanup_needed_;
@@ -226,7 +221,6 @@ void OtaCleanupManager::loop() {
     }
   }
 
-  // ── Drive cleanup (shared by OTA and DiscoveryRefresh paths) ─────────────
   if (this->ota_cleanup_in_progress_) {
     ha_discovery_cleanup_run(&this->ha_discovery_manager_->cleanup);
     if (ha_discovery_cleanup_is_done(&this->ha_discovery_manager_->cleanup)) {
@@ -238,7 +232,6 @@ void OtaCleanupManager::loop() {
       ha_discovery_cleanup_destroy(&this->ha_discovery_manager_->cleanup);
       ha_discovery_manager_init(this->ha_discovery_manager_);
 
-      // Publish fresh HA discovery payloads.
       ha_discovery_manager_configure(
         this->ha_discovery_manager_,
         this->device_identity_manager_->get_device_id(),
@@ -253,7 +246,6 @@ void OtaCleanupManager::loop() {
     }
   }
 
-  // ── Drive discovery publishing ───────────────────────────────────────────
   if (this->ota_discovery_publishing_) {
     if (ha_discovery_manager_is_processing(this->ha_discovery_manager_)) {
       ha_discovery_manager_run(this->ha_discovery_manager_);
@@ -292,12 +284,10 @@ void OtaCleanupManager::loop() {
         ESP_LOGE(TAG, "HA discovery failed; not saving discovery state, will retry on next boot");
       } else {
         if (this->cleanup_trigger_ == CleanupTrigger::INITIAL) {
-          // Initial publish: no cleanup needed, but still reboot after.
           this->initial_discovery_done_ = true;
           this->cleanup_trigger_ = CleanupTrigger::NONE;
           ESP_LOGI(TAG, "Initial HA discovery publish complete, preparing reboot...");
         } else {
-          // OTA or DiscoveryRefresh: prepare for reboot.
           this->cleanup_trigger_ = CleanupTrigger::NONE;
           ESP_LOGI(TAG, "OTA HA discovery publish complete, preparing reboot...");
         }
@@ -330,7 +320,6 @@ void OtaCleanupManager::loop() {
     }
   }
 
-  // ── Wait then reboot ─────────────────────────────────────────────────────
   if (this->ota_reboot_pending_) {
     esp_task_wdt_reset();
     uint32_t elapsed = esphome::millis() - this->ota_reboot_start_ms_;

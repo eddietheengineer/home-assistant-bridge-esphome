@@ -1,16 +1,9 @@
-/**
- * HA Discovery Cleanup Module.
- * Discovers and removes old Home Assistant MQTT discovery topics for a device.
- * Independent of the discovery manager — no knowledge of discovery state or
- * buffers.
- */
 
 #include "ha_discovery_cleanup.h"
 
 #ifndef USE_ESP_IDF
 #error "This component requires ESPHome with framework: type: esp-idf"
 #endif
-
 
 #include <string.h>
 #include <stdio.h>
@@ -30,30 +23,23 @@
 #include "freertos/portable.h"
 #endif
 
-/* ------------------------------------------------------------------ */
-/* Cleanup: discover and remove old HA discovery topics               */
-/* ------------------------------------------------------------------ */
-
 /* Uses a single wildcard subscription (homeassistant/+/{device_id}/#)
  * to catch all retained discovery topics across all domains at once. */
 
-/* Idle timeout after last topic callback during cleanup.
- * The ESP-IDF framework MQTT inbound queue holds ~32 messages before dropping.
- * This must be long enough for the broker to finish delivering a batch
- * and for the MQTT task to process its queue before we flush. */
+/* Idle timeout: must be long enough for the broker to finish delivering a
+ * batch and for the MQTT task to process its queue (~32 messages per
+ * inbound queue) before we flush. */
 
-/* Minimum time we stay subscribed before considering a pass complete.
- * Ensures we wait for the initial retained message burst even if
- * cleanup_run() isn't called frequently. */
+/* Minimum subscription time: ensures we wait for the initial retained
+ * message burst even if cleanup_run() isn't called frequently. */
 
-/* Wait after unsubscribe for the inbound MQTT event queue to drain
- * before re-subscribing. If no new topic callbacks fire during this
- * window, the queue is empty and it's safe to re-subscribe. */
+/* Wait after unsubscribe for the inbound MQTT event queue to drain before
+ * re-subscribing; if no new callbacks fire during this window, the queue
+ * is empty and it's safe to re-subscribe. */
 
-/* Flush one topic per batch call. Each publish allocates a std::string
- * on the heap; processing one at a time minimizes peak heap pressure. */
+/* Flush one topic per batch call: each publish allocates a std::string on
+ * the heap, so one at a time minimizes peak heap pressure. */
 
-/* Expose cleanup functions for unit testing. */
 #ifdef HA_DISCOVERY_CLEANUP_TEST_EXPORT
 #  define CLEANUP_FN
 #else
@@ -62,19 +48,18 @@
 
 GEA_TAG(TAG) = "ha_cleanup";
 
-/* Flush queued cleanup topics: publish empty retained payloads to remove them.
- * Called from cleanup_run() during idle periods, not from the MQTT callback,
- * to avoid blocking the ESP-IDF framework MQTT task. Returns the number of topics
- * remaining in the queue (0 means all flushed). */
+/* Publishes empty retained payloads to remove topics. Called from
+ * cleanup_run(), not the MQTT callback, to avoid blocking the ESP-IDF
+ * framework MQTT task. Returns the number of topics remaining in the
+ * queue (0 = all flushed). */
 CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
 {
     if (self == NULL) return 0;
     if (self->mqtt_client == NULL) return self->queue_count;
 
-    /* topic[] is 256 bytes. Topics from the wildcard subscription are bounded
-     * by HA_CLEANUP_TOPIC_BUF_SIZE entries in topic_buf. Each topic is at most
-     * ~200 bytes (homeassistant/{domain}/{device_id}/{entity_id}/config).
-     * strncpy truncates safely. Long-term: validate topic length before copy. */
+    /* Each topic is at most ~200 bytes
+     * (homeassistant/{domain}/{device_id}/{entity_id}/config), so 256 is
+     * safe; strncpy truncates. */
     char topic[256];
     uint16_t consumed;
     uint16_t remaining;
@@ -109,13 +94,12 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
     }
     consumed = (uint16_t)(strlen(self->topic_buf) + 1);
 
-    /* Safety clamp: prevent underflow if buffer is corrupted. */
+    /* Prevent underflow if the buffer is corrupted. */
     if (consumed > self->queue_write_pos) {
         consumed = self->queue_write_pos;
     }
 
-    /* Compact: shift remaining data to front. Save pre-compact state
-     * so we can undo if the publish fails. */
+    /* Save pre-compact state so we can undo if the publish fails. */
     uint16_t saved_write_pos = self->queue_write_pos;
     uint16_t saved_count = self->queue_count;
     memmove(self->topic_buf, self->topic_buf + consumed,
@@ -126,10 +110,9 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
     taskEXIT_CRITICAL(&self->mux);
 
     if (!mqtt_client_publish_raw(self->mqtt_client, topic, "", 0, true)) {
-        /* Publish dropped (queue full) — undo the compact using saved
-         * state. The saved values were captured inside the critical
-         * section so they are consistent even if the callback fires
-         * during the publish attempt. */
+        /* Publish dropped (queue full) — undo the compact. The saved
+         * values were captured inside the critical section, so they are
+         * consistent even if the callback fires during the publish. */
         taskENTER_CRITICAL(&self->mux);
         self->queue_write_pos = saved_write_pos;
         self->queue_count = saved_count;
@@ -142,7 +125,6 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
 
     ESP_LOGD(TAG, "Removed old topic: %s", topic);
 
-    /* Read remaining count after successful publish. */
     taskENTER_CRITICAL(&self->mux);
     remaining = self->queue_count;
     taskEXIT_CRITICAL(&self->mux);
@@ -150,37 +132,18 @@ CLEANUP_FN uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self)
     return remaining;
 }
 
-/* Callback for homeassistant/+/{device_id}/# wildcard subscription during cleanup.
- * Stores the full topic string in the buffer for republishing from the main loop.
- * Keeps the callback short — no outbound publish call — so the MQTT task's
- * inbound queue drains fast and retained message bursts don't overflow.
+/* Callback for the homeassistant/+/{device_id}/# wildcard subscription.
+ * Stores the full topic for republishing from the main loop; keeps the
+ * callback short (no outbound publish) so the MQTT task's inbound queue
+ * drains fast and retained message bursts don't overflow.
  *
- * THREAD SAFETY: This callback runs in the ESP-IDF framework MQTT task
- * context (a separate FreeRTOS task). Shared state (topic_buf,
- * queue_write_pos, queue_count) is protected by
- * taskENTER_CRITICAL()/taskEXIT_CRITICAL() on the per-instance mux
- * (self->mux).
- *
- * On single-core (ESP32-C3/C6, RISC-V): the critical section disables
- * interrupts, preventing preemption.
- *
- * On dual-core (ESP32-S3, Xtensa): the portMUX_TYPE contains a spinlock.
- * taskENTER_CRITICAL disables interrupts on the calling core AND acquires
- * the spinlock, which prevents the other core from entering the same
- * critical section. The other core spins until the lock is released.
- * This is the standard ESP-IDF SMP critical section mechanism — no mutex
- * needed.
- *
- * The ESP-IDF framework MQTT task is not pinned to a specific core and may
- * run on either core. The spinlock handles cross-core contention
- * correctly regardless of core assignment.
- *
- * DESTROY SAFETY: ha_discovery_cleanup_destroy() poisons get_time_ms (NULL)
- * before unsubscribing, waits 50 ms for any in-flight callback that passed
- * the guard to finish its critical section, then memsets the struct and
- * re-initializes the per-instance spinlock (portMUX_INITIALIZE) so a late
- * callback on the dead struct acquires a valid lock instead of spinning on
- * the zeroed one. */
+ * Runs in the ESP-IDF framework MQTT task context; shared state
+ * (topic_buf, queue_write_pos, queue_count) is protected by the
+ * per-instance mux. On single-core (C3/C6) the critical section disables
+ * interrupts; on dual-core (S3) the portMUX_TYPE is a spinlock, so
+ * cross-core contention is handled regardless of which core the unpinned
+ * MQTT task runs on.
+ */
 CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg)
 {
     (void)payload;
@@ -190,23 +153,21 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
 
     /* Read the time function exactly once and use that value for both the
      * guard and the later call: destroy() may null self->get_time_ms (and
-     * later memset the struct) at any point. A single read is airtight at
-     * any optimization level - a second, separate read could observe the
-     * post-poison NULL even when the guard's read was non-NULL, and only
-     * the optimizer's read-merging happens to close that window at -O2. */
+     * later memset the struct) at any point. A second, separate read could
+     * observe the post-poison NULL even when the guard's read was
+     * non-NULL; only the optimizer's read-merging closes that window. */
     uint32_t (*get_time)(void) = self->get_time_ms;
     if (get_time == NULL) return;
 
-    /* Only remove config topics. */
     size_t topic_len = strlen(topic);
     if (topic_len < 7) return;
     if (strcmp(topic + topic_len - 7, "/config") != 0) return;
 
-    /* If the payload is empty, it's our own echo from a previous clear — skip. */
+    /* An empty payload is our own echo from a previous clear — skip. */
     if (payload_len == 0) return;
 
-    /* Guard against oversized topics: if topic_len >= HA_CLEANUP_TOPIC_BUF_SIZE,
-     * the uint16_t cast of (topic_len + 1) could overflow to 0. */
+    /* If topic_len >= HA_CLEANUP_TOPIC_BUF_SIZE, the uint16_t cast of
+     * (topic_len + 1) could overflow to 0. */
     if (topic_len >= HA_CLEANUP_TOPIC_BUF_SIZE) {
         self->dropped_count++;
         return;
@@ -214,17 +175,16 @@ CLEANUP_FN void cleanup_topic_callback(const char* topic, const char* payload, s
     uint16_t needed = (uint16_t)(topic_len + 1);
 
     taskENTER_CRITICAL(&self->mux);
-    /* Diagnostic: count all callbacks received (inside critical section to avoid race). */
+    /* Count all callbacks received (inside the critical section to avoid a race). */
     self->pass_received_count++;
 
-    /* Check if buffer has room. Simple linear append — no ring buffer. */
+    /* Linear append, no ring buffer. */
     if (self->queue_write_pos + needed <= HA_CLEANUP_TOPIC_BUF_SIZE) {
         memcpy(self->topic_buf + self->queue_write_pos, topic, topic_len);
         self->topic_buf[self->queue_write_pos + topic_len] = '\0';
         self->queue_write_pos += needed;
         self->queue_count++;
     } else {
-        /* Buffer full — drop this topic */
         self->dropped_count++;
     }
 
@@ -247,7 +207,6 @@ CLEANUP_FN void cleanup_start(ha_discovery_cleanup_t* self)
     self->pass_number = 1;
     self->drain_start_ms = 0;
 
-    /* Heap fragmentation baseline before cleanup. */
     {
         size_t free_heap __attribute__((unused)) = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
         size_t largest_free __attribute__((unused)) = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
@@ -258,10 +217,6 @@ CLEANUP_FN void cleanup_start(ha_discovery_cleanup_t* self)
 
     ESP_LOGI(TAG, "Starting HA discovery cleanup...");
 }
-
-/* ------------------------------------------------------------------ */
-/* Public API                                                         */
-/* ------------------------------------------------------------------ */
 
 void ha_discovery_cleanup_init(ha_discovery_cleanup_t* self)
 {
@@ -288,43 +243,36 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
 {
     if (self == NULL) return;
     if (self->mqtt_client == NULL) {
-        /* No MQTT client — skip cleanup, mark done. */
         self->state = ha_cleanup_state_done;
         ESP_LOGI(TAG, "Skipping cleanup (no MQTT client)");
         return;
     }
     if (self->device_id == NULL) {
-        /* No device_id — can't build subscription topic, mark done. */
         self->state = ha_cleanup_state_done;
         ESP_LOGW(TAG, "Skipping cleanup (no device_id)");
         return;
     }
     if (self->get_time_ms == NULL) {
-        /* No time function — can't track drain timers, mark done. */
         self->state = ha_cleanup_state_done;
         ESP_LOGW(TAG, "Skipping cleanup (no get_time_ms)");
         return;
     }
 
-    /* Not yet subscribed — subscribe to all domains at once. */
     if (!self->subscribed) {
-        /* If we just unsubscribed, wait for the inbound MQTT event queue
-         * to drain before re-subscribing. We know it's drained when no new
-         * topic callbacks fire for DRAIN_WAIT_MS after the last one. */
+        /* Wait for the inbound MQTT event queue to drain before
+         * re-subscribing: it's drained when no new topic callbacks fire
+         * for DRAIN_WAIT_MS after the last one. */
         if (self->drain_start_ms != 0) {
             uint32_t now = self->get_time_ms();
-            /* If a callback still fired after we started draining, the queue
-             * isn't empty yet — reset the drain timer from the latest activity. */
+            /* A callback fired after drain started — the queue isn't empty
+             * yet; reset the drain timer from the latest activity. */
             if (self->last_activity_ms > self->drain_start_ms) {
                 self->drain_start_ms = self->last_activity_ms;
                 return;
             }
-            /* No new activity since drain started. Wait until enough time
-             * has passed to be confident the queue is empty. */
             if (now - self->last_activity_ms < HA_CLEANUP_DRAIN_WAIT_MS) {
                 return;
             }
-            /* Queue has drained — clear drain state and proceed to subscribe. */
             self->drain_start_ms = 0;
         }
 
@@ -346,11 +294,10 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
 
     uint32_t now = self->get_time_ms();
 
-    /* Enforce minimum subscription time: don't consider the pass complete
-     * until we've been subscribed long enough for the MQTT task to deliver
-     * at least one batch of retained messages (~32 per queue cycle). */
+    /* Don't consider the pass complete until we've been subscribed long
+     * enough for the MQTT task to deliver at least one batch of retained
+     * messages (~32 per queue cycle). */
     if (now - self->subscribe_start_ms < HA_CLEANUP_MIN_SUBSCRIBE_MS) {
-        /* Still within minimum subscription window — flush one topic (fixes C4). */
         cleanup_flush_queue(self);
         return;
     }
@@ -362,9 +309,7 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
         return;
     }
 
-    /* Check if we've been idle long enough (no new callbacks). */
     if (now - self->last_activity_ms >= HA_CLEANUP_IDLE_TIMEOUT_MS) {
-        /* Flush one topic (fixes C4). */
         cleanup_flush_queue(self);
 
         char sub_topic[128];
@@ -372,12 +317,11 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
             "homeassistant/+/%s/#", self->device_id);
         mqtt_client_unsubscribe(self->mqtt_client, sub_topic);
         self->subscribed = false;
-        /* Start drain wait: track when we unsubscribed so we can wait
-         * for the inbound queue to empty before re-subscribing. */
+        /* Track when we unsubscribed so we can wait for the inbound queue
+         * to empty before re-subscribing. */
         self->drain_start_ms = self->last_activity_ms;
 
         if (self->pass_found_topics) {
-            /* Found topics this pass — log and retry from scratch. */
             ESP_LOGI(TAG, "  Pass %u: %u received, %u removed, %u dropped — retrying",
                 self->pass_number,
                 self->pass_received_count,
@@ -387,7 +331,6 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
             return;
         }
 
-        /* Clean pass — no topics found. */
         ESP_LOGI(TAG, "  Pass %u: clean (%u received, %u removed)",
             self->pass_number,
             self->pass_received_count,
@@ -396,11 +339,9 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
         self->pass_number++;
 
         if (self->clean_passes < 2) {
-            /* Need one more verification pass. */
             return;
         }
 
-        /* Two clean verification passes — done. */
         if (self->dropped_count > 0) {
             ESP_LOGW(TAG, "  Dropped %u topics due to buffer full during cleanup",
                 (unsigned)self->dropped_count);
@@ -417,7 +358,6 @@ void ha_discovery_cleanup_run(ha_discovery_cleanup_t* self)
         return;
     }
 
-    /* Still receiving messages. Flush one topic while waiting (fixes C4). */
     cleanup_flush_queue(self);
 }
 
@@ -429,9 +369,9 @@ void ha_discovery_cleanup_destroy(ha_discovery_cleanup_t* self)
      * firing on a partially-destroyed struct. */
     self->get_time_ms = NULL;
 
-    /* Unsubscribe if we ever subscribed, regardless of whether device_id
-     * is set. device_id == NULL only means "never configured", but a
-     * double-destroy could have already zeroed it. */
+    /* Unsubscribe if we ever subscribed, regardless of device_id: NULL
+     * only means "never configured", but a double-destroy could have
+     * already zeroed it. */
     if (self->subscribed && self->mqtt_client != NULL) {
         i_mqtt_client_t* client = self->mqtt_client;
         self->mqtt_client = NULL;
@@ -443,28 +383,17 @@ void ha_discovery_cleanup_destroy(ha_discovery_cleanup_t* self)
         }
         self->subscribed = false;
 
-        /* Wait for any callback that passed the get_time_ms guard BEFORE
-         * we poisoned it (above) to finish its critical section.
-         *
-         * The dangerous window is a single callback that read get_time_ms
-         * (non-NULL) before destroy() nulled it, then entered
-         * taskENTER_CRITICAL and is writing to topic_buf. That critical
-         * section takes microseconds on ESP32-C3. Messages dequeued
-         * AFTER the poison return at the guard (get_time_ms == NULL)
-         * without touching the struct — they are irrelevant to the memset.
-         *
-         * 50 ms is a conservative margin (~1000x the actual CS duration).
-         * It matches the 100 ms pattern in erd_cache_mqtt_publisher_stop(). */
+        /* Wait for any callback that read get_time_ms (non-NULL) before
+         * the poison to finish its critical section. 50 ms is a
+         * conservative margin (~1000x the actual CS duration). */
         vTaskDelay(pdMS_TO_TICKS(50));
     }
     memset(self, 0, sizeof(*self));
 
     /* Re-initialize the per-instance spinlock: the memset zeroed it to
-     * owner=0, an invalid state (neither SPINLOCK_FREE nor a core ID). A
-     * delayed callback that fires on the dead struct would otherwise spin
-     * forever in spinlock_acquire (deadlock -> watchdog reset) on
-     * dual-core. With a valid FREE lock, a late callback just performs the
-     * pre-patch harmless data race on the about-to-be-reinitialized struct. */
+     * owner=0, an invalid state. A delayed callback on the dead struct
+     * would otherwise spin forever in spinlock_acquire (deadlock ->
+     * watchdog reset) on dual-core. */
     portMUX_INITIALIZE(&self->mux);
 }
 ha_cleanup_state_t ha_discovery_cleanup_get_state(ha_discovery_cleanup_t* self)

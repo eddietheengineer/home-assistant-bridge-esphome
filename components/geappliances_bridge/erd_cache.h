@@ -1,19 +1,13 @@
-/*!
- * @file
- * @brief Fixed-size ERD cache with static arena storage.
- *
- * Stores the latest data for up to ERD_CACHE_CAPACITY ERDs. All ERD data is
- * stored in a contiguous static arena (bump allocator). ERDs > 248 bytes
- * (GEA3 max payload) are rejected. ERD size is invariant after registration —
- * updates are in-place memcpy with no allocation or deallocation. Change
- * detection is done at insert/update time, eliminating per-read memcmp overhead.
- *
- * Thread safety: The cache is accessed from both the main loop (writes ERD
- * updates) and the background MQTT publisher task (drains update_required
- * entries). A single mutex (lock) guards entries[] + arena[] + arena_offset,
- * so the two paths are safe on single-core (C3/C6) and dual-core (S3) alike.
- * Every public accessor takes the lock; it is held only for the short
- * read/copy or write of an entry, never across the slow MQTT publish. */
+// Fixed-size ERD cache backed by a static arena (bump allocator); no
+// allocation/deallocation after registration. ERD size is invariant after
+// registration — updates are in-place memcpy.
+//
+// Change detection is done at insert/update time, eliminating per-read
+// memcmp overhead.
+//
+// Thread safety: a single mutex guards entries[] + arena[] + arena_offset.
+// Every accessor takes the lock for a short read/copy or write, never across
+// the slow MQTT publish.
 
 #ifndef erd_cache_h
 #define erd_cache_h

@@ -1,16 +1,3 @@
-/*!
- * @file
- * @brief ERD polling bridge implementation.
- *
- * The polling bridge probes a pre-built list of ERDs at a known host
- * address, then settles into steady-state polling.  It does not perform
- * broadcast discovery — that is the responsibility of
- * DeviceIdentityManager/AutodiscoveryManager.
- *
- * State machine:
- *   state_probe_list  (reads each probe_list ERD; only successful reads added)
- *     → state_polling
- */
 
 #include "erd_bridge_poll.h"
 
@@ -21,12 +8,10 @@
 #include "esphome/core/hal.h"
 #include "esphome/core/application.h"
 #include "erd_cache.h"
+// This bridge does not perform broadcast discovery — that is the
+// responsibility of DeviceIdentityManager/AutodiscoveryManager.
 
 GEA_TAG(TAG) = "erd_bridge_poll";
-
-// ============================================================================
-// Polling bridge — forward declarations
-// ============================================================================
 
 static tiny_hsm_result_t poll_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_probe_list(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
@@ -37,10 +22,6 @@ static bool send_cycle_reads(erd_bridge_poll_t* self);
 static constexpr uint32_t POLL_YIELD_MS = 50;          // per-batch time budget
 static constexpr uint32_t POLL_CYCLE_SEND_BUDGET_MS = 100;  // max time per send invocation
 static constexpr uint32_t POLL_CYCLE_RESUME_MS = 100;   // timer interval when send budget exceeded
-
-// ============================================================================
-// Polling bridge — private helpers
-// ============================================================================
 
 static void arm_polling_timer(erd_bridge_poll_t* self, tiny_timer_ticks_t ticks)
 {
@@ -89,21 +70,17 @@ static void clear_discovery_state(erd_bridge_poll_t* self)
   self->polling_list_count = 0;
 }
 
-// Called when all ERDs in the current polling cycle have responded.
-// Records cycle metrics and decides whether to start the next cycle
-// immediately or wait for the polling timer.  When 'immediate' is true,
-// the next cycle starts right away (used when restart_pending is set or
-// the timer has already expired).  When 'immediate' is false, only arms
-// the timer if it isn't already armed (used from send_next_poll_read_request
-// where restart_pending is never set).
+// 'immediate' controls how the next cycle is started:
+//   true  — start the next cycle right away (used when restart_pending is set
+//           or the timer has already expired).
+//   false — only arm the timer if it isn't already armed (used from
+//           send_next_poll_read_request, where restart_pending is never set).
 static void on_polling_cycle_complete(erd_bridge_poll_t* self, bool immediate)
 {
   uint32_t now = esphome::millis();
   self->last_cycle_time_ms = (uint32_t)(now - self->cycle_start_ms);
   self->cycle_count++;
 
-  // Track consecutive cycle failures. If any ERD in the cycle failed,
-  // increment the failure counter. On success, reset it.
   if (self->cycle_has_failure) {
     self->polling_failure_count++;
   } else {
@@ -225,7 +202,6 @@ static bool send_cycle_reads(erd_bridge_poll_t* self)
       return false;
     }
   }
-  /* All reads sent. */
   self->cycle_sending_in_progress = false;
   uint32_t elapsed = esphome::millis() - send_start;
   if (elapsed >= 1000) {
@@ -247,8 +223,6 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
 {
   erd_bridge_poll_t* self = container_of(erd_bridge_poll_t, hsm, hsm);
   if (data == nullptr) {
-    // Signal with no payload (entry, exit, or unknown).  Callers are
-    // responsible for handling entry before reaching this point.
     return tiny_hsm_result_signal_deferred;
   }
   auto args = reinterpret_cast<const tiny_gea3_erd_client_on_activity_args_t*>(data);
@@ -385,7 +359,6 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       }
       break;
     case signal_polling_timer_expired: {
-      // Timer fired: mark as no longer armed.
       self->polling_timer_armed = false;
       if (self->erd_index >= self->polling_list_count && self->cycle_completed_count < self->polling_list_count) {
         // Reads are in flight (erd_index reached the end of the list) but
@@ -396,7 +369,6 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         self->restart_pending = true;
         break;
       }
-      // If we were in the middle of sending reads for a cycle, resume.
       bool all_sent;
       if (self->cycle_sending_in_progress) {
         all_sent = send_cycle_reads(self);
@@ -406,7 +378,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
           arm_polling_timer(self, POLL_CYCLE_RESUME_MS);
         }
       } else {
-        /* Cycle was already complete when the timer fired — start next cycle. */
+        // Cycle was already complete when the timer fired — start next cycle.
         self->erd_index = 0;
         self->cycle_completed_count = 0;
         uint32_t now = esphome::millis();
@@ -432,7 +404,6 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
       uint8_t addr = args->address;
 
       if (erd_set_contains(&self->erd_set, erd)) {
-        // ERD already known — just update cache.
       } else {
         add_erd_to_polling_list(self, erd, addr);
       }
@@ -485,7 +456,6 @@ static tiny_hsm_result_t state_failed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal,
       break;
 
     case signal_appliance_lost:
-      // Appliance came back — re-probe from scratch.
       self->erd_host_address = self->known_host_address;
       self->polling_failure_count = 0;
       tiny_hsm_transition(hsm, state_probe_list);
@@ -501,8 +471,6 @@ static tiny_hsm_result_t state_failed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal,
   return tiny_hsm_result_signal_consumed;
 }
 
-// ============================================================================
-// Polling bridge — HSM configuration
 static const tiny_hsm_state_descriptor_t poll_hsm_state_descriptors[] = {
   { .state = poll_state_top,              .parent = nullptr         },
   { .state = state_probe_list,            .parent = poll_state_top  },
@@ -514,9 +482,6 @@ static const tiny_hsm_configuration_t poll_hsm_configuration = {
   .state_count = element_count(poll_hsm_state_descriptors)
 };
 
-// ============================================================================
-// Polling bridge — public API
-// ============================================================================
 // Shared initialization helper.  Sets self->erd_host_address and
 // self->probe_list BEFORE calling tiny_hsm_init(), so that
 // state_probe_list entry can probe at the correct address.

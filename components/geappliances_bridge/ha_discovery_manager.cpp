@@ -1,11 +1,6 @@
-/*!
- * @file
- * @brief Home Assistant MQTT Discovery manager implementation.
- *
- * Main-loop design: start() builds the sorted ERD list and device JSON
- * inline. run() is called from the main loop; it decompresses chunks,
- * parses JSONL, and publishes one entity per call, keeping loop times low.
- */
+// Main-loop design: start() builds the sorted ERD list and device JSON inline.
+// run() is called from the main loop; it decompresses chunks, parses JSONL,
+// and publishes one entity per call, keeping loop times low.
 
 #include "ha_discovery_manager.h"
 #include "ha_discovery_data.h"
@@ -35,10 +30,6 @@
 #endif
 
 GEA_TAG(TAG) = "ha_discovery";
-
-/* ------------------------------------------------------------------ */
-/* Zero-allocation JSON parser helpers                                */
-/* ------------------------------------------------------------------ */
 
 /* Extract a JSON string value for the given key.
  * Returns a pointer to the first character of the value (after opening quote)
@@ -99,7 +90,6 @@ static const char* json_get_str(const char* json, const char* key,
     return NULL;
 }
 
-/* Unescape a JSON string value into out (max out_size bytes including null). */
 static void json_unescape(const char* src, size_t src_len, char* out, int out_size)
 {
     int i = 0;
@@ -139,10 +129,6 @@ static int json_embed_value(const char* src, size_t src_len, char* out, int out_
     return (int)src_len;
 }
 
-/* ------------------------------------------------------------------ */
-/* ERD cache lookup (binary search on sorted array)                    */
-/* ------------------------------------------------------------------ */
-
 static bool erd_is_registered_sorted(const ha_discovery_manager_t* self, uint16_t erd_id)
 {
     uint16_t lo = 0, hi = self->sorted_erds_count;
@@ -155,7 +141,6 @@ static bool erd_is_registered_sorted(const ha_discovery_manager_t* self, uint16_
     return false;
 }
 
-/* Build sorted ERD array from cache for binary search. */
 static void build_sorted_erd_list(ha_discovery_manager_t* self)
 {
     self->sorted_erds_count = 0;
@@ -164,7 +149,6 @@ static void build_sorted_erd_list(ha_discovery_manager_t* self)
         erd_cache_entry_t* entry = erd_cache_get_next_entry(self->cache, &iterator);
         if (!entry) break;
         if (self->sorted_erds_count >= HA_DISCOVERY_MAX_ERDS) break;
-        /* Dedup */
         bool already = false;
         for (uint16_t k = 0; k < self->sorted_erds_count; k++) {
             if (self->sorted_erds[k] == entry->erd) { already = true; break; }
@@ -185,10 +169,6 @@ static void build_sorted_erd_list(ha_discovery_manager_t* self)
     }
 }
 
-/* ------------------------------------------------------------------ */
-/* Device JSON builder                                                */
-/* ------------------------------------------------------------------ */
-
 static void build_device_json(ha_discovery_manager_t* self)
 {
     if (self->device_id == NULL) {
@@ -198,7 +178,6 @@ static void build_device_json(ha_discovery_manager_t* self)
     int pos = snprintf(self->device_json_buf, sizeof(self->device_json_buf),
         "{\"identifiers\":[\"");
 
-    /* Escape device_id for identifiers */
     for (const char* p = self->device_id; *p && pos < (int)sizeof(self->device_json_buf) - 8; p++) {
         unsigned char c = (unsigned char)*p;
         if (c == '"') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\"");
@@ -211,7 +190,6 @@ static void build_device_json(ha_discovery_manager_t* self)
             "\"],\"name\":\"");
     }
 
-    /* Escape device_id for name */
     for (const char* p = self->device_id; *p && pos < (int)sizeof(self->device_json_buf) - 8; p++) {
         unsigned char c = (unsigned char)*p;
         if (c == '"') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\"");
@@ -253,10 +231,6 @@ static void build_device_json(ha_discovery_manager_t* self)
     self->device_json_buf[pos] = '\0';
 }
 
-/* ------------------------------------------------------------------ */
-/* Decompression helper                                               */
-/* ------------------------------------------------------------------ */
-
 static int chunk_decompress(ha_discovery_manager_t* self, const uint8_t* compressed, size_t compressed_len,
                            uint8_t* output, size_t* output_len)
 {
@@ -284,15 +258,10 @@ static int chunk_decompress(ha_discovery_manager_t* self, const uint8_t* compres
 #endif
 }
 
-/* ------------------------------------------------------------------ */
-/* Runtime config topic filtering                                     */
-/* ------------------------------------------------------------------ */
-
 /* Keywords that mark an entity as internal/diagnostic.
  * If filter_config_topics is enabled and the entity name contains
  * any of these (case-insensitive), the entity is skipped. */
 static const char* FILTER_KEYWORDS[] = {
-    /* Internal/diagnostic */
     "linux diagnostics",
     "gea interface diagnostic",
     "non-volatile usage warning",
@@ -309,13 +278,11 @@ static const char* FILTER_KEYWORDS[] = {
     "ready to enter boot",
     "engineering revision setup",
     "csm fault data",
-    /* Cloud/voice/iot */
     "alexa registration",
     "matter commissioning",
     "onboarding",
     "voice module",
     "push notification",
-    /* Allowability/availability metadata */
     "range data",
     "expiration limit",
     "modification available",
@@ -332,7 +299,6 @@ static const char* FILTER_KEYWORDS[] = {
     "request setting",
     "request mask",
     "request configuration",
-    /* Time/network */
     "clock time",
     "ntp",
     "time zone",
@@ -343,7 +309,6 @@ static const char* FILTER_KEYWORDS[] = {
     "signal strength",
     "ble master",
     "bluetooth master",
-    /* Energy/camera */
     "electrical pricing",
     "demand response",
     "time of use pricing",
@@ -354,15 +319,12 @@ static const char* FILTER_KEYWORDS[] = {
     "camera stream",
     "inference id",
     "cook cam upload",
-    /* Sound */
     "available sound",
     "number of sound level",
-    /* Enhanced features */
     "enhanced feature",
     "core-enhanced-cloud",
     "request enabled enhanced",
     "current enabled enhanced",
-    /* Usage/cycle */
     "usage profile",
     "current report",
     "feature configuration",
@@ -370,7 +332,6 @@ static const char* FILTER_KEYWORDS[] = {
     "latched key status",
     "dip switch",
     "most recent cycle status",
-    /* Service/diagnostic */
     "service mode",
     NULL
 };
@@ -381,7 +342,6 @@ static const char* FILTER_KEYWORDS[] = {
  * so the 256-byte buffer always has headroom. Long-term: replace with a
  * case-insensitive strstr variant to eliminate the stack allocation. */
 static bool should_filter_config_topic(const char* name) {
-    /* Convert name to lowercase for comparison. */
     char lower[256];
     size_t i, name_len = strlen(name);
     if (name_len >= sizeof(lower)) name_len = sizeof(lower) - 1;
@@ -423,17 +383,12 @@ void ha_discovery_test_format_erd_topic(char* destination, size_t destination_si
 }
 #endif
 
-/* ------------------------------------------------------------------ */
-/* Process a single JSONL line: build topic/payload in shared buffers */
-/* ------------------------------------------------------------------ */
-
 static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
 {
     if (self->device_id == NULL) return false;
     const char* val = NULL;
     size_t len = 0;
 
-    /* Required fields */
     if (!json_get_str(line, "i", &val, &len)) return false;
     if (len >= sizeof(self->erd_id_hex_buf)) len = sizeof(self->erd_id_hex_buf) - 1;
     memcpy(self->erd_id_hex_buf, val, len);
@@ -443,7 +398,6 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     if (!json_get_str(line, "n", &val, &len)) return false;
     json_unescape(val, len, self->entity_name_buf, sizeof(self->entity_name_buf));
 
-    /* Runtime config topic filtering. */
     if (self->filter_config_topics && should_filter_config_topic(self->entity_name_buf)) {
         self->total_filtered++;
         return false;
@@ -502,13 +456,11 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
 
     uint16_t erd_id = (uint16_t)strtoul(erd_id_hex, NULL, 16);
 
-    /* Check if ERD is registered (binary search). */
     if (!erd_is_registered_sorted(self, erd_id)) {
         self->total_filtered++;
         return false;
     }
 
-    /* Check paired ERD if present. */
     if (self->paired_erd_buf[0]) {
         uint16_t paired_id = (uint16_t)strtoul(self->paired_erd_buf, NULL, 16);
         if (!erd_is_registered_sorted(self, paired_id)) {
@@ -531,13 +483,11 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
         snprintf(self->unique_id_buf, sizeof(self->unique_id_buf), "%s_erd_%s", self->device_id, erd_id_hex);
     }
 
-    /* Build state_topic and command_topic */
     format_erd_topic(self->state_topic_buf, sizeof(self->state_topic_buf), self->device_id,
                      erd_id_hex, self->board_address_buf, "value");
     format_erd_topic(self->command_topic_buf, sizeof(self->command_topic_buf), self->device_id,
                      erd_id_hex, self->board_address_buf, "write");
 
-    /* For paired entities, swap state/command topics */
     if (self->paired_erd_buf[0]) {
         if (self->role_buf[0] && strcmp(self->role_buf, "request") == 0) {
             format_erd_topic(self->actual_command_topic_buf, sizeof(self->actual_command_topic_buf),
@@ -561,7 +511,6 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
      * Address-aware custom entries add "_address_xx" to the suffix. Truncation
      * is detected below so oversized configuration topics are safely skipped. */
     if (self->domain_topic_prefix[0] == '\0' || strcmp(self->domain_buf, self->current_domain_prefix_buf) != 0) {
-        /* Domain changed or first use — rebuild prefix. */
         snprintf(self->domain_topic_prefix, sizeof(self->domain_topic_prefix),
             "homeassistant/%s/%s/", self->domain_buf, self->device_id);
         /* Detect prefix truncation: if it doesn't end with '/', it was cut short. */
@@ -606,11 +555,10 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
      * avoiding intermediate buffer limits. */
     char* payload = self->payload_buf;
     int pos = 0;
-    int space = (int)HA_DISCOVERY_PAYLOAD_BUF_SIZE - 1;  /* leave room for null */
+    int space = (int)HA_DISCOVERY_PAYLOAD_BUF_SIZE - 1;
 
     int n;
 
-    /* Button domain: simpler payload, no state_topic/value_template. */
     if (strcmp(self->domain_buf, "button") == 0) {
         n = snprintf(payload + pos, space,
             "{\"name\":\"%s\",\"unique_id\":\"%s\",\"device\":%s,",
@@ -630,7 +578,6 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             pos += n; space -= n;
         }
     } else {
-        /* Non-button domains: sensor, binary_sensor, switch, select, number, etc. */
         n = snprintf(payload + pos, space,
             "{\"name\":\"%s\",\"unique_id\":\"%s\",\"device\":%s,",
             self->entity_name_buf, self->unique_id_buf, self->device_json_buf);
@@ -642,7 +589,6 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
         if (n < 0 || n >= space) goto too_large;
         pos += n; space -= n;
 
-        /* Embed value_template directly from raw JSONL with re-escaping. */
         if (json_get_str(line, "vt", &val, &len)) {
             n = snprintf(payload + pos, space, "\"value_template\":\"");
             if (n < 0 || n >= space) goto too_large;
@@ -655,7 +601,6 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             pos += n; space -= n;
         }
 
-        /* Embed command_template directly from raw JSONL with re-escaping. */
         if (json_get_str(line, "ct", &val, &len)) {
             n = snprintf(payload + pos, space, "\"command_topic\":\"%s\",\"command_template\":\"", self->actual_command_topic_buf);
             if (n < 0 || n >= space) goto too_large;
@@ -692,7 +637,6 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
             if (n < 0 || n >= space) goto too_large;
             pos += n; space -= n;
         }
-        /* Number domain: use mn/mx/st from JSONL (scaled values). */
         if (strcmp(self->domain_buf, "number") == 0) {
             if (self->min_buf[0]) {
                 n = snprintf(payload + pos, space, "\"min\":%s,", self->min_buf);
@@ -761,7 +705,6 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
         }
     }
 
-    /* Remove trailing comma and close */
     if (pos > 0 && payload[pos - 1] == ',') {
         payload[pos - 1] = '\0';
         pos--; space++;
@@ -778,10 +721,6 @@ too_large:
     self->total_filtered++;
     return false;
 }
-
-/* ------------------------------------------------------------------ */
-/* Category filtering by appliance type                               */
-/* ------------------------------------------------------------------ */
 
 static bool should_process_category(const char* category, uint8_t appliance_type)
 {
@@ -895,12 +834,6 @@ static bool should_process_category(const char* category, uint8_t appliance_type
     return false;
 }
 
-/* ------------------------------------------------------------------ */
-
-/* ------------------------------------------------------------------ */
-/* Cleanup helper                                                     */
-/* ------------------------------------------------------------------ */
-
 static void cleanup_resources(ha_discovery_manager_t* self)
 {
     free(self->decomp_buf);
@@ -925,10 +858,6 @@ static ha_discovery_category_t discovery_category_at(const ha_discovery_manager_
       self->custom_num_chunks, self->custom_max_decompressed_chunk };
 }
 
-/* ------------------------------------------------------------------ */
-/* run(): publish one entity per call                                 */
-/* ------------------------------------------------------------------ */
-
 void ha_discovery_manager_run(ha_discovery_manager_t* self)
 {
     if (self->state != ha_discovery_state_building &&
@@ -950,9 +879,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
         return;
     }
 
-    /* Discovering state: decompress chunks and publish one entity per call. */
     while (self->state == ha_discovery_state_discovering) {
-        /* Find the next category to process. */
         while (self->current_category < discovery_category_count(self)) {
             ha_discovery_category_t cat = discovery_category_at(self, self->current_category);
 
@@ -966,7 +893,6 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                 return;
             }
 
-            /* Decompress the current chunk if needed. */
             if (self->current_decomp_size == 0) {
                 if (self->current_chunk >= cat.num_chunks) {
                     /* Done with this category. Return to main loop; next
@@ -994,11 +920,9 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                 self->current_offset = 0;
             }
 
-            /* Parse lines from the current decompressed chunk. */
             const char* decomp = (const char*)self->decomp_buf;
 
             while (self->current_offset < self->current_decomp_size) {
-                /* Find the next line. */
                 const char* line_start = decomp + self->current_offset;
                 const char* line_end = line_start;
                 while ((uintptr_t)(line_end - decomp) < self->current_decomp_size &&
@@ -1017,9 +941,7 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                 memcpy(self->line_buf, line_start, line_len);
                 self->line_buf[line_len] = '\0';
 
-                /* Process the line. */
                 if (process_jsonl_line(self, self->line_buf)) {
-                    /* Publish. */
                     if (!self->mqtt_client) {
                         /* No MQTT client yet — skip this entity.
                          * Discovery will be retried later when MQTT connects. */
@@ -1035,12 +957,10 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                     self->total_published++;
                     self->total_discovered++;
 
-                    /* Advance offset past this line after successful publish. */
                     self->current_offset = (uint32_t)(line_end - decomp) + 1;
 
                     ESP_LOGD(TAG, "Published: %s (0x%s)", self->entity_name_buf, self->erd_id_hex_buf);
 
-                    /* Log category progress periodically. */
                     if (self->total_published % 50 == 0) {
                         ESP_LOGI(TAG, "Category %s: %lu discovered, %lu published",
                             cat.name, (unsigned long)self->total_discovered, (unsigned long)self->total_published);
@@ -1049,7 +969,6 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
                     /* One entity per call — return to main loop. */
                     return;
                 } else {
-                    /* Line was filtered; advance offset past it. */
                     self->current_offset = (uint32_t)(line_end - decomp) + 1;
                 }
             }
@@ -1062,7 +981,6 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
             return;
         }
 
-        /* Check if all categories are done. */
         if (self->current_category >= discovery_category_count(self)) {
             self->state = ha_discovery_state_complete;
             break;
@@ -1085,10 +1003,6 @@ void ha_discovery_manager_run(ha_discovery_manager_t* self)
     }
 }
 
-/* ------------------------------------------------------------------ */
-/* Public API                                                         */
-/* ------------------------------------------------------------------ */
-
 void ha_discovery_manager_init(ha_discovery_manager_t* self)
 {
     /* Preserve custom data pointers; they are set by codegen and survive reinit. */
@@ -1106,10 +1020,8 @@ void ha_discovery_manager_init(ha_discovery_manager_t* self)
     free(self->line_buf);
     free(self->payload_buf);
 
-    /* Zero all runtime state. */
     memset(self, 0, sizeof(*self));
 
-    /* Restore custom data pointers. */
     self->custom_data = custom_data;
     self->custom_chunks = custom_chunks;
     self->custom_num_chunks = custom_num_chunks;
@@ -1176,7 +1088,6 @@ void ha_discovery_manager_start(ha_discovery_manager_t* self)
         return;
     }
 
-    /* Build sorted ERD list and device JSON inline. */
     build_sorted_erd_list(self);
     build_device_json(self);
 
@@ -1195,7 +1106,6 @@ void ha_discovery_manager_cleanup(ha_discovery_manager_t* self)
      * struct never holds an invalid mux. */
     portMUX_INITIALIZE(&self->cleanup.mux);
 }
-
 
 bool ha_discovery_manager_is_processing(ha_discovery_manager_t* self)
 {

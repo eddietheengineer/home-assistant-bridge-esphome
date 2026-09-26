@@ -1,7 +1,3 @@
-/*!
- * @file
- * @brief ERD cache implementation.
- */
 
 #include "erd_cache.h"
 #include "geappliances_bridge_log.h"
@@ -104,7 +100,6 @@ static erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd, uint
 
 static bool erd_cache_update_locked(erd_cache_t* self, tiny_erd_t erd, uint8_t board_address, const uint8_t* data, uint8_t data_size)
 {
-  /* Reject ERDs exceeding GEA3 max payload size */
   if (data_size > ERD_CACHE_MAX_DATA_SIZE) {
     if (!s_size_rejected_warned) {
       s_size_rejected_warned = true;
@@ -132,12 +127,10 @@ static bool erd_cache_update_locked(erd_cache_t* self, tiny_erd_t erd, uint8_t b
 
     bool data_changed = erd_data_changed(self, existing, data, data_size);
 
-    /* If data hasn't changed, skip storage and publishing. */
     if (!data_changed) {
       return false;
     }
 
-    /* In-place memcpy into arena */
     memcpy(&self->arena[existing->data_offset], data, data_size);
 
     existing->update_required = data_changed;
@@ -148,7 +141,6 @@ static bool erd_cache_update_locked(erd_cache_t* self, tiny_erd_t erd, uint8_t b
     return existing->update_required;
   }
 
-  /* New entry — find a free slot */
   erd_cache_entry_t* slot = nullptr;
   for (uint16_t i = 0; i < ERD_CACHE_CAPACITY; i++) {
     if (!self->entries[i].valid) {
@@ -158,7 +150,6 @@ static bool erd_cache_update_locked(erd_cache_t* self, tiny_erd_t erd, uint8_t b
   }
 
   if (!slot) {
-    /* Cache full — reject new ERD */
     if (!s_slot_overflow_warned) {
       s_slot_overflow_warned = true;
       ESP_LOGW(TAG, "ERD cache full (%u slots), new ERD 0x%04X not cached", ERD_CACHE_CAPACITY, erd);
@@ -166,7 +157,6 @@ static bool erd_cache_update_locked(erd_cache_t* self, tiny_erd_t erd, uint8_t b
     return false;
   }
 
-  /* Check arena has room */
   if (self->arena_offset + data_size > ERD_CACHE_ARENA_SIZE) {
     if (!s_arena_overflow_warned) {
       s_arena_overflow_warned = true;
@@ -176,13 +166,11 @@ static bool erd_cache_update_locked(erd_cache_t* self, tiny_erd_t erd, uint8_t b
     return false;
   }
 
-  /* Insert new entry */
   self->update_count++;
   self->update_count_window++;
   self->required_update_count++;
   self->required_update_count_window++;
 
-  /* Allocate from arena */
   slot->data_offset = self->arena_offset;
   memcpy(&self->arena[self->arena_offset], data, data_size);
   self->arena_offset += data_size;
@@ -199,7 +187,6 @@ static bool erd_cache_update_locked(erd_cache_t* self, tiny_erd_t erd, uint8_t b
   return true;
 }
 
-/* Public wrapper: acquires the cache lock, performs the update, releases the lock. */
 bool erd_cache_update(erd_cache_t* self, tiny_erd_t erd, uint8_t board_address, const uint8_t* data, uint8_t data_size)
 {
   erd_cache_lock(self);

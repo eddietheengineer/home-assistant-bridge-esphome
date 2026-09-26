@@ -1,12 +1,6 @@
 #pragma once
 
-/*!
- * @file
- * @brief Lightweight logging helpers used across the bridge implementation.
- *
- * This header is safe to include from any translation unit (C or C++) and
- * intentionally does not define any global symbols — it only provides macros.
- */
+// Logging macros only — no global symbols, safe to include from any TU.
 
 #ifdef __cplusplus
 #define GEA_MAYBE_UNUSED [[maybe_unused]]

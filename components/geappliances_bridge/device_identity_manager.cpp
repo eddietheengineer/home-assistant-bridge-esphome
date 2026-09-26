@@ -1,10 +1,3 @@
-/*
- * @file
- * @brief DeviceIdentityManager implementation.
- *
- * Self-driving: on_erd_read_completed() queues the next ERD read,
- * on_erd_read_failed() re-queues the current ERD read.
- */
 
 #include "device_identity_manager.h"
 #include "geappliances_bridge_constants.h"
@@ -42,7 +35,6 @@ void DeviceIdentityManager::init(const char* configured_id,
     ESP_LOGI(TAG, "No device_id configured, will auto-generate from identity ERDs");
   }
 
-  // Immediately queue the first ERD read
   this->try_queue_read_(ERD_APPLIANCE_TYPE);
 }
 void DeviceIdentityManager::cleanup()
@@ -58,7 +50,6 @@ void DeviceIdentityManager::cleanup()
   this->erd_client_ = nullptr;
   this->host_address_ = 0;
 }
-
 
 void DeviceIdentityManager::on_erd_read_completed(tiny_erd_t erd, const uint8_t* data, uint8_t size)
 {
@@ -137,7 +128,6 @@ void DeviceIdentityManager::bytes_to_string_(const uint8_t* data, size_t size,
     out[i] = static_cast<char>(raw);
   }
   out[i] = '\0';
-  // Strip trailing '_' padding
   while (i > 0 && out[i - 1] == '_') {
     out[i - 1] = '\0';
     i--;

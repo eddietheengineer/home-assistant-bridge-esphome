@@ -1,15 +1,3 @@
-/*!
- * @file
- * @brief Startup state machine implementation.
- *
- * Each state function handles entry/exit signals and the signal_run_loop
- * signal that drives ongoing work.  Transitions to the next state happen
- * when the required gate conditions are met (e.g., autodiscovery complete,
- * device ID ready, MQTT connected, etc.).
- *
- * The hierarchy is flat — all states defer to startup_state_top for signals
- * they don't handle, providing a common "root" for any unhandled signals.
- */
 
 #include "i_bridge_services.h"
 #include "erd_bridge_common.h"
@@ -26,8 +14,6 @@ GEA_TAG(TAG) = "geappliances_bridge_startup_hsm";
 
 namespace esphome {
 namespace geappliances_bridge {
-
-
 
 IBridgeServices* services_from_hsm(tiny_hsm_t* hsm)
 {
@@ -49,11 +35,6 @@ void startup_hsm_wrapper_destroy(startup_hsm_wrapper_t* self)
   self->hsm.current = nullptr;
 }
 
-
-// ============================================================================
-// Top state — handles signals common to all startup phases
-// ============================================================================
-
 tiny_hsm_result_t startup_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   (void)data;
@@ -65,30 +46,18 @@ tiny_hsm_result_t startup_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, c
   switch (signal) {
     case tiny_hsm_signal_entry:
     case tiny_hsm_signal_exit:
-      // No common entry/exit logic needed.
       break;
 
     default:
-      // Unhandled signal at root — consume it to avoid silent loss.
       break;
   }
 
   return tiny_hsm_result_signal_consumed;
 }
 
-// Phase 1: Protocol Stack — drive GEA2/GEA3 hardware
-//
-// This is the initial state.  It transitions to autodiscovery as soon as
-// the first loop() call arrives (the protocol stack is always running).
-// ============================================================================
-// ============================================================================
-// Phase 1.5: Startup Delay — wait for appliance board to stabilize
-//
-// Waits AUTODISCOVERY_STARTUP_DELAY_MS (5 seconds) before transitioning to
-// autodiscovery.  This gives the appliance board time to boot and be ready
-// to respond to broadcast requests.
-// ============================================================================
-
+// Waits AUTODISCOVERY_STARTUP_DELAY_MS before transitioning to autodiscovery.
+// This gives the appliance board time to boot and be ready to respond to
+// broadcast requests.
 tiny_hsm_result_t startup_state_startup_delay(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   IBridgeServices* svc = services_from_hsm(hsm);
@@ -117,16 +86,8 @@ tiny_hsm_result_t startup_state_startup_delay(tiny_hsm_t* hsm, tiny_hsm_signal_t
   return tiny_hsm_result_signal_consumed;
 }
 
-// ============================================================================
-// Phase 2: Autodiscovery — find appliance on bus
-//
-// The AutodiscoveryManager is fully self-driving: it owns its own timers
-// and event subscriptions.  The HSM calls start() on entry, then checks
-// for completion on each loop iteration and via the completion signal.
-// If no board responds, the manager keeps retrying indefinitely — this
-// state will not transition until a valid board address is found.
-// ============================================================================
-
+// If no board responds, the manager keeps retrying indefinitely — this state
+// will not transition until a valid board address is found.
 tiny_hsm_result_t startup_state_autodiscovery(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   IBridgeServices* svc = services_from_hsm(hsm);
@@ -135,12 +96,10 @@ tiny_hsm_result_t startup_state_autodiscovery(tiny_hsm_t* hsm, tiny_hsm_signal_t
   switch (signal) {
     case tiny_hsm_signal_entry:
       ESP_LOGI(TAG, "Startup: Autodiscovery phase");
-      // Kick off the self-driving autodiscovery manager.
       svc->run_autodiscovery();
       break;
 
     case signal_run_loop:
-      // Manager is self-driving — just check if it completed.
       if (svc->is_autodiscovery_complete()) {
         ESP_LOGI(TAG, "Autodiscovery complete (host=0x%02X, protocol=%s)",
                  svc->get_discovered_host_address(),
@@ -167,13 +126,6 @@ tiny_hsm_result_t startup_state_autodiscovery(tiny_hsm_t* hsm, tiny_hsm_signal_t
   return tiny_hsm_result_signal_consumed;
 }
 
-// ============================================================================
-// Phase 3: Device ID — read appliance identity ERDs
-//
-// Runs the DeviceIdentityManager each loop iteration.  Transitions to
-// mqtt_client_init when the device ID is ready (read or pre-configured).
-// ============================================================================
-
 tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   IBridgeServices* svc = services_from_hsm(hsm);
@@ -190,7 +142,6 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
       break;
 
     case signal_run_loop:
-      // Manager is fully self-driving — just check if it completed.
       if (svc->is_device_id_complete()) {
         tiny_hsm_transition(hsm, startup_state_mqtt_client_init);
       }
@@ -210,13 +161,7 @@ tiny_hsm_result_t startup_state_device_id(tiny_hsm_t* hsm, tiny_hsm_signal_t sig
   return tiny_hsm_result_signal_consumed;
 }
 
-// ============================================================================
-// Phase 4: MQTT Client Init — initialize the MQTT client adapter
-//
-// Initializes the MQTT client adapter with the device ID, then transitions
-// to feature_bits.  This phase is fast — it doesn't wait for MQTT connection.
-// ============================================================================
-
+// This phase is fast — it doesn't wait for MQTT connection.
 tiny_hsm_result_t startup_state_mqtt_client_init(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   IBridgeServices* svc = services_from_hsm(hsm);
@@ -243,14 +188,6 @@ tiny_hsm_result_t startup_state_mqtt_client_init(tiny_hsm_t* hsm, tiny_hsm_signa
 
   return tiny_hsm_result_signal_consumed;
 }
-
-// ============================================================================
-// Phase 5: Feature Bits — read appliance API feature bit ERDs
-//
-// FeatureBitManager is self-driving (owns its own timers and event subscriptions).
-// The HSM only polls is_feature_bits_complete() to know when to transition.
-// Transitions to bridge_init when feature bits are complete AND MQTT is connected.
-// ============================================================================
 
 tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
@@ -293,13 +230,6 @@ tiny_hsm_result_t startup_state_feature_bits(tiny_hsm_t* hsm, tiny_hsm_signal_t 
   return tiny_hsm_result_signal_consumed;
 }
 
-// ============================================================================
-// Phase 6: Bridge Init — initialize the ERD bridge (poll or subscribe)
-//
-// Waits for MQTT connection, then initializes the appropriate bridge.
-// Transitions to subscription_watch on completion.
-// ============================================================================
-
 tiny_hsm_result_t startup_state_bridge_init(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   IBridgeServices* svc = services_from_hsm(hsm);
@@ -333,14 +263,6 @@ tiny_hsm_result_t startup_state_bridge_init(tiny_hsm_t* hsm, tiny_hsm_signal_t s
   return tiny_hsm_result_signal_consumed;
 }
 
-// ============================================================================
-// Phase 7: Subscription Watch — AUTO mode subscription watchdog
-//
-// In AUTO mode, monitors subscription activity and falls back to polling
-// if no activity is detected within the timeout.  In poll/subscribe modes,
-// this phase is a no-op and transitions immediately.
-// ============================================================================
-
 tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
   IBridgeServices* svc = services_from_hsm(hsm);
@@ -366,7 +288,6 @@ tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_sig
         svc->handle_polling_failed();
         svc->maybe_start_custom_erd_polling();
 
-        // Check if the appliance bridge has reached steady state.
         if (svc->check_steady_state()) {
           tiny_hsm_transition(hsm, startup_state_running);
         }
@@ -386,13 +307,6 @@ tiny_hsm_result_t startup_state_subscription_watch(tiny_hsm_t* hsm, tiny_hsm_sig
 
   return tiny_hsm_result_signal_consumed;
 }
-
-
-// Phase 8: Running — steady-state operation
-//
-// All recurring tasks run every loop() iteration.  This is the terminal
-// state of the startup sequence.
-// ============================================================================
 
 tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
 {
@@ -418,7 +332,6 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
       svc->log_poll_state_transitions();
       svc->maybe_start_custom_erd_polling();
 
-      // Check and log once when the appliance bridge first reaches steady state.
       svc->check_steady_state();
       break;
 
@@ -431,10 +344,6 @@ tiny_hsm_result_t startup_state_running(tiny_hsm_t* hsm, tiny_hsm_signal_t signa
 
   return tiny_hsm_result_signal_consumed;
 }
-
-// ============================================================================
-// HSM configuration — state descriptors with parent hierarchy
-// ============================================================================
 
 static const tiny_hsm_state_descriptor_t startup_hsm_state_descriptors[] = {
   { .state = startup_state_top,              .parent = nullptr },

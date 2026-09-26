@@ -1,43 +1,4 @@
-/*!
- * @file
- * @brief Startup state machine for the GE Appliances Bridge.
- *
- * Replaces the manual switch-based phase progression with a proper
- * tiny_hsm-based hierarchical state machine.  The startup sequence is:
- *
- *   startup_delay → autodiscovery → device_id → mqtt_client_init
- *                 → feature_bits → bridge_init → subscription_watch
- *                 → running
- *
- * Each state handles its own entry/exit logic and waits for signals
- * from the managers (autodiscovery, device identity, feature bits,
- * ERD bridge) before transitioning to the next phase.
- *
- * The "running" state is the steady-state where all recurring tasks
- * run every loop() iteration.
- */
 
-// =============================================================================
-// MODULE GOAL
-// =============================================================================
-// Goal: Drive the ordered startup phase sequence from protocol initialization
-//       to steady-state running.
-//
-// Responsibilities:
-//   - Own the tiny_hsm state machine for all startup phases
-//   - Transition between phases when each manager signals completion
-//   - Enforce per-phase timeout guards
-//   - Call IBridgeServices to trigger bridge actions at phase boundaries
-//
-// NOT responsible for:
-//   - Implementing any phase's work (delegates to managers via IBridgeServices)
-//   - Owning component instances or configuration state
-//   - Any steady-state work beyond the "running" phase entry
-//
-// Dependencies:
-//   - tiny_hsm
-//   - IBridgeServices
-// =============================================================================
 
 #ifndef startup_hsm_h
 #define startup_hsm_h
@@ -48,23 +9,15 @@ extern "C" {
 #include "tiny_hsm.h"
 }
 
-// ============================================================================
-// Startup HSM signal identifiers
-// ============================================================================
-
 enum {
-  signal_run_loop = tiny_hsm_signal_user_start,  // Drive ongoing work in current state
-  signal_autodiscovery_complete,                  // Autodiscovery found (or gave up on) appliance
-  signal_device_id_complete,                      // Device ID ready (read or pre-configured)
-  signal_mqtt_connected,                          // MQTT broker connection established
-  signal_feature_bits_complete,                   // All feature bit ERDs read and parsed
-  signal_bridge_ready,                            // ERD bridge (poll/subscribe) initialized
-  signal_subscription_fallback                   // AUTO mode: subscription timed out, fell back to polling
+  signal_run_loop = tiny_hsm_signal_user_start,
+  signal_autodiscovery_complete,
+  signal_device_id_complete,
+  signal_mqtt_connected,
+  signal_feature_bits_complete,
+  signal_bridge_ready,
+  signal_subscription_fallback
 };
-
-// ============================================================================
-// Startup HSM state function declarations & configuration
-// ============================================================================
 
 namespace esphome {
 namespace geappliances_bridge {

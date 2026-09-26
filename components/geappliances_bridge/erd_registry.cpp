@@ -4,7 +4,6 @@
 namespace esphome {
 namespace geappliances_bridge {
 
-
 void ErdRegistry::set_valid_erds(const tiny_erd_t* erds, uint16_t count)
 {
   /* An empty set would silently suppress all publishes; ignore it so filtering
@@ -24,7 +23,6 @@ void ErdRegistry::set_valid_erds(const tiny_erd_t* erds, uint16_t count)
 
 void ErdRegistry::add_valid_erds(const tiny_erd_t* erds, uint16_t count)
 {
-  /* If the valid set hasn't been initialized, nothing to append to. */
   if (!valid_erds_ready_ || !erds || count == 0) {
     return;
   }
@@ -32,11 +30,9 @@ void ErdRegistry::add_valid_erds(const tiny_erd_t* erds, uint16_t count)
    * binary_search must only search the pre-existing sorted prefix. */
   uint16_t base_count = valid_erds_count_;
   for (uint16_t i = 0; i < count; i++) {
-    /* Deduplicate against existing sorted entries (only the base prefix). */
     if (std::binary_search(valid_erds_, valid_erds_ + base_count, erds[i])) {
       continue;
     }
-    /* Deduplicate within the input batch. */
     bool dup = false;
     for (uint16_t k = 0; k < i; k++) {
       if (erds[k] == erds[i]) { dup = true; break; }
@@ -58,7 +54,6 @@ void ErdRegistry::clear_registered_erds()
 
 void ErdRegistry::register_erd(tiny_erd_t erd)
 {
-  /* Deduplicate. */
   for (uint16_t i = 0; i < registered_erds_count_; i++) {
     if (registered_erds_[i] == erd) return;
   }
@@ -71,7 +66,6 @@ bool ErdRegistry::is_valid(tiny_erd_t erd) const
   if (!valid_erds_ready_) {
     return true;  /* No filter active: all ERDs are valid. */
   }
-  /* Binary search in sorted array. */
   return std::binary_search(valid_erds_, valid_erds_ + valid_erds_count_, erd);
 }
 

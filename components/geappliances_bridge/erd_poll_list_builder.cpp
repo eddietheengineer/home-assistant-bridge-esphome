@@ -1,7 +1,3 @@
-/*!
- * @file
- * @brief ErdPollListBuilder implementation.
- */
 
 #include "erd_poll_list_builder.h"
 #include "erd_lists.h"
@@ -15,11 +11,6 @@ GEA_TAG(TAG) = "erd_poll_list_builder";
 namespace esphome {
 namespace geappliances_bridge {
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/* Append standard ERDs (no board address — default to primary). */
 static uint16_t append_standard_erds(probe_entry_t* out, uint16_t count,
                                      const tiny_erd_t* list, uint16_t list_count)
 {
@@ -37,7 +28,6 @@ static uint16_t append_standard_erds(probe_entry_t* out, uint16_t count,
   return count + n;
 }
 
-/* Append custom ERDs that carry per-ERD board addresses. */
 static uint16_t append_custom_erds(probe_entry_t* out, uint16_t count,
                                    const probe_entry_t* list, uint16_t list_count)
 {
@@ -53,7 +43,6 @@ static uint16_t append_custom_erds(probe_entry_t* out, uint16_t count,
   return count + n;
 }
 
-/* Compare probe_entry_t for sorting: by (erd, board_address). */
 static int probe_entry_cmp(const void* a, const void* b)
 {
   const probe_entry_t* pa = (const probe_entry_t*)a;
@@ -65,7 +54,6 @@ static int probe_entry_cmp(const void* a, const void* b)
   return 0;
 }
 
-/* Deduplicate on (erd, board_address) pairs. */
 static void deduplicate(probe_entry_t* erds, uint16_t& count)
 {
   if (count <= 1) return;

@@ -1,60 +1,3 @@
-/*!
- * @file
- * @brief Polls ERDs and updates the ERD cache (polling mode)
- */
-
-// =============================================================================
-// MODULE GOAL
-// =============================================================================
-// Goal: Periodically poll a list of ERDs from the appliance and update their
-//       values in the ERD cache; fulfill write commands received from MQTT.
-//
-// Responsibilities:
-//   - Maintain and iterate a fixed-capacity polling list
-//   - Drive a tiny_hsm for probe discovery, polling, and appliance-lost recovery
-//   - Accept a pre-built probe list to verify ERDs before polling
-//   - Report polling health metrics (cycle count, last cycle time)
-//
-// NOT responsible for:
-//   - Subscription-mode operation (see erd_bridge_subscribe.h)
-//   - Bridge initialization or startup phase management
-//
-// ---- 3-Phase Polling Lifecycle ----
-//
-// Phase 1 — Build Verification List (no reads)
-//   Determines which ERDs to probe in Phase 2. Contents depend on config:
-//   - POLL or AUTO→poll, appliance_api_parsing=false:
-//       commonErds + energyErds + applianceApiFeatureErds +
-//       appliance-specific (erd_lists.h) + custom_erds
-//   - POLL or AUTO→poll, appliance_api_parsing=true:
-//       feature_bit_manager valid ERD list + custom_erds
-//   - SUBSCRIBE or AUTO→subscribing:
-//       custom_erds only (empty if none configured)
-//
-// Phase 2 — Verification (sequential reads; HSM states before state_polling)
-//   Each ERD in the verification list is read once:
-//   - read_completed             → register ERD + publish value → next ERD
-//   - read_failed(not_supported) → permanently exclude          → next ERD
-//   - read_failed(retries_exhausted) → skip, not added to polling list → next ERD
-//   Result: erd_polling_list contains only ERDs that responded successfully.
-//
-// Phase 3 — Steady-State Polling (state_polling)
-//   All registered ERDs are read sequentially each cycle. Timer semantics:
-//   - Timer fires mid-cycle (cycle not yet complete):
-//       set restart_pending=true; let the cycle finish naturally.
-//   - Timer fires after cycle already complete:
-//       start next cycle immediately; re-arm timer.
-//   - Cycle completes with restart_pending=true:
-//       start next cycle immediately; re-arm timer; clear restart_pending.
-//   - Cycle completes, timer still armed:
-//       wait for timer to fire.
-//   - Cycle completes, timer not armed, no restart_pending:
-//       start next cycle immediately; re-arm timer.
-//
-// Dependencies:
-//   - i_tiny_gea3_erd_client.h, tiny_hsm.h, tiny_timer.h
-//   - erd_lists.h (appliance ERD list arrays)
-// =============================================================================
 
 #ifndef erd_bridge_poll_h
 #define erd_bridge_poll_h
@@ -67,6 +10,18 @@ extern "C" {
 #include "erd_lists.h"
 }
 #include "erd_bridge_common.h"
+// 3-Phase Polling Lifecycle:
+//   Phase 1 (probe): read the appliance ERD list to discover which ERDs exist.
+//   Phase 2 (verify): filter the discovered ERDs (feature-bit / custom-ERD).
+//   Phase 3 (poll): steady-state polling of the verified list.
+//
+// Phase 3 timer semantics:
+//   Timer fires mid-cycle (cycle not yet complete): set restart_pending=true;
+//   let the cycle finish naturally.
+//   Timer fires after cycle already complete: start next cycle immediately;
+//   re-arm timer.
+//   Cycle completes with restart_pending=true: start next cycle immediately;
+//   re-arm timer; clear restart_pending.
 
 typedef struct {
   tiny_erd_t erd_polling_list[POLLING_LIST_MAX_SIZE];
@@ -144,9 +99,6 @@ typedef struct {
   void* on_discovery_complete_context;
 } erd_bridge_poll_t;
 
-/*!
- * Initialize the ERD polling bridge.
- */
 void erd_bridge_poll_init(
   erd_bridge_poll_t* self,
   tiny_timer_group_t* timer_group,
@@ -157,9 +109,6 @@ void erd_bridge_poll_init(
   uint16_t probe_list_count,
   erd_cache_t* cache);
 
-/*!
- * Destroy the ERD polling bridge.
- */
 void erd_bridge_poll_destroy(erd_bridge_poll_t* self);
 
 #endif

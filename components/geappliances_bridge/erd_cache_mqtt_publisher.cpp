@@ -1,7 +1,3 @@
-/*!
- * @file
- * @brief ERD cache MQTT publisher implementation.
- */
 
 #include "erd_cache_mqtt_publisher.h"
 #include "erd_cache.h"
@@ -15,7 +11,6 @@
 #include <cstdio>
 #include <string.h>
 
-
 #ifndef USE_ESP_IDF
 #error "This component requires ESPHome with framework: type: esp-idf"
 #endif
@@ -26,7 +21,6 @@ static void mqtt_publisher_task(void* arg)
 {
   erd_cache_mqtt_publisher_t* self = (erd_cache_mqtt_publisher_t*)arg;
 
-  // Defensive: if semaphore creation failed, exit immediately.
   if (self->work_semaphore == NULL) {
     vTaskDelete(NULL);
     return;
@@ -194,7 +188,6 @@ void erd_cache_mqtt_publisher_init(
   self->task_running = false;
 
   if (!mqtt_client) return;
-  /* Subscribe to MQTT disconnect event */
   tiny_event_subscription_init(
     &self->mqtt_disconnect_subscription, self,
     +[](void* context, const void*) {
@@ -205,7 +198,6 @@ void erd_cache_mqtt_publisher_init(
     mqtt_client_on_mqtt_disconnect(self->mqtt_client),
     &self->mqtt_disconnect_subscription);
 
-  /* Subscribe to MQTT connect event */
   tiny_event_subscription_init(
     &self->mqtt_connect_subscription, self,
     +[](void* context, const void*) {
@@ -261,8 +253,8 @@ void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self)
 
 void erd_cache_mqtt_publisher_start(erd_cache_mqtt_publisher_t* self)
 {
-  if (self->task_handle != NULL) return; // already running
-  if (self->work_semaphore == NULL) return; // semaphore creation failed in init
+  if (self->task_handle != NULL) return;
+  if (self->work_semaphore == NULL) return;
   self->task_running = true;
   /* Pin the publisher task to Core 0 (dual-core) with priority 1 (below the
    * main loop). The cache is now protected by its own mutex (erd_cache_t.lock),
@@ -341,7 +333,6 @@ void erd_cache_mqtt_publisher_stop(erd_cache_mqtt_publisher_t* self)
 void erd_cache_mqtt_publisher_signal_work(erd_cache_mqtt_publisher_t* self)
 {
   if (self->work_semaphore != NULL) {
-    // Non-blocking give — if task is already waiting, it will wake up.
     xSemaphoreGive(self->work_semaphore);
   }
 }
@@ -468,7 +459,6 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
   } else {
     ESP_LOGI(PUBLISHER_TAG, "MQTT reconnected — resuming ERD cache publishing");
   }
-  /* Wake the background task so it can start publishing again. */
   erd_cache_mqtt_publisher_signal_work(self);
 }
 void erd_cache_mqtt_publisher_on_disconnected(erd_cache_mqtt_publisher_t* self)
@@ -516,7 +506,6 @@ void erd_cache_mqtt_publisher_resume(erd_cache_mqtt_publisher_t* self)
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->paused = false;
       xSemaphoreGive(self->state_mutex);
-      // Wake the task so it can resume publishing.
       erd_cache_mqtt_publisher_signal_work(self);
     }
   } else {

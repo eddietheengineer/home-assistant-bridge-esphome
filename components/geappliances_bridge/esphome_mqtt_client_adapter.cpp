@@ -141,7 +141,6 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
   self->write_topic_[sizeof(self->write_topic_) - 1] = '\0';
 
   mqtt_client->subscribe(topic, [self](const std::string& topic, const std::string& payload) {
-    // Parse ERD from topic: geappliances/{device_id}/erd/0x{ERD}/write
     auto pos = topic.find("/erd/0x");
     if (pos == std::string::npos) return;
 

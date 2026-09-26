@@ -1,37 +1,8 @@
-/*!
- * @file
- * @brief Adapter that wraps a GEA2 ERD client (i_tiny_gea2_erd_client_t)
- *        and presents it as a GEA3 ERD client (i_tiny_gea3_erd_client_t).
- *
- * This allows the existing erd_bridge_poll (which requires i_tiny_gea3_erd_client_t)
- * to operate over a GEA2 bus without modification.
- *
- * The GEA2 and GEA3 on_activity args are layout-compatible for read/write event
- * types (types 0-3), so GEA2 activity args can be safely re-published through
- * the adapter's GEA3-typed event without any data transformation.
- *
- * subscribe() and retain_subscription() are no-ops because GEA2 does not
- * support subscriptions; callers must use polling mode only.
- */
-
-// =============================================================================
-// MODULE GOAL
-// =============================================================================
-// Goal: Present a GEA2 ERD client as a GEA3-compatible i_tiny_gea3_erd_client_t
-//       so the polling bridge can operate over GEA2 without modification.
-//
-// Responsibilities:
-//   - Forward read() and write() to the underlying GEA2 client
-//   - Return false for subscribe() and retain_subscription() (GEA2 has none)
-//   - Re-publish GEA2 activity events through the GEA3-typed on_activity event
-//
-// NOT responsible for:
-//   - Any GEA2 protocol framing or timing
-//   - Subscription support (structurally impossible over GEA2)
-//
-// Dependencies:
-//   - i_tiny_gea2_erd_client.h, i_tiny_gea3_erd_client.h
-// =============================================================================
+/* GEA2 and GEA3 on_activity args are layout-compatible for read/write event
+ * types (types 0-3), so GEA2 activity args can be re-published through the
+ * adapter's GEA3-typed event without transformation. subscribe() and
+ * retain_subscription() are no-ops because GEA2 does not support
+ * subscriptions; callers must use polling mode only. */
 
 #pragma once
 

@@ -1,11 +1,3 @@
-/*!
- * @file
- * @brief ERD write bridge implementation.
- *
- * Relays write requests from MQTT to the GEA3 ERD client and reports results
- * back to MQTT. Uses a simple two-state HSM (ready/writing) to track in-flight
- * writes.
- */
 
 #include "erd_write_bridge.h"
 #include "geappliances_bridge_log.h"
@@ -13,7 +5,6 @@
 #include "tiny_gea_constants.h"
 #include "erd_bridge_common.h"
 
-// Write bridge-specific HSM signals (not shared with other bridges)
 enum {
   signal_write_requested = tiny_hsm_signal_user_start,
   signal_write_completed,
@@ -21,10 +12,6 @@ enum {
 };
 
 GEA_TAG(TAG) = "erd_write_bridge";
-
-// ============================================================================
-// State machine
-// ============================================================================
 
 static tiny_hsm_result_t write_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_ready(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
@@ -80,7 +67,6 @@ static tiny_hsm_result_t state_writing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
 
   switch(signal) {
     case signal_write_requested: {
-      // Write already in progress — drop with warning.
       [[maybe_unused]] auto args = reinterpret_cast<const mqtt_client_on_write_request_args_t*>(data);
       ESP_LOGW(TAG, "Write request for ERD 0x%04x dropped: write already in progress", args->erd);
     } break;
@@ -115,10 +101,6 @@ static tiny_hsm_result_t state_writing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
   return tiny_hsm_result_signal_consumed;
 }
 
-// ============================================================================
-// HSM configuration
-// ============================================================================
-
 static const tiny_hsm_state_descriptor_t write_hsm_state_descriptors[] = {
   { .state = write_state_top, .parent = nullptr },
   { .state = state_ready, .parent = write_state_top },
@@ -128,10 +110,6 @@ static const tiny_hsm_configuration_t write_hsm_configuration = {
   .states = write_hsm_state_descriptors,
   .state_count = element_count(write_hsm_state_descriptors)
 };
-
-// ============================================================================
-// Public API
-// ============================================================================
 
 void erd_write_bridge_init(
   erd_write_bridge_t* self,
@@ -147,7 +125,6 @@ void erd_write_bridge_init(
   self->pending_request_id = 0;
   self->pending_erd = 0;
 
-  // Subscribe to MQTT write requests
   tiny_event_subscription_init(
     &self->mqtt_write_request_subscription, self, +[](void* context, const void* _args) {
       auto self = reinterpret_cast<erd_write_bridge_t*>(context);

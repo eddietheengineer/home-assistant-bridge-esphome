@@ -1,23 +1,3 @@
-// =============================================================================
-// MODULE GOAL
-// =============================================================================
-// Goal: Be the single authoritative source for which ERDs are valid
-//       and which are registered at runtime.
-//
-// Responsibilities:
-//   - Own the valid-ERD set (populated by FeatureBitManager at startup)
-//   - Own the registered-ERD set (appended by the MQTT adapter at runtime)
-//   - Expose query methods used by the MQTT adapter during publish
-//   - Expose read-only accessors used by diagnostics
-//
-// NOT responsible for:
-//   - Reading ERDs from the appliance (FeatureBitManager does that)
-//   - Publishing MQTT messages (EsphomeMqttClientAdapter does that)
-//   - Any bridge lifecycle management
-//
-// Dependencies:
-//   - tiny_erd.h (tiny_erd_t type)
-// =============================================================================
 
 #pragma once
 
@@ -69,7 +49,6 @@ class ErdRegistry {
 
   /// Returns true if the ERD passes the valid-ERD filter (or no filter active).
   bool is_valid(tiny_erd_t erd) const;
-
 
   // -------------------------------------------------------------------------
   // Read-only accessors (diagnostics)

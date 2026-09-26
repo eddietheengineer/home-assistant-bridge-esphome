@@ -1,12 +1,3 @@
-/*!
- * @file
- * @brief ERD subscription bridge implementation.
- *
- * Manages the GEA3 ERD subscription lifecycle: subscribing, retaining the
- * subscription every 30 s, and publishing received ERD values to the ERD
- * cache.  The polling bridge lives in erd_bridge_poll.cpp; shared signals and
- * utility templates are in erd_bridge_common.h.
- */
 
 #include "erd_bridge_subscribe.h"
 #include "erd_cache.h"
@@ -15,10 +6,6 @@
 #include "esphome/core/log.h"
 
 GEA_TAG(TAG) = "erd_bridge_subscribe";
-
-// ============================================================================
-// Subscription bridge
-// ============================================================================
 
 static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
 static tiny_hsm_result_t state_subscribed(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data);
@@ -102,7 +89,6 @@ static tiny_hsm_result_t state_subscribing(tiny_hsm_t* hsm, tiny_hsm_signal_t si
       // retries. The timer is re-armed when transitioning to state_subscribed.
       disarm_timer(self);
       self->current_state = subscription_state_subscribing;
-      /* Intentionally fall through to the subscribe case below. */
       __attribute__((fallthrough));
     case signal_subscription_failed:
       self->subscribe_failure_count++;
@@ -132,7 +118,6 @@ static tiny_hsm_result_t state_subscribing(tiny_hsm_t* hsm, tiny_hsm_signal_t si
   return tiny_hsm_result_signal_consumed;
 }
 
-
 static void arm_periodic_timer(erd_bridge_subscribe_t* self, tiny_timer_ticks_t ticks)
 {
   tiny_timer_start_periodic(
@@ -140,7 +125,6 @@ static void arm_periodic_timer(erd_bridge_subscribe_t* self, tiny_timer_ticks_t 
       tiny_hsm_send_signal(&reinterpret_cast<erd_bridge_subscribe_t*>(context)->hsm, signal_timer_expired, nullptr);
     });
 }
-
 
 static void arm_quiet_timer(erd_bridge_subscribe_t* self, tiny_timer_ticks_t ticks)
 {
@@ -194,7 +178,6 @@ static tiny_hsm_result_t state_steady(tiny_hsm_t* hsm, tiny_hsm_signal_t signal,
       // was not disarmed on exit — no need to re-arm.
       tiny_timer_stop(self->timer_group, &self->quiet_timer);
       break;
-
 
     case signal_subscription_host_came_online:
       tiny_hsm_transition(hsm, state_subscribing);

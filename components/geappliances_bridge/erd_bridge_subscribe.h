@@ -1,26 +1,4 @@
-/*!
- * @file
- * @brief Subscribes to ERDs and pushes published values to the ERD cache.
- */
 
-// =============================================================================
-// MODULE GOAL
-// =============================================================================
-// Goal: Subscribe to all ERDs at the appliance's address and relay their
-//       published values to the ERD cache.
-//
-// Responsibilities:
-//   - Manage a tiny_hsm that drives GEA3 subscription lifecycle
-//   - Forward ERD publications to erd_cache
-//
-// NOT responsible for:
-//   - Polling (see erd_bridge_poll.h)
-//   - Write requests or MQTT interaction
-//   - Bridge initialization or startup phase management
-//
-// Dependencies:
-//   - i_tiny_gea3_erd_client.h, tiny_hsm.h, tiny_timer.h
-// =============================================================================
 
 #ifndef erd_bridge_subscribe_h
 #define erd_bridge_subscribe_h

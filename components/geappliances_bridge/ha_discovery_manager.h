@@ -1,19 +1,13 @@
 /*!
- * @file
- * @brief Home Assistant MQTT Discovery manager.
- *
  * Main-loop design: start() builds the sorted ERD list and device JSON
- * inline. run() is called from the main loop; it decompresses chunks,
- * parses JSONL, and publishes one entity per call, keeping loop times low.
+ * inline; run() is called from the main loop and publishes one entity per
+ * call, keeping loop times low.
  *
  * States: IDLE -> BUILDING -> DISCOVERING -> COMPLETE / FAILED
  *
- * Cleanup is handled by the embedded ha_discovery_cleanup_t module.
- *
  * The three large buffers (decomp ~18 KB, line ~18 KB, payload ~8 KB) are
- * heap-allocated only for the duration of a discovery run (see
- * ha_discovery_manager_start / cleanup_resources); on non-discovery boots
- * they are never allocated. Peak memory during discovery: those three
+ * heap-allocated only for the duration of a discovery run; on non-discovery
+ * boots they are never allocated. Peak memory during discovery: those three
  * buffers + the sorted ERD array (~1.3 KB).
  */
 
@@ -42,67 +36,54 @@
 extern "C" {
 #endif
 
-/* Discovery manager states */
 typedef enum {
   ha_discovery_state_idle,
-  ha_discovery_state_building,     // building sorted ERD list
-  ha_discovery_state_discovering,  // main loop decompressing/publishing
+  ha_discovery_state_building,
+  ha_discovery_state_discovering,
   ha_discovery_state_complete,
   ha_discovery_state_failed
 } ha_discovery_state_t;
 
-/* Maximum number of registered/seen ERDs for HA discovery binary search.
-   Uses POLLING_LIST_MAX_SIZE from erd_lists.h as the single source of truth. */
+/* Uses POLLING_LIST_MAX_SIZE from erd_lists.h as the single source of truth. */
 #define HA_DISCOVERY_MAX_ERDS POLLING_LIST_MAX_SIZE
 
-
-/* Decompression buffer size per chunk. Must be >= max decompressed chunk
-   size (range category has 17770 bytes). */
+/* Must be >= max decompressed chunk size (range category has 17770 bytes). */
 #define HA_DISCOVERY_DECOMP_BUF_SIZE 18432
 
-/* Line parsing buffer size (matches decomp buffer). */
+/* Matches the decomp buffer size. */
 #define HA_DISCOVERY_LINE_BUF_SIZE 18432
 
 /* Topic buffer size for HA discovery topics (must fit worst-case topic + null). */
 #define HA_DISCOVERY_TOPIC_BUF_SIZE 192
-/* Field ID slug buffer size. */
 #define HA_DISCOVERY_FIELD_ID_BUF_SIZE 72
-/* Unique ID buffer size. */
 #define HA_DISCOVERY_UNIQUE_ID_BUF_SIZE 160
-/* Payload buffer for building discovery payloads. */
 #define HA_DISCOVERY_PAYLOAD_BUF_SIZE 8192
 
 /*!
- * @brief Home Assistant MQTT Discovery manager.
- *
  * Peak memory: payload buffer (~8 KB) + decompress buffer (~18 KB) +
  * line buffer (~18 KB) + sorted ERD array (~1.3 KB).
  */
 typedef struct {
   erd_cache_t* cache;              // Shared ERD cache (owned by GeappliancesBridge)
-  i_mqtt_client_t* mqtt_client;    // MQTT publish interface
-  const char* device_id;           // Device ID string for topic construction
-  const char* model_number;        // Model number for device info
-  const char* serial_number;       // Serial number for device info
-  uint8_t appliance_type;          // Appliance type for category filtering
+  i_mqtt_client_t* mqtt_client;
+  const char* device_id;
+  const char* model_number;
+  const char* serial_number;
+  uint8_t appliance_type;
 
-  bool filter_config_topics;       /* Whether config topic filtering was enabled */
+  bool filter_config_topics;
   ha_discovery_state_t state;
 
-  /* Stats */
-  uint32_t total_discovered;       // Total entities discovered
-  uint32_t total_published;        // Total discovery publishes
+  uint32_t total_discovered;
+  uint32_t total_published;
   uint32_t total_filtered;         // Entities filtered out (ERD not registered)
 
-
-  /* Sorted ERD array for binary search during discovery. */
   uint16_t sorted_erds[HA_DISCOVERY_MAX_ERDS];
   uint16_t sorted_erds_count;
 
   tinfl_decompressor decomp_state;
-  /* Decompression buffer for JSONL chunks (18KB). Heap-allocated only while a
-   * discovery run is active (see ha_discovery_manager_start/cleanup); NULL
-   * otherwise, so non-discovery boots don't carry this ~44 KB in the object. */
+  /* Heap-allocated only while a discovery run is active; NULL otherwise, so
+   * non-discovery boots don't carry this ~44 KB in the object. */
   uint8_t* decomp_buf;
 
   /* Line parsing buffer. Heap-allocated only while a discovery run is active. */
@@ -110,22 +91,19 @@ typedef struct {
 
   /* Topic buffer (small; stays a static member). */
   char topic_buf[HA_DISCOVERY_TOPIC_BUF_SIZE];
-  /* Payload buffer for building discovery payloads. Heap-allocated only while
-   * a discovery run is active. */
+  /* Heap-allocated only while a discovery run is active. */
   char* payload_buf;
 
-
-  /* Device JSON built once at start. */
   char device_json_buf[512];
 
-  /* Entity field buffers (used by process_jsonl_line to avoid stack overflow).
+  /* Entity field buffers (avoid stack overflow in process_jsonl_line).
    * Templates are NOT stored here — they are embedded directly from the raw
    * JSONL line into the payload buffer with proper re-escaping. */
   char entity_name_buf[160];
   char erd_id_hex_buf[8];
   char domain_buf[32];
   char field_id_buf[HA_DISCOVERY_FIELD_ID_BUF_SIZE];
-  char board_address_buf[4];       /* optional two-digit JSONL board address */
+  char board_address_buf[4];
   char paired_erd_buf[8];
   char role_buf[16];
   char unit_buf[32];
@@ -148,35 +126,32 @@ typedef struct {
   char actual_state_topic_buf[128];
   char actual_command_topic_buf[128];
 
-  /* Discovery progress tracking. */
-  uint16_t current_category;       // Index into ha_discovery_categories[]
-  uint16_t current_chunk;          // Index into current category's chunks
-  uint32_t current_offset;         // Byte offset within decompressed chunk
-  uint32_t current_decomp_size;    // Size of current decompressed chunk
-  const uint8_t* custom_data;      // Optional codegen-provided compressed discovery data
+  uint16_t current_category;
+  uint16_t current_chunk;
+  uint32_t current_offset;
+  uint32_t current_decomp_size;
+  const uint8_t* custom_data;
   const void* custom_chunks;
   uint16_t custom_num_chunks;
   uint16_t custom_max_decompressed_chunk;
   uint32_t custom_data_hash;
-  /* Embedded cleanup module for removing old discovery topics. */
   ha_discovery_cleanup_t cleanup;
 
-  /* Domain topic prefix: pre-computed "homeassistant/{domain}/{device_id}/"
-   * to avoid repeated snprintf during discovery publish. */
+  /* Pre-computed "homeassistant/{domain}/{device_id}/" prefix to avoid
+   * repeated snprintf during discovery publish. */
   char domain_topic_prefix[128];
-  char current_domain_prefix_buf[32]; // Tracks current domain for prefix caching
+  char current_domain_prefix_buf[32];
 
 } ha_discovery_manager_t;
 
 /*!
- * Initialize the discovery manager. Call once before configure().
+ * Call once before configure().
  */
 void ha_discovery_manager_init(ha_discovery_manager_t* self);
 void ha_discovery_manager_set_custom_data(ha_discovery_manager_t* self,
   const uint8_t* data, const void* chunks, uint16_t num_chunks, uint16_t max_chunk, uint32_t data_hash);
 
 /*!
- * Configure the discovery manager with device info and dependencies.
  * Call after init(), before start().
  */
 void ha_discovery_manager_configure(
@@ -189,39 +164,17 @@ void ha_discovery_manager_configure(
   erd_cache_t* cache,
   i_mqtt_client_t* mqtt_client);
 
-/*!
- * Start the discovery process.
- * Builds the sorted ERD list and device JSON inline, then
- * transitions to DISCOVERING state.
- */
 void ha_discovery_manager_start(ha_discovery_manager_t* self);
 
-/*!
- * Drive the discovery: decompress chunks and publish entities.
- * Call from the main loop while the manager is in BUILDING or DISCOVERING state.
- * Publishes one entity per call, keeping loop times low.
- * Transitions to COMPLETE when all entities are published.
- */
 void ha_discovery_manager_run(ha_discovery_manager_t* self);
 
-/*!
- * Clean up the discovery manager.
- * Stops tasks and frees resources. Call from teardown.
- */
 void ha_discovery_manager_cleanup(ha_discovery_manager_t* self);
 
-
-/*!
- * Returns true if the manager is currently processing (building or discovering).
- */
 bool ha_discovery_manager_is_processing(ha_discovery_manager_t* self);
 
-/*!
- * Returns the current state.
- */
 ha_discovery_state_t ha_discovery_manager_get_state(ha_discovery_manager_t* self);
 
-/* Test-only exports: exposed when HA_DISCOVERY_TEST_EXPORT is defined. */
+/* Test-only exports. */
 #ifdef HA_DISCOVERY_TEST_EXPORT
 void cleanup_topic_callback(const char* topic, const char* payload, size_t payload_len, void* arg);
 void cleanup_start(ha_discovery_cleanup_t* self);

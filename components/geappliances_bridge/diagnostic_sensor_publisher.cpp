@@ -25,8 +25,6 @@ void DiagnosticSensorPublisher::init(
   this->erd_cache_publisher_ = &erd_cache_publisher;
 }
 
-// Helper: publish a group of sensors at the configured interval.
-// Returns true if any sensor in the group was published this call.
 // Templated to avoid std::function SBO/heap allocation risk on each loop().
 template<typename GetA, typename GetB>
 static bool publish_sensor_group(sensor::Sensor* a, sensor::Sensor* b,
@@ -51,7 +49,6 @@ static bool publish_sensor_group(sensor::Sensor* a, sensor::Sensor* b,
 }
 
 void DiagnosticSensorPublisher::loop() {
-  // Publish ERD publish rate and MQTT publish rate sensors every ~60 seconds.
   publish_sensor_group(
       this->erd_publish_rate_sensor_,
       this->mqtt_publish_rate_sensor_,
@@ -60,7 +57,6 @@ void DiagnosticSensorPublisher::loop() {
       [this]() -> uint32_t { return erd_cache_get_update_rate(this->erd_cache_); },
       [this]() -> uint32_t { return erd_cache_mqtt_publisher_get_publish_rate(this->erd_cache_publisher_); });
 
-  // Publish cache stats sensors every ~60 seconds.
   publish_sensor_group(
       this->erd_cache_entries_sensor_,
       this->erd_cache_updates_sensor_,
@@ -69,7 +65,6 @@ void DiagnosticSensorPublisher::loop() {
       [this]() -> uint32_t { return erd_cache_get_count(this->erd_cache_); },
       [this]() -> uint32_t { return erd_cache_get_required_update_rate(this->erd_cache_); });
 
-  // Publish MQTT disconnect sensors every ~60 seconds.
   publish_sensor_group(
       this->mqtt_disconnect_count_sensor_,
       this->mqtt_disconnect_duration_sensor_,

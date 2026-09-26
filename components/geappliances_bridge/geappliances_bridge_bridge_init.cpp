@@ -1,28 +1,3 @@
-/*!
- * @file
- * @brief Bridge startup initializers and ongoing bridge lifecycle management.
- *
- * MODULE GOAL: Own every one-time initialization step for the MQTT client
- * adapter and the bridge HSMs, plus feature-bit reading startup and the
- * AUTO-mode subscription-activity watchdog.
- *
- * start_feature_bit_reading_() is called by the startup HSM to kick off
- * the feature-bit ERD reads once the MQTT client adapter is ready.
- *
- * initialize_mqtt_client_() runs once as soon as the device ID is ready
- * (Phase 4), before feature bit reading.  It binds the MQTT client adapter
- * to the device ID, sets up the ERD registry (registered-ERD tracking and
- * string-ERD type detection), and passes the registry to the adapter so it
- * is ready to publish ERD values immediately.
- *
- * initialize_erd_bridge_() runs once after feature bit reading and MQTT are
- * both ready (Phase 6).  It applies the valid-ERD filter to the registry
- * (built from feature bit results), selects the operating mode
- * (poll / subscribe / auto), and initializes the appropriate bridge HSMs.
- *
- * handle_subscription_failed() / handle_polling_failed() are called from the
- * startup HSM to handle bridge failures and trigger fallback to polling.
- */
 
 #include <cstring>
 #include "geappliances_bridge.h"
@@ -39,19 +14,11 @@ GEA_TAG(TAG) = "geappliances_bridge_bridge_init";
 
 namespace esphome {
 namespace geappliances_bridge {
-// ---------------------------------------------------------------------------
-// Polling bridge discovery-complete callback (shared by all three init paths)
-// ---------------------------------------------------------------------------
 
 void GeappliancesBridge::on_poll_discovery_complete_()
 {
   tiny_hsm_send_signal(&this->startup_hsm_wrapper_.hsm, signal_bridge_ready, nullptr);
 }
-
-
-// ---------------------------------------------------------------------------
-// Build the poll list using the erd_poll_list_builder module
-// ---------------------------------------------------------------------------
 
 ErdPollListResult build_poll_list_(GeappliancesBridge* bridge,
                                    const probe_entry_t* custom_erds,
@@ -146,10 +113,6 @@ void GeappliancesBridge::start_feature_bit_reading_()
   this->feature_bit_manager_.start();
 }
 
-// ---------------------------------------------------------------------------
-// Phase 4: Initialize the MQTT client adapter (called once from loop())
-// ---------------------------------------------------------------------------
-
 void GeappliancesBridge::initialize_mqtt_client_()
 {
   if (this->mqtt_client_adapter_initialized_) {
@@ -165,13 +128,9 @@ void GeappliancesBridge::initialize_mqtt_client_()
     }
   }
 
-  // Bind the adapter to the device ID.
   esphome_mqtt_client_adapter_init(&this->mqtt_client_adapter_,
                                    this->device_identity_manager_.get_device_id());
 
-  // Wire up the ERD registry: clears any stale registrations and sets up
-  // the MQTT adapter with a single pointer for valid-ERD filtering and
-  // registered-ERD tracking.
   this->erd_registry_.clear_registered_erds();
   esphome_mqtt_client_adapter_set_erd_registry(
     &this->mqtt_client_adapter_, &this->erd_registry_);
@@ -179,17 +138,12 @@ void GeappliancesBridge::initialize_mqtt_client_()
   this->mqtt_client_adapter_initialized_ = true;
 }
 
-// ---------------------------------------------------------------------------
-// Phase 6: Initialize the ERD bridge (called once from loop())
-// ---------------------------------------------------------------------------
-
 void GeappliancesBridge::initialize_erd_bridge_()
 {
   if (!this->mqtt_client_adapter_initialized_ || this->erd_bridge_initialized_) {
     return;
   }
 
-  // Skip if no ERD client is configured (no UART).
   if (this->uart_ == nullptr && this->gea2_uart_ == nullptr) {
     return;
   }
@@ -220,7 +174,6 @@ void GeappliancesBridge::initialize_erd_bridge_()
   // (is_valid returns true for all ERDs), so this is a no-op.
   erd_bridge_subscribe_set_erd_registry(&this->erd_bridge_subscribe_, &this->erd_registry_);
 
-  // Select operating mode.
   bool        use_polling = false;
   const char* mode_name = "unknown";
 
@@ -270,6 +223,8 @@ void GeappliancesBridge::initialize_erd_bridge_()
   // Initialize the write bridge. Autodiscovery is complete by this point,
   // so we have the real host address from the broadcast FF 0x0008 response.
   uint8_t host_addr = this->autodiscovery_manager_.get_host_address();
+  // The write bridge subscribes to the wildcard write topic so incoming write
+  // commands from Home Assistant are routed to it via on_write_request_event.
   erd_write_bridge_init(
     &this->erd_write_bridge_,
     &this->timer_group_,
@@ -277,21 +232,9 @@ void GeappliancesBridge::initialize_erd_bridge_()
     &this->mqtt_client_adapter_.interface,
     host_addr);
   this->write_bridge_initialized_ = true;
-
-  // Subscribe to the wildcard write topic so incoming write commands from
-  // Home Assistant are routed to the write bridge via on_write_request_event.
   esphome_mqtt_client_adapter_subscribe_write_topic(&this->mqtt_client_adapter_);
-}
 
-// ---------------------------------------------------------------------------
-// Start custom ERD polling bridge (deferred: called after subscription settles)
-// ---------------------------------------------------------------------------
-// When in subscription mode with custom ERDs, this starts a polling bridge
-// that polls only the custom ERDs alongside the subscription bridge.
-// The subscription bridge continues to handle all standard ERDs, while the
-// polling bridge handles custom ERDs that may not be covered by subscription.
-// The polling list is allocated to the exact size needed.
-// ---------------------------------------------------------------------------
+}
 
 void GeappliancesBridge::start_custom_erd_polling_()
 {
@@ -344,11 +287,6 @@ void GeappliancesBridge::maybe_start_custom_erd_polling_()
   this->start_custom_erd_polling_();
 }
 
-// ---------------------------------------------------------------------------
-// Check if the polling bridge (running alongside subscription) has failed,
-// and if so, transition to full polling mode.
-// ---------------------------------------------------------------------------
-
 void GeappliancesBridge::handle_polling_failed()
 {
   polling_state_t poll_state = this->get_polling_state();
@@ -357,14 +295,11 @@ void GeappliancesBridge::handle_polling_failed()
   }
 
   if (this->subscription_bridge_initialized_) {
-    // Custom ERD polling bridge failed alongside subscription — destroy it
-    // and let subscription continue handling standard ERDs.
     ESP_LOGW(TAG, "Custom ERD polling bridge failed; continuing with subscription only");
     erd_bridge_poll_destroy(&this->erd_bridge_poll_);
     this->polling_bridge_initialized_ = false;
     this->custom_erd_polling_started_ = false;
   } else {
-    // Primary polling bridge failed (POLL mode or GEA2). No fallback available.
     ESP_LOGE(TAG, "Primary polling bridge failed; no data path available");
     // Leave the bridge in failed state. The appliance_lost handler in
     // state_failed will re-probe if the appliance comes back.
@@ -372,18 +307,12 @@ void GeappliancesBridge::handle_polling_failed()
   this->last_logged_poll_state_ = polling_state_none;
 }
 
-// ---------------------------------------------------------------------------
-// Subscription failed: fallback to polling
-// ---------------------------------------------------------------------------
-
 void GeappliancesBridge::handle_subscription_failed()
 {
-  // Already in polling mode — nothing to do.
   if (this->mode_ != BRIDGE_MODE_AUTO) {
     return;
   }
 
-  // Tear down the subscription bridge.
   erd_bridge_subscribe_destroy(&this->erd_bridge_subscribe_);
   this->subscription_bridge_initialized_ = false;
   this->last_logged_poll_state_ = polling_state_none;
@@ -399,7 +328,6 @@ void GeappliancesBridge::handle_subscription_failed()
 
   this->init_polling_bridge_(true);
 
-  // Signal the startup HSM that subscription fallback has occurred.
   tiny_hsm_send_signal(&this->startup_hsm_wrapper_.hsm, signal_subscription_fallback, nullptr);
 
   ESP_LOGI(TAG, "Successfully switched to polling mode");

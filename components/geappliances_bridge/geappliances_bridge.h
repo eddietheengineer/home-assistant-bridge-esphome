@@ -1,29 +1,4 @@
 // =============================================================================
-// MODULE GOAL
-// =============================================================================
-// Goal: Coordinate the lifecycle of all bridge components and serve as the
-//       ESPHome component entry point (setup / loop / dump_config).
-//
-// Responsibilities:
-//   - Own and construct all component instances (adapters, managers, bridges)
-//   - Wire components together during setup()
-//   - Drive the GEA2 tight-loop and delegate ongoing work in loop()
-//   - Expose configuration setters called by the ESPHome code generator
-//   - Implement IBridgeServices so the startup HSM can request bridge actions
-//     without depending on this concrete class
-//
-// NOT responsible for:
-//   - Assembling the device ID (DeviceIdentityManager)
-//   - Determining which ERDs are valid (FeatureBitManager / ErdRegistry)
-//   - MQTT connection lifecycle (EsphomeMqttClientAdapter)
-//   - Startup phase sequencing (StartupHsm)
-//
-// Dependencies:
-//   - ESPHome UART, MQTT, and Component APIs
-//   - tiny_gea3_interface, tiny_gea2_interface, tiny_gea3_erd_client
-//   - All manager and adapter classes in this component
-// =============================================================================
-// =============================================================================
 // C/C++ CONVENTION
 // =============================================================================
 // C structs + vtables: data-path components (erd_cache, bridges, interfaces,
@@ -83,10 +58,6 @@ extern "C" {
 
 namespace esphome {
 namespace geappliances_bridge {
-
-// BridgeMode is now defined in bridge_mode.h (included via i_bridge_services.h).
-
-
 
 class GeappliancesBridge : public Component, public IBridgeServices {
   friend ErdPollListResult build_poll_list_(GeappliancesBridge* bridge,
@@ -161,13 +132,11 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void log_poll_state_transitions() override;
   void initialize_erd_cache_publisher() override;
   bool is_erd_cache_publisher_initialized() const override;
-  // ── Internal bridge methods (event callbacks and per-phase helpers) ─────────
   void handle_erd_client_activity_(const tiny_gea3_erd_client_on_activity_args_t* args);
   void initialize_mqtt_client_();
   void initialize_erd_bridge_();
   void start_custom_erd_polling_();
   void maybe_start_custom_erd_polling_();
-  // Protocol stack iteration helpers (extracted from run_protocol_stack_)
   void run_gea2_iteration_();
   void run_gea3_iteration_();
   void run_timer_only_iteration_();
@@ -196,9 +165,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
     iter_fn();
 #endif
   }
-  void run_protocol_stack_();         // Drive GEA2/GEA3 hardware stack
-  void log_poll_state_transitions_(); // Debug: log polling HSM state changes
-  void update_publisher_state_();       // Publisher pause/resume + steady-state detection
+  void run_protocol_stack_();
+  void log_poll_state_transitions_();
+  void update_publisher_state_();
   void start_feature_bit_reading_();
   void init_erd_cache_publisher_();
   void init_polling_bridge_(bool log_as_info, const probe_entry_t* custom_erds = nullptr,
@@ -206,10 +175,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void on_poll_discovery_complete_();
   bool should_route_to_feature_bits_(tiny_erd_t erd);
 
-  // Startup HSM — replaces the manual switch-based phase progression.
-  //   startup_delay → autodiscovery → device_id → mqtt_client_init
-  //                 → feature_bits → bridge_init → subscription_watch
-  //                 → running
   startup_hsm_wrapper_t startup_hsm_wrapper_;
 
   uart::UARTComponent *uart_{nullptr};
@@ -227,10 +192,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool generate_device_config_{true};
   bool filter_config_topics_{true};
   uint8_t throttle_rate_seconds_{1};
-  uint32_t last_cooldown_tick_{0};  /* last time erd_cache_tick_cooldowns ran (ms) */
-  // User-configured custom ERDs to poll in addition to the standard list.
-  // Populated by add_custom_erd() calls generated from the YAML custom_erds option.
-  // Fixed-capacity array to avoid heap allocation.
+  uint32_t last_cooldown_tick_{0};
   static constexpr uint16_t CUSTOM_ERDS_MAX = 128;
   struct custom_erd_entry_t {
     tiny_erd_t erd;
@@ -247,9 +209,8 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   erd_set_t custom_erd_subscription_seen_erds_;
   probe_entry_t poll_probe_list_[POLLING_LIST_MAX_SIZE];
   uint16_t poll_probe_list_count_{0};
-  bool custom_erd_polling_started_{false};  // Guard to prevent re-initialization
+  bool custom_erd_polling_started_{false};
 
-  // Startup phase delay tracking
   uint32_t startup_delay_start_ms_{0};
 
   // GEA2 tight-loop duration: covers the full TX→RX cycle at 19200 baud
@@ -257,7 +218,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   static constexpr uint32_t GEA2_LOOP_DURATION_MS = 100;
   // Cap on msec catchup iterations to prevent runaway loops
   static constexpr uint32_t MSEC_CATCHUP_CAP = 1000;
-  // GEA3 tight-loop duration
   static constexpr uint32_t GEA3_LOOP_DURATION_MS = 10;
   static constexpr uint32_t GEA2_LOOP_HARD_CAP_MS = GEA2_LOOP_DURATION_MS * 2;
   static constexpr uint32_t GEA3_LOOP_HARD_CAP_MS = GEA3_LOOP_DURATION_MS * 2;
@@ -267,10 +227,8 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // bridge) has reached steady-state operation.  Set once; never cleared.
   bool steady_state_reached_{false};
 
-  // Device identity manager (extracted from god class)
   DeviceIdentityManager device_identity_manager_;
 
-  // Feature bit manager (extracted from god class)
   FeatureBitManager feature_bit_manager_;
 
   // Guard to prevent re-initializing feature bit reading mid-sequence.
@@ -278,15 +236,10 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // if called again while the first ERD read is still in-flight.
   bool feature_bit_reading_started_{false};
 
-  // Feature bit reading state machine (runs after autodiscovery, before device ID gen)
-  // The FeatureBitManager owns the valid ERD list and ready flag; use its getters directly.
-
   polling_state_t last_logged_poll_state_{polling_state_none};
   subscription_state_t last_logged_subscribe_state_{subscription_state_none};
   mutable bool feature_bit_failure_logged_{false};
 
-  // ERD publish rate sensor: counts ERD updates per ~60s window and
-  // publishes to Home Assistant.
   sensor::Sensor* erd_publish_rate_sensor_{nullptr};
 
   sensor::Sensor* erd_cache_entries_sensor_{nullptr};
@@ -295,43 +248,23 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   sensor::Sensor* mqtt_disconnect_count_sensor_{nullptr};
   sensor::Sensor* mqtt_disconnect_duration_sensor_{nullptr};
 
-  // ERD registry: single owner of valid-ERD filter, string-type set,
-  // and runtime registered-ERD tracking.
   ErdRegistry erd_registry_;
 
-  // Shared ERD cache — owned by the bridge, used by both bridge HSMs and the
-  // MQTT publisher. Entries are updated by the bridges on read/subscription;
-  // the publisher drains update_required entries to MQTT each loop().
-
-  // ERD cache MQTT publisher: drains update_required entries from the shared
-  // cache and publishes them to MQTT topics each loop().
   erd_cache_mqtt_publisher_t erd_cache_publisher_;
   erd_cache_t erd_cache_;
 
-  // HA discovery manager: publishes one-shot HA MQTT discovery payloads
-  // after steady state is reached.
+  // HA discovery manager: publishes one-shot HA MQTT discovery payloads after steady state is reached.
   ha_discovery_manager_t ha_discovery_manager_;
   bool erd_cache_publisher_paused_{false};
   bool discovery_just_resumed_{false};
 
-  // OTA-triggered discovery cleanup: set in setup() if the stored
-  // discovery data hash differs from the current build's hash. Driven
-  // in loop() after steady state. After cleanup, reboots (same as
-  // DiscoveryRefresh) for fresh republish.
-
-  // Autodiscovery manager (extracted from god class)
   AutodiscoveryManager autodiscovery_manager_;
-  // OTA cleanup manager: owns the OTA-triggered discovery cleanup state
-  // machine and the DiscoveryRefresh path (cleanup → republish → reboot).
+  // OTA-triggered discovery cleanup: set in setup() if the stored discovery data hash differs from the current build's hash. Driven in loop() after steady state. After cleanup, reboots (same as DiscoveryRefresh) for fresh republish.
   OtaCleanupManager ota_cleanup_manager_;
-  // Diagnostic sensor publisher: owns periodic publishing of ERD/MQTT
-  // diagnostic sensors (publish rate, cache stats, disconnect stats).
   DiagnosticSensorPublisher diagnostic_sensor_publisher_;
-
 
   tiny_timer_group_t timer_group_;
 
-  // GEA3 components
   esphome_uart_adapter_t uart_adapter_;
   esphome_mqtt_client_adapter_t mqtt_client_adapter_;
 
@@ -352,7 +285,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
    * prvCheckTasksWaitingTermination crashes (see erd_bridge_poll.cpp). */
   uint8_t client_queue_buffer_[4096];
 
-  // GEA2 components (only used when gea2_uart_ is set)
   esphome_uart_adapter_t gea2_uart_adapter_;
   tiny_gea2_interface_t gea2_interface_;
 
@@ -364,7 +296,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   uint8_t gea2_send_queue_buffer_[4096];
 
   tiny_gea2_erd_client_t gea2_erd_client_;
-  // GEA2 client queue — same sizing as GEA3 client queue; see comment above.
   uint8_t gea2_client_queue_buffer_[4096];
 
   // Event fired once per millisecond to drive GEA2 interface's internal timers.
@@ -377,20 +308,14 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   tiny_time_source_ticks_t gea2_tick_count_{0};
   uint32_t gea2_last_ms_{0};
 
-  // Adapter that wraps the GEA2 ERD client as a GEA3 ERD client interface
   gea2_erd_client_adapter_t gea2_erd_client_adapter_;
 
   erd_bridge_subscribe_t erd_bridge_subscribe_;
   erd_bridge_poll_t erd_bridge_poll_;
 
-  // Write bridge: relays MQTT write requests to the ERD client
   erd_write_bridge_t erd_write_bridge_;
   bool write_bridge_initialized_{false};
 
-  // Track which bridge(s) were actually initialized so teardown is unambiguous.
-  // A subscription bridge (erd_bridge_subscribe_) is created when use_polling is false.
-  // A polling bridge (erd_bridge_poll_) is created when use_polling is true,
-  // or when custom ERD polling is started alongside a subscription bridge.
   bool subscription_bridge_initialized_{false};
   bool polling_bridge_initialized_{false};
 
@@ -398,8 +323,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   tiny_event_subscription_t gea2_activity_subscription_;
 };
 
-// DiscoveryRefreshButton: concrete button that triggers HA discovery cleanup
-// and device restart when pressed.
 class DiscoveryRefreshButton : public button::Button {
  public:
   DiscoveryRefreshButton(GeappliancesBridge* bridge) : bridge_(bridge) {}
