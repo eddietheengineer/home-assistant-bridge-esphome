@@ -113,4 +113,4 @@ The regular `test` target runs 405 unit tests on CI. The `integration-test` targ
   Single-board appliances use `0xFF`; multi-board appliances use a specific board address. Any cache lookup or key must include the board address. See `erd_cache.h`, `erd_poll_list_builder.h`.
 
 - **Generated files must not be hand-edited.**
-  `erd_lists.{h,cpp}`, `appliance_api_feature_lists.{h,cpp}`, `ha_discovery_data.{h,cpp}`, `ha_discovery/*.jsonl`, and `appliance_api_erd_definitions_processed.json` are produced by `scripts/generate_erd_lists.py` and `scripts/ha_discovery/run_pipeline.py`. CI enforces this via `scripts/check_generated_sync.sh` (run `make check-generated` locally).
+  `erd_lists.{h,cpp}`, `appliance_api_feature_lists.{h,cpp}`, `appliance_type_map.h`, `ha_discovery_data.{h,cpp}`, `ha_discovery/*.jsonl`, and `appliance_api_erd_definitions_processed.json` are produced by `scripts/generate_erd_lists.py` and `scripts/ha_discovery/run_pipeline.py`. CI enforces this via `scripts/check_generated_sync.sh` (run `make check-generated` locally).

@@ -107,7 +107,7 @@ tries subscribe and falls back to poll).
 | `erd_lists.h/.cpp` | `scripts/generate_erd_lists.py` — ERD category lists. |
 | `appliance_api_feature_lists.h/.cpp` | `scripts/generate_erd_lists.py` — feature-bit -> ERD lists. |
 | `ha_discovery_data.h/.cpp` | `scripts/ha_discovery/run_pipeline.py` (compress step) — compressed HA discovery JSONL. |
-| `appliance_type_map.h` | Appliance type enum -> string. Hand-maintained (no generator produces it); keep in sync with ERD 0x0008 values in the submodule. |
+| `appliance_type_map.h` | `scripts/generate_erd_lists.py` — appliance type (ERD 0x0008) -> display-name identifier. |
 
 CI verifies the generated files are in sync with their generators via
 `scripts/check_generated_sync.sh` (run `make check-generated` locally).
