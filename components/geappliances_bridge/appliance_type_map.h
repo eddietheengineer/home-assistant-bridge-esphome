@@ -1,6 +1,7 @@
-/* Auto-generated from public-appliance-api-documentation
- * ERD 0x0008 - Appliance Type enum mapping
- * Regenerate with: python3 scripts/generate_erd_lists.py
+/* Appliance type enum (ERD 0x0008) -> display-name identifier mapping.
+ *
+ * Hand-maintained (not generated). Keep in sync with the "values" of ERD
+ * 0x0008 in lib/public-appliance-api-documentation/appliance_api_erd_definitions.json.
  */
 
 #ifndef APPLIANCE_TYPE_MAP_H

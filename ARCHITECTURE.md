@@ -9,6 +9,13 @@ settings, diagnostics), and exposes them to Home Assistant via MQTT discovery. I
 accepts writes from Home Assistant (e.g. set a temperature) and forwards them to the
 appliance.
 
+This file is a quick map. For detail, see:
+- `docs/architecture/overview.md` — C4 model (system context, container, component diagrams)
+- `docs/architecture/startup-sequence.md` — startup HSM sequence
+- `docs/architecture/data-flow.md` — read / write / discovery flows
+- `docs/module_descriptions/` — per-module summaries
+- `docs/spec/` — detailed behavioral contracts per module
+
 ## Data flow
 
 ```
