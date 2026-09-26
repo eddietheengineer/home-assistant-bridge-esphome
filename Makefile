@@ -101,6 +101,10 @@ clean:
 pytest:
 	@python3 -m pytest scripts/test_generate_erd_lists.py scripts/test_ha_discovery.py -v
 
+.PHONY: check-generated
+check-generated:
+	@bash scripts/check_generated_sync.sh
+
 .PHONY: integration-test
 integration-test:
 	@echo Building integration tests...

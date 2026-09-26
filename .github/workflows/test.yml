@@ -52,3 +52,6 @@ jobs:
     - name: Run Python tests
       run: |
         python -m pytest scripts/test_*.py -v
+
+    - name: Check generated files are in sync
+      run: bash scripts/check_generated_sync.sh

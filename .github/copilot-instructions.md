@@ -92,3 +92,25 @@ make integration-test -j4
 ```
 
 The regular `test` target runs 405 unit tests on CI. The `integration-test` target runs all 502 tests (including the startup integration test suite) locally. The integration tests are excluded from CI because CppUTest's `TestMemoryAllocator` causes false "Memory corruption" detections on GCC/Ubuntu CI with `std::function` members — this is a known limitation. Always verify integration tests pass locally before pushing.
+
+## Critical Invariants
+
+**These are load-bearing contracts in the C++ component. Breaking any of them causes subtle concurrency bugs, protocol violations, or memory corruption. Read the referenced file before changing the code that implements an invariant.**
+
+- **`erd_cache_t` is mutex-protected and append-only, with an O(log n) binary-search index.**
+  Entries are added, never modified in place. The index (keyed by `(erd, board_address)`) is what makes lookups O(log n); any change to how entries are stored must keep the index consistent. See `erd_cache.h` / `erd_cache.cpp`.
+
+- **The MQTT publisher runs on Core 0 at priority 1 and publishes from a snapshot.**
+  It is pinned to Core 0 (off ESPHome's loop core) at priority 1 (below the main loop) so it cannot starve the loopTask watchdog. It never mutates the cache directly — each publish atomically snapshots the payload out of the arena under the cache lock, so the main loop cannot overwrite it mid-publish. The state mutex is never held across the slow MQTT publish. See `erd_cache_mqtt_publisher.cpp`.
+
+- **HA discovery cleanup uses a per-instance `portMUX_TYPE` (spinlock) for thread safety.**
+  The cleanup struct embeds a `portMUX_TYPE` that is initialized in `start()` and restored after the discovery buffers are freed (freeing re-zeros the embedded spinlock to an invalid state). See `ha_discovery_cleanup.h` / `.cpp` and `ha_discovery_manager.cpp`.
+
+- **The ERD data size limit is 248 bytes — the GEA3 max payload (255 on-wire minus 7 bytes overhead).**
+  `erd_cache_t` rejects entries whose `data_size` exceeds `ERD_CACHE_MAX_DATA_SIZE` (248). Do not grow this without confirming the appliance protocol supports a larger payload. See `erd_cache.h`.
+
+- **Multi-board keying uses `(erd, board_address)` with `0xFF` as the primary-host board address.**
+  Single-board appliances use `0xFF`; multi-board appliances use a specific board address. Any cache lookup or key must include the board address. See `erd_cache.h`, `erd_poll_list_builder.h`.
+
+- **Generated files must not be hand-edited.**
+  `erd_lists.{h,cpp}`, `appliance_api_feature_lists.{h,cpp}`, `ha_discovery_data.{h,cpp}`, `ha_discovery/*.jsonl`, and `appliance_api_erd_definitions_processed.json` are produced by `scripts/generate_erd_lists.py` and `scripts/ha_discovery/run_pipeline.py`. CI enforces this via `scripts/check_generated_sync.sh` (run `make check-generated` locally).
