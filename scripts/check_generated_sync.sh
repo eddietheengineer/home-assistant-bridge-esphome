@@ -12,6 +12,7 @@
 #   scripts/generate_erd_lists.py
 #       -> components/geappliances_bridge/erd_lists.{h,cpp}
 #       -> components/geappliances_bridge/appliance_api_feature_lists.{h,cpp}
+#       -> components/geappliances_bridge/appliance_type_map.h
 #   scripts/ha_discovery/run_pipeline.py
 #       -> components/geappliances_bridge/ha_discovery_data.{h,cpp}
 #       -> ha_discovery/*.jsonl
@@ -37,6 +38,7 @@ GENERATED=(
   components/geappliances_bridge/erd_lists.cpp
   components/geappliances_bridge/appliance_api_feature_lists.h
   components/geappliances_bridge/appliance_api_feature_lists.cpp
+  components/geappliances_bridge/appliance_type_map.h
   components/geappliances_bridge/ha_discovery_data.h
   components/geappliances_bridge/ha_discovery_data.cpp
   scripts/ha_discovery/appliance_api_erd_definitions_processed.json
