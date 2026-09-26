@@ -25,7 +25,7 @@ UART (GEA2 / GEA3)
 [Startup HSM] -> autodiscovery -> device ID -> feature bits -> valid ERD set
    |
    v
-[ERD Bridge] -> poll / subscribe ERDs -> erd_cache (append-only, indexed)
+[ERD Bridge] -> poll / subscribe ERDs -> erd_cache (fixed array, in-place updates)
    |
    v
 [MQTT publisher task] -> snapshot -> Home Assistant (discovery + telemetry)
@@ -70,7 +70,7 @@ tries subscribe and falls back to poll).
 ### ERD storage
 | File | Responsibility |
 |------|----------------|
-| `erd_cache.h/.cpp` | Append-only ERD cache; mutex-protected, O(log n) binary-search index keyed by `(erd, board_address)`. |
+| `erd_cache.h/.cpp` | ERD cache; mutex-protected fixed 300-slot array + 4096-byte bump arena, keyed by `(erd, board_address)`. Entries never removed; data updated in place; O(n) linear lookup. |
 | `erd_registry.h/.cpp` | Holds the valid-ERD set (from feature bits) and filters cache entries against it (max 645). |
 
 ### MQTT
@@ -107,7 +107,7 @@ tries subscribe and falls back to poll).
 | `erd_lists.h/.cpp` | `scripts/generate_erd_lists.py` — ERD category lists. |
 | `appliance_api_feature_lists.h/.cpp` | `scripts/generate_erd_lists.py` — feature-bit -> ERD lists. |
 | `ha_discovery_data.h/.cpp` | `scripts/ha_discovery/run_pipeline.py` (compress step) — compressed HA discovery JSONL. |
-| `appliance_type_map.h` | Appliance type enum -> string. **Note:** its header claims "auto-generated" but no generator produces it; treat as hand-maintained. |
+| `appliance_type_map.h` | Appliance type enum -> string. Hand-maintained (no generator produces it); keep in sync with ERD 0x0008 values in the submodule. |
 
 CI verifies the generated files are in sync with their generators via
 `scripts/check_generated_sync.sh` (run `make check-generated` locally).

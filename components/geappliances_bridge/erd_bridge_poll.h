@@ -10,12 +10,12 @@ extern "C" {
 #include "erd_lists.h"
 }
 #include "erd_bridge_common.h"
-// 3-Phase Polling Lifecycle:
-//   Phase 1 (probe): read the appliance ERD list to discover which ERDs exist.
-//   Phase 2 (verify): filter the discovered ERDs (feature-bit / custom-ERD).
-//   Phase 3 (poll): steady-state polling of the verified list.
+// Polling lifecycle:
+//   1. Probe: read the appliance ERD list to discover which ERDs exist; non-responders
+//      are filtered out in the same pass (feature-bit filtering happens at list-build time).
+//   2. Poll: steady-state polling of the verified list.
 //
-// Phase 3 timer semantics:
+// Poll-phase timer semantics:
 //   Timer fires mid-cycle (cycle not yet complete): set restart_pending=true;
 //   let the cycle finish naturally.
 //   Timer fires after cycle already complete: start next cycle immediately;
