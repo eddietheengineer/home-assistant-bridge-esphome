@@ -91,7 +91,17 @@ make test -j4
 make integration-test -j4
 ```
 
-The regular `test` target runs 405 unit tests on CI. The `integration-test` target runs all 502 tests (including the startup integration test suite) locally. The integration tests are excluded from CI because CppUTest's `TestMemoryAllocator` causes false "Memory corruption" detections on GCC/Ubuntu CI with `std::function` members — this is a known limitation. Always verify integration tests pass locally before pushing.
+The regular `test` target runs 440 unit tests on CI (the full 537-test suite minus the 97 startup integration tests). The `integration-test` target runs all 537 tests (including the startup integration test suite) locally. The integration tests are excluded from CI because CppUTest's `TestMemoryAllocator` causes false "Memory corruption" detections on GCC/Ubuntu CI with `std::function` members — this is a known limitation. Always verify integration tests pass locally before pushing.
+
+## Global Protocol Rules
+
+**Wire-format facts that hold across the whole component. Code that appears to violate them is usually the bug — confirm against the appliance protocol before "fixing" either side.**
+
+- **A board address is always 1 byte (`uint8_t`).** Physical board addresses are `0x00`–`0xFE`. `0xFF` is the GEA broadcast address (`tiny_gea_broadcast_address` in `lib/tiny-gea-api/include/tiny_gea_constants.h`) and can never be a physical board address. `0xFF` is used as a "primary board" sentinel in the write path and the polling list (`PROBE_ENTRY_DEFAULT_ADDRESS` in `erd_bridge_common.h`); the ERD cache stores only physical addresses.
+
+- **An ERD is always 2 bytes (`uint16_t`, `tiny_erd_t` in `lib/tiny-gea-api/include/tiny_erd.h`).** ERD IDs are printed as 4 hex digits (`0x%04x`) in MQTT topics and logs.
+
+- **MQTT topic format is `geappliances/{device_id}/erd/0x{ERD}/{op}` for the primary board and `geappliances/{device_id}/erd/0x{ADDR}_0x{ERD}/{op}` for secondary boards**, where `{ADDR}` is 2 hex digits, `{ERD}` is 4 hex digits, and `{op}` is `value`, `write`, or `write_result`. The no-prefix primary form is the legacy format that single-board appliances must keep working.
 
 ## Critical Invariants
 

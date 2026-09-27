@@ -158,8 +158,9 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
     // secondary board, no prefix means the primary board (tagged with the
     // broadcast address 0xFF, which can never be a physical board address, so
     // a secondary board at 0x00 stays unambiguous). The write bridge resolves
-    // the 0xFF sentinel to the detected host address. A segment whose ERD
-    // field is not valid hex is dropped; a missing/empty address parses as 0x00.
+    // the 0xFF sentinel to the detected host address. A segment whose address
+    // or ERD field is not valid hex is dropped; a secondary board at 0x00
+    // parses as 0x00 and stays distinct from the 0xFF primary sentinel.
     uint8_t board_address = tiny_gea_broadcast_address;
     unsigned erd = 0;
     const char* underscore = strchr(segment, '_');
