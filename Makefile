@@ -1,5 +1,9 @@
 TARGET := home-assistant-bridge_tests
 BUILD_DIR := ./build
+# The integration build links a separate binary so the two targets can never
+# run each other's stale binary (make cannot tell which source set produced a
+# shared output path).
+TARGET_INTEGRATION := home-assistant-bridge_tests_integration
 
 INC_DIRS := \
   components/geappliances_bridge \
@@ -108,9 +112,9 @@ check-generated:
 .PHONY: integration-test
 integration-test:
 	@echo Building integration tests...
-	@$(MAKE) $(BUILD_DIR)/$(TARGET) SRCS="$(SRCS_INTEGRATION)"
+	@$(MAKE) $(BUILD_DIR)/$(TARGET_INTEGRATION) TARGET="$(TARGET_INTEGRATION)" SRCS="$(SRCS_INTEGRATION)"
 	@echo Running integration tests...
-	@ASAN_OPTIONS=detect_leaks=0:detect_stack_use_after_return=0 halt_on_error=0 $(BUILD_DIR)/$(TARGET)
+	@ASAN_OPTIONS=detect_leaks=0:detect_stack_use_after_return=0 halt_on_error=0 $(BUILD_DIR)/$(TARGET_INTEGRATION)
 
 -include $(DEPS)
 
