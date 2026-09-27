@@ -27,6 +27,7 @@ static const char* write_failure_reason_to_string(tiny_gea3_erd_client_write_fai
 static void update_erd_write_result(
   i_mqtt_client_t* _self,
   tiny_erd_t erd,
+  uint8_t board_address,
   bool success,
   tiny_gea3_erd_client_write_failure_reason_t failure_reason)
 {
@@ -35,8 +36,13 @@ static void update_erd_write_result(
   if (mqtt_client == nullptr || !mqtt_client->is_connected()) return;
 
   char topic[128];
-  snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/write_result",
-          self->device_id, erd);
+  if (board_address != 0) {
+    snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%02x_0x%04x/write_result",
+            self->device_id, board_address, erd);
+  } else {
+    snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/write_result",
+            self->device_id, erd);
+  }
 
   // Use a stack buffer to avoid heap allocation.
   // Max error payload: "{\"error\":\"retries_exhausted\"}" = 28 chars + null.
@@ -144,10 +150,23 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
     auto pos = topic.find("/erd/0x");
     if (pos == std::string::npos) return;
 
-    const char* erd_str = topic.c_str() + pos + 5; // skip "erd/"
+    const char* segment = topic.c_str() + pos + 5; // points to "0x..."
 
+    // Primary-board topics are 0x{erd}; secondary-board topics are
+    // 0x{addr}_0x{erd}. Distinguish by the "_" separator. board_address
+    // stays 0 for the primary board (the write bridge resolves it to the
+    // detected host address).
+    uint8_t board_address = 0;
     unsigned erd = 0;
-    if (sscanf(erd_str, "%x", &erd) != 1) return;
+    const char* underscore = strchr(segment, '_');
+    if (underscore != nullptr) {
+      unsigned addr = 0;
+      if (sscanf(segment, "%x", &addr) != 1) return;
+      if (sscanf(underscore + 1, "%x", &erd) != 1) return;
+      board_address = static_cast<uint8_t>(addr);
+    } else {
+      if (sscanf(segment, "%x", &erd) != 1) return;
+    }
 
     // Decode hex payload to a local stack buffer to avoid race condition:
     // if a new MQTT message arrives before tiny_event_publish() delivers
@@ -166,6 +185,7 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
 
     mqtt_client_on_write_request_args_t args;
     args.erd = static_cast<tiny_erd_t>(erd);
+    args.board_address = board_address;
     args.size = local_size;
     args.value = local_buffer;
 

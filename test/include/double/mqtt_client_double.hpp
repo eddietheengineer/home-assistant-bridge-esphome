@@ -30,6 +30,7 @@ void mqtt_client_double_init(mqtt_client_double_t* self);
 void mqtt_client_double_trigger_write_request(
   mqtt_client_double_t* self,
   tiny_erd_t erd,
+  uint8_t board_address,
   uint8_t size,
   const void* value);
 
