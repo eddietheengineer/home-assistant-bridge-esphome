@@ -33,7 +33,7 @@
 
 typedef struct {
   tiny_erd_t erd;
-  uint8_t board_address;      /* board address; 0xFF = primary host */
+  uint8_t board_address;      /* physical board address; the primary host stores its detected address */
   uint16_t data_offset;        /* offset into arena */
   uint8_t data_size;           /* invariant after registration */
   bool update_required;

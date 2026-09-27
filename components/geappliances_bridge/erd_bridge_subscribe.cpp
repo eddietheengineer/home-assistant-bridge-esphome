@@ -40,9 +40,10 @@ static tiny_hsm_result_t sub_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         tiny_hsm_transition(hsm, state_subscribed);
       }
 
-      // Subscription publications come from the primary board. Store them
-      // under the primary sentinel so their MQTT topics have no address prefix.
-      erd_cache_update(self->erd_cache, erd, PROBE_ENTRY_DEFAULT_ADDRESS,
+      // Subscription publications come from the primary board. Store the
+      // physical host address; the publisher maps it back to the legacy
+      // (no-prefix) MQTT topic so topics remain backward compatible.
+      erd_cache_update(self->erd_cache, erd, self->erd_host_address,
               reinterpret_cast<const uint8_t*>(args->subscription_publication_received.data),
               args->subscription_publication_received.data_size);
     } break;

@@ -35,6 +35,7 @@ typedef struct {
   erd_cache_t* cache;              // Shared cache (owned by GeappliancesBridge)
   i_mqtt_client_t* mqtt_client;
   const char* device_id;
+  uint8_t primary_board_address;  /* board address that maps to the legacy (no-prefix) MQTT topic */
   uint16_t publish_index;
   bool mqtt_connected;
   bool paused;
@@ -68,7 +69,8 @@ void erd_cache_mqtt_publisher_init(
   erd_cache_mqtt_publisher_t* self,
   erd_cache_t* cache,
   i_mqtt_client_t* mqtt_client,
-  const char* device_id);
+  const char* device_id,
+  uint8_t primary_board_address);
 
 void erd_cache_mqtt_publisher_destroy(erd_cache_mqtt_publisher_t* self);
 

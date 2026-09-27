@@ -55,7 +55,8 @@ TEST(erd_cache_mqtt_publisher_pause, pause_sets_paused_and_resets_first_round_do
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   /* Initially not paused, first_round_done is false (memset zero). */
   CHECK_FALSE(publisher.paused);
@@ -80,7 +81,8 @@ TEST(erd_cache_mqtt_publisher_pause, resume_sets_paused_false)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   publisher.paused = true;
 
@@ -102,7 +104,8 @@ TEST(erd_cache_mqtt_publisher_pause, loop_skips_publishing_when_paused)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data = 0x42;
@@ -131,7 +134,8 @@ TEST(erd_cache_mqtt_publisher_pause, loop_resumes_publishing_after_resume)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data = 0x42;
@@ -159,7 +163,8 @@ TEST(erd_cache_mqtt_publisher_pause, first_round_done_false_after_resume_true_af
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   /* Insert a single ERD so a full round is one entry. */
@@ -195,7 +200,8 @@ TEST(erd_cache_mqtt_publisher_pause, pause_is_idempotent)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   /* Pause twice — should not crash and remain paused. */
   erd_cache_mqtt_publisher_pause(&publisher);
@@ -211,7 +217,8 @@ TEST(erd_cache_mqtt_publisher_pause, resume_is_idempotent)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   publisher.paused = true;
 
@@ -228,7 +235,8 @@ TEST(erd_cache_mqtt_publisher_pause, pause_resume_pause_resume_sequence)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   /* Alternate pause/resume multiple times. */
   erd_cache_mqtt_publisher_pause(&publisher);
@@ -256,7 +264,8 @@ TEST(erd_cache_mqtt_publisher_pause, pause_works_with_null_state_mutex)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   /* On non-ESP-IDF, state_mutex does not exist (compiled out).
    * The pause() function takes the #else path and directly sets fields. */
@@ -274,7 +283,8 @@ TEST(erd_cache_mqtt_publisher_pause, resume_works_with_null_state_mutex)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   publisher.paused = true;
 
@@ -289,7 +299,8 @@ TEST(erd_cache_mqtt_publisher_pause, first_round_done_works_with_null_state_mute
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   /* Initially false. */
   CHECK_FALSE(erd_cache_mqtt_publisher_first_round_done(&publisher));
@@ -309,7 +320,8 @@ TEST(erd_cache_mqtt_publisher_pause, pause_resets_first_round_done_when_already_
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   /* first_round_done is already false from init. */
   CHECK_FALSE(publisher.first_round_done);
@@ -331,7 +343,8 @@ TEST(erd_cache_mqtt_publisher_pause, resume_does_not_set_first_round_done)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   /* Set first_round_done to true, then pause (resets it), then resume. */
   publisher.first_round_done = true;
