@@ -65,7 +65,7 @@ Write bridge-specific signals (defined in `erd_write_bridge.cpp`):
 1. MQTT adapter receives a write command on a Home Assistant entity topic (primary board: `0x{ERD}/write`, secondary board: `0x{ADDR}_0x{ERD}/write`)
 2. `mqtt_client_on_write_request` event fires with `erd`, `board_address`, `value`, and `size`
 3. Bridge checks if the appliance is identified (host address ≠ broadcast)
-4. If identified, resolves the target address (`board_address != 0` → secondary, `board_address == 0` → host address) and `tiny_gea3_erd_client_write()` queues the write to the ERD client
+4. If identified, resolves the target address (`board_address != 0xFF` → secondary, `board_address == 0xFF` → host address) and `tiny_gea3_erd_client_write()` queues the write to the ERD client
 5. Bridge transitions to `state_writing`, storing the request ID, ERD, and board address
 6. ERD client completes or fails the write asynchronously
 7. `tiny_gea3_erd_client_on_activity` event fires with the result

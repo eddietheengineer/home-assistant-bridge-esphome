@@ -3,6 +3,7 @@
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 #include "erd_cache.h"
+#include "tiny_gea_constants.h"
 
 extern "C" {
 #include "tiny_utils.h"
@@ -36,7 +37,7 @@ static void update_erd_write_result(
   if (mqtt_client == nullptr || !mqtt_client->is_connected()) return;
 
   char topic[128];
-  if (board_address != 0) {
+  if (board_address != tiny_gea_broadcast_address) {
     snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%02x_0x%04x/write_result",
             self->device_id, board_address, erd);
   } else {
@@ -153,10 +154,13 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
     const char* segment = topic.c_str() + pos + 5; // points to "0x..."
 
     // Primary-board topics are 0x{erd}; secondary-board topics are
-    // 0x{addr}_0x{erd}. Distinguish by the "_" separator. board_address
-    // stays 0 for the primary board (the write bridge resolves it to the
-    // detected host address).
-    uint8_t board_address = 0;
+    // 0x{addr}_0x{erd}. Distinguish by the "_" separator. The primary
+    // board is tagged with the broadcast address (0xFF), which can never
+    // be a physical board address, so a secondary board at 0x00 stays
+    // unambiguous; the write bridge resolves it to the detected host
+    // address. Malformed segments (e.g. an empty address) fail the
+    // sscanf checks and are dropped.
+    uint8_t board_address = tiny_gea_broadcast_address;
     unsigned erd = 0;
     const char* underscore = strchr(segment, '_');
     if (underscore != nullptr) {

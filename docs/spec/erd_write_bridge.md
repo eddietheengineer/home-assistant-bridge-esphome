@@ -77,7 +77,7 @@ Initial state. Accepts new write requests.
 
 **On `signal_write_requested`:**
 - If `erd_host_address == tiny_gea_broadcast_address`: logs a warning, publishes a failure result via `mqtt_client_update_erd_write_result(erd, board_address, false, not_supported)`, stays in `state_ready`.
-- Otherwise: resolves the target address — `board_address != 0` uses the parsed secondary address, `board_address == 0` uses `erd_host_address` (primary). Calls `tiny_gea3_erd_client_write(erd_client, &request_id, target_address, erd, value, size)`.
+- Otherwise: resolves the target address — `board_address != 0xFF` uses the parsed secondary address, `board_address == 0xFF` uses `erd_host_address` (primary). Calls `tiny_gea3_erd_client_write(erd_client, &request_id, target_address, erd, value, size)`.
   - If write fails to queue (returns false): logs a warning, publishes a failure result via `mqtt_client_update_erd_write_result(erd, board_address, false, retries_exhausted)`, stays in `state_ready`.
   - If write succeeds: stores `request_id` in `pending_request_id`, `erd` in `pending_erd`, and `board_address` in `pending_board_address`, transitions to `state_writing`.
 

@@ -40,9 +40,10 @@ static tiny_hsm_result_t state_ready(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, 
         break;
       }
 
-      // Primary-board topics (board_address == 0) route to the detected host
-      // address; secondary-board topics route to the parsed address.
-      uint8_t target_address = (args->board_address != 0) ? args->board_address : self->erd_host_address;
+      // Primary-board topics (board_address == 0xFF, the broadcast sentinel)
+      // route to the detected host address; secondary-board topics route to
+      // the parsed address.
+      uint8_t target_address = (args->board_address != tiny_gea_broadcast_address) ? args->board_address : self->erd_host_address;
 
       tiny_gea3_erd_client_request_id_t request_id;
       if(!tiny_gea3_erd_client_write(self->erd_client, &request_id, target_address,
@@ -129,7 +130,7 @@ void erd_write_bridge_init(
   self->erd_host_address = host_address;
   self->pending_request_id = 0;
   self->pending_erd = 0;
-  self->pending_board_address = 0;
+  self->pending_board_address = tiny_gea_broadcast_address;
 
   tiny_event_subscription_init(
     &self->mqtt_write_request_subscription, self, +[](void* context, const void* _args) {

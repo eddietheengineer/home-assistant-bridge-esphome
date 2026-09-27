@@ -32,7 +32,7 @@ The `on_write_request` event carries `mqtt_client_on_write_request_args_t`:
 | Field | Type | Description |
 |-------|------|-------------|
 | `erd` | `tiny_erd_t` | The target ERD |
-| `board_address` | `uint8_t` | 0 = primary board; non-zero = secondary board address |
+| `board_address` | `uint8_t` | 0xFF (broadcast) = primary board; any other value = secondary board address |
 | `size` | `uint8_t` | Payload length |
 | `value` | `const void*` | The write payload |
 

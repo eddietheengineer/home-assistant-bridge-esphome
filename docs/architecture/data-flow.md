@@ -81,7 +81,7 @@ graph LR
    `geappliances/{device_id}/erd/0x{ERD}/write` (primary board) or
    `geappliances/{device_id}/erd/0x{ADDR}_0x{ERD}/write` (secondary board).
 2. **MQTT Adapter** receives the command via wildcard subscription, parses the
-   board address from the topic (0 for primary, the address for secondary), and
+   board address from the topic (0xFF for primary, the address for secondary), and
    fires the `on_write_request` event.
 3. **Write Bridge** (`erd_write_bridge`) resolves the target address (primary
    board topics route to the detected host address; secondary board topics route

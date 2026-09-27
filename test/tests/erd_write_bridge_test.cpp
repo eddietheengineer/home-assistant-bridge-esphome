@@ -57,7 +57,7 @@ TEST_GROUP_BASE(erd_write_bridge, simulation_test_base)
     mock().enable();
   }
 
-  void when_a_write_request_is_received(tiny_erd_t erd, const uint8_t* value, uint8_t size, uint8_t board_address = 0)
+  void when_a_write_request_is_received(tiny_erd_t erd, const uint8_t* value, uint8_t size, uint8_t board_address = 0xFF)
   {
     mqtt_client_double_trigger_write_request(&mqtt_client, erd, board_address, size, value);
   }
@@ -91,7 +91,7 @@ TEST_GROUP_BASE(erd_write_bridge, simulation_test_base)
   }
 
   void should_report_write_result(tiny_erd_t erd, bool success,
-    tiny_gea3_erd_client_write_failure_reason_t reason, uint8_t board_address = 0)
+    tiny_gea3_erd_client_write_failure_reason_t reason, uint8_t board_address = 0xFF)
   {
     mock()
       .expectOneCall("update_erd_write_result")
@@ -136,10 +136,10 @@ TEST(erd_write_bridge, should_route_primary_board_write_to_host_address)
     .ignoreOtherParameters()
     .andReturnValue(true);
 
-  // board_address = 0 (primary) resolves to the detected host address 0xC0.
-  when_a_write_request_is_received(0x3001, &value, sizeof(value), 0);
+  // board_address = 0xFF (primary) resolves to the detected host address 0xC0.
+  when_a_write_request_is_received(0x3001, &value, sizeof(value), 0xFF);
 
-  should_report_write_result(0x3001, true, 0, 0);
+  should_report_write_result(0x3001, true, 0, 0xFF);
   when_a_write_is_completed(mock_request_id, 0x3001);
 }
 

@@ -10,8 +10,11 @@
 
 typedef struct {
   tiny_erd_t erd;
-  /* 0 = primary board (use the bridge's host address); non-zero = the
-   * secondary board address parsed from the 0x{addr}_0x{erd} topic form. */
+  /* 0xFF (broadcast) = primary board (the bridge resolves it to the
+   * detected host address); any other value = the secondary board address
+   * parsed from the 0x{addr}_0x{erd} topic form. 0xFF is used because it
+   * can never be a physical board address, keeping a 0x00 secondary board
+   * unambiguous. */
   uint8_t board_address;
   uint8_t size;
   const void* value;

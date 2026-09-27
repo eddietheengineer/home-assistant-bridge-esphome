@@ -147,7 +147,7 @@ TEST(write_flow_integration, should_drop_write_when_host_is_broadcast)
     .expectOneCall("update_erd_write_result")
     .onObject(&adapter.interface)
     .withParameter("erd", erd)
-    .withParameter("board_address", 0)
+    .withParameter("board_address", 0xFF)
     .withParameter("success", false)
     .withParameter("failure_reason",
       tiny_gea3_erd_client_write_failure_reason_not_supported);

@@ -75,7 +75,7 @@ void mqtt_client_update_erd_write_result(
     tiny_gea3_erd_client_write_failure_reason_t failure_reason);
 ```
 
-Provide the result for the most recently completed write request to an ERD. `board_address` is 0 for the primary board (legacy no-prefix result topic) or the secondary board address (address-prefixed result topic).
+Provide the result for the most recently completed write request to an ERD. `board_address` is 0xFF (broadcast) for the primary board (legacy no-prefix result topic) or the secondary board address (address-prefixed result topic).
 
 ### 3.3 `mqtt_client_on_write_request`
 
@@ -166,7 +166,7 @@ typedef struct {
 | Field | Type | Description |
 |-------|------|-------------|
 | `erd` | `tiny_erd_t` | The target ERD to write |
-| `board_address` | `uint8_t` | 0 = primary board (bridge resolves to its host address); non-zero = secondary board address parsed from the `0x{addr}_0x{erd}` topic form |
+| `board_address` | `uint8_t` | 0xFF (broadcast) = primary board (bridge resolves to its host address); any other value = secondary board address parsed from the `0x{addr}_0x{erd}` topic form |
 | `size` | `uint8_t` | Payload length in bytes |
 | `value` | `const void*` | The write payload |
 
