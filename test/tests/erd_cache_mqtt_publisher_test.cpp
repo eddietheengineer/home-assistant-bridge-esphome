@@ -293,30 +293,6 @@ TEST(erd_cache_mqtt_publisher, loop_retries_after_drop)
   CHECK_FALSE(erd_cache_mqtt_publisher_loop(&publisher));
 }
 
-
-/* ------------------------------------------------------------------ */
-/* loop - topic format                                                  */
-/* ------------------------------------------------------------------ */
-
-TEST(erd_cache_mqtt_publisher, topic_format_correct)
-{
-  erd_cache_mqtt_publisher_init(
-    &publisher,
-    &cache,
-    &adapter.interface,
-    "my_device",
-    0xE0);
-  erd_cache_mqtt_publisher_on_connected(&publisher);
-
-  uint8_t data = 0x01;
-  erd_cache_update(&cache, 0x0008, 0xFF, &data, sizeof(data));
-
-  // The publisher will call esphome_mqtt_client_adapter_publish with the topic.
-  // We verify it doesn't crash and the topic is constructed correctly.
-  bool published = erd_cache_mqtt_publisher_loop(&publisher);
-  CHECK_TRUE(published);
-}
-
 /* ------------------------------------------------------------------ */
 /* loop - payload format                                                */
 /* ------------------------------------------------------------------ */
@@ -1115,7 +1091,7 @@ TEST(erd_cache_mqtt_publisher, cumulative_disconnect_duration_across_reconnect_a
 /* Address-qualified topic format                                      */
 /* ------------------------------------------------------------------ */
 
-TEST(erd_cache_mqtt_publisher, default_address_publishes_without_crashing)
+TEST(erd_cache_mqtt_publisher, primary_address_publishes_without_prefix)
 {
   erd_cache_mqtt_publisher_init(
     &publisher,
@@ -1133,7 +1109,7 @@ TEST(erd_cache_mqtt_publisher, default_address_publishes_without_crashing)
   STRCMP_EQUAL("geappliances/my_device/erd/0x0008/value", mqtt_double.last_published_topic_.c_str());
 }
 
-TEST(erd_cache_mqtt_publisher, non_default_address_publishes_without_crashing)
+TEST(erd_cache_mqtt_publisher, secondary_address_publishes_with_prefix)
 {
   erd_cache_mqtt_publisher_init(
     &publisher,

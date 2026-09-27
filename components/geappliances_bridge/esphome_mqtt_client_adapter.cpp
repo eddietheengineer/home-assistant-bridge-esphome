@@ -154,12 +154,12 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
     const char* segment = topic.c_str() + pos + 5; // points to "0x..."
 
     // Primary-board topics are 0x{erd}; secondary-board topics are
-    // 0x{addr}_0x{erd}. Distinguish by the "_" separator. The primary
-    // board is tagged with the broadcast address (0xFF), which can never
-    // be a physical board address, so a secondary board at 0x00 stays
-    // unambiguous; the write bridge resolves it to the detected host
-    // address. Malformed segments (e.g. an empty address) fail the
-    // sscanf checks and are dropped.
+    // 0x{addr}_0x{erd}. Distinguish by the "_" separator: a prefix means a
+    // secondary board, no prefix means the primary board (tagged with the
+    // broadcast address 0xFF, which can never be a physical board address, so
+    // a secondary board at 0x00 stays unambiguous). The write bridge resolves
+    // the 0xFF sentinel to the detected host address. A segment whose ERD
+    // field is not valid hex is dropped; a missing/empty address parses as 0x00.
     uint8_t board_address = tiny_gea_broadcast_address;
     unsigned erd = 0;
     const char* underscore = strchr(segment, '_');
