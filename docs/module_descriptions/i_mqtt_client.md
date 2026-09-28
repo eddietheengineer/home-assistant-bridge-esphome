@@ -13,7 +13,7 @@ The `i_mqtt_client_t` struct wraps a vtable (`i_mqtt_client_api_t`) that the con
 | Method | Description |
 |--------|-------------|
 | `mqtt_client_register_erd(self, erd)` | Register a newly discovered ERD with the MQTT adapter. The adapter creates MQTT topics for the ERD. |
-| `mqtt_client_update_erd_write_result(self, erd, success, failure_reason)` | Provide the result for the most recently completed write request to an ERD. The adapter publishes the result to the appropriate MQTT topic. |
+| `mqtt_client_update_erd_write_result(self, erd, board_address, success, failure_reason)` | Provide the result for the most recently completed write request to an ERD. The adapter publishes the result to the appropriate MQTT topic (legacy no-prefix for the primary board, address-prefixed for secondary boards). |
 | `mqtt_client_on_write_request(self)` | Return an event pointer for subscribing to write requests received from MQTT. The bridge subscribes to this event to handle write commands. |
 | `mqtt_client_on_mqtt_disconnect(self)` | Return an event pointer for subscribing to MQTT disconnect notifications. |
 | `mqtt_client_on_mqtt_connect(self)` | Return an event pointer for subscribing to MQTT connect notifications. |
@@ -32,6 +32,7 @@ The `on_write_request` event carries `mqtt_client_on_write_request_args_t`:
 | Field | Type | Description |
 |-------|------|-------------|
 | `erd` | `tiny_erd_t` | The target ERD |
+| `board_address` | `uint8_t` | 0xFF (broadcast) = primary board; any other value = secondary board address |
 | `size` | `uint8_t` | Payload length |
 | `value` | `const void*` | The write payload |
 

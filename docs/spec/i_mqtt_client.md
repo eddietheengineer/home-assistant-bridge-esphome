@@ -37,7 +37,7 @@ The handle wraps a pointer to the vtable. Callers interact with the interface th
 typedef struct i_mqtt_client_api_t {
   void (*register_erd)(i_mqtt_client_t* self, tiny_erd_t erd);
 
-  void (*update_erd_write_result)(i_mqtt_client_t* self, tiny_erd_t erd, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason);
+  void (*update_erd_write_result)(i_mqtt_client_t* self, tiny_erd_t erd, uint8_t board_address, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason);
 
   i_tiny_event_t* (*on_write_request)(i_mqtt_client_t* self);
 
@@ -70,11 +70,13 @@ Register a newly discovered ERD.
 void mqtt_client_update_erd_write_result(
     i_mqtt_client_t* self,
     tiny_erd_t erd,
+    uint8_t board_address,
     bool success,
     tiny_gea3_erd_client_write_failure_reason_t failure_reason);
 ```
 
-Provide the result for the most recently completed write request to an ERD.
+Provide the result for the most recently completed write request to an ERD. `board_address` is 0xFF (broadcast) for the primary board (legacy no-prefix result topic) or the secondary board address (address-prefixed result topic).
+
 ### 3.3 `mqtt_client_on_write_request`
 
 ```c
@@ -135,7 +137,7 @@ Each vtable method has a corresponding `static inline` wrapper in the header:
 | Wrapper | Vtable Call |
 |---------|-------------|
 | `mqtt_client_register_erd(self, erd)` | `self->api->register_erd(self, erd)` |
-| `mqtt_client_update_erd_write_result(self, erd, success, failure_reason)` | `self->api->update_erd_write_result(self, erd, success, failure_reason)` |
+| `mqtt_client_update_erd_write_result(self, erd, board_address, success, failure_reason)` | `self->api->update_erd_write_result(self, erd, board_address, success, failure_reason)` |
 | `mqtt_client_on_write_request(self)` | `self->api->on_write_request(self)` |
 | `mqtt_client_on_mqtt_disconnect(self)` | `self->api->on_mqtt_disconnect(self)` |
 | `mqtt_client_on_mqtt_connect(self)` | `self->api->on_mqtt_connect(self)` |
@@ -155,6 +157,7 @@ This allows callers to use the interface with normal function-call syntax withou
 ```c
 typedef struct {
   tiny_erd_t erd;
+  uint8_t board_address;
   uint8_t size;
   const void* value;
 } mqtt_client_on_write_request_args_t;
@@ -163,6 +166,7 @@ typedef struct {
 | Field | Type | Description |
 |-------|------|-------------|
 | `erd` | `tiny_erd_t` | The target ERD to write |
+| `board_address` | `uint8_t` | 0xFF (broadcast) = primary board (bridge resolves to its host address); any other value = secondary board address parsed from the `0x{addr}_0x{erd}` topic form |
 | `size` | `uint8_t` | Payload length in bytes |
 | `value` | `const void*` | The write payload |
 

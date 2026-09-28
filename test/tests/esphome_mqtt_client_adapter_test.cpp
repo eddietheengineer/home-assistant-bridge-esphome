@@ -78,7 +78,7 @@ TEST(esphome_mqtt_client_adapter, update_erd_write_result_success_no_crash)
 {
   init_adapter();
 
-  adapter.interface.api->update_erd_write_result(&adapter.interface, 0x0092, true, 0);
+  adapter.interface.api->update_erd_write_result(&adapter.interface, 0x0092, 0xFF, true, 0);
   // global_mqtt_client is null in tests — publish is skipped, no crash.
 }
 
@@ -86,7 +86,7 @@ TEST(esphome_mqtt_client_adapter, update_erd_write_result_failure_no_crash)
 {
   init_adapter();
 
-  adapter.interface.api->update_erd_write_result(&adapter.interface, 0x0092, false, 3);
+  adapter.interface.api->update_erd_write_result(&adapter.interface, 0x0092, 0xA1, false, 3);
   // global_mqtt_client is null in tests — publish is skipped, no crash.
 }
 /* ------------------------------------------------------------------ */

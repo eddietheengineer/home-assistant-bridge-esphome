@@ -235,12 +235,10 @@ static tiny_hsm_result_t handle_discovery_list_signals(tiny_hsm_t* hsm, tiny_hsm
       // one board, in which case a list lookup would select the first match.
       uint8_t addr = args->address;
       add_erd_to_polling_list(self, erd, addr);
-      // The cache uses the default-address sentinel for the primary board so
-      // its MQTT topic remains backward compatible. Explicit secondary-board
-      // responses retain their physical address.
-      uint8_t cache_addr = (addr == self->erd_host_address)
-                         ? PROBE_ENTRY_DEFAULT_ADDRESS : addr;
-      erd_cache_update(self->erd_cache, erd, cache_addr,
+      // Store the physical board address in the cache. The publisher maps the
+      // primary board's address back to the legacy (no-prefix) MQTT topic, so
+      // topics remain backward compatible while diagnostics show the real address.
+      erd_cache_update(self->erd_cache, erd, addr,
               reinterpret_cast<const uint8_t*>(args->read_completed.data),
               args->read_completed.data_size);
       if (!send_next_read_request(self)) {
@@ -408,9 +406,7 @@ static tiny_hsm_result_t state_polling(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
         add_erd_to_polling_list(self, erd, addr);
       }
 
-      uint8_t cache_addr = (addr == self->erd_host_address)
-                         ? PROBE_ENTRY_DEFAULT_ADDRESS : addr;
-      erd_cache_update(self->erd_cache, erd, cache_addr, erd_data, data_size);
+      erd_cache_update(self->erd_cache, erd, addr, erd_data, data_size);
       self->cycle_completed_count++;
       if (self->cycle_completed_count >= self->polling_list_count) {
         on_polling_cycle_complete(self, self->restart_pending || !self->polling_timer_armed);

@@ -78,13 +78,17 @@ graph LR
 ```
 
 1. **Home Assistant** publishes a write command to
-   `geappliances/{device_id}/erd/0x{ERD}/write`.
-2. **MQTT Adapter** receives the command via wildcard subscription and fires the
-   `on_write_request` event.
-3. **Write Bridge** (`erd_write_bridge`) forwards the write to the ERD Client
-   via `tiny_gea3_erd_client_write`, gates writes on appliance identification
+   `geappliances/{device_id}/erd/0x{ERD}/write` (primary board) or
+   `geappliances/{device_id}/erd/0x{ADDR}_0x{ERD}/write` (secondary board).
+2. **MQTT Adapter** receives the command via wildcard subscription, parses the
+   board address from the topic (0xFF for primary, the address for secondary), and
+   fires the `on_write_request` event.
+3. **Write Bridge** (`erd_write_bridge`) resolves the target address (primary
+   board topics route to the detected host address; secondary board topics route
+   to the parsed address), forwards the write to the ERD Client via
+   `tiny_gea3_erd_client_write`, gates writes on appliance identification
    (host address must not be broadcast `0xFF`), and reports the result back to
-   MQTT via `mqtt_client_update_erd_write_result`.
+   MQTT via `mqtt_client_update_erd_write_result` on the matching topic form.
 4. The **Protocol Stack** packages the write into a GEA3/GEA2 message and
    transmits it over UART to the appliance.
 

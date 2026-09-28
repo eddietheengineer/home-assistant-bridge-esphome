@@ -23,6 +23,10 @@ typedef struct {
   tiny_event_subscription_t erd_client_activity_subscription;
   tiny_gea3_erd_client_request_id_t pending_request_id;
   tiny_erd_t pending_erd;
+  /* 0xFF (broadcast) = primary board; any other value = secondary board
+   * address. Mirrors the board_address in the write request args so the
+   * result topic matches the topic the write was issued on. */
+  uint8_t pending_board_address;
 } erd_write_bridge_t;
 
 void erd_write_bridge_init(

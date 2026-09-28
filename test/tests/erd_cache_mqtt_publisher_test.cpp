@@ -61,7 +61,8 @@ TEST(erd_cache_mqtt_publisher, init_sets_cache_pointer)
     &publisher,
     &cache,
     &adapter.interface,
-    "my_device");
+    "my_device",
+    0xE0);
 
   CHECK(publisher.cache != nullptr);
   CHECK_EQUAL(0u, publisher.publish_index);
@@ -78,7 +79,8 @@ TEST(erd_cache_mqtt_publisher, init_sets_mqtt_connected_false)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_disconnected(&publisher); // double starts connected in setup
   CHECK(!publisher.mqtt_connected);
 }
@@ -89,7 +91,8 @@ TEST(erd_cache_mqtt_publisher, destroy_unsubscribes_events)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   // Destroy should not crash even after events are set up.
   erd_cache_mqtt_publisher_destroy(&publisher);
@@ -108,7 +111,8 @@ TEST(erd_cache_mqtt_publisher, init_handles_null_mqtt_client_gracefully)
     &publisher,
     &cache,
     nullptr,
-    "device");
+    "device",
+    0xE0);
 
   /* Should not crash; fields set before the null guard are still valid. */
   CHECK(publisher.cache != nullptr);
@@ -122,7 +126,8 @@ TEST(erd_cache_mqtt_publisher, destroy_after_init_with_null_mqtt_client)
     &publisher,
     &cache,
     nullptr,
-    "device");
+    "device",
+    0xE0);
 
   /* Destroy should clean up without crash when mqtt_client was null. */
   erd_cache_mqtt_publisher_destroy(&publisher);
@@ -140,7 +145,8 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_updated_erd)
     &publisher,
     &cache,
     &adapter.interface,
-    "my_device");
+    "my_device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data = 0x42;
@@ -156,7 +162,8 @@ TEST(erd_cache_mqtt_publisher, loop_returns_zero_when_no_updates)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   bool published = erd_cache_mqtt_publisher_loop(&publisher);
   CHECK_FALSE(published);
@@ -168,7 +175,8 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_one_per_call)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   // Insert 20 ERDs with update_required=true
@@ -189,7 +197,8 @@ TEST(erd_cache_mqtt_publisher, loop_skips_when_mqtt_disconnected)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   uint8_t data = 0x01;
   erd_cache_update(&cache, 0x0008, 0xFF, &data, sizeof(data));
@@ -207,7 +216,8 @@ TEST(erd_cache_mqtt_publisher, loop_resumes_after_reconnect)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   uint8_t data = 0x01;
   erd_cache_update(&cache, 0x0008, 0xFF, &data, sizeof(data));
@@ -233,7 +243,8 @@ TEST(erd_cache_mqtt_publisher, loop_marks_unpublished_on_drop)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data = 0x42;
@@ -257,7 +268,8 @@ TEST(erd_cache_mqtt_publisher, loop_retries_after_drop)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data = 0x42;
@@ -281,29 +293,6 @@ TEST(erd_cache_mqtt_publisher, loop_retries_after_drop)
   CHECK_FALSE(erd_cache_mqtt_publisher_loop(&publisher));
 }
 
-
-/* ------------------------------------------------------------------ */
-/* loop - topic format                                                  */
-/* ------------------------------------------------------------------ */
-
-TEST(erd_cache_mqtt_publisher, topic_format_correct)
-{
-  erd_cache_mqtt_publisher_init(
-    &publisher,
-    &cache,
-    &adapter.interface,
-    "my_device");
-  erd_cache_mqtt_publisher_on_connected(&publisher);
-
-  uint8_t data = 0x01;
-  erd_cache_update(&cache, 0x0008, 0xFF, &data, sizeof(data));
-
-  // The publisher will call esphome_mqtt_client_adapter_publish with the topic.
-  // We verify it doesn't crash and the topic is constructed correctly.
-  bool published = erd_cache_mqtt_publisher_loop(&publisher);
-  CHECK_TRUE(published);
-}
-
 /* ------------------------------------------------------------------ */
 /* loop - payload format                                                */
 /* ------------------------------------------------------------------ */
@@ -313,7 +302,8 @@ TEST(erd_cache_mqtt_publisher, payload_lowercase_hex_no_separator)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data[] = {0x01, 0xAB, 0xFF};
@@ -333,7 +323,8 @@ TEST(erd_cache_mqtt_publisher, retain_flag_true)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data = 0x01;
@@ -354,7 +345,8 @@ TEST(erd_cache_mqtt_publisher, on_disconnected_sets_flag)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   // Double starts connected in setup; disconnect to test the flag
   erd_cache_mqtt_publisher_on_disconnected(&publisher);
   CHECK(!publisher.mqtt_connected);
@@ -372,7 +364,8 @@ TEST(erd_cache_mqtt_publisher, on_disconnected_then_connected_toggles_flag)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   // Double starts connected in setup; disconnect to test the flag
   erd_cache_mqtt_publisher_on_disconnected(&publisher);
   CHECK(!publisher.mqtt_connected);
@@ -391,7 +384,8 @@ TEST(erd_cache_mqtt_publisher, disconnect_event_is_noop_when_already_disconnecte
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   // Start disconnected; disconnect event is a no-op, flag stays false
 
@@ -407,7 +401,8 @@ TEST(erd_cache_mqtt_publisher, connect_event_triggers_callback)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   publisher.mqtt_connected = false;
 
@@ -427,7 +422,8 @@ TEST(erd_cache_mqtt_publisher, loop_advances_publish_index)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   // Insert 10 ERDs
@@ -452,7 +448,8 @@ TEST(erd_cache_mqtt_publisher, loop_returns_zero_with_null_cache)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   publisher.cache = nullptr;
   bool published = erd_cache_mqtt_publisher_loop(&publisher);
@@ -465,7 +462,8 @@ TEST(erd_cache_mqtt_publisher, loop_returns_zero_with_null_mqtt_client)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   publisher.mqtt_client = nullptr;
   bool published = erd_cache_mqtt_publisher_loop(&publisher);
@@ -482,7 +480,8 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_one_per_call_with_multiple_pending
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data_a = 0x01;
@@ -515,7 +514,8 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_32_byte_payload)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data[32];
@@ -679,7 +679,8 @@ TEST(erd_cache_mqtt_publisher, loop_publishes_after_disconnect_reconnect)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   uint8_t data = 0x42;
   erd_cache_update(&cache, 0x1001, 0xFF, &data, sizeof(data));
@@ -702,7 +703,8 @@ TEST(erd_cache_mqtt_publisher, loop_no_publish_after_reconnect_when_no_changes)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data = 0x42;
@@ -728,7 +730,8 @@ TEST(erd_cache_mqtt_publisher, short_disconnect_no_republish)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_set_time_fn(&publisher, esphome_hal_double_get_millis);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
@@ -759,7 +762,8 @@ TEST(erd_cache_mqtt_publisher, long_disconnect_republish_all)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_set_time_fn(&publisher, esphome_hal_double_get_millis);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
@@ -796,7 +800,8 @@ TEST(erd_cache_mqtt_publisher, long_disconnect_empty_cache_safe)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_set_time_fn(&publisher, esphome_hal_double_get_millis);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
@@ -818,7 +823,8 @@ TEST(erd_cache_mqtt_publisher, exact_threshold_republish)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_set_time_fn(&publisher, esphome_hal_double_get_millis);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
@@ -845,7 +851,8 @@ TEST(erd_cache_mqtt_publisher, just_under_threshold_no_republish)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_set_time_fn(&publisher, esphome_hal_double_get_millis);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
@@ -873,7 +880,8 @@ TEST(erd_cache_mqtt_publisher, loop_reloads_cooldown_after_publish)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data = 0x42;
@@ -898,7 +906,8 @@ TEST(erd_cache_mqtt_publisher, loop_skips_rate_limited_entries)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data = 0x42;
@@ -936,7 +945,8 @@ TEST(erd_cache_mqtt_publisher, disconnect_count_starts_at_zero)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   CHECK_EQUAL(0u, erd_cache_mqtt_publisher_get_disconnect_count(&publisher));
 }
@@ -947,7 +957,8 @@ TEST(erd_cache_mqtt_publisher, disconnect_count_increments_on_disconnect)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   erd_cache_mqtt_publisher_on_disconnected(&publisher);
   CHECK_EQUAL(1u, erd_cache_mqtt_publisher_get_disconnect_count(&publisher));
@@ -965,7 +976,8 @@ TEST(erd_cache_mqtt_publisher, last_disconnect_duration_starts_at_zero)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   CHECK_EQUAL(0u, erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(&publisher));
 }
@@ -976,7 +988,8 @@ TEST(erd_cache_mqtt_publisher, last_disconnect_duration_set_on_reconnect)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
 
   /* Simulate disconnect at time 0 (default time source returns 0). */
   erd_cache_mqtt_publisher_on_disconnected(&publisher);
@@ -995,7 +1008,8 @@ TEST(erd_cache_mqtt_publisher, last_disconnect_duration_reflects_gap)
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_set_time_fn(&publisher, +[]() -> uint32_t { return fake_time; });
 
   /* Disconnect at t=2000. */
@@ -1019,7 +1033,8 @@ TEST(erd_cache_mqtt_publisher, last_disconnect_duration_overwritten_on_subsequen
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_set_time_fn(&publisher, +[]() -> uint32_t { return fake_time; });
 
   /* First disconnect/reconnect: 100ms gap. */
@@ -1047,7 +1062,8 @@ TEST(erd_cache_mqtt_publisher, cumulative_disconnect_duration_across_reconnect_a
     &publisher,
     &cache,
     &adapter.interface,
-    "device");
+    "device",
+    0xE0);
   erd_cache_mqtt_publisher_set_time_fn(&publisher, +[]() -> uint32_t { return fake_time; });
 
   /* Simulate a prolonged outage with ESPHome reconnect attempts every ~15s.
@@ -1075,30 +1091,32 @@ TEST(erd_cache_mqtt_publisher, cumulative_disconnect_duration_across_reconnect_a
 /* Address-qualified topic format                                      */
 /* ------------------------------------------------------------------ */
 
-TEST(erd_cache_mqtt_publisher, default_address_publishes_without_crashing)
+TEST(erd_cache_mqtt_publisher, primary_address_publishes_without_prefix)
 {
   erd_cache_mqtt_publisher_init(
     &publisher,
     &cache,
     &adapter.interface,
-    "my_device");
+    "my_device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data = 0x42;
-  erd_cache_update(&cache, 0x0008, 0xFF, &data, sizeof(data));
+  erd_cache_update(&cache, 0x0008, 0xE0, &data, sizeof(data));
 
   bool published = erd_cache_mqtt_publisher_loop(&publisher);
   CHECK_TRUE(published);
   STRCMP_EQUAL("geappliances/my_device/erd/0x0008/value", mqtt_double.last_published_topic_.c_str());
 }
 
-TEST(erd_cache_mqtt_publisher, non_default_address_publishes_without_crashing)
+TEST(erd_cache_mqtt_publisher, secondary_address_publishes_with_prefix)
 {
   erd_cache_mqtt_publisher_init(
     &publisher,
     &cache,
     &adapter.interface,
-    "my_device");
+    "my_device",
+    0xE0);
   erd_cache_mqtt_publisher_on_connected(&publisher);
 
   uint8_t data = 0x42;

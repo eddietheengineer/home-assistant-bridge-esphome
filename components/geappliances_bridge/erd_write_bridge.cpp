@@ -35,22 +35,28 @@ static tiny_hsm_result_t state_ready(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, 
 
       if(self->erd_host_address == tiny_gea_broadcast_address) {
         ESP_LOGW(TAG, "Write request for ERD 0x%04x dropped: appliance not identified", args->erd);
-        mqtt_client_update_erd_write_result(self->mqtt_client, args->erd, false,
+        mqtt_client_update_erd_write_result(self->mqtt_client, args->erd, args->board_address, false,
           tiny_gea3_erd_client_write_failure_reason_not_supported);
         break;
       }
 
+      // Primary-board topics (board_address == 0xFF, the broadcast sentinel)
+      // route to the detected host address; secondary-board topics route to
+      // the parsed address.
+      uint8_t target_address = (args->board_address != tiny_gea_broadcast_address) ? args->board_address : self->erd_host_address;
+
       tiny_gea3_erd_client_request_id_t request_id;
-      if(!tiny_gea3_erd_client_write(self->erd_client, &request_id, self->erd_host_address,
+      if(!tiny_gea3_erd_client_write(self->erd_client, &request_id, target_address,
          args->erd, args->value, args->size)) {
         ESP_LOGW(TAG, "Write request for ERD 0x%04x failed to queue", args->erd);
-        mqtt_client_update_erd_write_result(self->mqtt_client, args->erd, false,
+        mqtt_client_update_erd_write_result(self->mqtt_client, args->erd, args->board_address, false,
           tiny_gea3_erd_client_write_failure_reason_retries_exhausted);
         break;
       }
 
       self->pending_request_id = request_id;
       self->pending_erd = args->erd;
+      self->pending_board_address = args->board_address;
       tiny_hsm_transition(hsm, state_writing);
     } break;
 
@@ -78,7 +84,7 @@ static tiny_hsm_result_t state_writing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
           args->write_completed.request_id, self->pending_request_id);
         break;
       }
-      mqtt_client_update_erd_write_result(self->mqtt_client, self->pending_erd, true,
+      mqtt_client_update_erd_write_result(self->mqtt_client, self->pending_erd, self->pending_board_address, true,
         0);
       tiny_hsm_transition(hsm, state_ready);
     } break;
@@ -90,7 +96,7 @@ static tiny_hsm_result_t state_writing(tiny_hsm_t* hsm, tiny_hsm_signal_t signal
           args->write_failed.request_id, self->pending_request_id);
         break;
       }
-      mqtt_client_update_erd_write_result(self->mqtt_client, self->pending_erd, false,
+      mqtt_client_update_erd_write_result(self->mqtt_client, self->pending_erd, self->pending_board_address, false,
         args->write_failed.reason);
       tiny_hsm_transition(hsm, state_ready);
     } break;
@@ -124,6 +130,7 @@ void erd_write_bridge_init(
   self->erd_host_address = host_address;
   self->pending_request_id = 0;
   self->pending_erd = 0;
+  self->pending_board_address = tiny_gea_broadcast_address;
 
   tiny_event_subscription_init(
     &self->mqtt_write_request_subscription, self, +[](void* context, const void* _args) {

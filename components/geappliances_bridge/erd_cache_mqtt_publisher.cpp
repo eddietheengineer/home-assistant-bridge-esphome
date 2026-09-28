@@ -91,7 +91,7 @@ static void mqtt_publisher_task(void* arg)
     bool published_ok = false;
     if (have_entry) {
       int topic_len;
-      if (snap_addr == PROBE_ENTRY_DEFAULT_ADDRESS) {
+      if (snap_addr == self->primary_board_address) {
         topic_len = snprintf(self->task_topic, sizeof(self->task_topic), "geappliances/%s/erd/0x%04x/value", self->device_id, snap_erd);
       } else {
         topic_len = snprintf(self->task_topic, sizeof(self->task_topic), "geappliances/%s/erd/0x%02x_0x%04x/value", self->device_id, snap_addr, snap_erd);
@@ -163,12 +163,14 @@ void erd_cache_mqtt_publisher_init(
   erd_cache_mqtt_publisher_t* self,
   erd_cache_t* cache,
   i_mqtt_client_t* mqtt_client,
-  const char* device_id)
+  const char* device_id,
+  uint8_t primary_board_address)
 {
   memset(self, 0, sizeof(*self));
   self->cache = cache;
   self->mqtt_client = mqtt_client;
   self->device_id = device_id;
+  self->primary_board_address = primary_board_address;
   self->publish_index = 0;
   self->mqtt_connected = false;
   self->get_time_ms = esphome::millis;
@@ -364,7 +366,7 @@ bool erd_cache_mqtt_publisher_loop(erd_cache_mqtt_publisher_t* self)
 
   char topic[128];
   int topic_len;
-  if (snap_addr == PROBE_ENTRY_DEFAULT_ADDRESS) {
+  if (snap_addr == self->primary_board_address) {
     topic_len = snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%04x/value", self->device_id, snap_erd);
   } else {
     topic_len = snprintf(topic, sizeof(topic), "geappliances/%s/erd/0x%02x_0x%04x/value", self->device_id, snap_addr, snap_erd);
