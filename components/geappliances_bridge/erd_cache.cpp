@@ -180,6 +180,11 @@ static bool erd_cache_update_locked(erd_cache_t* self, tiny_erd_t erd, uint8_t b
   slot->data_size = data_size;
   slot->valid = true;
   slot->update_required = true;
+  /* New entries start with the publish cooldown so their FIRST publish is
+   * rate-limited like a republish.  Probe-phase entries are created in a burst;
+   * without this the publisher drains them all at the main-loop wake rate and
+   * overflows the MQTT outgoing queue.  max_cooldown==0 disables the limit. */
+  slot->publish_cooldown = self->max_cooldown;
 
   ESP_LOGD(TAG, "ERD 0x%04X at address 0x%02X added to cache (%u bytes, arena offset %u)",
            erd, board_address, data_size, slot->data_offset);

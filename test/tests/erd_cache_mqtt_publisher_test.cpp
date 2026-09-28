@@ -879,7 +879,13 @@ TEST(erd_cache_mqtt_publisher, loop_reloads_cooldown_after_publish)
   uint8_t data = 0x42;
   erd_cache_update(&cache, 0x1001, 0xFF, &data, sizeof(data));
 
-  /* First publish — immediate (new entry, cooldown=0). */
+  /* New entries start with the publish cooldown (throttle), so expire it
+   * before the first publish. */
+  for (int i = 0; i < 5; i++) {
+    erd_cache_tick_cooldowns(&cache);
+  }
+
+  /* First publish. */
   bool published = erd_cache_mqtt_publisher_loop(&publisher);
   CHECK_TRUE(published);
 
@@ -904,7 +910,13 @@ TEST(erd_cache_mqtt_publisher, loop_skips_rate_limited_entries)
   uint8_t data = 0x42;
   erd_cache_update(&cache, 0x1001, 0xFF, &data, sizeof(data));
 
-  /* First publish — immediate. */
+  /* New entries start with the publish cooldown (throttle), so expire it
+   * before the first publish. */
+  for (int i = 0; i < 5; i++) {
+    erd_cache_tick_cooldowns(&cache);
+  }
+
+  /* First publish. */
   bool published = erd_cache_mqtt_publisher_loop(&publisher);
   CHECK_TRUE(published);
 

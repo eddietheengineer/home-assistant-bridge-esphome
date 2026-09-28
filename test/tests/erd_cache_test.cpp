@@ -438,14 +438,26 @@ TEST(erd_cache, rate_limit_disabled_allows_immediate_publish)
   CHECK_EQUAL(0x0001, entry->erd);
 }
 
-TEST(erd_cache, rate_limit_first_entry_publishes_immediately)
+TEST(erd_cache, rate_limit_first_entry_starts_with_cooldown)
 {
-  /* New entries always publish immediately, even with rate limiting enabled. */
+  /* New entries start with the publish cooldown, so their first publish is
+   * rate-limited like a republish (avoids a burst when many entries are
+   * created at once). */
   erd_cache_set_throttle_rate_seconds(&cache, 5);
   uint8_t data[] = { 0x01 };
   erd_cache_update(&cache, 0x0001, 0xFF, data, 1);
 
+  /* Not yet eligible: the initial cooldown is 5. */
   uint16_t iter = 0;
+  CHECK(NULL == erd_cache_get_next_updated(&cache, &iter));
+
+  /* Expire the cooldown. */
+  for (int i = 0; i < 5; i++) {
+    erd_cache_tick_cooldowns(&cache);
+  }
+
+  /* Now eligible for the first publish. */
+  iter = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
   CHECK(entry != NULL);
   CHECK_EQUAL(0x0001, entry->erd);
@@ -464,7 +476,12 @@ TEST(erd_cache, rate_limit_blocks_republish_until_cooldown_expires)
   uint8_t data[] = { 0x01 };
   erd_cache_update(&cache, 0x0001, 0xFF, data, 1);
 
-  /* First publish — immediate. */
+  /* New entries start with the cooldown, so expire it before the first publish. */
+  for (int i = 0; i < 5; i++) {
+    erd_cache_tick_cooldowns(&cache);
+  }
+
+  /* First publish. */
   uint16_t iter = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
   CHECK(entry != NULL);
@@ -507,6 +524,11 @@ TEST(erd_cache, rate_limit_reload_after_publish)
   uint8_t data[] = { 0x01 };
   erd_cache_update(&cache, 0x0001, 0xFF, data, 1);
 
+  /* New entries start with the cooldown, so expire it before the first publish. */
+  for (int i = 0; i < 3; i++) {
+    erd_cache_tick_cooldowns(&cache);
+  }
+
   uint16_t iter = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
   CHECK(entry != NULL);
@@ -523,6 +545,11 @@ TEST(erd_cache, rate_limit_tick_only_decrements_when_update_required)
   erd_cache_set_throttle_rate_seconds(&cache, 5);
   uint8_t data[] = { 0x01 };
   erd_cache_update(&cache, 0x0001, 0xFF, data, 1);
+
+  /* New entries start with the cooldown, so expire it before the first publish. */
+  for (int i = 0; i < 5; i++) {
+    erd_cache_tick_cooldowns(&cache);
+  }
 
   uint16_t iter = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
@@ -545,7 +572,12 @@ TEST(erd_cache, rate_limit_multiple_erds_independent)
   erd_cache_update(&cache, 0x0001, 0xFF, data1, 1);
   erd_cache_update(&cache, 0x0002, 0xFF, data2, 1);
 
-  /* Both publish immediately (first time). */
+  /* New entries start with the cooldown, so expire it before the first publishes. */
+  for (int i = 0; i < 3; i++) {
+    erd_cache_tick_cooldowns(&cache);
+  }
+
+  /* Both publish (first time). */
   uint16_t iter = 0;
   erd_cache_entry_t* e1 = erd_cache_get_next_updated(&cache, &iter);
   CHECK(e1 != NULL);
@@ -629,7 +661,12 @@ TEST(erd_cache, rate_limit_unchanged_data_does_not_reset_cooldown)
   uint8_t data[] = { 0x01 };
   erd_cache_update(&cache, 0x0001, 0xFF, data, 1);
 
-  /* First publish — immediate (new entry). */
+  /* New entries start with the cooldown, so expire it before the first publish. */
+  for (int i = 0; i < 5; i++) {
+    erd_cache_tick_cooldowns(&cache);
+  }
+
+  /* First publish. */
   uint16_t iter = 0;
   erd_cache_entry_t* entry = erd_cache_get_next_updated(&cache, &iter);
   CHECK(entry != NULL);
