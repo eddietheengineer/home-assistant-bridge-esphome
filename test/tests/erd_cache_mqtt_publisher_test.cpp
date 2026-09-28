@@ -296,6 +296,39 @@ TEST(erd_cache_mqtt_publisher, loop_retries_after_drop)
   CHECK_FALSE(erd_cache_mqtt_publisher_loop(&publisher));
 }
 
+TEST(erd_cache_mqtt_publisher, loop_decays_backoff_on_success)
+{
+  erd_cache_mqtt_publisher_init(
+    &publisher,
+    &cache,
+    &adapter.interface,
+    "device",
+    0xE0);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  uint8_t data = 0x42;
+  erd_cache_update(&cache, 0x0008, 0xFF, &data, sizeof(data));
+
+  /* First attempt fails: the backoff arms at the initial interval. */
+  mqtt_double.publish_should_fail_ = true;
+  erd_cache_mqtt_publisher_loop(&publisher);
+  CHECK_EQUAL(ERD_PUBLISHER_BACKOFF_INITIAL_MS, publisher.backoff_ms);
+
+  /* Second call: the iterator has wrapped past the entry and resets to 0;
+   * no publish happens. Bypass the backoff gate to simulate the delay
+   * elapsing. */
+  mqtt_double.publish_should_fail_ = false;
+  publisher.backoff_until = 0;
+  CHECK_FALSE(erd_cache_mqtt_publisher_loop(&publisher));
+
+  /* Third call: the retried entry publishes successfully. The backoff
+   * decays (halves) rather than resetting to zero, keeping the next
+   * publish paced while the outgoing queue drains. */
+  erd_cache_mqtt_publisher_loop(&publisher);
+  CHECK_EQUAL(1u, publisher.total_published);
+  CHECK_EQUAL(ERD_PUBLISHER_BACKOFF_INITIAL_MS / 2, publisher.backoff_ms);
+}
+
 /* ------------------------------------------------------------------ */
 /* loop - payload format                                                */
 /* ------------------------------------------------------------------ */

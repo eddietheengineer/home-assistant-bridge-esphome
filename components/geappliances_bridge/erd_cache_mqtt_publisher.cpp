@@ -121,8 +121,15 @@ static void mqtt_publisher_task(void* arg)
         if (sent) {
           erd_cache_mark_published(self->cache, entry);
           published_ok = true;
-          self->backoff_ms = 0;
-          self->backoff_until = 0;
+          /* Decay the backoff (halve) rather than resetting it to zero, so a
+           * single success during a slow queue drain keeps a small backoff
+           * active instead of letting the next publish immediately
+           * re-overflow the outgoing queue. In steady state backoff_ms is 0
+           * and this is a no-op. */
+          if (self->backoff_ms > 0) {
+            self->backoff_ms /= 2;
+            self->backoff_until = self->get_time_ms() + self->backoff_ms;
+          }
         } else {
           /* Publish dropped (queue full or not connected) - re-set
            * update_required so the entry is picked up on the next wake. */
@@ -413,8 +420,10 @@ bool erd_cache_mqtt_publisher_loop(erd_cache_mqtt_publisher_t* self)
     erd_cache_mark_published(self->cache, entry);
     self->total_published++;
     self->publish_count_window++;
-    self->backoff_ms = 0;
-    self->backoff_until = 0;
+    if (self->backoff_ms > 0) {
+      self->backoff_ms /= 2;
+      self->backoff_until = self->get_time_ms() + self->backoff_ms;
+    }
   } else {
     erd_cache_mark_unpublished(self->cache, entry);
     self->backoff_ms = (self->backoff_ms == 0) ? ERD_PUBLISHER_BACKOFF_INITIAL_MS
