@@ -77,6 +77,12 @@ static void mqtt_publisher_task(void* arg)
       mutex_held = false;
     }
 
+    /* Backoff: if the previous publish failed and the backoff window has not
+     * elapsed, skip this iteration without touching the cache. */
+    if (self->get_time_ms() < self->backoff_until) {
+      continue;
+    }
+
     /* Publish one entry per wake. The snapshot atomically copies the payload
      * out of the arena under the cache lock, so the main loop cannot overwrite
      * it during the slow MQTT publish. */
@@ -115,10 +121,16 @@ static void mqtt_publisher_task(void* arg)
         if (sent) {
           erd_cache_mark_published(self->cache, entry);
           published_ok = true;
+          self->backoff_ms = 0;
+          self->backoff_until = 0;
         } else {
           /* Publish dropped (queue full or not connected) - re-set
            * update_required so the entry is picked up on the next wake. */
           erd_cache_mark_unpublished(self->cache, entry);
+          self->backoff_ms = (self->backoff_ms == 0) ? ERD_PUBLISHER_BACKOFF_INITIAL_MS
+                           : (self->backoff_ms < ERD_PUBLISHER_BACKOFF_MAX_MS) ? self->backoff_ms * 2
+                           : ERD_PUBLISHER_BACKOFF_MAX_MS;
+          self->backoff_until = self->get_time_ms() + self->backoff_ms;
         }
       } else if (topic_len >= (int)sizeof(self->task_topic)) {
         ESP_LOGW(PUBLISHER_TAG, "MQTT topic truncated (device_id too long: %s)", self->device_id);
@@ -350,6 +362,12 @@ bool erd_cache_mqtt_publisher_loop(erd_cache_mqtt_publisher_t* self)
     return false;
   }
 
+  /* Backoff: if the previous publish failed and the backoff window has not
+   * elapsed, skip this iteration without touching the cache. */
+  if (self->get_time_ms() < self->backoff_until) {
+    return false;
+  }
+
   uint8_t snap_data[ERD_CACHE_MAX_DATA_SIZE];
   erd_cache_entry_t* entry = NULL;
   tiny_erd_t snap_erd = 0;
@@ -395,8 +413,14 @@ bool erd_cache_mqtt_publisher_loop(erd_cache_mqtt_publisher_t* self)
     erd_cache_mark_published(self->cache, entry);
     self->total_published++;
     self->publish_count_window++;
+    self->backoff_ms = 0;
+    self->backoff_until = 0;
   } else {
     erd_cache_mark_unpublished(self->cache, entry);
+    self->backoff_ms = (self->backoff_ms == 0) ? ERD_PUBLISHER_BACKOFF_INITIAL_MS
+                     : (self->backoff_ms < ERD_PUBLISHER_BACKOFF_MAX_MS) ? self->backoff_ms * 2
+                     : ERD_PUBLISHER_BACKOFF_MAX_MS;
+    self->backoff_until = self->get_time_ms() + self->backoff_ms;
   }
 
   return true;
@@ -417,6 +441,8 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
     if (xSemaphoreTake(self->state_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       self->mqtt_connected = true;
       self->first_round_done = false;
+      self->backoff_ms = 0;
+      self->backoff_until = 0;
       disconnect_start = self->disconnect_start_ms;
       /* Don't reset disconnect_start_ms here — it may be set from a prior
        * disconnect and we want to measure the cumulative outage duration
@@ -427,6 +453,8 @@ void erd_cache_mqtt_publisher_on_connected(erd_cache_mqtt_publisher_t* self)
   } else {
     self->mqtt_connected = true;
     self->first_round_done = false;
+    self->backoff_ms = 0;
+    self->backoff_until = 0;
     disconnect_start = self->disconnect_start_ms;
   }
 

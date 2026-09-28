@@ -31,6 +31,13 @@
  */
 enum { ERD_MQTT_PUBLISHER_TASK_STACK_BYTES = 4096 };
 
+/* Exponential backoff for the publish path: when a publish fails (queue full),
+ * the next attempt is delayed.  The delay doubles each consecutive failure up
+ * to the cap, and resets to zero on the first success.  In steady state the
+ * queue never fills, so the backoff never engages. */
+#define ERD_PUBLISHER_BACKOFF_INITIAL_MS  100u
+#define ERD_PUBLISHER_BACKOFF_MAX_MS      5000u
+
 typedef struct {
   erd_cache_t* cache;              // Shared cache (owned by GeappliancesBridge)
   i_mqtt_client_t* mqtt_client;
@@ -49,6 +56,8 @@ typedef struct {
   uint32_t disconnect_start_ms;  /* millis() when MQTT disconnected; 0 if connected */
   uint32_t disconnect_count;
   uint32_t last_disconnect_duration_ms;
+  uint32_t backoff_ms;           /* current backoff interval; 0 = no backoff */
+  uint32_t backoff_until;        /* millis() at which the next publish attempt is allowed */
   TaskHandle_t    task_handle;
   StaticTask_t    task_tcb;
   StackType_t     task_stack[ERD_MQTT_PUBLISHER_TASK_STACK_BYTES / sizeof(StackType_t)];

@@ -281,8 +281,11 @@ TEST(erd_cache_mqtt_publisher, loop_retries_after_drop)
   CHECK_EQUAL(0u, publisher.total_published);
 
   /* Second call: iterator has advanced past the entry, so it scans
-   * the rest of the cache, resets to 0, and returns NULL. */
+   * the rest of the cache, resets to 0, and returns NULL.
+   * Reset backoff to simulate the delay elapsing. */
   mqtt_double.publish_should_fail_ = false;
+  publisher.backoff_ms = 0;
+  publisher.backoff_until = 0;
   CHECK_FALSE(erd_cache_mqtt_publisher_loop(&publisher));
 
   /* Third call: iterator is at 0, finds the retried entry. */
