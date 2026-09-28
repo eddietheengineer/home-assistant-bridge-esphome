@@ -1138,3 +1138,50 @@ TEST(erd_cache_mqtt_publisher, secondary_address_publishes_with_prefix)
   CHECK_TRUE(published);
   STRCMP_EQUAL("geappliances/my_device/erd/0x10_0x0008/value", mqtt_double.last_published_topic_.c_str());
 }
+
+/* ------------------------------------------------------------------ */
+/* publish interval (rate limiting)                                   */
+/* ------------------------------------------------------------------ */
+
+TEST(erd_cache_mqtt_publisher, publish_interval_blocks_second_publish_within_window)
+{
+  erd_cache_mqtt_publisher_init(&publisher, &cache, &adapter.interface, "dev", 0xE0);
+  erd_cache_mqtt_publisher_set_publish_interval(&publisher, 100);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  esphome_hal_double_set_millis(1000);
+  uint8_t d1 = 0x11;
+  uint8_t d2 = 0x22;
+  erd_cache_update(&cache, 0x0008, 0xFF, &d1, sizeof(d1));
+  erd_cache_update(&cache, 0x0009, 0xFF, &d2, sizeof(d2));
+
+  /* First attempt is allowed (no prior attempt). */
+  CHECK_TRUE(erd_cache_mqtt_publisher_loop(&publisher));
+  CHECK_EQUAL(1u, publisher.total_published);
+
+  /* A second attempt within the 100 ms window is rate-limited. */
+  CHECK_FALSE(erd_cache_mqtt_publisher_loop(&publisher));
+  CHECK_EQUAL(1u, publisher.total_published);
+}
+
+TEST(erd_cache_mqtt_publisher, publish_interval_allows_publish_after_window)
+{
+  erd_cache_mqtt_publisher_init(&publisher, &cache, &adapter.interface, "dev", 0xE0);
+  erd_cache_mqtt_publisher_set_publish_interval(&publisher, 100);
+  erd_cache_mqtt_publisher_on_connected(&publisher);
+
+  esphome_hal_double_set_millis(1000);
+  uint8_t d1 = 0x11;
+  uint8_t d2 = 0x22;
+  erd_cache_update(&cache, 0x0008, 0xFF, &d1, sizeof(d1));
+  erd_cache_update(&cache, 0x0009, 0xFF, &d2, sizeof(d2));
+
+  /* First attempt at t=1000. */
+  CHECK_TRUE(erd_cache_mqtt_publisher_loop(&publisher));
+  CHECK_EQUAL(1u, publisher.total_published);
+
+  /* After the 100 ms window elapses, the next entry is publishable. */
+  esphome_hal_double_set_millis(1100);
+  CHECK_TRUE(erd_cache_mqtt_publisher_loop(&publisher));
+  CHECK_EQUAL(2u, publisher.total_published);
+}

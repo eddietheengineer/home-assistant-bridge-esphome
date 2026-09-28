@@ -49,6 +49,8 @@ typedef struct {
   uint32_t disconnect_start_ms;  /* millis() when MQTT disconnected; 0 if connected */
   uint32_t disconnect_count;
   uint32_t last_disconnect_duration_ms;
+  uint32_t last_publish_ms;      /* millis() of the last publish attempt; 0 = none yet */
+  uint32_t publish_interval_ms;  /* min ms between publish attempts; 0 = no rate limit */
   TaskHandle_t    task_handle;
   StaticTask_t    task_tcb;
   StackType_t     task_stack[ERD_MQTT_PUBLISHER_TASK_STACK_BYTES / sizeof(StackType_t)];
@@ -105,6 +107,16 @@ void erd_cache_mqtt_publisher_resume(erd_cache_mqtt_publisher_t* self);
 void erd_cache_mqtt_publisher_set_time_fn(
   erd_cache_mqtt_publisher_t* self,
   uint32_t (*get_time_ms)(void));
+
+/*!
+ * Set the minimum interval (ms) between ERD publish attempts. 0 disables the
+ * limit.  The firmware enables this so the MQTT enqueue rate stays below the
+ * client's send capacity and the outgoing queue does not overflow during a
+ * burst of pending ERDs (e.g. the initial drain after startup/discovery).
+ */
+void erd_cache_mqtt_publisher_set_publish_interval(
+  erd_cache_mqtt_publisher_t* self,
+  uint32_t min_interval_ms);
 
 /*!
  * Returns the number of ERD publishes in the last 60 seconds, then resets the window.

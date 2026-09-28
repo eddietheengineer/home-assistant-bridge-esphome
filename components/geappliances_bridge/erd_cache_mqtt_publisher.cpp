@@ -17,6 +17,24 @@
 GEA_TAG(PUBLISHER_TAG) = "erd_cache_mqtt_publisher";
 #include "esp_task_wdt.h"
 
+
+/* True if a publish may proceed now: the interval since the last attempt has
+ * elapsed, or no attempt has been made yet.  A zero interval disables the limit.
+ * Reads only the publisher's own rate-limit state (last_publish_ms /
+ * publish_interval_ms), which the main loop never writes, so no lock is needed. */
+static bool erd_publisher_publish_allowed(const erd_cache_mqtt_publisher_t* self, uint32_t now)
+{
+  if (self->publish_interval_ms == 0) return true;
+  return self->last_publish_ms == 0 ||
+         (now - self->last_publish_ms) >= self->publish_interval_ms;
+}
+
+/* Stamp the time of a publish attempt.  Called after every attempt (success or
+ * failure) so the next attempt is paced by the configured interval. */
+static void erd_publisher_record_attempt(erd_cache_mqtt_publisher_t* self, uint32_t now)
+{
+  self->last_publish_ms = now;
+}
 static void mqtt_publisher_task(void* arg)
 {
   erd_cache_mqtt_publisher_t* self = (erd_cache_mqtt_publisher_t*)arg;
@@ -85,6 +103,16 @@ static void mqtt_publisher_task(void* arg)
     tiny_erd_t snap_erd = 0;
     uint8_t snap_addr = 0;
     uint8_t snap_size = 0;
+
+    /* Rate limit: only attempt a publish if the interval since the last
+     * attempt has elapsed.  This keeps the MQTT enqueue rate below the client's
+     * send capacity so the outgoing queue does not overflow during a burst of
+     * pending ERDs.  publish_index is not advanced, so the next eligible entry
+     * is preserved for a later wake. */
+    uint32_t now = self->get_time_ms();
+    if (!erd_publisher_publish_allowed(self, now)) {
+      continue;
+    }
     bool have_entry = erd_cache_snapshot_next_updated(self->cache, &self->publish_index,
                                                       &entry, &snap_erd, &snap_addr,
                                                       snap_data, &snap_size);
@@ -107,6 +135,7 @@ static void mqtt_publisher_task(void* arg)
         bool sent = mqtt_client_publish_raw(self->mqtt_client, self->task_topic,
             self->task_hex, data_len * 2, true);
         uint32_t elapsed = self->get_time_ms() - t_publish;
+        erd_publisher_record_attempt(self, self->get_time_ms());
 
         if (elapsed >= 1000) {
           ESP_LOGW(PUBLISHER_TAG, "Slow publish: %lums for ERD 0x%04x addr 0x%02x", (unsigned long)elapsed, snap_erd, snap_addr);
@@ -355,6 +384,14 @@ bool erd_cache_mqtt_publisher_loop(erd_cache_mqtt_publisher_t* self)
   tiny_erd_t snap_erd = 0;
   uint8_t snap_addr = 0;
   uint8_t snap_size = 0;
+
+  /* Rate limit: only attempt a publish if the interval since the last attempt
+   * has elapsed.  Returns false (like the no-entry case) without advancing
+   * publish_index, so the next eligible entry is preserved for a later call. */
+  uint32_t now = self->get_time_ms();
+  if (!erd_publisher_publish_allowed(self, now)) {
+    return false;
+  }
   if (!erd_cache_snapshot_next_updated(self->cache, &self->publish_index,
                                        &entry, &snap_erd, &snap_addr,
                                        snap_data, &snap_size)) {
@@ -386,6 +423,7 @@ bool erd_cache_mqtt_publisher_loop(erd_cache_mqtt_publisher_t* self)
   uint32_t t_publish = self->get_time_ms();
   bool sent = mqtt_client_publish_raw(self->mqtt_client, topic, hex, data_len * 2, true);
   uint32_t elapsed = self->get_time_ms() - t_publish;
+  erd_publisher_record_attempt(self, self->get_time_ms());
 
   if (elapsed >= 1000) {
     ESP_LOGW(PUBLISHER_TAG, "Slow publish: %lums for ERD 0x%04x addr 0x%02x", (unsigned long)elapsed, snap_erd, snap_addr);
@@ -520,6 +558,14 @@ void erd_cache_mqtt_publisher_set_time_fn(
   uint32_t (*get_time_ms)(void))
 {
   self->get_time_ms = get_time_ms;
+}
+
+void erd_cache_mqtt_publisher_set_publish_interval(
+  erd_cache_mqtt_publisher_t* self,
+  uint32_t min_interval_ms)
+{
+  self->publish_interval_ms = min_interval_ms;
+  self->last_publish_ms = 0;
 }
 
 uint32_t erd_cache_mqtt_publisher_get_publish_rate(erd_cache_mqtt_publisher_t* self)

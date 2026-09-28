@@ -781,6 +781,13 @@ void GeappliancesBridge::init_erd_cache_publisher_()
     this->device_identity_manager_.get_device_id(),
     this->autodiscovery_manager_.get_host_address());
 
+  /* Cap the ERD publish rate so the MQTT enqueue rate stays below the client's
+   * send capacity.  50 ms => at most 20 publishes/s, which keeps the outgoing
+   * queue from overflowing while the initial backlog of ERDs (created during
+   * startup / after HA discovery) is drained.  Set after init() and before
+   * start() so the background task is rate-limited from its very first wake. */
+  erd_cache_mqtt_publisher_set_publish_interval(&this->erd_cache_publisher_, 50);
+
   erd_cache_mqtt_publisher_start(&this->erd_cache_publisher_);
 
   ha_discovery_manager_init(&this->ha_discovery_manager_);
