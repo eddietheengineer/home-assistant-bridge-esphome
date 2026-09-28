@@ -147,6 +147,7 @@ TEST(write_flow_integration, should_drop_write_when_host_is_broadcast)
     .expectOneCall("update_erd_write_result")
     .onObject(&adapter.interface)
     .withParameter("erd", erd)
+    .withParameter("board_address", 0xFF)
     .withParameter("success", false)
     .withParameter("failure_reason",
       tiny_gea3_erd_client_write_failure_reason_not_supported);
@@ -228,6 +229,50 @@ TEST(write_flow_integration, should_report_write_failure_to_mqtt)
   mock()
     .expectOneCall("publish_raw")
     .withParameter("topic", "geappliances/test_device/erd/0x7701/write_result")
+    .withParameter("retain", true);
+
+  tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
+}
+
+TEST(write_flow_integration, should_route_secondary_board_write_to_secondary_address)
+{
+  uint8_t host = 0xC0;
+  init_all(host);
+
+  uint8_t value = 0x01;
+  tiny_erd_t erd = 0x7701;
+  uint8_t secondary = 0xA1;
+  tiny_gea3_erd_client_request_id_t mock_request_id{1};
+
+  // The write is published on the secondary-board topic form.
+  mock()
+    .expectOneCall("write")
+    .onObject(&erd_client)
+    .withParameter("address", secondary)
+    .withParameter("erd", erd)
+    .withMemoryBufferParameter("data", &value, 1)
+    .withOutputParameterReturning("request_id", &mock_request_id, sizeof(mock_request_id))
+    .andReturnValue(true);
+
+  char topic[128];
+  snprintf(topic, sizeof(topic), "geappliances/test_device/erd/0x%02x_0x%04x/write", secondary, erd);
+  mqtt_double.simulate_message(topic, "01");
+
+  // Simulate write completion; the result must go to the secondary-board topic.
+  uint8_t dummy = 0;
+  tiny_gea3_erd_client_on_activity_args_t args;
+  args.type = tiny_gea3_erd_client_activity_type_write_completed;
+  args.address = secondary;
+  args.write_completed.request_id = mock_request_id;
+  args.write_completed.erd = erd;
+  args.write_completed.data = &dummy;
+  args.write_completed.data_size = 1;
+
+  mock()
+    .expectOneCall("publish_raw")
+    .withParameter("topic", "geappliances/test_device/erd/0xa1_0x7701/write_result")
+    .withParameterOfType("const char*", "payload", "ok")
+    .withParameter("payload_len", 2)
     .withParameter("retain", true);
 
   tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);

@@ -76,10 +76,10 @@ Defers all signals to child states.
 Initial state. Accepts new write requests.
 
 **On `signal_write_requested`:**
-- If `erd_host_address == tiny_gea_broadcast_address`: logs a warning, publishes a failure result via `mqtt_client_update_erd_write_result(erd, false, not_supported)`, stays in `state_ready`.
-- Otherwise: calls `tiny_gea3_erd_client_write(erd_client, &request_id, erd_host_address, erd, value, size)`.
-  - If write fails to queue (returns false): logs a warning, publishes a failure result via `mqtt_client_update_erd_write_result(erd, false, retries_exhausted)`, stays in `state_ready`.
-  - If write succeeds: stores `request_id` in `pending_request_id` and `erd` in `pending_erd`, transitions to `state_writing`.
+- If `erd_host_address == tiny_gea_broadcast_address`: logs a warning, publishes a failure result via `mqtt_client_update_erd_write_result(erd, board_address, false, not_supported)`, stays in `state_ready`.
+- Otherwise: resolves the target address — `board_address != 0xFF` uses the parsed secondary address, `board_address == 0xFF` uses `erd_host_address` (primary). Calls `tiny_gea3_erd_client_write(erd_client, &request_id, target_address, erd, value, size)`.
+  - If write fails to queue (returns false): logs a warning, publishes a failure result via `mqtt_client_update_erd_write_result(erd, board_address, false, retries_exhausted)`, stays in `state_ready`.
+  - If write succeeds: stores `request_id` in `pending_request_id`, `erd` in `pending_erd`, and `board_address` in `pending_board_address`, transitions to `state_writing`.
 
 #### `state_writing`
 
@@ -91,12 +91,12 @@ One write is in progress. New write requests are dropped.
 **On `signal_write_completed`:**
 - Validates `args->write_completed.request_id` against `pending_request_id`.
 - If request IDs do not match: logs a warning and ignores the stale event.
-- If request IDs match: publishes a success result via `mqtt_client_update_erd_write_result(pending_erd, true, 0)`, transitions to `state_ready`.
+- If request IDs match: publishes a success result via `mqtt_client_update_erd_write_result(pending_erd, pending_board_address, true, 0)`, transitions to `state_ready`.
 
 **On `signal_write_failed`:**
 - Validates `args->write_failed.request_id` against `pending_request_id`.
 - If request IDs do not match: logs a warning and ignores the stale event.
-- If request IDs match: publishes a failure result via `mqtt_client_update_erd_write_result(pending_erd, false, args->write_failed.reason)`, transitions to `state_ready`.
+- If request IDs match: publishes a failure result via `mqtt_client_update_erd_write_result(pending_erd, pending_board_address, false, args->write_failed.reason)`, transitions to `state_ready`.
 
 ### 3.3 State Diagram
 
@@ -145,6 +145,7 @@ typedef struct {
     // Pending write state (one write at a time)
     tiny_gea3_erd_client_request_id_t pending_request_id;
     tiny_erd_t pending_erd;
+    uint8_t pending_board_address;
 } erd_write_bridge_t;
 ```
 

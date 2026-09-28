@@ -10,6 +10,12 @@
 
 typedef struct {
   tiny_erd_t erd;
+  /* 0xFF (broadcast) = primary board (the bridge resolves it to the
+   * detected host address); any other value = the secondary board address
+   * parsed from the 0x{addr}_0x{erd} topic form. 0xFF is used because it
+   * can never be a physical board address, keeping a 0x00 secondary board
+   * unambiguous. */
+  uint8_t board_address;
   uint8_t size;
   const void* value;
 } mqtt_client_on_write_request_args_t;
@@ -21,7 +27,7 @@ typedef struct {
 } i_mqtt_client_t;
 
 typedef struct i_mqtt_client_api_t {
-  void (*update_erd_write_result)(i_mqtt_client_t* self, tiny_erd_t erd, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason);
+  void (*update_erd_write_result)(i_mqtt_client_t* self, tiny_erd_t erd, uint8_t board_address, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason);
 
   i_tiny_event_t* (*on_write_request)(i_mqtt_client_t* self);
 
@@ -36,9 +42,9 @@ typedef struct i_mqtt_client_api_t {
   void (*unsubscribe)(i_mqtt_client_t* self, const char* topic);
 } i_mqtt_client_api_t;
 
-static inline void mqtt_client_update_erd_write_result(i_mqtt_client_t* self, tiny_erd_t erd, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason)
+static inline void mqtt_client_update_erd_write_result(i_mqtt_client_t* self, tiny_erd_t erd, uint8_t board_address, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason)
 {
-  self->api->update_erd_write_result(self, erd, success, failure_reason);
+  self->api->update_erd_write_result(self, erd, board_address, success, failure_reason);
 }
 
 static inline i_tiny_event_t* mqtt_client_on_write_request(i_mqtt_client_t* self)

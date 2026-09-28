@@ -57,9 +57,9 @@ TEST_GROUP_BASE(erd_write_bridge, simulation_test_base)
     mock().enable();
   }
 
-  void when_a_write_request_is_received(tiny_erd_t erd, const uint8_t* value, uint8_t size)
+  void when_a_write_request_is_received(tiny_erd_t erd, const uint8_t* value, uint8_t size, uint8_t board_address = 0xFF)
   {
-    mqtt_client_double_trigger_write_request(&mqtt_client, erd, size, value);
+    mqtt_client_double_trigger_write_request(&mqtt_client, erd, board_address, size, value);
   }
 
   void when_a_write_is_completed(tiny_gea3_erd_client_request_id_t request_id, tiny_erd_t erd)
@@ -91,12 +91,13 @@ TEST_GROUP_BASE(erd_write_bridge, simulation_test_base)
   }
 
   void should_report_write_result(tiny_erd_t erd, bool success,
-    tiny_gea3_erd_client_write_failure_reason_t reason)
+    tiny_gea3_erd_client_write_failure_reason_t reason, uint8_t board_address = 0xFF)
   {
     mock()
       .expectOneCall("update_erd_write_result")
       .onObject(&mqtt_client)
       .withParameter("erd", erd)
+      .withParameter("board_address", board_address)
       .withParameter("success", success)
       .withParameter("failure_reason", reason);
   }
@@ -119,6 +120,48 @@ TEST(erd_write_bridge, should_forward_write_to_erd_client_when_host_address_is_k
   uint8_t value = 0x01;
   expect_write_succeeds();
   when_a_write_request_is_received(0x3001, &value, sizeof(value));
+}
+
+TEST(erd_write_bridge, should_route_primary_board_write_to_host_address)
+{
+  given_that_the_bridge_has_been_initialized();
+
+  uint8_t value = 0x01;
+  mock()
+    .expectOneCall("write")
+    .onObject(&erd_client)
+    .withParameter("address", 0xC0)
+    .withParameter("erd", 0x3001)
+    .withOutputParameterReturning("request_id", &mock_request_id, sizeof(mock_request_id))
+    .ignoreOtherParameters()
+    .andReturnValue(true);
+
+  // board_address = 0xFF (primary) resolves to the detected host address 0xC0.
+  when_a_write_request_is_received(0x3001, &value, sizeof(value), 0xFF);
+
+  should_report_write_result(0x3001, true, 0, 0xFF);
+  when_a_write_is_completed(mock_request_id, 0x3001);
+}
+
+TEST(erd_write_bridge, should_route_secondary_board_write_to_parsed_address)
+{
+  given_that_the_bridge_has_been_initialized();
+
+  uint8_t value = 0x01;
+  mock()
+    .expectOneCall("write")
+    .onObject(&erd_client)
+    .withParameter("address", 0xA1)
+    .withParameter("erd", 0x3001)
+    .withOutputParameterReturning("request_id", &mock_request_id, sizeof(mock_request_id))
+    .ignoreOtherParameters()
+    .andReturnValue(true);
+
+  // board_address = 0xA1 (secondary) routes to 0xA1, not the host address.
+  when_a_write_request_is_received(0x3001, &value, sizeof(value), 0xA1);
+
+  should_report_write_result(0x3001, true, 0, 0xA1);
+  when_a_write_is_completed(mock_request_id, 0x3001);
 }
 
 TEST(erd_write_bridge, should_drop_write_when_host_address_is_broadcast)

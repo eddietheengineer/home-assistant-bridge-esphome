@@ -91,7 +91,17 @@ make test -j4
 make integration-test -j4
 ```
 
-The regular `test` target runs 405 unit tests on CI. The `integration-test` target runs all 502 tests (including the startup integration test suite) locally. The integration tests are excluded from CI because CppUTest's `TestMemoryAllocator` causes false "Memory corruption" detections on GCC/Ubuntu CI with `std::function` members — this is a known limitation. Always verify integration tests pass locally before pushing.
+The regular `test` target runs 440 unit tests on CI (the full 537-test suite minus the 97 startup integration tests). The `integration-test` target runs all 537 tests (including the startup integration test suite) locally. The integration tests are excluded from CI because CppUTest's `TestMemoryAllocator` causes false "Memory corruption" detections on GCC/Ubuntu CI with `std::function` members — this is a known limitation. Always verify integration tests pass locally before pushing.
+
+## Global Protocol Rules
+
+**Wire-format facts that hold across the whole component. Code that appears to violate them is usually the bug — confirm against the appliance protocol before "fixing" either side.**
+
+- **A board address is always 1 byte (`uint8_t`).** Physical board addresses are `0x00`–`0xFE`. `0xFF` is the GEA broadcast address (`tiny_gea_broadcast_address` in `lib/tiny-gea-api/include/tiny_gea_constants.h`) and can never be a physical board address. `0xFF` is used as a "primary board" sentinel in the write path and the polling list (`PROBE_ENTRY_DEFAULT_ADDRESS` in `erd_bridge_common.h`); the ERD cache stores only physical addresses.
+
+- **An ERD is always 2 bytes (`uint16_t`, `tiny_erd_t` in `lib/tiny-gea-api/include/tiny_erd.h`).** ERD IDs are printed as 4 hex digits (`0x%04x`) in MQTT topics and logs.
+
+- **MQTT topic format is `geappliances/{device_id}/erd/0x{ERD}/{op}` for the primary board and `geappliances/{device_id}/erd/0x{ADDR}_0x{ERD}/{op}` for secondary boards**, where `{ADDR}` is 2 hex digits, `{ERD}` is 4 hex digits, and `{op}` is `value`, `write`, or `write_result`. The no-prefix primary form is the legacy format that single-board appliances must keep working.
 
 ## Critical Invariants
 
@@ -109,8 +119,8 @@ The regular `test` target runs 405 unit tests on CI. The `integration-test` targ
 - **The ERD data size limit is 248 bytes — the GEA3 max payload (255 on-wire minus 7 bytes overhead).**
   `erd_cache_t` rejects entries whose `data_size` exceeds `ERD_CACHE_MAX_DATA_SIZE` (248). Do not grow this without confirming the appliance protocol supports a larger payload. See `erd_cache.h`.
 
-- **Multi-board keying uses `(erd, board_address)` with `0xFF` as the primary-host board address.**
-  Single-board appliances use `0xFF`; multi-board appliances use a specific board address. Any cache lookup or key must include the board address. See `erd_cache.h`, `erd_poll_list_builder.h`.
+- **Multi-board keying uses `(erd, board_address)`; the cache stores the physical board address, and the primary host stores its detected address.**
+  The MQTT publisher maps the primary host's detected address (its `primary_board_address`) to the legacy no-prefix topic; every other address gets the `0x{addr}_0x{erd}` prefix. The write path uses the broadcast address `0xFF` as the "primary board" sentinel (it can never be a physical board address, keeping a `0x00` secondary board unambiguous). The polling list is a separate concept: `probe_entry_t.board_address` still uses `0xFF` (`PROBE_ENTRY_DEFAULT_ADDRESS`) to mean "use the host address". Any cache lookup or key must include the board address. See `erd_cache.h`, `erd_poll_list_builder.h`, `erd_cache_mqtt_publisher.h`.
 
 - **Generated files must not be hand-edited.**
   `erd_lists.{h,cpp}`, `appliance_api_feature_lists.{h,cpp}`, `appliance_type_map.h`, `ha_discovery_data.{h,cpp}`, `ha_discovery/*.jsonl`, and `appliance_api_erd_definitions_processed.json` are produced by `scripts/generate_erd_lists.py` and `scripts/ha_discovery/run_pipeline.py`. CI enforces this via `scripts/check_generated_sync.sh` (run `make check-generated` locally).

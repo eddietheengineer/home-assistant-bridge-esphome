@@ -778,7 +778,8 @@ void GeappliancesBridge::init_erd_cache_publisher_()
     &this->erd_cache_publisher_,
     &this->erd_cache_,
     &this->mqtt_client_adapter_.interface,
-    this->device_identity_manager_.get_device_id());
+    this->device_identity_manager_.get_device_id(),
+    this->autodiscovery_manager_.get_host_address());
 
   erd_cache_mqtt_publisher_start(&this->erd_cache_publisher_);
 

@@ -6,12 +6,13 @@
 #include "CppUTestExt/MockSupport.h"
 #include "double/mqtt_client_double.hpp"
 
-static void update_erd_write_result(i_mqtt_client_t* self, tiny_erd_t erd, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason)
+static void update_erd_write_result(i_mqtt_client_t* self, tiny_erd_t erd, uint8_t board_address, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason)
 {
   mock()
     .actualCall("update_erd_write_result")
     .onObject(self)
     .withParameter("erd", erd)
+    .withParameter("board_address", board_address)
     .withParameter("success", success)
     .withParameter("failure_reason", failure_reason);
 }
@@ -73,10 +74,11 @@ void mqtt_client_double_init(mqtt_client_double_t* self)
 void mqtt_client_double_trigger_write_request(
   mqtt_client_double_t* self,
   tiny_erd_t erd,
+  uint8_t board_address,
   uint8_t size,
   const void* value)
 {
-  mqtt_client_on_write_request_args_t args = { erd, size, value };
+  mqtt_client_on_write_request_args_t args = { erd, board_address, size, value };
   tiny_event_publish(&self->on_write_request, &args);
 }
 
