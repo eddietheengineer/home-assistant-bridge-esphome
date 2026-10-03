@@ -58,6 +58,8 @@ typedef enum {
 #define HA_DISCOVERY_FIELD_ID_BUF_SIZE 72
 #define HA_DISCOVERY_UNIQUE_ID_BUF_SIZE 160
 #define HA_DISCOVERY_PAYLOAD_BUF_SIZE 8192
+#define HA_DISCOVERY_AVAILABILITY_TOPIC_BUF_SIZE 128
+#define HA_DISCOVERY_AVAILABILITY_PAYLOAD_BUF_SIZE 32
 
 /*!
  * Peak memory: payload buffer (~8 KB) + decompress buffer (~18 KB) +
@@ -95,6 +97,12 @@ typedef struct {
   char* payload_buf;
 
   char device_json_buf[512];
+
+  /* ESPHome birth/LWT availability, copied by set_availability(). An empty
+   * topic omits availability from every discovery payload. */
+  char availability_topic_buf[HA_DISCOVERY_AVAILABILITY_TOPIC_BUF_SIZE];
+  char payload_available_buf[HA_DISCOVERY_AVAILABILITY_PAYLOAD_BUF_SIZE];
+  char payload_not_available_buf[HA_DISCOVERY_AVAILABILITY_PAYLOAD_BUF_SIZE];
 
   /* Entity field buffers (avoid stack overflow in process_jsonl_line).
    * Templates are NOT stored here — they are embedded directly from the raw
@@ -164,6 +172,20 @@ void ha_discovery_manager_configure(
   erd_cache_t* cache,
   i_mqtt_client_t* mqtt_client);
 
+/*!
+ * Call after configure(), before start(). Adds an availability topic to
+ * every discovery payload so HA marks entities unavailable when the bridge's
+ * MQTT last will fires. payload_available / payload_not_available are only
+ * emitted when they differ from HA's defaults ("online" / "offline"); NULL
+ * means the default. A NULL/empty topic, or a value that is too long or not
+ * JSON-safe, leaves availability disabled.
+ */
+void ha_discovery_manager_set_availability(
+  ha_discovery_manager_t* self,
+  const char* topic,
+  const char* payload_available,
+  const char* payload_not_available);
+
 void ha_discovery_manager_start(ha_discovery_manager_t* self);
 
 void ha_discovery_manager_run(ha_discovery_manager_t* self);
@@ -182,6 +204,7 @@ uint16_t cleanup_flush_queue(ha_discovery_cleanup_t* self);
 void ha_discovery_test_format_erd_topic(char* destination, size_t destination_size,
                                         const char* device_id, const char* erd_id,
                                         const char* board_address, const char* operation);
+bool ha_discovery_test_build_payload(ha_discovery_manager_t* self, const char* line);
 #endif
 
 #ifdef __cplusplus

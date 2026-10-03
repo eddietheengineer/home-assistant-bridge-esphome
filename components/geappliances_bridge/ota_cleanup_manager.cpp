@@ -22,6 +22,10 @@
 GEA_TAG(TAG) = "ota_cleanup_manager";
 
 #if defined(USE_ESP_IDF) && !defined(USE_ESP_IDF_STUBS)
+// Version 3 adds persisted discovery-affecting config flags. Version 4 adds
+// the availability topic to every payload. Older records are republished once.
+static const uint32_t DISCOVERY_HASH_VERSION = 4;
+
 static uint32_t discovery_data_hash(const ha_discovery_manager_t* manager)
 {
   // Mix the optional custom-profile hash with the built-in discovery hash.
@@ -30,6 +34,20 @@ static uint32_t discovery_data_hash(const ha_discovery_manager_t* manager)
   if (custom == 0) return HA_DISCOVERY_DATA_HASH;
   return HA_DISCOVERY_DATA_HASH ^ (custom + 0x9e3779b9u +
       (HA_DISCOVERY_DATA_HASH << 6) + (HA_DISCOVERY_DATA_HASH >> 2));
+}
+
+// Reuse ESPHome's own birth/LWT availability (default "<topic_prefix>/status")
+// so HA marks appliance entities unavailable when the bridge drops offline.
+// An empty topic (birth/will disabled) leaves availability off.
+static void apply_mqtt_availability(ha_discovery_manager_t* manager)
+{
+  auto mqtt_client = esphome::mqtt::global_mqtt_client;
+  if (mqtt_client == nullptr) return;
+  const auto& availability = mqtt_client->get_availability();
+  ha_discovery_manager_set_availability(manager,
+      availability.topic.c_str(),
+      availability.payload_available.c_str(),
+      availability.payload_not_available.c_str());
 }
 #endif
 
@@ -117,9 +135,6 @@ void OtaCleanupManager::check_discovery_changes(const char* current_device_id) {
   }
 
   static const uint32_t DISCOVERY_NVS_KEY = 0x64697363u; // "disc"
-  // Version 3 adds persisted discovery-affecting config flags. Older records
-  // (including version 2 custom-header hashes) are republished once.
-  static const uint32_t DISCOVERY_HASH_VERSION = 3;
   auto pref = global_preferences->make_preference<DiscoveryNVS>(DISCOVERY_NVS_KEY);
   DiscoveryNVS stored{};
 
@@ -197,6 +212,7 @@ void OtaCleanupManager::loop() {
         this->filter_config_topics_,
         this->erd_cache_,
         &this->mqtt_client_adapter_->interface);
+      apply_mqtt_availability(this->ha_discovery_manager_);
       ha_discovery_manager_start(this->ha_discovery_manager_);
       this->ota_discovery_publishing_ = true;
       this->cleanup_trigger_ = CleanupTrigger::INITIAL;
@@ -241,6 +257,7 @@ void OtaCleanupManager::loop() {
         this->filter_config_topics_,
         this->erd_cache_,
         &this->mqtt_client_adapter_->interface);
+      apply_mqtt_availability(this->ha_discovery_manager_);
       ha_discovery_manager_start(this->ha_discovery_manager_);
       this->ota_discovery_publishing_ = true;
     }
@@ -301,7 +318,7 @@ void OtaCleanupManager::loop() {
           static const uint32_t DISCOVERY_NVS_KEY = 0x64697363u; // "disc"
           auto pref = global_preferences->make_preference<DiscoveryNVS>(DISCOVERY_NVS_KEY);
           DiscoveryNVS state{};
-          state.version = 3;
+          state.version = DISCOVERY_HASH_VERSION;
           state.hash = discovery_data_hash(this->ha_discovery_manager_);
           strncpy(state.device_id,
                   this->device_identity_manager_->get_device_id(),

@@ -106,6 +106,25 @@ void ha_discovery_manager_configure(
 
 `configure()` stores all parameters directly; no validation or deep copy.
 
+### 3.2.1 Set Availability
+
+```c
+void ha_discovery_manager_set_availability(
+  ha_discovery_manager_t* self,
+  const char* topic,
+  const char* payload_available,
+  const char* payload_not_available);
+```
+
+Call after `configure()` and before `start()`; `init()` clears it. The caller passes ESPHome's MQTT birth/LWT
+availability (`global_mqtt_client->get_availability()`, default `<topic_prefix>/status` with `online`/`offline`).
+
+- Values are copied into fixed buffers (topic 128 B, payloads 32 B each).
+- NULL payloads mean the HA defaults (`online` / `offline`).
+- A NULL or empty topic disables availability (birth/will disabled in the `mqtt:` config).
+- A value that would be truncated, or that contains `"`, `\` or a control character, disables availability
+  and logs a warning. A wrong topic would leave every entity permanently unavailable.
+
 ### 3.3 Start
 
 ```c
@@ -257,6 +276,9 @@ When `current_decomp_size == 0`, the next chunk needs decompression. When `curre
 8. **Build discovery topic**: `homeassistant/{domain}/{device_id}/{erd_id}[_{field_id}]/config` using a cached domain prefix
 9. **Build payload**: Construct the JSON payload with all applicable fields, embedding `value_template` and `command_template` directly from the raw JSONL line
 10. **Button domain special case**: Buttons omit `state_topic` and `value_template`, using `payload_press="1"` instead
+11. **Availability**: If an availability topic is set, every payload (buttons included) gets `avty_t`, plus
+    `pl_avail` / `pl_not_avail` only when they differ from `online` / `offline`. Abbreviated keys keep the largest
+    payloads within `HA_DISCOVERY_PAYLOAD_BUF_SIZE`.
 
 **JSON helpers:**
 - `json_get_str()`: Extracts a value for a given key from a JSON string, handling string values, objects, and arrays

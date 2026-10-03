@@ -705,6 +705,24 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
         }
     }
 
+    /* Abbreviated keys keep the largest payloads under
+     * HA_DISCOVERY_PAYLOAD_BUF_SIZE; HA accepts mixed long and short keys. */
+    if (self->availability_topic_buf[0]) {
+        n = snprintf(payload + pos, space, "\"avty_t\":\"%s\",", self->availability_topic_buf);
+        if (n < 0 || n >= space) goto too_large;
+        pos += n; space -= n;
+        if (strcmp(self->payload_available_buf, "online") != 0) {
+            n = snprintf(payload + pos, space, "\"pl_avail\":\"%s\",", self->payload_available_buf);
+            if (n < 0 || n >= space) goto too_large;
+            pos += n; space -= n;
+        }
+        if (strcmp(self->payload_not_available_buf, "offline") != 0) {
+            n = snprintf(payload + pos, space, "\"pl_not_avail\":\"%s\",", self->payload_not_available_buf);
+            if (n < 0 || n >= space) goto too_large;
+            pos += n; space -= n;
+        }
+    }
+
     if (pos > 0 && payload[pos - 1] == ',') {
         payload[pos - 1] = '\0';
         pos--; space++;
@@ -720,6 +738,28 @@ too_large:
     ESP_LOGW(TAG, "Payload too large for ERD 0x%s, skipping", erd_id_hex);
     self->total_filtered++;
     return false;
+}
+
+#ifdef HA_DISCOVERY_TEST_EXPORT
+bool ha_discovery_test_build_payload(ha_discovery_manager_t* self, const char* line)
+{
+    build_device_json(self);
+    return process_jsonl_line(self, line);
+}
+#endif
+
+/* Copies src into a fixed buffer. Rejects values that would be truncated or
+ * that need JSON escaping, since they are embedded verbatim in payloads. */
+static bool copy_availability_value(char* destination, size_t destination_size, const char* src)
+{
+    size_t len = strlen(src);
+    if (len >= destination_size) return false;
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)src[i];
+        if (c == '"' || c == '\\' || c < 0x20 || c == 0x7F) return false;
+    }
+    memcpy(destination, src, len + 1);
+    return true;
 }
 
 static bool should_process_category(const char* category, uint8_t appliance_type)
@@ -1058,6 +1098,27 @@ void ha_discovery_manager_configure(
     self->filter_config_topics = filter_config_topics;
     self->cache = cache;
     self->mqtt_client = mqtt_client;
+}
+
+void ha_discovery_manager_set_availability(
+    ha_discovery_manager_t* self,
+    const char* topic,
+    const char* payload_available,
+    const char* payload_not_available)
+{
+    self->availability_topic_buf[0] = '\0';
+    if (topic == NULL || topic[0] == '\0') return;
+
+    /* A truncated or malformed topic would leave every entity permanently
+     * unavailable in HA, so disable availability rather than publish it. */
+    if (!copy_availability_value(self->payload_available_buf, sizeof(self->payload_available_buf),
+                                 payload_available ? payload_available : "online") ||
+        !copy_availability_value(self->payload_not_available_buf, sizeof(self->payload_not_available_buf),
+                                 payload_not_available ? payload_not_available : "offline") ||
+        !copy_availability_value(self->availability_topic_buf, sizeof(self->availability_topic_buf), topic)) {
+        self->availability_topic_buf[0] = '\0';
+        ESP_LOGW(TAG, "Availability topic or payload too long or not JSON-safe; availability disabled");
+    }
 }
 
 void ha_discovery_manager_start(ha_discovery_manager_t* self)
