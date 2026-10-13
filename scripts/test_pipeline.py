@@ -778,6 +778,12 @@ class TestFlattenReviewPreservation(unittest.TestCase):
         # The CI failure mode: re-running the pipeline on its own output
         # must not change any review.
         first = flattened.flatten(self._erd_defs(), {}, self._index(self._existing()))
+        # The first pass must already carry the correct per-field values —
+        # otherwise a stable-yet-clobbered state (the pre-fix behavior)
+        # would pass the comparison below.
+        self.assertEqual(
+            [e["review"]["ha_domain"] for e in first],
+            ["number", "switch", "switch"])
         second = flattened.flatten(self._erd_defs(), {}, self._index(first))
         self.assertEqual(
             [e["review"] for e in first], [e["review"] for e in second])
