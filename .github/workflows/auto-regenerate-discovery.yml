@@ -1,0 +1,215 @@
+name: Weekly Auto-Regenerate & Merge
+
+# Weekly automation: sync the lib/public-appliance-api-documentation submodule
+# to the latest `main`, regenerate the ERD / HA-discovery artifacts, open a PR,
+# wait for CI, and auto-merge if (and only if) CI passes.
+#
+# Mirrors the manual `regenerate-discovery.yml` workflow, but:
+#   - runs on a schedule (Fridays) instead of only on workflow_dispatch
+#   - resolves the latest submodule `main` automatically (no commit input)
+#   - exits early when there is nothing to change
+#   - waits for the PR's CI and merges automatically on green
+#
+# NOTE on the schedule: GitHub Actions cron expressions are evaluated in UTC
+# and do NOT observe daylight-saving time. `43 21 * * 5` is 21:43 UTC, which is
+# 5:43 PM US/Eastern during EDT (summer). During EST (winter) the same instant
+# is 4:43 PM US/Eastern. Adjust the cron if you want a different wall-clock time.
+
+on:
+  schedule:
+    - cron: '43 21 * * 5' # Fridays, 21:43 UTC (5:43 PM US/Eastern during EDT)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  # gh pr checks reads check runs + commit statuses (and the associated
+  # workflow run) to poll CI; these read scopes are required or the call
+  # fails with a GraphQL permission error and the merge never happens.
+  checks: read
+  actions: read
+  statuses: read
+
+# Serialize runs so a manual trigger never overlaps the scheduled one.
+concurrency:
+  group: auto-regenerate-discovery
+  cancel-in-progress: false
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install test dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pytest jinja2
+
+      - name: Resolve latest main of public-appliance-api-documentation
+        id: latest
+        run: |
+          SUBMODULE_URL="https://github.com/geappliances/public-appliance-api-documentation"
+          LATEST="$(git ls-remote "$SUBMODULE_URL" refs/heads/main | awk '{print $1}')"
+          CURRENT="$(git -C lib/public-appliance-api-documentation rev-parse HEAD)"
+          if [ -z "$LATEST" ]; then
+            echo "ERROR: could not resolve latest main of $SUBMODULE_URL" >&2
+            exit 1
+          fi
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "Latest main: $LATEST"
+          echo "Current pin: $CURRENT"
+
+      - name: Check whether the submodule is already up to date
+        id: changed
+        run: |
+          if [ "${{ steps.latest.outputs.latest }}" = "${{ steps.latest.outputs.current }}" ]; then
+            echo "Submodule already at latest main. Nothing to do."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Submodule is behind latest main. Proceeding."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update submodule to latest main
+        if: steps.changed.outputs.changed == 'true'
+        run: |
+          cd lib/public-appliance-api-documentation
+          git fetch origin
+          git checkout "${{ steps.latest.outputs.latest }}"
+          cd ../..
+
+      - name: Regenerate ERD and HA discovery artifacts
+        if: steps.changed.outputs.changed == 'true'
+        run: |
+          python3 scripts/generate_erd_lists.py
+          python3 scripts/ha_discovery/run_pipeline.py
+
+      - name: Validate generated output
+        if: steps.changed.outputs.changed == 'true'
+        run: |
+          PYTHONPATH="$GITHUB_WORKSPACE" python3 -m pytest -v \
+            scripts/test_compress_ha_discovery.py \
+            scripts/test_ha_discovery.py \
+            scripts/test_pipeline.py
+
+      - name: Detect whether regeneration produced any changes
+        if: steps.changed.outputs.changed == 'true'
+        id: filechanges
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Changes detected:"
+            git status --porcelain
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No changes after regeneration. Nothing to commit."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push to feature branch
+        if: steps.filechanges.outputs.has_changes == 'true'
+        id: push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          BRANCH="auto-regenerate-discovery/$(date -u +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "regenerate: sync generated artifacts with latest public-appliance-api-documentation"
+          git push origin "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "Pushed branch $BRANCH"
+
+      - name: Create pull request
+        if: steps.filechanges.outputs.has_changes == 'true'
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="${{ github.repository }}"
+          BRANCH="${{ steps.push.outputs.branch }}"
+          LATEST="${{ steps.latest.outputs.latest }}"
+
+          PR_URL="$(gh pr create \
+            --repo "$REPO" \
+            --base develop \
+            --head "$BRANCH" \
+            --title "regenerate: sync generated artifacts with latest public-appliance-api-documentation" \
+            --body "Auto-generated weekly sync of lib/public-appliance-api-documentation to commit ${LATEST}. Regenerated ERD/API feature lists and HA discovery artifacts (processed JSON, JSONL payloads, compressed header). This PR merges automatically if CI passes.")"
+          PR_NUMBER="${PR_URL##*/}"
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "Created PR #$PR_NUMBER: $PR_URL"
+
+      - name: Wait for CI to complete
+        if: steps.filechanges.outputs.has_changes == 'true'
+        id: wait_ci
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="${{ github.repository }}"
+          PR_NUMBER="${{ steps.pr.outputs.number }}"
+          MAX_ATTEMPTS=60   # 60 x 30s = up to 30 minutes
+          SLEEP_SECS=30
+          CI_STATE="pending"
+
+          for i in $(seq 1 "$MAX_ATTEMPTS"); do
+            OUTPUT="$(gh pr checks "$PR_NUMBER" --repo "$REPO" 2>&1 || true)"
+            # Each check line is: <name>\t<state>\t<duration>\t<url>
+            STATES="$(printf '%s\n' "$OUTPUT" | awk -F'\t' 'NF>=2 {print tolower($2)}')"
+            COUNT="$(printf '%s\n' "$STATES" | grep -cE '.' || true)"
+
+            # Terminal failure?
+            if printf '%s\n' "$STATES" | grep -qE '^(fail|failed|cancelled|action_required|error)$'; then
+              CI_STATE="failed"
+              echo "CI reported a failure."
+              break
+            fi
+
+            INPROGRESS="$(printf '%s\n' "$STATES" | grep -cE '^(pending|queued|in_progress)$' || true)"
+
+            # At least one check reported and none still running and none failed -> passed.
+            if [ "$COUNT" -gt 0 ] && [ "$INPROGRESS" -eq 0 ]; then
+              CI_STATE="passed"
+              echo "All CI checks passed."
+              break
+            fi
+
+            echo "Attempt $i/$MAX_ATTEMPTS: $COUNT check(s) reported, $INPROGRESS in progress. Sleeping ${SLEEP_SECS}s..."
+            sleep "$SLEEP_SECS"
+          done
+
+          echo "Final CI state: $CI_STATE"
+          echo "ci_state=$CI_STATE" >> "$GITHUB_OUTPUT"
+
+      - name: Merge pull request if CI passed
+        if: steps.filechanges.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="${{ github.repository }}"
+          PR_NUMBER="${{ steps.pr.outputs.number }}"
+          CI_STATE="${{ steps.wait_ci.outputs.ci_state }}"
+
+          if [ "$CI_STATE" = "passed" ]; then
+            echo "Merging PR #$PR_NUMBER (CI passed)..."
+            gh pr merge "$PR_NUMBER" --repo "$REPO" --squash --delete-branch
+            echo "Successfully merged PR #$PR_NUMBER."
+          else
+            echo "NOT merging PR #$PR_NUMBER (CI state: $CI_STATE)."
+            echo "Leaving the PR open for manual review."
+            exit 1
+          fi
