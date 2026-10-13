@@ -31,8 +31,10 @@ static const rmw_erd_t* rmw_find(tiny_erd_t request_erd)
 
 /* Patch a single field into a full-payload buffer. Byte-aligned fields
  * (bit_offset 0, bit_size == byte_size*8) are a plain memcpy; otherwise each
- * target bit is set/cleared from the value's corresponding bit. The value is
- * little-endian: field bit i is (value[i/8] >> (i%8)) & 1.
+ * target bit is set/cleared from the value's corresponding bit. The rendered
+ * value is big-endian (MSB first), so field bit i (0 = LSB) is
+ * (value[value_size - 1 - i/8] >> (i%8)) & 1; see the bit branch below for
+ * the matching big-endian payload placement.
  *
  * Returns false (and patches nothing) when the command value is too short for
  * a byte-aligned field: copying a fixed byte_size from a shorter value would

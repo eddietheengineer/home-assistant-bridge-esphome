@@ -1409,13 +1409,26 @@ def _demote_partial_write_entities(entries: List[Dict],
         matched_base = _matched_base_erd(target_erd, erd_by_id) if target_erd else None
         for e in group:
             if matched_base is not None:
-                # Only sub-field entities (byte_size > 0) use the field-write
-                # topic. A single-classification matched-pair entity is a
-                # full-payload writer (byte_size == 0); it must keep the plain
-                # .../write topic, so leave fw empty for it.
+                # A sub-field entity (byte_size > 0) uses the field-write topic
+                # only if it can render a valid payload: a switch (binary
+                # '01'/'00') or a number/select with a hex command_template.
+                # A multi-bit bitfield number/select sub-field has no
+                # command_template, so a raw HA value would not hex-decode to
+                # the field value; demote it (read-only) instead of making it
+                # writable-but-broken. A single-classification matched-pair
+                # entity is a full-payload writer (byte_size == 0); it keeps
+                # the plain .../write topic, so leave fw empty for it.
                 if e['byte_size'] > 0:
-                    e['fw'] = (f"{e['byte_offset']}/{e['byte_size']}/"
-                               f"{e['bit_offset']}/{e['bit_size']}")
+                    if e['domain'] == 'switch' or e['command_template']:
+                        e['fw'] = (f"{e['byte_offset']}/{e['byte_size']}/"
+                                   f"{e['bit_offset']}/{e['bit_size']}")
+                        continue
+                    e['domain'] = 'binary_sensor' if e['domain'] == 'switch' else 'sensor'
+                    e['command_template'] = ''
+                    e['options_json'] = ''
+                    e['command_bytes'] = 0
+                    demoted.append(e)
+                    continue
                 continue
             safe = (target_ds is not None
                     and e['command_bytes'] == target_ds

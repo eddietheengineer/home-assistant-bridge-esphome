@@ -1348,6 +1348,29 @@ class TestRMWTable(unittest.TestCase):
         self.assertEqual(entries[0]['domain'], 'switch')
         self.assertEqual(entries[0]['fw'], '0/1/2/1')
 
+    def test_matched_pair_multibit_bitfield_no_ct_demoted(self):
+        # A multi-bit (number/select) bitfield sub-field in a matched pair has
+        # no command_template, so a raw HA value would not hex-decode to the
+        # field value. The gate must fail closed: demote it (read-only)
+        # instead of making it writable-but-broken.
+        def _multibit_erd(erd_id, role, paired):
+            data = [{'name': 'Field', 'offset': 0, 'size': 2,
+                     'bits': {'offset': 5, 'size': 3}, 'type': 'u8',
+                     'paired_erd': paired}]
+            return {'id': erd_id, 'pair_role': role, 'paired_erd': paired,
+                    'data': data}
+        entries = [self._entry(0x7051, 'number', cb=0, paired=0x7053,
+                               role='request', ct='',
+                               byte_offset=0, byte_size=2, bit_offset=5, bit_size=3)]
+        erd_by_id = {
+            '0x7051': _multibit_erd('0x7051', 'request', '0x7053'),
+            '0x7053': _multibit_erd('0x7053', 'status', '0x7051'),
+        }
+        demoted = gen._demote_partial_write_entities(entries, erd_by_id)
+        self.assertEqual(len(demoted), 1, 'multi-bit bitfield without ct must be demoted')
+        self.assertEqual(entries[0]['domain'], 'sensor')
+        self.assertNotIn('fw', entries[0])
+
     def test_matched_pair_rmw_rows(self):
         entries = [self._entry(0x7051, 'switch', cb=1, paired=0x7053,
                                role='request', ct='ct',
