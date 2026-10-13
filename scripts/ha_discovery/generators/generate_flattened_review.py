@@ -50,6 +50,23 @@ def build_erd_to_features(api_defs):
                     })
     return erd_to_features
 
+def review_key(erd_id, field_name, field_offset, field_bits):
+    """Build a unique review-preservation key for one flattened field.
+
+    (erd_id, field_name) alone is NOT unique: an ERD may contain multiple
+    fields with the same name at different byte offsets, or the same name
+    and offset but different bit-fields (e.g. 0x0a00 has two
+    'Schedule[0].Unused' fields per schedule slot, and 0x0802 has eight
+    'reserved' fields at offset 0). Including the byte offset and the
+    bit-field makes the key injective so each field preserves its own
+    review instead of colliding with a same-named sibling.
+    """
+    if isinstance(field_bits, dict):
+        bits = f"b{field_bits.get('offset')}:{field_bits.get('size')}"
+    else:
+        bits = '-'
+    return f"{erd_id}#{field_name}#{field_offset}#{bits}"
+
 
 def make_entry(erd, erd_features, existing_review=None):
     """Create a flattened entry for one sub-field of one ERD.
@@ -95,7 +112,7 @@ def make_entry(erd, erd_features, existing_review=None):
 def flatten(erd_defs, erd_to_features, existing_reviews=None):
     """Flatten ERD definitions into one entry per sub-field.
 
-    If existing_reviews is provided (dict keyed by 'erd_id#field_name'),
+    If existing_reviews is provided (dict keyed by review_key),
     merge the existing review data into each entry.
     """
     flattened = []
@@ -115,7 +132,7 @@ def flatten(erd_defs, erd_to_features, existing_reviews=None):
                 'field_values': f.get('values'),
                 'field_bits': f.get('bits'),
             })
-            key = f"{erd_id}#{f['name']}"
+            key = review_key(erd_id, f['name'], f['offset'], f.get('bits'))
             existing = existing_reviews.get(key) if existing_reviews else None
             flattened.append(make_entry(merged, erd_features, existing))
         else:
@@ -129,7 +146,7 @@ def flatten(erd_defs, erd_to_features, existing_reviews=None):
                     'field_values': f.get('values'),
                     'field_bits': f.get('bits'),
                 })
-                key = f"{erd_id}#{f['name']}"
+                key = review_key(erd_id, f['name'], f['offset'], f.get('bits'))
                 existing = existing_reviews.get(key) if existing_reviews else None
                 flattened.append(make_entry(merged, erd_features, existing))
 
@@ -169,7 +186,7 @@ def main():
     if args.preserve_review:
         existing = load_json(args.preserve_review)
         existing_reviews = {
-            f"{e['erd_id']}#{e['field_name']}": e['review']
+            review_key(e['erd_id'], e['field_name'], e['field_offset'], e.get('field_bits')): e['review']
             for e in existing
         }
         print(f"Loaded {len(existing_reviews)} existing reviews from {args.preserve_review}")

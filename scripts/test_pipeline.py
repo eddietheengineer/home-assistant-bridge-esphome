@@ -7,6 +7,7 @@ Covers:
     precedence, idempotency
   - auto_detect_scaling non-numeric field guard
   - apply_post_processing all 4 rules
+  - generate_flattened_review: injective review keys for same-named fields
 
 Run with:
     python3 -m pytest scripts/test_pipeline.py -v
@@ -17,8 +18,10 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "ha_discovery" / "pipeline"))
+sys.path.insert(0, str(Path(__file__).parent / "ha_discovery" / "generators"))
 import auto_detect_scaling as scaling
 from post_process import apply_overrides, apply_post_processing
+import generate_flattened_review as flattened
 
 
 # Synthetic overrides for testing precedence and type guards.
@@ -694,6 +697,91 @@ class TestRequestedDesiredPairing(unittest.TestCase):
         }
         pairs = pairings.find_erd_pairs(erd_by_id, ["0x4220", "0x4221"])
         self.assertEqual(pairs, [("0x4221", "0x4220")])
+
+
+class TestFlattenReviewPreservation(unittest.TestCase):
+    """Reviews are keyed by (erd, name, offset, bits), so same-named sibling
+    fields must not clobber each other's reviews on re-flatten (PR #160).
+    """
+
+    def _erd_defs(self):
+        # Mirrors 0x0a00: two fields named 'Schedule[0].Unused' — a 5-bit
+        # field at byte 0 and a 1-bit field at byte 1.
+        return {"erds": [{
+            "id": "0x0a00",
+            "name": "Weekly Recurring On/Off Schedule",
+            "operations": ["read", "write"],
+            "data": [
+                {"name": "Schedule[0].Unused", "type": "u8",
+                 "bits": {"offset": 3, "size": 5}, "offset": 0, "size": 1},
+                {"name": "Schedule[0].Enabled for Sunday", "type": "bool",
+                 "bits": {"offset": 0, "size": 1}, "offset": 1, "size": 1},
+                {"name": "Schedule[0].Unused", "type": "u8",
+                 "bits": {"offset": 7, "size": 1}, "offset": 1, "size": 1},
+            ],
+        }]}
+
+    def _existing(self):
+        # As produced by a prior pipeline run: 5-bit -> number, 1-bit -> switch.
+        return [
+            {"erd_id": "0x0a00", "field_name": "Schedule[0].Unused",
+             "field_offset": 0, "field_bits": {"offset": 3, "size": 5},
+             "review": {"ha_domain": "number", "_domain_confidence": 0.85}},
+            {"erd_id": "0x0a00", "field_name": "Schedule[0].Enabled for Sunday",
+             "field_offset": 1, "field_bits": {"offset": 0, "size": 1},
+             "review": {"ha_domain": "switch", "_domain_confidence": 0.9}},
+            {"erd_id": "0x0a00", "field_name": "Schedule[0].Unused",
+             "field_offset": 1, "field_bits": {"offset": 7, "size": 1},
+             "review": {"ha_domain": "switch", "_domain_confidence": 0.9}},
+        ]
+
+    @staticmethod
+    def _index(entries):
+        return {
+            flattened.review_key(e["erd_id"], e["field_name"],
+                                 e["field_offset"], e.get("field_bits")): e["review"]
+            for e in entries
+        }
+
+    def test_review_key_injective(self):
+        # Same name, different offsets (0x0a00 'Schedule[0].Unused' case).
+        k1 = flattened.review_key("0x0a00", "Schedule[0].Unused", 0, {"offset": 3, "size": 5})
+        k2 = flattened.review_key("0x0a00", "Schedule[0].Unused", 1, {"offset": 7, "size": 1})
+        self.assertNotEqual(k1, k2)
+        # Same name AND offset, different bits (0x0802 'reserved' case).
+        k3 = flattened.review_key("0x0802", "reserved", 0, {"offset": 0, "size": 8})
+        k4 = flattened.review_key("0x0802", "reserved", 0, {"offset": 8, "size": 8})
+        self.assertNotEqual(k3, k4)
+        # No bits -> stable suffix, distinct from any bit-field.
+        k5 = flattened.review_key("0x9314", "Reserved", 8, None)
+        k6 = flattened.review_key("0x9314", "Reserved", 8, {"offset": 0, "size": 1})
+        self.assertNotEqual(k5, k6)
+
+    def test_same_name_fields_preserve_own_reviews(self):
+        out = flattened.flatten(self._erd_defs(), {}, self._index(self._existing()))
+
+        def bits_key(b):
+            return (b["offset"], b["size"]) if isinstance(b, dict) else None
+
+        by_key = {
+            (e["field_name"], e["field_offset"], bits_key(e["field_bits"])): e["review"]["ha_domain"]
+            for e in out
+        }
+        self.assertEqual(
+            by_key[("Schedule[0].Unused", 0, (3, 5))], "number")
+        self.assertEqual(
+            by_key[("Schedule[0].Unused", 1, (7, 1))], "switch")
+        self.assertEqual(
+            by_key[("Schedule[0].Enabled for Sunday", 1, (0, 1))], "switch")
+
+    def test_reflatten_is_idempotent(self):
+        # The CI failure mode: re-running the pipeline on its own output
+        # must not change any review.
+        first = flattened.flatten(self._erd_defs(), {}, self._index(self._existing()))
+        second = flattened.flatten(self._erd_defs(), {}, self._index(first))
+        self.assertEqual(
+            [e["review"] for e in first], [e["review"] for e in second])
+
 
 
 if __name__ == "__main__":
