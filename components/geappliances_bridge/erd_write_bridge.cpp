@@ -97,9 +97,13 @@ static tiny_hsm_result_t state_ready(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, 
       // snapshotted base with the target field patched).
       const void* write_value = args->value;
       uint8_t write_size = args->size;
+      // Declared outside the field-write block: write_value points into it and
+      // is used by tiny_gea3_erd_client_write() after the block, so it must
+      // stay in scope (a 248-byte stack cost on the full-write path is a minor
+      // inefficiency, not a correctness issue).
+      uint8_t rmw_buffer[ERD_CACHE_MAX_DATA_SIZE];
 
       if (args->is_field_write) {
-        uint8_t rmw_buffer[ERD_CACHE_MAX_DATA_SIZE];
         const rmw_erd_t* rmw = rmw_find(args->erd);
         if (rmw == nullptr) {
           ESP_LOGW(TAG, "Field write for ERD 0x%04x dropped: not an RMW target", args->erd);

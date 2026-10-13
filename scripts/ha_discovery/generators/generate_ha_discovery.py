@@ -1409,8 +1409,13 @@ def _demote_partial_write_entities(entries: List[Dict],
         matched_base = _matched_base_erd(target_erd, erd_by_id) if target_erd else None
         for e in group:
             if matched_base is not None:
-                e['fw'] = (f"{e['byte_offset']}/{e['byte_size']}/"
-                           f"{e['bit_offset']}/{e['bit_size']}")
+                # Only sub-field entities (byte_size > 0) use the field-write
+                # topic. A single-classification matched-pair entity is a
+                # full-payload writer (byte_size == 0); it must keep the plain
+                # .../write topic, so leave fw empty for it.
+                if e['byte_size'] > 0:
+                    e['fw'] = (f"{e['byte_offset']}/{e['byte_size']}/"
+                               f"{e['bit_offset']}/{e['bit_size']}")
                 continue
             safe = (target_ds is not None
                     and e['command_bytes'] == target_ds
