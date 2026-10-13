@@ -1409,17 +1409,23 @@ def _demote_partial_write_entities(entries: List[Dict],
         matched_base = _matched_base_erd(target_erd, erd_by_id) if target_erd else None
         for e in group:
             if matched_base is not None:
-                # A sub-field entity (byte_size > 0) uses the field-write topic
-                # only if it can render a valid payload: a switch (binary
-                # '01'/'00') or a number/select with a hex command_template.
-                # A multi-bit bitfield number/select sub-field has no
-                # command_template, so a raw HA value would not hex-decode to
-                # the field value; demote it (read-only) instead of making it
+                # A sub-field can use the field-write topic only if it can
+                # render a valid payload: a switch (1-byte '01'/'00' — valid
+                # only for a single-bit field or a byte-aligned 1-byte field)
+                # or a number/select with a hex command_template. A multi-bit
+                # bitfield number/select sub-field has no command_template, and
+                # a byte-aligned multi-byte switch would fail the memcpy size
+                # check; demote both (read-only) instead of making them
                 # writable-but-broken. A single-classification matched-pair
                 # entity is a full-payload writer (byte_size == 0); it keeps
                 # the plain .../write topic, so leave fw empty for it.
                 if e['byte_size'] > 0:
-                    if e['domain'] == 'switch' or e['command_template']:
+                    if e['domain'] == 'switch':
+                        can_write = (e['bit_size'] == 1
+                                     or (e['bit_offset'] == 0 and e['byte_size'] == 1))
+                    else:
+                        can_write = bool(e['command_template'])
+                    if can_write:
                         e['fw'] = (f"{e['byte_offset']}/{e['byte_size']}/"
                                    f"{e['bit_offset']}/{e['bit_size']}")
                         continue

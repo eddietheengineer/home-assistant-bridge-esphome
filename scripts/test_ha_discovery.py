@@ -1371,6 +1371,28 @@ class TestRMWTable(unittest.TestCase):
         self.assertEqual(entries[0]['domain'], 'sensor')
         self.assertNotIn('fw', entries[0])
 
+    def test_matched_pair_multibyte_aligned_switch_demoted(self):
+        # A byte-aligned multi-byte switch sub-field renders a 1-byte '01'/'00'
+        # command, which would fail the memcpy size check (value_size <
+        # byte_size). The gate must fail closed: demote it (read-only) instead
+        # of making it writable-but-broken.
+        def _aligned_erd(erd_id, role, paired):
+            data = [{'name': 'Field', 'offset': 0, 'size': 2,
+                     'type': 'u16', 'paired_erd': paired}]
+            return {'id': erd_id, 'pair_role': role, 'paired_erd': paired,
+                    'data': data}
+        entries = [self._entry(0x7051, 'switch', cb=1, paired=0x7053,
+                               role='request', ct='',
+                               byte_offset=0, byte_size=2, bit_offset=0, bit_size=16)]
+        erd_by_id = {
+            '0x7051': _aligned_erd('0x7051', 'request', '0x7053'),
+            '0x7053': _aligned_erd('0x7053', 'status', '0x7051'),
+        }
+        demoted = gen._demote_partial_write_entities(entries, erd_by_id)
+        self.assertEqual(len(demoted), 1, 'multi-byte aligned switch must be demoted')
+        self.assertEqual(entries[0]['domain'], 'binary_sensor')
+        self.assertNotIn('fw', entries[0])
+
     def test_matched_pair_rmw_rows(self):
         entries = [self._entry(0x7051, 'switch', cb=1, paired=0x7053,
                                role='request', ct='ct',
