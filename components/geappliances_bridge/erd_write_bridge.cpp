@@ -36,16 +36,18 @@ static const rmw_erd_t* rmw_find(tiny_erd_t request_erd)
  * (value[value_size - 1 - i/8] >> (i%8)) & 1; see the bit branch below for
  * the matching big-endian payload placement.
  *
- * Returns false (and patches nothing) when the command value is too short for
- * a byte-aligned field: copying a fixed byte_size from a shorter value would
- * read uninitialized stack bytes into the appliance payload. The bit-field
- * branch is always safe (missing value bits read as 0). */
+ * Returns false (and patches nothing) when the command value is not exactly
+ * byte_size bytes for a byte-aligned field: too short would read
+ * uninitialized stack bytes, and too long would silently MSB-truncate (copy
+ * the high-order bytes and discard the low-order ones), writing a wrong
+ * value. The bit-field branch is always safe (missing value bits read as 0).
+ */
 static bool rmw_patch_field(uint8_t* buffer, uint16_t byte_offset, uint8_t byte_size,
                             uint8_t bit_offset, uint8_t bit_size,
                             const uint8_t* value, uint8_t value_size)
 {
   if (bit_offset == 0 && bit_size == byte_size * 8) {
-    if (value_size < byte_size) {
+    if (value_size != byte_size) {
       return false;
     }
     memcpy(buffer + byte_offset, value, byte_size);
