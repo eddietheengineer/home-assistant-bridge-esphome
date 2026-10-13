@@ -240,12 +240,21 @@ def _field_layout_signature(erd_data: List[Dict]) -> list:
 
 def _matched_base_erd(erd: Dict, erd_by_id: Dict[str, Dict]) -> Optional[str]:
     """Return the paired status ERD id if `erd` is a request ERD whose status
-    ERD has an identical non-reserved field layout and equal payload size.
+    ERD is a valid full-payload source for field-level read-modify-write.
 
-    Such a pair is safe for field-level read-modify-write: the status ERD is a
-    valid full-payload source, and patching a field's bytes/bits in a copy of
-    the status payload produces a correct request payload. Returns None when
-    the ERD is not a request, has no paired status ERD, or the layouts diverge.
+    A pair is safe for RMW only when patching a field in a copy of the status
+    payload yields a correct request payload. That requires ALL of:
+      - `erd` is a request ERD with a paired status ERD;
+      - the non-reserved field layouts are identical (bytes line up);
+      - the payload sizes are equal;
+      - every non-reserved request field is individually paired to the status
+        ERD (per-field `paired_erd`), so no byte is left to a field whose
+        meaning is unverified. The layout signature alone is name-ignoring and
+        cannot catch two fields at the same position with different semantics;
+        the per-field pairing is the authoritative semantic signal.
+
+    Returns None when any condition fails (fail closed: the ERD stays
+    read-only).
     """
     if erd.get('pair_role') != 'request':
         return None
@@ -257,6 +266,13 @@ def _matched_base_erd(erd: Dict, erd_by_id: Dict[str, Dict]) -> Optional[str]:
         return None
     if get_erd_byte_size(erd.get('data', [])) != get_erd_byte_size(status.get('data', [])):
         return None
+    # Every non-reserved request field must be individually paired to the base.
+    # A field with no per-field pairing (or paired to a different ERD) means a
+    # byte of the payload has no verified semantic correspondence, so the pair
+    # is not safe for RMW.
+    for f in _get_non_reserved_fields(erd.get('data', [])):
+        if f.get('paired_erd') != paired:
+            return None
     return paired
 
 

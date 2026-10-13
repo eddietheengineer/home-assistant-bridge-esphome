@@ -360,11 +360,15 @@ TEST(write_flow_integration, should_drop_malformed_field_write_topic)
   uint8_t host = 0xC0;
   init_all_with_cache(host);
 
+  // Cache the base so that IF the adapter failed to drop the topic, the write
+  // bridge would proceed and call erd_client.write() — an unexpected mock call
+  // that fails the test. With the adapter correct, no write is queued.
+  uint8_t base = 0x00;
+  erd_cache_update(&test_cache, 0x7053, host, &base, sizeof(base));
+
   // Three segments (not four) -> malformed, dropped. No write, no result.
   mqtt_double.simulate_message(
     "geappliances/test_device/erd/0x7051/write/0/1/2", "01");
-
-  // No write should be queued; nothing to verify beyond no crash.
 }
 
 TEST(write_flow_integration, should_drop_out_of_range_field_write_topic)
@@ -372,9 +376,30 @@ TEST(write_flow_integration, should_drop_out_of_range_field_write_topic)
   uint8_t host = 0xC0;
   init_all_with_cache(host);
 
-  // byte_offset + byte_size exceeds the max payload size -> dropped.
+  // Cache the base so a regression that lets the topic through would queue a
+  // write (unexpected mock call -> test failure).
+  uint8_t base = 0x00;
+  erd_cache_update(&test_cache, 0x7053, host, &base, sizeof(base));
+
+  // byte_offset (300) exceeds the max payload size -> dropped by the adapter.
   mqtt_double.simulate_message(
     "geappliances/test_device/erd/0x7051/write/300/1/0/8", "01");
+}
+
+TEST(write_flow_integration, should_drop_overflow_field_write_topic)
+{
+  uint8_t host = 0xC0;
+  init_all_with_cache(host);
+
+  // Cache the base so a regression that lets the topic through would queue a
+  // write (unexpected mock call -> test failure).
+  uint8_t base = 0x00;
+  erd_cache_update(&test_cache, 0x7053, host, &base, sizeof(base));
+
+  // byte_offset huge enough to overflow the int range check (sscanf clamps to
+  // INT_MAX; off + size wraps negative). Must be dropped, not written OOB.
+  mqtt_double.simulate_message(
+    "geappliances/test_device/erd/0x7051/write/99999999999999/1/0/8", "01");
 }
 
 TEST(write_flow_integration, should_parse_secondary_board_field_write)

@@ -32,14 +32,22 @@ static const rmw_erd_t* rmw_find(tiny_erd_t request_erd)
 /* Patch a single field into a full-payload buffer. Byte-aligned fields
  * (bit_offset 0, bit_size == byte_size*8) are a plain memcpy; otherwise each
  * target bit is set/cleared from the value's corresponding bit. The value is
- * little-endian: field bit i is (value[i/8] >> (i%8)) & 1. */
-static void rmw_patch_field(uint8_t* buffer, uint16_t byte_offset, uint8_t byte_size,
+ * little-endian: field bit i is (value[i/8] >> (i%8)) & 1.
+ *
+ * Returns false (and patches nothing) when the command value is too short for
+ * a byte-aligned field: copying a fixed byte_size from a shorter value would
+ * read uninitialized stack bytes into the appliance payload. The bit-field
+ * branch is always safe (missing value bits read as 0). */
+static bool rmw_patch_field(uint8_t* buffer, uint16_t byte_offset, uint8_t byte_size,
                             uint8_t bit_offset, uint8_t bit_size,
                             const uint8_t* value, uint8_t value_size)
 {
   if (bit_offset == 0 && bit_size == byte_size * 8) {
+    if (value_size < byte_size) {
+      return false;
+    }
     memcpy(buffer + byte_offset, value, byte_size);
-    return;
+    return true;
   }
   uint32_t abs_start = (uint32_t)byte_offset * 8 + bit_offset;
   for (uint8_t i = 0; i < bit_size; i++) {
@@ -53,6 +61,7 @@ static void rmw_patch_field(uint8_t* buffer, uint16_t byte_offset, uint8_t byte_
       *byte &= (uint8_t)~mask;
     }
   }
+  return true;
 }
 
 static tiny_hsm_result_t write_state_top(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, const void* data)
@@ -115,8 +124,14 @@ static tiny_hsm_result_t state_ready(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, 
             tiny_gea3_erd_client_write_failure_reason_incorrect_size);
           break;
         }
-        rmw_patch_field(rmw_buffer, args->byte_offset, args->byte_size, args->bit_offset, args->bit_size,
-                        (const uint8_t*)args->value, args->size);
+        if (!rmw_patch_field(rmw_buffer, args->byte_offset, args->byte_size, args->bit_offset, args->bit_size,
+                             (const uint8_t*)args->value, args->size)) {
+          ESP_LOGW(TAG, "Field write for ERD 0x%04x dropped: value too short for field (size %u)",
+            args->erd, args->size);
+          mqtt_client_update_erd_write_result(self->mqtt_client, args->erd, args->board_address, false,
+            tiny_gea3_erd_client_write_failure_reason_incorrect_size);
+          break;
+        }
         write_value = rmw_buffer;
         write_size = rmw->payload_size;
       }

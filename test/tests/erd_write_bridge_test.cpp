@@ -417,3 +417,17 @@ TEST(erd_write_bridge, should_full_write_unchanged_with_cache)
 
   when_a_write_request_is_received(0x3001, &value, sizeof(value));
 }
+
+TEST(erd_write_bridge, should_drop_field_write_when_value_too_short)
+{
+  // A byte-aligned 2-byte field (0x222d -> 0x222c) with a 1-byte value must be
+  // dropped: copying the fixed 2 bytes from a 1-byte value would read
+  // uninitialized stack bytes into the appliance payload.
+  given_that_the_bridge_has_been_initialized_with_cache();
+  uint8_t base[] = {0xAA, 0xBB};
+  given_that_the_base_is_cached(0x222c, base, sizeof(base));
+
+  should_report_write_result(0x222d, false, tiny_gea3_erd_client_write_failure_reason_incorrect_size);
+  uint8_t value = 0x42; // only 1 byte, but the field is 2 bytes
+  when_a_field_write_is_received(0x222d, &value, sizeof(value), 0, 2, 0, 16);
+}
