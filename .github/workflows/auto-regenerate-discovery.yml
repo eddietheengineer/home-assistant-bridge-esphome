@@ -23,6 +23,12 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # gh pr checks reads check runs + commit statuses (and the associated
+  # workflow run) to poll CI; these read scopes are required or the call
+  # fails with a GraphQL permission error and the merge never happens.
+  checks: read
+  actions: read
+  statuses: read
 
 # Serialize runs so a manual trigger never overlaps the scheduled one.
 concurrency:
