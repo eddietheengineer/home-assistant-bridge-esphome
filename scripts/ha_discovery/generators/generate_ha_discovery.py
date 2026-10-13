@@ -1858,8 +1858,12 @@ def _rmw_rows_from_entries(entries: List[Dict]) -> List[Tuple[int, int, int]]:
     for e in entries:
         if not e.get('fw'):
             continue
-        request_erd = e['erd_id']
-        rows[request_erd] = (request_erd, e['paired_erd_id'], e['data_size'])
+        # Mirror the demotion pass's target logic: a status-role entity's
+        # write target is its paired request ERD, so the row is keyed by the
+        # request ERD with the status ERD as the base.
+        request_erd = e['paired_erd_id'] if e['pair_role'] == 'status' else e['erd_id']
+        base_erd = e['erd_id'] if e['pair_role'] == 'status' else e['paired_erd_id']
+        rows[request_erd] = (request_erd, base_erd, e['data_size'])
     return [rows[k] for k in sorted(rows)]
 
 

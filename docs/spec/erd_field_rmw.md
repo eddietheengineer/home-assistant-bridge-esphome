@@ -77,11 +77,12 @@ The bridge reconstructs the absolute bit range as `[byte_offset*8 + bit_offset, 
 | Cycle Pricing "Price[1]" (bytes 2–3, u16) | `…/0x2164/write/2/2/0/16` |
 | Smoker "Cavity Temperature" (bytes 2–3, u16) | `…/0x9401/write/2/2/0/16` |
 
-**Command template.** Each field entity's `command_template` renders **only the field value** as a lowercase hex string of `ceil(bit_size/8)` bytes (little-endian, matching the ERD byte order):
+**Command template.** Each field entity's `command_template` renders **only the field value** as a lowercase hex string, **big-endian (MSB first)** — matching the ERD payload's big-endian byte order (the VTs, the `>f` float32 unpack, and the write API's "Data must already be in big endian" warning all agree). The RMW patch reads the rendered value big-endian and places the field's bits big-endian within the field's `byte_size` span (field bit *i* is bit `bit_offset + i` of the big-endian `byte_size`-byte integer):
 
 - 1-bit switch → `00` / `01` (1 byte).
 - N-bit field, N ≤ 8 → 1 byte, zero-extended.
 - N-bit field, N > 8 → `N/8` bytes.
+- A multi-byte field (e.g. a 3-bit field in a 2-byte span) renders the full `byte_size` bytes big-endian, so the low bits live in the last byte.
 
 **Subscription.** The adapter's wildcard changes from `…/erd/+/write` to `…/erd/+/write/#`. Per the MQTT spec, `#` matches zero or more trailing levels (subscribing to `a/b/#` also receives `a/b`), so this single filter catches both the full-write topic (zero trailing levels) and the field-write topic (four trailing levels). The parser reads the ERD (and optional `0x{addr}_` prefix) exactly as today, then inspects what follows `write`:
 - **zero** trailing segments → full write (existing behavior, unchanged).

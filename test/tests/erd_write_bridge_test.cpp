@@ -358,6 +358,43 @@ TEST(erd_write_bridge, should_rmw_multi_bit_field)
   when_a_field_write_is_received(0x7051, &value, sizeof(value), 0, 1, 1, 3);
 }
 
+// Regression: a bit-field spanning multiple bytes must be placed big-endian
+// within the field's byte_size span (matching the VT / appliance), not
+// little-endian. 0x222d is a 2-byte RMW target. Bit 8 of the big-endian
+// 2-byte integer is byte 0 bit 0 (the MSB byte), so setting it must touch
+// byte 0, not byte 1.
+TEST(erd_write_bridge, should_rmw_multi_byte_bit_field_high_bit)
+{
+  given_that_the_bridge_has_been_initialized_with_cache();
+  uint8_t base[] = {0x00, 0x00};
+  given_that_the_base_is_cached(0x222c, base, sizeof(base));
+
+  // Field: byte 0, size 2, bit 8, 1 bit. Value 0x01 (set) -> byte 0 bit 0.
+  uint8_t expected[] = {0x01, 0x00};
+  expect_rmw_write(0x222d, 0xC0, expected, sizeof(expected));
+
+  uint8_t value = 0x01;
+  when_a_field_write_is_received(0x222d, &value, sizeof(value), 0, 2, 8, 1);
+}
+
+// Regression: a multi-bit field in a multi-byte span must read the rendered
+// value big-endian (MSB first) AND place the bits big-endian within the span.
+// 3-bit field at bit 5 of a 2-byte span, value 6 (0b110) rendered as
+// {0x00, 0x06}: bits land in byte 1 bits 5,6,7 -> {0x00, 0xC0}.
+TEST(erd_write_bridge, should_rmw_multi_byte_multi_bit_field)
+{
+  given_that_the_bridge_has_been_initialized_with_cache();
+  uint8_t base[] = {0x00, 0x00};
+  given_that_the_base_is_cached(0x222c, base, sizeof(base));
+
+  // Field: byte 0, size 2, bit 5, 3 bits. Value {0x00, 0x06} (big-endian 6).
+  uint8_t expected[] = {0x00, 0xC0};
+  expect_rmw_write(0x222d, 0xC0, expected, sizeof(expected));
+
+  uint8_t value[] = {0x00, 0x06};
+  when_a_field_write_is_received(0x222d, value, sizeof(value), 0, 2, 5, 3);
+}
+
 TEST(erd_write_bridge, should_drop_field_write_when_base_missing)
 {
   given_that_the_bridge_has_been_initialized_with_cache();

@@ -49,10 +49,19 @@ static bool rmw_patch_field(uint8_t* buffer, uint16_t byte_offset, uint8_t byte_
     memcpy(buffer + byte_offset, value, byte_size);
     return true;
   }
-  uint32_t abs_start = (uint32_t)byte_offset * 8 + bit_offset;
+  // The command renders the field value big-endian (MSB first), and the
+  // appliance/VT reads the field as a big-endian integer of byte_size bytes.
+  // Field bit i (0 = LSB) is therefore bit (bit_offset + i) of that integer:
+  //   - in the rendered value: byte (value_size - 1 - i/8), bit (i%8);
+  //   - in the payload: byte (byte_offset + byte_size - 1 - (bit_offset+i)/8),
+  //     bit ((bit_offset+i)%8).
+  // For byte_size == 1 (all current RMW rows) this reduces to the naive
+  // little-endian placement, so existing behavior is unchanged.
   for (uint8_t i = 0; i < bit_size; i++) {
-    uint8_t vbit = (i / 8 < value_size) ? ((value[i / 8] >> (i % 8)) & 1) : 0;
-    uint32_t abs_bit = abs_start + i;
+    uint8_t vbit = (i / 8 < value_size)
+        ? ((value[value_size - 1 - i / 8] >> (i % 8)) & 1) : 0;
+    uint32_t b = (uint32_t)bit_offset + i;
+    uint32_t abs_bit = ((uint32_t)byte_offset + (uint32_t)byte_size - 1 - b / 8) * 8 + (b % 8);
     uint8_t* byte = &buffer[abs_bit / 8];
     uint8_t mask = (uint8_t)(1u << (abs_bit % 8));
     if (vbit) {
