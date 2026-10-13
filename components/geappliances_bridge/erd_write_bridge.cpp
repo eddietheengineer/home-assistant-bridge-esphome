@@ -97,14 +97,25 @@ static tiny_hsm_result_t state_ready(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, 
       // snapshotted base with the target field patched).
       const void* write_value = args->value;
       uint8_t write_size = args->size;
-      uint8_t rmw_buffer[ERD_CACHE_MAX_DATA_SIZE];
 
       if (args->is_field_write) {
+        uint8_t rmw_buffer[ERD_CACHE_MAX_DATA_SIZE];
         const rmw_erd_t* rmw = rmw_find(args->erd);
         if (rmw == nullptr) {
           ESP_LOGW(TAG, "Field write for ERD 0x%04x dropped: not an RMW target", args->erd);
           mqtt_client_update_erd_write_result(self->mqtt_client, args->erd, args->board_address, false,
             tiny_gea3_erd_client_write_failure_reason_not_supported);
+          break;
+        }
+        // The field must fit within the base's actual payload. The adapter only
+        // bounds the geometry to the 248-byte ERD max; a rogue topic whose field
+        // extends past this base's payload_size would patch bytes that are never
+        // sent (write_size is payload_size), silently truncating the write.
+        if (args->byte_offset + args->byte_size > rmw->payload_size) {
+          ESP_LOGW(TAG, "Field write for ERD 0x%04x dropped: field (off %u size %u) exceeds payload %u",
+            args->erd, args->byte_offset, args->byte_size, rmw->payload_size);
+          mqtt_client_update_erd_write_result(self->mqtt_client, args->erd, args->board_address, false,
+            tiny_gea3_erd_client_write_failure_reason_incorrect_size);
           break;
         }
         if (self->cache == nullptr) {

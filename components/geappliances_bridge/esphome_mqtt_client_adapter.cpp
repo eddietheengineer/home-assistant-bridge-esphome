@@ -203,7 +203,7 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
       if (off < 0 || off > ERD_CACHE_MAX_DATA_SIZE) return;
       if (size <= 0 || size > ERD_CACHE_MAX_DATA_SIZE) return;
       if (bitoff < 0 || bitoff > 7) return;
-      if (bitsize <= 0 || bitsize > ERD_CACHE_MAX_DATA_SIZE * 8) return;
+      if (bitsize <= 0 || bitsize > 255) return; // bit_size is stored in a uint8_t
       if (off + size > ERD_CACHE_MAX_DATA_SIZE) return;
       if (bitoff + bitsize > size * 8) return;
       is_field_write = true;
