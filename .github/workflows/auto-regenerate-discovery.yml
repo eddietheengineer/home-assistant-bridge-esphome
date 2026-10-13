@@ -92,6 +92,14 @@ jobs:
           python3 scripts/generate_erd_lists.py
           python3 scripts/ha_discovery/run_pipeline.py
 
+      - name: Validate generated output
+        if: steps.changed.outputs.changed == 'true'
+        run: |
+          PYTHONPATH="$GITHUB_WORKSPACE" python3 -m pytest -v \
+            scripts/test_compress_ha_discovery.py \
+            scripts/test_ha_discovery.py \
+            scripts/test_pipeline.py
+
       - name: Detect whether regeneration produced any changes
         if: steps.changed.outputs.changed == 'true'
         id: filechanges
