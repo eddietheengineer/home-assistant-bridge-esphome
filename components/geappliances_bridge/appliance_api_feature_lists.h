@@ -209,6 +209,7 @@ extern const tiny_erd_t appliance_api_clothes_washer_v3_washer_push_notification
 extern const tiny_erd_t appliance_api_clothes_washer_v3_flexible_dispensing_erds[];
 extern const tiny_erd_t appliance_api_clothes_washer_v3_commercial_laundry_top_load_remote_parameters_erds[];
 extern const tiny_erd_t appliance_api_clothes_washer_v3_commercial_laundry_front_load_remote_parameters_erds[];
+extern const tiny_erd_t appliance_api_clothes_washer_v3_cycle_function_erds[];
 extern const tiny_erd_t appliance_api_clothes_washer_v4_mabe_washer_foundation_erds[];
 extern const tiny_erd_t appliance_api_clothes_washer_v4_mabe_washer_diagnostics_erds[];
 extern const tiny_erd_t appliance_api_clothes_washer_v4_commercial_free_mode_erds[];
@@ -471,6 +472,8 @@ extern const tiny_erd_t appliance_api_zoneline_v1_stratos_od_coil_liquid_sensor_
 extern const tiny_erd_t appliance_api_zoneline_v1_stratos_humidity_sensor_erds[];
 extern const tiny_erd_t appliance_api_zoneline_v1_stratos_base_aux_modes_erds[];
 extern const tiny_erd_t appliance_api_zoneline_v1_stratos_heat_source_optimization_erds[];
+extern const tiny_erd_t appliance_api_zoneline_v1_24v_controllable_output_erds[];
+extern const tiny_erd_t appliance_api_zoneline_v1_24v_thermostat_transformer_configuration_erds[];
 extern const tiny_erd_t appliance_api_hood_v1_foundation_erds[];
 extern const tiny_erd_t appliance_api_hood_v1_hood_delays_erds[];
 extern const tiny_erd_t appliance_api_hood_v1_hub_support_erds[];

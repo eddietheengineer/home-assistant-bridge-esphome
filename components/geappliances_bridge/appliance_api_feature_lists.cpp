@@ -1052,6 +1052,11 @@ const tiny_erd_t appliance_api_clothes_washer_v3_commercial_laundry_front_load_r
   0x2259,
 };
 
+const tiny_erd_t appliance_api_clothes_washer_v3_cycle_function_erds[] = {
+  0x20dc,
+  0x20de,
+};
+
 const tiny_erd_t appliance_api_clothes_washer_v4_mabe_washer_foundation_erds[] = {
   0x0004,
   0x000e,
@@ -2781,6 +2786,18 @@ const tiny_erd_t appliance_api_zoneline_v1_stratos_base_aux_modes_erds[] = {
 const tiny_erd_t appliance_api_zoneline_v1_stratos_heat_source_optimization_erds[] = {
   0x7472,
   0x7473,
+};
+
+const tiny_erd_t appliance_api_zoneline_v1_24v_controllable_output_erds[] = {
+  0x7474,
+  0x7475,
+  0x7476,
+  0x7477,
+};
+
+const tiny_erd_t appliance_api_zoneline_v1_24v_thermostat_transformer_configuration_erds[] = {
+  0x7478,
+  0x7479,
 };
 
 const tiny_erd_t appliance_api_hood_v1_foundation_erds[] = {
@@ -5859,6 +5876,7 @@ const appliance_feature_api_descriptor_t appliance_feature_api_descriptors[] = {
   {0x0002, 3, 0x00000010, "Clothes Washer / Flexible Dispensing", appliance_api_clothes_washer_v3_flexible_dispensing_erds, 6},
   {0x0002, 3, 0x00000020, "Clothes Washer / Commercial Laundry Top Load Remote Parameters", appliance_api_clothes_washer_v3_commercial_laundry_top_load_remote_parameters_erds, 6},
   {0x0002, 3, 0x00000040, "Clothes Washer / Commercial Laundry Front Load Remote Parameters", appliance_api_clothes_washer_v3_commercial_laundry_front_load_remote_parameters_erds, 21},
+  {0x0002, 3, 0x00000800, "Clothes Washer / Cycle Function", appliance_api_clothes_washer_v3_cycle_function_erds, 2},
   {0x0002, 4, 0x00000001, "Clothes Washer / Mabe Washer Foundation", appliance_api_clothes_washer_v4_mabe_washer_foundation_erds, 31},
   {0x0002, 4, 0x00000010, "Clothes Washer / Mabe Washer Diagnostics", appliance_api_clothes_washer_v4_mabe_washer_diagnostics_erds, 6},
   {0x0002, 4, 0x00000020, "Clothes Washer / Commercial Free Mode", appliance_api_clothes_washer_v4_commercial_free_mode_erds, 2},
@@ -6121,6 +6139,8 @@ const appliance_feature_api_descriptor_t appliance_feature_api_descriptors[] = {
   {0x0014, 1, 0x00002000, "Zoneline / Stratos Humidity Sensor", appliance_api_zoneline_v1_stratos_humidity_sensor_erds, 2},
   {0x0014, 1, 0x00004000, "Zoneline / Stratos Base Aux Modes", appliance_api_zoneline_v1_stratos_base_aux_modes_erds, 16},
   {0x0014, 1, 0x00008000, "Zoneline / Stratos Heat Source Optimization", appliance_api_zoneline_v1_stratos_heat_source_optimization_erds, 2},
+  {0x0014, 1, 0x00010000, "Zoneline / 24V Controllable Output", appliance_api_zoneline_v1_24v_controllable_output_erds, 4},
+  {0x0014, 1, 0x00020000, "Zoneline / 24V Thermostat Transformer Configuration", appliance_api_zoneline_v1_24v_thermostat_transformer_configuration_erds, 2},
   {0x0015, 1, 0x00000001, "Hood / Foundation", appliance_api_hood_v1_foundation_erds, 7},
   {0x0015, 1, 0x00000002, "Hood / Hood Delays", appliance_api_hood_v1_hood_delays_erds, 2},
   {0x0015, 1, 0x00000004, "Hood / Hub Support", appliance_api_hood_v1_hub_support_erds, 6},
