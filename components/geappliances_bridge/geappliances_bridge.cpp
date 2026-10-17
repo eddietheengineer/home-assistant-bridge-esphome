@@ -368,10 +368,13 @@ void GeappliancesBridge::run_timer_only_iteration_()
 
 void GeappliancesBridge::run_protocol_stack_()
 {
-  // When GEA2 is active (or during GEA2 autodiscovery), run the GEA2
-  // iteration once per loop() call.  The GEA2 interface's internal timers
-  // use real millis(), so the 6 ms interbyte / 8 ms ack timeouts track
-  // wall-clock time across the ~50 ms gap between loop() calls.
+  // When GEA2 is active (or during GEA2 autodiscovery), run a 10 ms burst
+  // to keep the GEA2 interface's 6 ms interbyte timeout from firing during
+  // the TX→RX cycle (~4 ms at 19200 baud).  The burst services the GEA2
+  // interface's internal timer group (via gea2_msec_interrupt_) and the
+  // shared timer group (via the UART adapter poll) at ~1 ms intervals,
+  // so multi-byte responses are received without aborting mid-packet.
+  // 10 ms is well under the 50 ms WARN_IF_BLOCKING_OVER_CS threshold.
   bool need_gea2 = this->gea2_uart_ != nullptr && (
     this->autodiscovery_manager_.is_gea2_protocol() ||
     this->gea2_protocol_active_ ||
@@ -389,7 +392,17 @@ void GeappliancesBridge::run_protocol_stack_()
   }
 
   if (need_gea2) {
+#ifndef UNIT_TEST_BUILD
+    uint32_t burst_start = millis();
+    while (millis() - burst_start < GEA2_BURST_DURATION_MS) {
+      this->run_gea2_iteration_();
+#ifdef USE_ESP32
+      esp_task_wdt_reset();
+#endif
+    }
+#else
     this->run_gea2_iteration_();
+#endif
   } else if (this->uart_ != nullptr) {
     this->run_gea3_iteration_();
   } else {

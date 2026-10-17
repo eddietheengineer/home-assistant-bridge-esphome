@@ -212,6 +212,11 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   uint32_t startup_delay_start_ms_{0};
 
+  // GEA2 burst duration: keeps the 6 ms interbyte timeout from firing during
+  // the TX→RX cycle (~4 ms at 19200 baud).  Well under the 50 ms
+  // WARN_IF_BLOCKING_OVER_CS threshold.
+  static constexpr uint32_t GEA2_BURST_DURATION_MS = 10;
+
   bool gea2_protocol_active_{false}; // fallback for manual device_id when autodiscovery is skipped
 
   // True once the appliance-side data path (subscription and/or polling
