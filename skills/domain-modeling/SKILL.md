@@ -37,7 +37,7 @@ When domain relationships are being discussed, stress-test them with specific sc
 
 ### Cross-reference with code
 
-When the user states how something works, check whether the code agrees. If you find a contradiction, surface it: "The code rejects writes while the host address is still `0xFF`, but you just said writes queue until discovery completes. Which is right?"
+When the user states how something works, check whether the code agrees. If you find a contradiction, surface it: "The write bridge drops writes when its host address is the broadcast sentinel, but you just said writes queue until discovery completes. Which is right?"
 
 ### Update the glossary inline
 
@@ -45,10 +45,10 @@ When a term is resolved, update `docs/GLOSSARY.md` right there. Don't batch thes
 
 ### Offer ADRs sparingly
 
-Only offer to create an ADR when all three are true:
+Only offer to create an ADR when any of these holds (per `docs/adr/README.md`):
 
 1. **Hard to reverse**: the cost of changing your mind later is meaningful
-2. **Surprising without context**: a future reader will wonder "why did they do it this way?"
-3. **The result of a real trade-off**: there were genuine alternatives and you picked one for specific reasons
+2. **Rejects a viable alternative**: there were genuine alternatives and you picked one for specific reasons — the rejected option and the reason must be recorded
+3. **Constrains future work**: an invariant other code must respect
 
-If any of the three is missing, skip the ADR. Use `docs/adr/TEMPLATE.md`.
+Do not offer one for obvious bug fixes, style choices, refactors with no behavioral change, or decisions the existing specs already cover. Use `docs/adr/TEMPLATE.md`.

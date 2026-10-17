@@ -11,7 +11,7 @@ Maintained by the `grill-with-docs` and `domain-modeling` skills: when a grillin
 - **Board address** — A 1-byte physical address of a board on the GEA bus, `0x00`–`0xFE`. `0xFF` is the broadcast address and can never be a physical board address.
 - **Primary board** — The appliance's main board. Its detected physical address is stored as `primary_board_address`. In the write path and the polling list, `0xFF` is used as a sentinel meaning "the primary board" (it can never collide with a physical address).
 - **Secondary board** — Any board other than the primary. Its ERDs get the `0x{addr}_` topic prefix.
-- **Host address** — The appliance's board address, resolved during discovery. Until it is resolved (still `0xFF`), the write bridge rejects all writes.
+- **Host address** — The appliance's board address, resolved during discovery. Defaults to `0` until autodiscovery completes; the write bridge defensively rejects writes when its host address is the broadcast address `0xFF` (which can never be a physical address).
 - **Probe entry** — One item in the polling list. `board_address` of `0xFF` (`PROBE_ENTRY_DEFAULT_ADDRESS`) means "use the host address".
 - **Matched pair / paired ERD** — A request/status ERD pair (e.g. request `0x7708` and its status ERD). The `paired_erd` override links them manually when auto-detection fails.
 - **RMW (read-modify-write)** — The write strategy for matched-pair request ERDs: read the record, modify the target field, write the whole record back.
@@ -45,7 +45,7 @@ Maintained by the `grill-with-docs` and `domain-modeling` skills: when a grillin
 - **Subscription bridge** — Registers ERD subscriptions and routes appliance publications into the cache.
 - **Polling bridge** — Periodically reads the polling list; budgets MQTT work per loop tick.
 - **Write bridge** — Forwards MQTT write commands to the appliance; gated on host-address resolution; single-flight.
-- **Startup HSM** — The 8-phase startup state machine: autodiscovery → identity → feature bits → mode selection → bridge initialization.
+- **Startup HSM** — The 8-state startup state machine (representative phases: autodiscovery → identity → feature bits → mode selection → bridge initialization).
 - **IBridgeServices** — The abstract C++ interface decoupling the startup HSM from the concrete `GeappliancesBridge`.
 - **Tick-counter time source** — GEA2's millisecond timer: a counter incremented once per real millisecond inside the GEA2 tight loop, catching up missed milliseconds via `msec_interrupt` events.
 

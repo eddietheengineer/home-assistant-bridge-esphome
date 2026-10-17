@@ -20,6 +20,7 @@ Run as each applies, per ticket:
 - `make pytest` — pipeline tests, when `scripts/ha_discovery/` changed
 - `python3 scripts/ha_discovery/run_pipeline.py` + `make check-generated` — when ERD definitions, overrides, or pipeline scripts changed; commit all generated files together
 - `esphome compile docs/test-compile.yaml` — when `components/geappliances_bridge/` changed (the test harness uses mocked ESP-IDF stubs and misses real-build header issues)
+- TLC model check over `formal/` — when a concurrency-core `docs/spec/` module changed (cache, publisher, write bridge, startup HSM); model and spec commit together (ADR-0003)
 
 Run single test files regularly while iterating; the full gauntlet once at the end of each ticket.
 
