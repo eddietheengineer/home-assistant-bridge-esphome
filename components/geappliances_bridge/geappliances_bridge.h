@@ -164,32 +164,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void run_gea2_iteration_();
   void run_gea3_iteration_();
   void run_timer_only_iteration_();
-  // Log a tight-loop overrun; lives in the .cpp so no ESP_LOG* in this header.
-  void log_tight_loop_overrun_(const char* protocol_name, uint32_t hard_cap_ms);
-  // Run a tight-loop for the given iteration function, bounded by a duration
-  // and a hard cap.  In test builds the loop is replaced with a single call.
-  template<typename IterFn>
-  void run_tight_loop_(IterFn iter_fn, uint32_t duration_ms,
-                        uint32_t hard_cap_ms, const char* protocol_name) {
-#ifndef UNIT_TEST_BUILD
-    uint32_t loop_start_ms = millis();
-    while (millis() - loop_start_ms < duration_ms) {
-      if (millis() - loop_start_ms >= hard_cap_ms) {
-        this->log_tight_loop_overrun_(protocol_name, hard_cap_ms);
-        break;
-      }
-#ifdef USE_ESP32
-      esp_task_wdt_reset();
-#endif
-      iter_fn();
-    }
-#else
-    (void)duration_ms;
-    (void)hard_cap_ms;
-    (void)protocol_name;
-    iter_fn();
-#endif
-  }
   void run_protocol_stack_();
   void log_poll_state_transitions_();
   void update_publisher_state_();
@@ -238,14 +212,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
 
   uint32_t startup_delay_start_ms_{0};
 
-  // GEA2 tight-loop duration: covers the full TX→RX cycle at 19200 baud
-  // (see doc/geappliances_bridge.md section 13 for detailed explanation)
-  static constexpr uint32_t GEA2_LOOP_DURATION_MS = 100;
-  // Cap on msec catchup iterations to prevent runaway loops
-  static constexpr uint32_t MSEC_CATCHUP_CAP = 1000;
-  static constexpr uint32_t GEA3_LOOP_DURATION_MS = 10;
-  static constexpr uint32_t GEA2_LOOP_HARD_CAP_MS = GEA2_LOOP_DURATION_MS * 2;
-  static constexpr uint32_t GEA3_LOOP_HARD_CAP_MS = GEA3_LOOP_DURATION_MS * 2;
   bool gea2_protocol_active_{false}; // fallback for manual device_id when autodiscovery is skipped
 
   // True once the appliance-side data path (subscription and/or polling
@@ -330,10 +296,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // timer) so the 1 ms interrupt never fires in the GEA3 single-pass path and
   // cannot starve the GEA3/polling-bridge timers in the shared timer_group_.
   tiny_event_t gea2_msec_interrupt_;
-  // GEA2 time tracking — moved from file-scope statics to class members
-  // so they reset on re-init (deep sleep wake, ESPHome reconfiguration).
-  tiny_time_source_ticks_t gea2_tick_count_{0};
-  uint32_t gea2_last_ms_{0};
 
   gea2_erd_client_adapter_t gea2_erd_client_adapter_;
 

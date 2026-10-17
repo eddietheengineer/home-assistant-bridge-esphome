@@ -95,35 +95,8 @@ static const tiny_gea2_erd_client_configuration_t gea2_client_configuration = {
   .request_retries = 1
 };
 
-// Tick-counter time source for the GEA2 interface's internal timer group.
-// The counter is incremented once per real millisecond inside the GEA2 tight
-// loop so that tiny_gea2_interface's internal timers advance by at most 1 ms
-// per event regardless of the ~50 ms ESPHome framework gap between loop() calls
-// (see doc/geappliances_bridge.md §13 for the full explanation).
-//
-// The tick count and last_ms are class members (gea2_tick_count_, gea2_last_ms_)
-// so they reset on re-init (deep sleep wake, ESPHome reconfiguration).
-struct gea2_tick_source_t {
-  i_tiny_time_source_t base;
-  GeappliancesBridge* bridge;
-};
-
-tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t* _self)
-{
-  auto* src = reinterpret_cast<gea2_tick_source_t*>(_self);
-  GeappliancesBridge* br = src->bridge;
-  if (br) {
-    return br->gea2_tick_count_;
-  }
-  return 0;
-}
-static const i_tiny_time_source_api_t kGea2TickApi = { gea2_tick_ticks };
-static gea2_tick_source_t s_gea2_tick_source = { .base = { &kGea2TickApi }, .bridge = nullptr };
 
 void GeappliancesBridge::setup() {
-  // Reset GEA2 state on re-init (deep sleep wake, ESPHome reconfiguration)
-  this->gea2_tick_count_ = 0;
-  this->gea2_last_ms_ = 0;
   ESP_LOGCONFIG(TAG, "Setting up GE Appliances Bridge...");
 
   tiny_timer_group_init(&this->timer_group_, esphome_time_source_init());
@@ -167,18 +140,18 @@ void GeappliancesBridge::setup() {
   if (this->gea2_uart_ != nullptr) {
     esphome_uart_adapter_init(&this->gea2_uart_adapter_, &this->timer_group_, this->gea2_uart_);
 
-    // Initialize the GEA2 msec-interrupt event that drives the GEA2 interface's
-    // internal timeout counters.  The event is published manually inside the
-    // GEA2 tight loop (see loop()) so it only fires when GEA2 is actually
-    // in use — keeping the shared timer_group_ free of a 1 ms periodic timer
-    // that would starve GEA3/polling-bridge timers when GEA3 is active.
+    // The GEA2 interface's internal timer group uses the ESPHome time source
+    // (real millis()) so its 6 ms interbyte / 8 ms ack timers track wall-clock
+    // time.  tiny_timer_group_run() computes the delta between calls, so the
+    // timers advance correctly even when loop() runs at ~50 ms intervals.
+    // The msec_interrupt event still drives signal_send_ready for packets
+    // queued in the background (see tiny_gea2_interface.c msec_interrupt_callback).
     tiny_event_init(&this->gea2_msec_interrupt_);
-    s_gea2_tick_source.bridge = this;
 
     tiny_gea2_interface_init(
       &this->gea2_interface_,
       &this->gea2_uart_adapter_.interface,
-      &s_gea2_tick_source.base,
+      esphome_time_source_init(),
       &this->gea2_msec_interrupt_.interface,
       this->client_address_,
       this->gea2_send_queue_buffer_,
@@ -357,21 +330,12 @@ void GeappliancesBridge::update_publisher_state_()
 
 void GeappliancesBridge::run_gea2_iteration_()
 {
-  if (this->gea2_last_ms_ == 0) {
-    this->gea2_last_ms_ = millis();
-  }
-  uint32_t now_ms = millis();
-  uint32_t catchup_count = 0;
-  while (this->gea2_last_ms_ < now_ms && catchup_count < MSEC_CATCHUP_CAP) {
-    this->gea2_tick_count_++;
-    tiny_event_publish(&this->gea2_msec_interrupt_, nullptr);
-    this->gea2_last_ms_++;
-    catchup_count++;
-  }
+  // Service the shared timer group (drives the GEA2 UART adapter poll, which
+  // reads RX bytes and publishes send-complete) and the GEA2 interface FSM.
+  // The GEA2 interface's internal timer group uses real millis(), so its
+  // 6 ms interbyte / 8 ms ack timers track wall-clock time across the ~50 ms
+  // gap between loop() calls (tiny_timer_group_run computes the delta).
   tiny_timer_group_run(&this->timer_group_);
-  if (this->uart_ != nullptr) {
-    tiny_timer_group_run(&this->timer_group_);
-  }
   tiny_gea2_interface_run(&this->gea2_interface_);
 }
 
@@ -392,23 +356,14 @@ void GeappliancesBridge::run_timer_only_iteration_()
   }
 }
 
-void GeappliancesBridge::log_tight_loop_overrun_(const char* protocol_name, uint32_t hard_cap_ms)
-{
-#ifdef UNIT_TEST_BUILD
-  (void)protocol_name;
-  (void)hard_cap_ms;
-#else
-  ESP_LOGW("geappliances_bridge", "%s tight loop exceeded hard cap (%u ms), breaking",
-           protocol_name, static_cast<unsigned>(hard_cap_ms));
-#endif
-}
 
 void GeappliancesBridge::run_protocol_stack_()
 {
-  // When GEA2 is active (or during GEA2 autodiscovery), run a 100 ms
-  // wall-clock busy loop (with a 200 ms hard cap) so the full TX->RX cycle
-  // at 19200 baud completes within a single loop() call.
-  bool need_gea2_loop = this->gea2_uart_ != nullptr && (
+  // When GEA2 is active (or during GEA2 autodiscovery), run the GEA2
+  // iteration once per loop() call.  The GEA2 interface's internal timers
+  // use real millis(), so the 6 ms interbyte / 8 ms ack timeouts track
+  // wall-clock time across the ~50 ms gap between loop() calls.
+  bool need_gea2 = this->gea2_uart_ != nullptr && (
     this->autodiscovery_manager_.is_gea2_protocol() ||
     this->gea2_protocol_active_ ||
     this->autodiscovery_manager_.get_state() == AUTODISCOVERY_GEA2_BROADCAST_PENDING ||
@@ -419,27 +374,17 @@ void GeappliancesBridge::run_protocol_stack_()
   // so tiny_timer_group_run() fires both poll callbacks on every call.  By
   // disabling the inactive adapter, its poll() returns early without reading
   // bytes or publishing events to an interface that isn't being driven.
-  uint32_t protocol_stack_start = esphome::millis();
   if (this->gea2_uart_ != nullptr && this->uart_ != nullptr) {
-    esphome_uart_adapter_set_enabled(&this->uart_adapter_, !need_gea2_loop);
-    esphome_uart_adapter_set_enabled(&this->gea2_uart_adapter_, need_gea2_loop);
+    esphome_uart_adapter_set_enabled(&this->uart_adapter_, !need_gea2);
+    esphome_uart_adapter_set_enabled(&this->gea2_uart_adapter_, need_gea2);
   }
 
-  if (need_gea2_loop) {
-    this->run_tight_loop_([this]() { this->run_gea2_iteration_(); },
-                           GEA2_LOOP_DURATION_MS, GEA2_LOOP_HARD_CAP_MS, "GEA2");
+  if (need_gea2) {
+    this->run_gea2_iteration_();
   } else if (this->uart_ != nullptr) {
-    this->run_tight_loop_([this]() { this->run_gea3_iteration_(); },
-                           GEA3_LOOP_DURATION_MS, GEA3_LOOP_HARD_CAP_MS, "GEA3");
+    this->run_gea3_iteration_();
   } else {
     this->run_timer_only_iteration_();
-  }
-  uint32_t loop_elapsed = esphome::millis() - protocol_stack_start;
-  if (loop_elapsed >= 1000) {
-    ESP_LOGW(TAG, "Long run_protocol_stack: %lums (mode=%s, polling=%s)",
-             (unsigned long)loop_elapsed,
-             this->mode_ == BRIDGE_MODE_SUBSCRIBE ? "sub" : (this->mode_ == BRIDGE_MODE_AUTO ? "auto" : "poll"),
-             this->erd_bridge_initialized_ ? "yes" : "no");
   }
 }
 
@@ -578,10 +523,6 @@ float GeappliancesBridge::get_setup_priority() const {
 }
 
 bool GeappliancesBridge::teardown() {
-  // Reset GEA2 globals so re-init starts fresh
-  s_gea2_tick_source.bridge = nullptr;
-  this->gea2_tick_count_ = 0;
-  this->gea2_last_ms_ = 0;
   // Clear the seen ERDs set for symmetry with erd_set_init() in setup().
   erd_set_clear(&this->custom_erd_subscription_seen_erds_);
   // Reset the feature bit failure log flag for correct behavior after re-init.
