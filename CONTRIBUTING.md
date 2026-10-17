@@ -49,6 +49,37 @@ See [Development Guide](./docs/guides/development.md) for the full workflow incl
 - **Python**: PEP 8.
 - **No trailing whitespace.** No lines > 120 characters in prose.
 
+### ESPHome Developer-Doc Compliance
+
+The external component in `components/geappliances_bridge/` follows the
+ESPHome developer documentation requirements, verified against
+`script/ci-custom.py` rules. Intentional deviations (documented, not
+oversights):
+
+- **`GEA_TAG` macro** instead of `ESPHOME_LOG_TAG` — the latter does not
+  exist in the supported ESPHome version (2026.6.2); `GEA_TAG` expands to
+  the same `static const char* const` form.
+- **`#ifndef` include guards** instead of `#pragma once` in data-path
+  headers — C-style convention shared with the `lib/tiny*` protocol
+  libraries.
+- **C-style `typedef struct` / `extern "C"`** in data-path files — kept for
+  compatibility with the C protocol libraries; C++-only files use `using`.
+- **`AUTO_LOAD = ["sensor", "button"]`** in `__init__.py` — required because
+  diagnostic entities are published as sensor/button platforms.
+- **GEA2 tight loop (100 ms, 200 ms hard cap)** in `run_protocol_stack_()` —
+  exceeds the 50 ms `WARN_IF_BLOCKING_OVER_CS` threshold; the loop feeds
+  `esp_task_wdt_reset()` each iteration, so the task watchdog stays
+  satisfied.
+- **~44 KB heap allocation** in `ha_discovery_manager_start()` — discovery
+  buffers are allocated once at startup, freed in the same run, and the
+  device reboots immediately after discovery completes.
+- **`HA_CLEANUP_TOPIC_BUF_SIZE` conditional `#define`** — the test build
+  overrides the size via `-DHA_CLEANUP_TEST_BUF_SIZE=512`; a `constexpr`
+  cannot be overridden from the command line.
+- **Vendored `miniz*`** — third-party, untouched.
+- **`ble master` / `bluetooth master`** strings in `FILTER_KEYWORDS` —
+  appliance-protocol data, not code identifiers.
+
 ## Documentation
 
 All documentation lives in `docs/`. The [style guide](./docs/style-guide.md) defines formatting conventions and the spec template.

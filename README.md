@@ -203,7 +203,7 @@ Navigate to Settings -> Devices & Services -> Devices, and then search for your 
 | [YAML Reference](./docs/reference/yaml-config.md) | All configuration options |
 | [MQTT Topics](./docs/reference/mqtt-topics.md) | Topic schema and payloads |
 | [Architecture](./docs/architecture/overview.md) | System design and data flow |
-| [Contributing](./CONTRIBUTING.md) | Development workflow |
+| [Contributing](./CONTRIBUTING.md) | Development workflow and ESPHome compliance notes |
 
 ---
 
