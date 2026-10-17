@@ -64,7 +64,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `should_route_to_feature_bits_(erd)` | Decide whether an ERD read goes to FeatureBitManager or DeviceIdentityManager |
 | `initialize_mqtt_client_()` | Create and configure the MQTT client adapter |
 | `initialize_erd_bridge_()` | Initialize subscription or polling bridge based on mode |
-| `run_protocol_stack_()` | Drive GEA2/GEA3 hardware (includes GEA2 tight loop) |
+| `run_protocol_stack_()` | Drive GEA2/GEA3 hardware (one iteration per loop() call) |
 | `start_feature_bit_reading_()` | Start the feature bit read sequence |
 | `handle_subscription_failed()` | Handle subscription bridge failure; trigger polling fallback in AUTO mode |
 | `handle_polling_failed()` | Handle polling bridge failure; clean up or recover |
@@ -101,14 +101,11 @@ During `startup_state_bridge_init`, `initialize_erd_bridge_()` runs:
 
 ---
 
-## 6. GEA2 Tight Loop
+## 6. GEA2 Protocol Tick
 
-When GEA2 is active, `run_protocol_stack_()` executes a 100 ms wall-clock busy loop to ensure the full TX→RX cycle at 19200 baud completes within a single `loop()` call. A manual millisecond counter (`gea2_msec_interrupt_`) drives the GEA2 interface's internal timers without starving the shared `timer_group_`.
+When GEA2 is active, `run_protocol_stack_()` calls `run_gea2_iteration_()` once per `loop()` call. The GEA2 interface's internal timer group uses the ESPHome time source (real `millis()`), so its 6 ms interbyte and 8 ms ack timers track wall-clock time across the ~50 ms gap between `loop()` calls. `tiny_timer_group_run()` computes the delta between calls, so timers advance correctly without a tight loop.
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `GEA2_LOOP_DURATION_MS` | 100 ms | Wall-clock duration for GEA2 tight loop |
-| `GEA3_LOOP_DURATION_MS` | 10 ms | Wall-clock duration for GEA3 protocol tick |
+The `gea2_msec_interrupt_` event is no longer published manually; it remains wired to the GEA2 interface's `msec_interrupt_callback` which services the internal timer group and signals `signal_send_ready` for packets queued in the background.
 
 ---
 
@@ -177,8 +174,7 @@ Key member variables:
 1. **Single appliance:** The bridge operates with a single discovered appliance address. Multi-appliance support would require significant architectural changes.
 2. **Fixed capacity arrays:** All data structures use fixed-capacity arrays. If the appliance supports more ERDs than the cache can hold (200), updates are silently dropped.
 3. **No rollback:** The startup sequence is linear — once a phase completes, it does not re-run. If a phase fails, the bridge continues with fallback values.
-4. **GEA2 tight loop blocks the main loop:** During the 100 ms GEA2 tight loop, the ESPHome main loop is blocked. This is necessary for correct GEA2 half-duplex operation but limits the responsiveness of other ESPHome components during that window.
-5. **Startup HSM bridge access:** The startup HSM uses the `container_of` pattern via `services_from_hsm()` to recover the `IBridgeServices` pointer from the embedded `startup_hsm_wrapper_t`. This avoids a static global back-pointer and keeps the HSM self-contained.
+4. **Startup HSM bridge access:** The startup HSM uses the `container_of` pattern via `services_from_hsm()` to recover the `IBridgeServices` pointer from the embedded `startup_hsm_wrapper_t`. This avoids a static global back-pointer and keeps the HSM self-contained.
 
 ## 11. HA Discovery Integration
 
