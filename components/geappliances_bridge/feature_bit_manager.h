@@ -31,7 +31,7 @@ enum FeatureBitState {
 
 /* Maximum number of ERDs the feature bit manager can track.
  * This covers all possible ERDs from common + appliance feature descriptors. */
-#define FEATURE_BIT_MAX_ERDS 645
+constexpr uint16_t FEATURE_BIT_MAX_ERDS = 645;
 
 class FeatureBitManager {
  public:

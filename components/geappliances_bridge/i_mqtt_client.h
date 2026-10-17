@@ -27,7 +27,8 @@ typedef struct {
 } i_mqtt_client_t;
 
 typedef struct i_mqtt_client_api_t {
-  void (*update_erd_write_result)(i_mqtt_client_t* self, tiny_erd_t erd, uint8_t board_address, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason);
+  void (*update_erd_write_result)(i_mqtt_client_t* self, tiny_erd_t erd, uint8_t board_address, bool success,
+                                  tiny_gea3_erd_client_write_failure_reason_t failure_reason);
 
   i_tiny_event_t* (*on_write_request)(i_mqtt_client_t* self);
 
@@ -37,12 +38,16 @@ typedef struct i_mqtt_client_api_t {
 
   bool (*publish_raw)(i_mqtt_client_t* self, const char* topic, const char* payload, size_t payload_len, bool retain);
 
-  void (*subscribe)(i_mqtt_client_t* self, const char* topic, void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg), void* arg);
+  void (*subscribe)(i_mqtt_client_t* self, const char* topic,
+                    void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg),
+                    void* arg);
 
   void (*unsubscribe)(i_mqtt_client_t* self, const char* topic);
 } i_mqtt_client_api_t;
 
-static inline void mqtt_client_update_erd_write_result(i_mqtt_client_t* self, tiny_erd_t erd, uint8_t board_address, bool success, tiny_gea3_erd_client_write_failure_reason_t failure_reason)
+static inline void mqtt_client_update_erd_write_result(
+    i_mqtt_client_t* self, tiny_erd_t erd, uint8_t board_address, bool success,
+    tiny_gea3_erd_client_write_failure_reason_t failure_reason)
 {
   self->api->update_erd_write_result(self, erd, board_address, success, failure_reason);
 }
@@ -62,12 +67,15 @@ static inline i_tiny_event_t* mqtt_client_on_mqtt_connect(i_mqtt_client_t* self)
   return self->api->on_mqtt_connect(self);
 }
 
-static inline bool mqtt_client_publish_raw(i_mqtt_client_t* self, const char* topic, const char* payload, size_t payload_len, bool retain)
+static inline bool mqtt_client_publish_raw(i_mqtt_client_t* self, const char* topic, const char* payload,
+                                           size_t payload_len, bool retain)
 {
   return self->api->publish_raw(self, topic, payload, payload_len, retain);
 }
 
-static inline void mqtt_client_subscribe(i_mqtt_client_t* self, const char* topic, void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg), void* arg)
+static inline void mqtt_client_subscribe(
+    i_mqtt_client_t* self, const char* topic,
+    void (*callback)(const char* topic, const char* payload, size_t payload_len, void* arg), void* arg)
 {
   self->api->subscribe(self, topic, callback, arg);
 }

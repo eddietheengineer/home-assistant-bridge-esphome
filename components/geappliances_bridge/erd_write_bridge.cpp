@@ -43,7 +43,9 @@ static tiny_hsm_result_t state_ready(tiny_hsm_t* hsm, tiny_hsm_signal_t signal, 
       // Primary-board topics (board_address == 0xFF, the broadcast sentinel)
       // route to the detected host address; secondary-board topics route to
       // the parsed address.
-      uint8_t target_address = (args->board_address != tiny_gea_broadcast_address) ? args->board_address : self->erd_host_address;
+      uint8_t target_address = (args->board_address != tiny_gea_broadcast_address)
+                                   ? args->board_address
+                                   : self->erd_host_address;
 
       tiny_gea3_erd_client_request_id_t request_id;
       if(!tiny_gea3_erd_client_write(self->erd_client, &request_id, target_address,

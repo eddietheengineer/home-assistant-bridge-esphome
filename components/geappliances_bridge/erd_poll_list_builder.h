@@ -10,7 +10,7 @@
 namespace esphome {
 namespace geappliances_bridge {
 
-#define ERD_POLL_LIST_MAX_SIZE POLLING_LIST_MAX_SIZE
+constexpr uint16_t ERD_POLL_LIST_MAX_SIZE = POLLING_LIST_MAX_SIZE;
 
 struct ErdPollListConfig {
   BridgeMode mode;

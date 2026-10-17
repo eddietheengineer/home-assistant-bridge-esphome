@@ -15,6 +15,75 @@ extern "C" {
 #include <string>
 
 GEA_TAG(TAG) = "geappliances_bridge.mqtt";
+
+/* Hex parsing helpers replacing the scanf family ("%x"/"%2x" calls) — the
+ * scanf family is banned in ESPHome code (pulls ~9 KB of flash). Semantics
+ * match the previous parsing: an optional "0x" prefix is accepted, at least
+ * one hex digit is required, and parsing stops at the first non-hex char. */
+
+/* Parses an unsigned hex value from *cursor; advances *cursor past the
+ * consumed characters. Returns false when no hex digits are present. */
+static bool parse_hex_uint(const char** cursor, unsigned* out)
+{
+  const char* p = *cursor;
+  if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) {
+    p += 2;
+  }
+  unsigned value = 0;
+  bool any_digit = false;
+  while (true) {
+    char c = *p;
+    unsigned digit;
+    if (c >= '0' && c <= '9') {
+      digit = c - '0';
+    } else if (c >= 'a' && c <= 'f') {
+      digit = c - 'a' + 10;
+    } else if (c >= 'A' && c <= 'F') {
+      digit = c - 'A' + 10;
+    } else {
+      break;
+    }
+    value = value * 16 + digit;
+    any_digit = true;
+    p++;
+  }
+  if (!any_digit) return false;
+  *cursor = p;
+  *out = value;
+  return true;
+}
+
+/* Parses up to two hex digits (the previous "%2x" semantics); advances
+ * *cursor past the consumed characters. Returns false when no hex digits. */
+static bool parse_hex_byte(const char** cursor, unsigned* out)
+{
+  const char* p = *cursor;
+  if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) {
+    p += 2;
+  }
+  unsigned value = 0;
+  bool any_digit = false;
+  for (int i = 0; i < 2; i++) {
+    char c = p[i];
+    unsigned digit;
+    if (c >= '0' && c <= '9') {
+      digit = c - '0';
+    } else if (c >= 'a' && c <= 'f') {
+      digit = c - 'a' + 10;
+    } else if (c >= 'A' && c <= 'F') {
+      digit = c - 'A' + 10;
+    } else {
+      break;
+    }
+    value = value * 16 + digit;
+    any_digit = true;
+  }
+  if (!any_digit) return false;
+  *cursor = p;
+  *out = value;
+  return true;
+}
+
 static const char* write_failure_reason_to_string(tiny_gea3_erd_client_write_failure_reason_t reason)
 {
   switch (reason) {
@@ -166,11 +235,17 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
     const char* underscore = strchr(segment, '_');
     if (underscore != nullptr) {
       unsigned addr = 0;
-      if (sscanf(segment, "%x", &addr) != 1) return;
-      if (sscanf(underscore + 1, "%x", &erd) != 1) return;
+      const char* addr_cursor = segment;
+      if (!parse_hex_uint(&addr_cursor, &addr)) return;
+      if (addr_cursor != underscore) return;
+      const char* erd_cursor = underscore + 1;
+      if (!parse_hex_uint(&erd_cursor, &erd)) return;
+      if (*erd_cursor != '\0') return;
       board_address = static_cast<uint8_t>(addr);
     } else {
-      if (sscanf(segment, "%x", &erd) != 1) return;
+      const char* erd_cursor = segment;
+      if (!parse_hex_uint(&erd_cursor, &erd)) return;
+      if (*erd_cursor != '\0') return;
     }
 
     // Decode hex payload to a local stack buffer to avoid race condition:
@@ -180,7 +255,8 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
     size_t decoded = 0;
     for (size_t i = 0; i + 1 < payload.size() && decoded < sizeof(local_buffer); i += 2) {
       unsigned byte = 0;
-      if (sscanf(&payload[i], "%2x", &byte) == 1) {
+      const char* byte_cursor = &payload[i];
+      if (parse_hex_byte(&byte_cursor, &byte)) {
         local_buffer[decoded++] = static_cast<uint8_t>(byte);
       } else {
         break;

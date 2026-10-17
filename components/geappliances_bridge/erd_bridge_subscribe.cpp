@@ -132,7 +132,8 @@ static void arm_quiet_timer(erd_bridge_subscribe_t* self, tiny_timer_ticks_t tic
   tiny_timer_stop(self->timer_group, &self->quiet_timer);
   tiny_timer_start(
     self->timer_group, &self->quiet_timer, ticks, self, +[](void* context) {
-      tiny_hsm_send_signal(&reinterpret_cast<erd_bridge_subscribe_t*>(context)->hsm, signal_quiet_period_expired, nullptr);
+      tiny_hsm_send_signal(&reinterpret_cast<erd_bridge_subscribe_t*>(context)->hsm,
+                           signal_quiet_period_expired, nullptr);
     });
 }
 

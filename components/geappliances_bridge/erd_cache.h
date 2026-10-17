@@ -27,9 +27,12 @@
   #include "freertos/semphr.h"
 #endif
 
-#define ERD_CACHE_CAPACITY 300
-#define ERD_CACHE_MAX_DATA_SIZE 248    /* GEA3 max payload: 255 - 7 byte overhead */
-#define ERD_CACHE_ARENA_SIZE 4096      /* Static arena for all ERD data */
+// ESPHome style: constexpr over #define for constants. This header is only
+// included from C++ translation units (the Makefile and ESPHome both compile
+// the component sources as C++), so constexpr is safe here.
+constexpr uint16_t ERD_CACHE_CAPACITY = 300;
+constexpr uint16_t ERD_CACHE_MAX_DATA_SIZE = 248;  // GEA3 max payload: 255 - 7 byte overhead
+constexpr uint16_t ERD_CACHE_ARENA_SIZE = 4096;    // Static arena for all ERD data
 
 typedef struct {
   tiny_erd_t erd;

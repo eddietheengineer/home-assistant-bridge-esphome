@@ -392,6 +392,17 @@ void GeappliancesBridge::run_timer_only_iteration_()
   }
 }
 
+void GeappliancesBridge::log_tight_loop_overrun_(const char* protocol_name, uint32_t hard_cap_ms)
+{
+#ifdef UNIT_TEST_BUILD
+  (void)protocol_name;
+  (void)hard_cap_ms;
+#else
+  ESP_LOGW("geappliances_bridge", "%s tight loop exceeded hard cap (%u ms), breaking",
+           protocol_name, static_cast<unsigned>(hard_cap_ms));
+#endif
+}
+
 void GeappliancesBridge::run_protocol_stack_()
 {
   // When GEA2 is active (or during GEA2 autodiscovery), run a 100 ms
@@ -426,7 +437,8 @@ void GeappliancesBridge::run_protocol_stack_()
   uint32_t loop_elapsed = esphome::millis() - protocol_stack_start;
   if (loop_elapsed >= 1000) {
     ESP_LOGW(TAG, "Long run_protocol_stack: %lums (mode=%s, polling=%s)",
-             (unsigned long)loop_elapsed, this->mode_ == BRIDGE_MODE_SUBSCRIBE ? "sub" : (this->mode_ == BRIDGE_MODE_AUTO ? "auto" : "poll"),
+             (unsigned long)loop_elapsed,
+             this->mode_ == BRIDGE_MODE_SUBSCRIBE ? "sub" : (this->mode_ == BRIDGE_MODE_AUTO ? "auto" : "poll"),
              this->erd_bridge_initialized_ ? "yes" : "no");
   }
 }
@@ -646,32 +658,32 @@ void GeappliancesBridge::run_autodiscovery()
 
 bool GeappliancesBridge::is_autodiscovery_complete() const
 {
-  return autodiscovery_manager_.get_state() == AUTODISCOVERY_COMPLETE;
+  return this->autodiscovery_manager_.get_state() == AUTODISCOVERY_COMPLETE;
 }
 
 uint8_t GeappliancesBridge::get_discovered_host_address() const
 {
-  return autodiscovery_manager_.get_host_address();
+  return this->autodiscovery_manager_.get_host_address();
 }
 
 bool GeappliancesBridge::is_discovered_gea2_protocol() const
 {
-  return autodiscovery_manager_.is_gea2_protocol();
+  return this->autodiscovery_manager_.is_gea2_protocol();
 }
 
 void GeappliancesBridge::init_device_id_reading()
 {
-  if (device_identity_manager_.get_state() != DEVICE_ID_STATE_COMPLETE) {
-    device_identity_manager_.init(
+  if (this->device_identity_manager_.get_state() != DEVICE_ID_STATE_COMPLETE) {
+    this->device_identity_manager_.init(
         configured_device_id_,
-        autodiscovery_manager_.get_active_erd_client(),
-        autodiscovery_manager_.get_host_address());
+        this->autodiscovery_manager_.get_active_erd_client(),
+        this->autodiscovery_manager_.get_host_address());
   }
 }
 
 bool GeappliancesBridge::is_device_id_complete() const
 {
-  return device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE;
+  return this->device_identity_manager_.get_state() == DEVICE_ID_STATE_COMPLETE;
 }
 
 bool GeappliancesBridge::is_mqtt_client_initialized() const
@@ -691,7 +703,7 @@ void GeappliancesBridge::start_feature_bit_reading()
 
 bool GeappliancesBridge::is_feature_bits_complete() const
 {
-  FeatureBitState state = feature_bit_manager_.get_state();
+  FeatureBitState state = this->feature_bit_manager_.get_state();
   if (state == FEATURE_BIT_STATE_FAILED && !feature_bit_failure_logged_) {
     feature_bit_failure_logged_ = true;
     ESP_LOGW(TAG, "Feature bit parsing failed; falling back to full polling mode");
@@ -762,7 +774,7 @@ bool GeappliancesBridge::check_steady_state()
 }
 bool GeappliancesBridge::is_erd_cache_publisher_initialized() const
 {
-  return erd_cache_publisher_.cache != nullptr;
+  return this->erd_cache_publisher_.cache != nullptr;
 }
 
 void GeappliancesBridge::init_erd_cache_publisher_()

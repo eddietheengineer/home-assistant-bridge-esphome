@@ -133,7 +133,8 @@ static void send_next_poll_read_request(erd_bridge_poll_t* self)
     uint8_t addr = self->erd_polling_addresses[self->erd_index];
     if (addr == PROBE_ENTRY_DEFAULT_ADDRESS) addr = self->erd_host_address;
     uint32_t t0 = esphome::millis();
-    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, addr, self->erd_polling_list[self->erd_index]);
+    bool queued = tiny_gea3_erd_client_read(self->erd_client, &self->request_id, addr,
+                                            self->erd_polling_list[self->erd_index]);
     uint32_t elapsed = esphome::millis() - t0;
     self->erd_index++;
     if (!queued) {

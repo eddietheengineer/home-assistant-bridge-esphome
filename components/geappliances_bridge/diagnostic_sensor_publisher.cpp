@@ -71,7 +71,9 @@ void DiagnosticSensorPublisher::loop() {
       &this->last_mqtt_disconnect_stats_publish_,
       ERD_PUBLISH_RATE_INTERVAL_MS,
       [this]() -> uint32_t { return erd_cache_mqtt_publisher_get_disconnect_count(this->erd_cache_publisher_); },
-      [this]() -> uint32_t { return erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(this->erd_cache_publisher_); });
+      [this]() -> uint32_t {
+        return erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(this->erd_cache_publisher_);
+      });
 }
 
 }  // namespace geappliances_bridge

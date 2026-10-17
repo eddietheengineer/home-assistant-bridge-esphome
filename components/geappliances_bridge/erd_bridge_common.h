@@ -23,7 +23,7 @@ enum {
   appliance_lost_timeout = 60000
 };
 
-#define PROBE_ENTRY_DEFAULT_ADDRESS 0xFF
+constexpr uint8_t PROBE_ENTRY_DEFAULT_ADDRESS = 0xFF;
 
 typedef struct {
   tiny_erd_t erd;
@@ -74,7 +74,7 @@ enum {
 // O(n) inserts (n is small: bounded by probe list or subscription ERDs).
 // ============================================================================
 
-#define ERD_SET_CAPACITY POLLING_LIST_MAX_SIZE
+constexpr uint16_t ERD_SET_CAPACITY = POLLING_LIST_MAX_SIZE;
 
 typedef struct {
   tiny_erd_t data[ERD_SET_CAPACITY];

@@ -180,9 +180,15 @@ static void build_device_json(ha_discovery_manager_t* self)
 
     for (const char* p = self->device_id; *p && pos < (int)sizeof(self->device_json_buf) - 8; p++) {
         unsigned char c = (unsigned char)*p;
-        if (c == '"') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\"");
-        else if (c == '\\') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\\");
-        else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F)) pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\u%04x", c);
+        if (c == '"')
+          pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+                          "\\\"");
+        else if (c == '\\')
+          pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+                          "\\\\");
+        else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F))
+          pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+                          "\\u%04x", c);
         else { self->device_json_buf[pos++] = (char)c; }
     }
     if (pos < (int)sizeof(self->device_json_buf) - 64) {
@@ -192,9 +198,15 @@ static void build_device_json(ha_discovery_manager_t* self)
 
     for (const char* p = self->device_id; *p && pos < (int)sizeof(self->device_json_buf) - 8; p++) {
         unsigned char c = (unsigned char)*p;
-        if (c == '"') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\"");
-        else if (c == '\\') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\\");
-        else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F)) pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\u%04x", c);
+        if (c == '"')
+          pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+                          "\\\"");
+        else if (c == '\\')
+          pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+                          "\\\\");
+        else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F))
+          pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+                          "\\u%04x", c);
         else { self->device_json_buf[pos++] = (char)c; }
     }
 
@@ -207,21 +219,34 @@ static void build_device_json(ha_discovery_manager_t* self)
         pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, ",\"model\":\"");
         for (const char* p = self->model_number; *p && pos < (int)sizeof(self->device_json_buf) - 8; p++) {
             unsigned char c = (unsigned char)*p;
-            if (c == '"') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\"");
-            else if (c == '\\') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\\");
-            else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F)) pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\u%04x", c);
+            if (c == '"')
+              pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+                              "\\\"");
+            else if (c == '\\')
+              pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+                              "\\\\");
+            else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F))
+          pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+                          "\\u%04x", c);
             else { self->device_json_buf[pos++] = (char)c; }
         }
         if (pos < (int)sizeof(self->device_json_buf) - 2) self->device_json_buf[pos++] = '"';
     }
 
     if (self->serial_number && self->serial_number[0] && pos < (int)sizeof(self->device_json_buf) - 128) {
-        pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, ",\"serial_number\":\"");
+        pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+                        ",\"serial_number\":\"");
         for (const char* p = self->serial_number; *p && pos < (int)sizeof(self->device_json_buf) - 8; p++) {
             unsigned char c = (unsigned char)*p;
-            if (c == '"') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\"");
-            else if (c == '\\') pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\\\");
-            else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F)) pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos, "\\u%04x", c);
+            if (c == '"')
+              pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+                              "\\\"");
+            else if (c == '\\')
+              pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+                              "\\\\");
+            else if (c < 0x20 || c == 0x7F || (c >= 0x80 && c <= 0x9F))
+          pos += snprintf(self->device_json_buf + pos, sizeof(self->device_json_buf) - (size_t)pos,
+                          "\\u%04x", c);
             else { self->device_json_buf[pos++] = (char)c; }
         }
         if (pos < (int)sizeof(self->device_json_buf) - 2) self->device_json_buf[pos++] = '"';
@@ -425,24 +450,42 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
     self->max_buf[0] = '\0';
     self->step_buf[0] = '\0';
 
-    if (json_get_str(line, "fi", &val, &len)) json_unescape(val, len, self->field_id_buf, sizeof(self->field_id_buf));
-    if (json_get_str(line, "a", &val, &len)) json_unescape(val, len, self->board_address_buf, sizeof(self->board_address_buf));
-    if (json_get_str(line, "p", &val, &len)) json_unescape(val, len, self->paired_erd_buf, sizeof(self->paired_erd_buf));
-    if (json_get_str(line, "r", &val, &len)) json_unescape(val, len, self->role_buf, sizeof(self->role_buf));
-    if (json_get_str(line, "u", &val, &len)) json_unescape(val, len, self->unit_buf, sizeof(self->unit_buf));
-    if (json_get_str(line, "dc", &val, &len)) json_unescape(val, len, self->device_class_buf, sizeof(self->device_class_buf));
-    if (json_get_str(line, "sc", &val, &len)) json_unescape(val, len, self->state_class_buf, sizeof(self->state_class_buf));
-    if (json_get_str(line, "o", &val, &len)) json_unescape(val, len, self->options_buf, sizeof(self->options_buf));
-    if (json_get_str(line, "dt", &val, &len)) json_unescape(val, len, self->data_type_buf, sizeof(self->data_type_buf));
-    if (json_get_str(line, "sf", &val, &len)) json_unescape(val, len, self->scale_factor_buf, sizeof(self->scale_factor_buf));
-    if (json_get_str(line, "m", &val, &len)) json_unescape(val, len, self->mode_buf, sizeof(self->mode_buf));
-    if (json_get_str(line, "pon", &val, &len)) json_unescape(val, len, self->payload_on_buf, sizeof(self->payload_on_buf));
-    if (json_get_str(line, "poff", &val, &len)) json_unescape(val, len, self->payload_off_buf, sizeof(self->payload_off_buf));
-    if (json_get_str(line, "son", &val, &len)) json_unescape(val, len, self->state_on_buf, sizeof(self->state_on_buf));
-    if (json_get_str(line, "soff", &val, &len)) json_unescape(val, len, self->state_off_buf, sizeof(self->state_off_buf));
-    if (json_get_str(line, "mn", &val, &len)) json_unescape(val, len, self->min_buf, sizeof(self->min_buf));
-    if (json_get_str(line, "mx", &val, &len)) json_unescape(val, len, self->max_buf, sizeof(self->max_buf));
-    if (json_get_str(line, "st", &val, &len)) json_unescape(val, len, self->step_buf, sizeof(self->step_buf));
+    if (json_get_str(line, "fi", &val, &len))
+      json_unescape(val, len, self->field_id_buf, sizeof(self->field_id_buf));
+    if (json_get_str(line, "a", &val, &len))
+      json_unescape(val, len, self->board_address_buf, sizeof(self->board_address_buf));
+    if (json_get_str(line, "p", &val, &len))
+      json_unescape(val, len, self->paired_erd_buf, sizeof(self->paired_erd_buf));
+    if (json_get_str(line, "r", &val, &len))
+      json_unescape(val, len, self->role_buf, sizeof(self->role_buf));
+    if (json_get_str(line, "u", &val, &len))
+      json_unescape(val, len, self->unit_buf, sizeof(self->unit_buf));
+    if (json_get_str(line, "dc", &val, &len))
+      json_unescape(val, len, self->device_class_buf, sizeof(self->device_class_buf));
+    if (json_get_str(line, "sc", &val, &len))
+      json_unescape(val, len, self->state_class_buf, sizeof(self->state_class_buf));
+    if (json_get_str(line, "o", &val, &len))
+      json_unescape(val, len, self->options_buf, sizeof(self->options_buf));
+    if (json_get_str(line, "dt", &val, &len))
+      json_unescape(val, len, self->data_type_buf, sizeof(self->data_type_buf));
+    if (json_get_str(line, "sf", &val, &len))
+      json_unescape(val, len, self->scale_factor_buf, sizeof(self->scale_factor_buf));
+    if (json_get_str(line, "m", &val, &len))
+      json_unescape(val, len, self->mode_buf, sizeof(self->mode_buf));
+    if (json_get_str(line, "pon", &val, &len))
+      json_unescape(val, len, self->payload_on_buf, sizeof(self->payload_on_buf));
+    if (json_get_str(line, "poff", &val, &len))
+      json_unescape(val, len, self->payload_off_buf, sizeof(self->payload_off_buf));
+    if (json_get_str(line, "son", &val, &len))
+      json_unescape(val, len, self->state_on_buf, sizeof(self->state_on_buf));
+    if (json_get_str(line, "soff", &val, &len))
+      json_unescape(val, len, self->state_off_buf, sizeof(self->state_off_buf));
+    if (json_get_str(line, "mn", &val, &len))
+      json_unescape(val, len, self->min_buf, sizeof(self->min_buf));
+    if (json_get_str(line, "mx", &val, &len))
+      json_unescape(val, len, self->max_buf, sizeof(self->max_buf));
+    if (json_get_str(line, "st", &val, &len))
+      json_unescape(val, len, self->step_buf, sizeof(self->step_buf));
 
     /* Board addresses are emitted as two hexadecimal digits by the custom
      * profile generator. Reject malformed optional data before it reaches a
@@ -475,7 +518,8 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
         snprintf(self->unique_id_buf, sizeof(self->unique_id_buf), "%s_erd_%s_address_%s_%s",
                  self->device_id, erd_id_hex, self->board_address_buf, self->field_id_buf);
     } else if (self->field_id_buf[0]) {
-        snprintf(self->unique_id_buf, sizeof(self->unique_id_buf), "%s_erd_%s_%s", self->device_id, erd_id_hex, self->field_id_buf);
+        snprintf(self->unique_id_buf, sizeof(self->unique_id_buf), "%s_erd_%s_%s",
+                 self->device_id, erd_id_hex, self->field_id_buf);
     } else if (self->board_address_buf[0]) {
         snprintf(self->unique_id_buf, sizeof(self->unique_id_buf), "%s_erd_%s_address_%s",
                  self->device_id, erd_id_hex, self->board_address_buf);
@@ -602,7 +646,9 @@ static bool process_jsonl_line(ha_discovery_manager_t* self, const char* line)
         }
 
         if (json_get_str(line, "ct", &val, &len)) {
-            n = snprintf(payload + pos, space, "\"command_topic\":\"%s\",\"command_template\":\"", self->actual_command_topic_buf);
+            n = snprintf(payload + pos, space,
+                      "\"command_topic\":\"%s\",\"command_template\":\"",
+                      self->actual_command_topic_buf);
             if (n < 0 || n >= space) goto too_large;
             pos += n; space -= n;
             int reescaped = json_embed_value(val, len, payload + pos, space);

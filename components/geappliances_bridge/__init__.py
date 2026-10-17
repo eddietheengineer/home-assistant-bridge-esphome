@@ -16,6 +16,7 @@ from esphome.core import CORE, EnumValue, ID
 _LOGGER = logging.getLogger(__name__)
 
 CODEOWNERS = ["@joshualongenecker"]
+DOMAIN = "geappliances_bridge"
 DEPENDENCIES = ["uart", "mqtt"]
 AUTO_LOAD = ["sensor", "button"]
 

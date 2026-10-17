@@ -31,10 +31,10 @@ typedef enum {
   ha_cleanup_state_done,
 } ha_cleanup_state_t;
 
-#define HA_CLEANUP_IDLE_TIMEOUT_MS 1000
-#define HA_CLEANUP_MIN_SUBSCRIBE_MS 1000
-#define HA_CLEANUP_DRAIN_WAIT_MS 1000
-#define HA_CLEANUP_FLUSH_BATCH 1
+constexpr uint32_t HA_CLEANUP_IDLE_TIMEOUT_MS = 1000;
+constexpr uint32_t HA_CLEANUP_MIN_SUBSCRIBE_MS = 1000;
+constexpr uint32_t HA_CLEANUP_DRAIN_WAIT_MS = 1000;
+constexpr uint16_t HA_CLEANUP_FLUSH_BATCH = 1;
 
 /* Overridable for tests. */
 

@@ -45,21 +45,21 @@ typedef enum {
 } ha_discovery_state_t;
 
 /* Uses POLLING_LIST_MAX_SIZE from erd_lists.h as the single source of truth. */
-#define HA_DISCOVERY_MAX_ERDS POLLING_LIST_MAX_SIZE
+constexpr uint16_t HA_DISCOVERY_MAX_ERDS = POLLING_LIST_MAX_SIZE;
 
 /* Must be >= max decompressed chunk size (range category has 17770 bytes). */
-#define HA_DISCOVERY_DECOMP_BUF_SIZE 18432
+constexpr uint16_t HA_DISCOVERY_DECOMP_BUF_SIZE = 18432;
 
 /* Matches the decomp buffer size. */
-#define HA_DISCOVERY_LINE_BUF_SIZE 18432
+constexpr uint16_t HA_DISCOVERY_LINE_BUF_SIZE = 18432;
 
 /* Topic buffer size for HA discovery topics (must fit worst-case topic + null). */
-#define HA_DISCOVERY_TOPIC_BUF_SIZE 192
-#define HA_DISCOVERY_FIELD_ID_BUF_SIZE 72
-#define HA_DISCOVERY_UNIQUE_ID_BUF_SIZE 160
-#define HA_DISCOVERY_PAYLOAD_BUF_SIZE 8192
-#define HA_DISCOVERY_AVAILABILITY_TOPIC_BUF_SIZE 128
-#define HA_DISCOVERY_AVAILABILITY_PAYLOAD_BUF_SIZE 32
+constexpr uint16_t HA_DISCOVERY_TOPIC_BUF_SIZE = 192;
+constexpr uint16_t HA_DISCOVERY_FIELD_ID_BUF_SIZE = 72;
+constexpr uint16_t HA_DISCOVERY_UNIQUE_ID_BUF_SIZE = 160;
+constexpr uint16_t HA_DISCOVERY_PAYLOAD_BUF_SIZE = 8192;
+constexpr uint16_t HA_DISCOVERY_AVAILABILITY_TOPIC_BUF_SIZE = 128;
+constexpr uint16_t HA_DISCOVERY_AVAILABILITY_PAYLOAD_BUF_SIZE = 32;
 
 /*!
  * Peak memory: payload buffer (~8 KB) + decompress buffer (~18 KB) +

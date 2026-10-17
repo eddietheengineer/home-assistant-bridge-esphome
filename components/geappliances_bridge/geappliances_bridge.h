@@ -79,20 +79,44 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void set_gea2_uart(uart::UARTComponent *uart) { this->gea2_uart_ = uart; }
   void set_client_address(uint8_t address) { this->client_address_ = address; }
   void set_board_address(uint8_t address) { this->board_address_ = address; this->board_address_configured_ = true; }
-  void set_device_id(const std::string &device_id) { strncpy(this->configured_device_id_, device_id.c_str(), sizeof(this->configured_device_id_) - 1); this->configured_device_id_[sizeof(this->configured_device_id_) - 1] = '\0'; }
+  void set_device_id(const std::string &device_id) {
+    strncpy(this->configured_device_id_, device_id.c_str(), sizeof(this->configured_device_id_) - 1);
+    this->configured_device_id_[sizeof(this->configured_device_id_) - 1] = '\0';
+  }
   void set_mode(uint8_t mode) { this->mode_ = static_cast<BridgeMode>(mode); }
   void set_polling_interval(uint32_t polling_interval) { this->polling_interval_ms_ = polling_interval; }
   void set_appliance_api_parsing(bool appliance_api_parsing) { this->appliance_api_parsing_ = appliance_api_parsing; }
-  void set_generate_device_config(bool generate_device_config) { this->generate_device_config_ = generate_device_config; }
+  void set_generate_device_config(bool generate_device_config) {
+    this->generate_device_config_ = generate_device_config;
+  }
   void set_filter_config_topics(bool filter_config_topics) { this->filter_config_topics_ = filter_config_topics; }
-  void set_erd_publish_rate_sensor(sensor::Sensor* sensor) { this->erd_publish_rate_sensor_ = sensor; this->diagnostic_sensor_publisher_.set_erd_publish_rate_sensor(sensor); }
-  void set_erd_cache_entries_sensor(sensor::Sensor* sensor) { this->erd_cache_entries_sensor_ = sensor; this->diagnostic_sensor_publisher_.set_erd_cache_entries_sensor(sensor); }
-  void set_erd_cache_updates_sensor(sensor::Sensor* sensor) { this->erd_cache_updates_sensor_ = sensor; this->diagnostic_sensor_publisher_.set_erd_cache_updates_sensor(sensor); }
-  void set_mqtt_publish_rate_sensor(sensor::Sensor* sensor) { this->mqtt_publish_rate_sensor_ = sensor; this->diagnostic_sensor_publisher_.set_mqtt_publish_rate_sensor(sensor); }
-  void set_mqtt_disconnect_count_sensor(sensor::Sensor* sensor) { this->mqtt_disconnect_count_sensor_ = sensor; this->diagnostic_sensor_publisher_.set_mqtt_disconnect_count_sensor(sensor); }
-  void set_mqtt_disconnect_duration_sensor(sensor::Sensor* sensor) { this->mqtt_disconnect_duration_sensor_ = sensor; this->diagnostic_sensor_publisher_.set_mqtt_disconnect_duration_sensor(sensor); }
+  void set_erd_publish_rate_sensor(sensor::Sensor* sensor) {
+    this->erd_publish_rate_sensor_ = sensor;
+    this->diagnostic_sensor_publisher_.set_erd_publish_rate_sensor(sensor);
+  }
+  void set_erd_cache_entries_sensor(sensor::Sensor* sensor) {
+    this->erd_cache_entries_sensor_ = sensor;
+    this->diagnostic_sensor_publisher_.set_erd_cache_entries_sensor(sensor);
+  }
+  void set_erd_cache_updates_sensor(sensor::Sensor* sensor) {
+    this->erd_cache_updates_sensor_ = sensor;
+    this->diagnostic_sensor_publisher_.set_erd_cache_updates_sensor(sensor);
+  }
+  void set_mqtt_publish_rate_sensor(sensor::Sensor* sensor) {
+    this->mqtt_publish_rate_sensor_ = sensor;
+    this->diagnostic_sensor_publisher_.set_mqtt_publish_rate_sensor(sensor);
+  }
+  void set_mqtt_disconnect_count_sensor(sensor::Sensor* sensor) {
+    this->mqtt_disconnect_count_sensor_ = sensor;
+    this->diagnostic_sensor_publisher_.set_mqtt_disconnect_count_sensor(sensor);
+  }
+  void set_mqtt_disconnect_duration_sensor(sensor::Sensor* sensor) {
+    this->mqtt_disconnect_duration_sensor_ = sensor;
+    this->diagnostic_sensor_publisher_.set_mqtt_disconnect_duration_sensor(sensor);
+  }
   void set_throttle_rate_seconds(uint8_t rate) { this->throttle_rate_seconds_ = rate; }
-  void set_custom_ha_discovery_data(const uint8_t* data, const void* chunks, uint16_t count, uint16_t max_chunk, uint32_t hash) {
+  void set_custom_ha_discovery_data(const uint8_t* data, const void* chunks, uint16_t count,
+                                    uint16_t max_chunk, uint32_t hash) {
     ha_discovery_manager_set_custom_data(&this->ha_discovery_manager_, data, chunks, count, max_chunk, hash);
   }
   void add_custom_erds(const uint16_t* erds, uint16_t count);
@@ -140,6 +164,8 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   void run_gea2_iteration_();
   void run_gea3_iteration_();
   void run_timer_only_iteration_();
+  // Log a tight-loop overrun; lives in the .cpp so no ESP_LOG* in this header.
+  void log_tight_loop_overrun_(const char* protocol_name, uint32_t hard_cap_ms);
   // Run a tight-loop for the given iteration function, bounded by a duration
   // and a hard cap.  In test builds the loop is replaced with a single call.
   template<typename IterFn>
@@ -149,8 +175,7 @@ class GeappliancesBridge : public Component, public IBridgeServices {
     uint32_t loop_start_ms = millis();
     while (millis() - loop_start_ms < duration_ms) {
       if (millis() - loop_start_ms >= hard_cap_ms) {
-        ESP_LOGW("geappliances_bridge", "%s tight loop exceeded hard cap (%u ms), breaking",
-                 protocol_name, static_cast<unsigned>(hard_cap_ms));
+        this->log_tight_loop_overrun_(protocol_name, hard_cap_ms);
         break;
       }
 #ifdef USE_ESP32
@@ -259,7 +284,9 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   bool discovery_just_resumed_{false};
 
   AutodiscoveryManager autodiscovery_manager_;
-  // OTA-triggered discovery cleanup: set in setup() if the stored discovery data hash differs from the current build's hash. Driven in loop() after steady state. After cleanup, reboots (same as DiscoveryRefresh) for fresh republish.
+  // OTA-triggered discovery cleanup: set in setup() if the stored discovery data hash differs from the current
+  // build's hash. Driven in loop() after steady state. After cleanup, reboots (same as DiscoveryRefresh) for
+  // fresh republish.
   OtaCleanupManager ota_cleanup_manager_;
   DiagnosticSensorPublisher diagnostic_sensor_publisher_;
 

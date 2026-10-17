@@ -11,7 +11,7 @@ namespace esphome {
 namespace geappliances_bridge {
 
 /* Maximum number of valid ERDs the registry can track. */
-#define ERD_REGISTRY_MAX_VALID 645
+constexpr uint16_t ERD_REGISTRY_MAX_VALID = 645;
 
 class ErdRegistry {
  public:

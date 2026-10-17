@@ -152,7 +152,7 @@ void OtaCleanupManager::check_discovery_changes(const char* current_device_id) {
   bool filter_topics_changed = (stored.filter_config_topics != this->filter_config_topics_);
 
   if (hash_changed || device_id_changed || api_parsing_changed || filter_topics_changed) {
-    ESP_LOGI(TAG, "Discovery state changed (hash=%s, device_id=%s, api_parsing=%s, filter_topics=%s), cleaning old topics",
+    ESP_LOGI(TAG, "Discovery state changed (hash=%s, device_id=%s, api_parsing=%s, filter_topics=%s), cleaning",
              hash_changed ? "changed" : "same",
              device_id_changed ? "changed" : "same",
              api_parsing_changed ? "changed" : "same",

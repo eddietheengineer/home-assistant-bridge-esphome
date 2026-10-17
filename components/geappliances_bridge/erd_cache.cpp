@@ -98,7 +98,8 @@ static erd_cache_entry_t* erd_cache_find(erd_cache_t* self, tiny_erd_t erd, uint
   return nullptr;
 }
 
-static bool erd_cache_update_locked(erd_cache_t* self, tiny_erd_t erd, uint8_t board_address, const uint8_t* data, uint8_t data_size)
+static bool erd_cache_update_locked(erd_cache_t* self, tiny_erd_t erd, uint8_t board_address,
+                                    const uint8_t* data, uint8_t data_size)
 {
   if (data_size > ERD_CACHE_MAX_DATA_SIZE) {
     if (!s_size_rejected_warned) {
