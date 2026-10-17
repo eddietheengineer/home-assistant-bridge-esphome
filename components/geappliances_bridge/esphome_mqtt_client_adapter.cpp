@@ -63,6 +63,7 @@ static bool parse_hex_byte(const char** cursor, unsigned* out)
   }
   unsigned value = 0;
   bool any_digit = false;
+  int consumed = 0;
   for (int i = 0; i < 2; i++) {
     char c = p[i];
     unsigned digit;
@@ -77,9 +78,10 @@ static bool parse_hex_byte(const char** cursor, unsigned* out)
     }
     value = value * 16 + digit;
     any_digit = true;
+    consumed++;
   }
   if (!any_digit) return false;
-  *cursor = p;
+  *cursor = p + consumed;
   *out = value;
   return true;
 }

@@ -63,7 +63,6 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   friend ErdPollListResult build_poll_list_(GeappliancesBridge* bridge,
                                             const probe_entry_t* custom_erds,
                                             uint16_t custom_erds_count);
-  friend tiny_time_source_ticks_t gea2_tick_ticks(i_tiny_time_source_t*);
 
  public:
   static constexpr unsigned long baud = 230400;
@@ -217,6 +216,12 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // WARN_IF_BLOCKING_OVER_CS threshold.
   static constexpr uint32_t GEA2_BURST_DURATION_MS = 10;
 
+  // GEA3 burst duration: the GEA3 TX state machine is byte-oriented (one byte
+  // per UART-adapter poll), so a short burst services the poll several times
+  // per loop() call to transmit a multi-byte request within the 250 ms
+  // request timeout.  Well under the 50 ms WARN_IF_BLOCKING_OVER_CS threshold.
+  static constexpr uint32_t GEA3_BURST_DURATION_MS = 10;
+
   bool gea2_protocol_active_{false}; // fallback for manual device_id when autodiscovery is skipped
 
   // True once the appliance-side data path (subscription and/or polling
@@ -290,16 +295,16 @@ class GeappliancesBridge : public Component, public IBridgeServices {
   // Max payload is tiny_gea_packet_max_payload_length (248) + 7 bytes overhead = 255.
   uint8_t gea2_receive_buffer_[255];
   // GEA2 send queue — larger than GEA3 to absorb more packets at 19200 baud
-  // where the slower bus means the tight loop processes fewer packets per call.
+  // where the slower bus means the burst processes fewer packets per call.
   uint8_t gea2_send_queue_buffer_[4096];
 
   tiny_gea2_erd_client_t gea2_erd_client_;
   uint8_t gea2_client_queue_buffer_[4096];
 
-  // Event fired once per millisecond to drive GEA2 interface's internal timers.
-  // Published manually inside the GEA2 tight loop (not via a timer_group_ periodic
-  // timer) so the 1 ms interrupt never fires in the GEA3 single-pass path and
-  // cannot starve the GEA3/polling-bridge timers in the shared timer_group_.
+  // Event published to drive the GEA2 interface's internal timer group.
+  // Published manually once per GEA2 burst iteration (not via a timer_group_
+  // periodic timer) so it never fires in the GEA3 path and cannot starve the
+  // GEA3/polling-bridge timers in the shared timer_group_.
   tiny_event_t gea2_msec_interrupt_;
 
   gea2_erd_client_adapter_t gea2_erd_client_adapter_;

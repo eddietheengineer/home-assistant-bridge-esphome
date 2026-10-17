@@ -238,7 +238,7 @@ void GeappliancesBridge::setup() {
 void GeappliancesBridge::loop() {
 
   // Drive the GEA2/GEA3 protocol stack FIRST so that UART bytes are
-  // processed before any MQTT work.  The tight loop must run before
+  // processed before any MQTT work.  The burst must run before
   // MQTT operations to avoid starving UART processing on single-core
   // ESP32 variants where a blocking MQTT call can delay response
   // processing past the appliance's timeout window.
@@ -256,8 +256,8 @@ void GeappliancesBridge::loop() {
     }
   }
 #ifdef USE_ESP32
-  // Feed the task watchdog after the protocol stack — the GEA2 tight loop
-  // can run for 200 ms wall-clock time, exceeding the default TWDT timeout.
+  // Feed the task watchdog after the protocol stack.  The 10 ms GEA2/GEA3
+  // burst is well under the default TWDT timeout; the reset is a safety net.
   esp_task_wdt_reset();
 #endif
 
@@ -404,7 +404,20 @@ void GeappliancesBridge::run_protocol_stack_()
     this->run_gea2_iteration_();
 #endif
   } else if (this->uart_ != nullptr) {
+    // GEA3 TX is byte-oriented (one byte per UART-adapter poll), so run a
+    // short burst to service the poll several times per loop() call and
+    // transmit a multi-byte request within the 250 ms request timeout.
+#ifndef UNIT_TEST_BUILD
+    uint32_t burst_start = millis();
+    while (millis() - burst_start < GEA3_BURST_DURATION_MS) {
+      this->run_gea3_iteration_();
+#ifdef USE_ESP32
+      esp_task_wdt_reset();
+#endif
+    }
+#else
     this->run_gea3_iteration_();
+#endif
   } else {
     this->run_timer_only_iteration_();
   }

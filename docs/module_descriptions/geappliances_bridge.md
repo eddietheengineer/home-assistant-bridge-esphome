@@ -39,7 +39,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `initialize_erd_bridge_()` | Initialize subscription or polling bridge based on mode |
 | `init_erd_cache_publisher_()` | Initialize the ERD cache MQTT publisher and HA discovery manager |
 | `init_polling_bridge_(log_as_info)` | Initialize the polling bridge with the probe list |
-| `run_protocol_stack_()` | Drive GEA2/GEA3 hardware (one iteration per loop() call) |
+| `run_protocol_stack_()` | Drive GEA2/GEA3 hardware (10 ms burst per loop() call) |
 | `update_publisher_state_()` | Publisher pause/resume during HA discovery + discovery_just_resumed_ tracking |
 | `start_feature_bit_reading_()` | Start the feature bit read sequence |
 | `start_custom_erd_polling_()` | Initialize polling for user-configured custom ERDs |
@@ -88,7 +88,7 @@ During `startup_state_bridge_init`, `initialize_erd_bridge_()` runs:
 
 ## Key Design Decisions
 
-- **GEA2 protocol tick**: When GEA2 is active, `run_gea2_iteration_()` runs once per `loop()` call. The GEA2 interface's internal timer group uses the ESPHome time source (real `millis()`), so its 6 ms interbyte and 8 ms ack timers track wall-clock time across the ~50 ms gap between `loop()` calls.
+- **GEA2 protocol tick**: When GEA2 is active, `run_protocol_stack_()` runs a 10 ms burst (`GEA2_BURST_DURATION_MS`) calling `run_gea2_iteration_()` as fast as possible, keeping the 6 ms interbyte timeout from firing during the TX→RX cycle. The GEA2 interface's internal timer group uses the ESPHome time source (real `millis()`), so its timers track wall-clock time. The GEA3 path runs an analogous 10 ms burst (`GEA3_BURST_DURATION_MS`) because its TX state machine is byte-oriented (one byte per UART-adapter poll).
 - **Bridge modes**: Three modes — POLL (always poll), SUBSCRIBE (always subscribe), AUTO (try subscribe, fall back to polling after 10 s if no activity).
 - **IBridgeServices interface**: `GeappliancesBridge` implements `IBridgeServices`, the abstract contract consumed by the startup HSM. This eliminates `friend` declarations and lets the HSM be unit-tested with a mock.
 - **Phase timeouts**: Device ID phase has a 30 s timeout, feature bits phase has a 60 s timeout — both prevent the startup HSM from stalling indefinitely.

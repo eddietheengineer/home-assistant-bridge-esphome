@@ -103,9 +103,11 @@ During `startup_state_bridge_init`, `initialize_erd_bridge_()` runs:
 
 ## 6. GEA2 Protocol Tick
 
-When GEA2 is active, `run_protocol_stack_()` calls `run_gea2_iteration_()` once per `loop()` call. The GEA2 interface's internal timer group uses the ESPHome time source (real `millis()`), so its 6 ms interbyte and 8 ms ack timers track wall-clock time across the ~50 ms gap between `loop()` calls. `tiny_timer_group_run()` computes the delta between calls, so timers advance correctly without a tight loop.
+When GEA2 is active, `run_protocol_stack_()` runs a 10 ms burst loop (`GEA2_BURST_DURATION_MS`) that calls `run_gea2_iteration_()` as fast as possible, feeding the task watchdog each iteration. The burst services the GEA2 interface's internal timer group and the shared timer group (UART adapter poll) at ~1 ms intervals, keeping the 6 ms interbyte timeout from firing during the TX→RX cycle (~4 ms at 19200 baud). 10 ms is well under the 50 ms `WARN_IF_BLOCKING_OVER_CS` threshold.
 
-The `gea2_msec_interrupt_` event is no longer published manually; it remains wired to the GEA2 interface's `msec_interrupt_callback` which services the internal timer group and signals `signal_send_ready` for packets queued in the background.
+The GEA2 interface's internal timer group uses the ESPHome time source (real `millis()`), so its 6 ms interbyte and 8 ms ack timers track wall-clock time; `tiny_timer_group_run()` computes the delta between calls. `run_gea2_iteration_()` publishes the `gea2_msec_interrupt_` event once per burst iteration, driving the GEA2 interface's `msec_interrupt_callback` (services the internal timer group and signals `signal_send_ready` for packets queued in the background).
+
+The GEA3 path runs an analogous 10 ms burst (`GEA3_BURST_DURATION_MS`) because the GEA3 TX state machine is byte-oriented (one byte per UART-adapter poll); the burst services the poll several times per `loop()` call so a multi-byte request transmits within the 250 ms request timeout.
 
 ---
 

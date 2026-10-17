@@ -74,8 +74,10 @@ oversights):
 - **`HA_CLEANUP_TOPIC_BUF_SIZE` conditional `#define`** — the test build
   overrides the size via `-DHA_CLEANUP_TEST_BUF_SIZE=512`; a `constexpr`
   cannot be overridden from the command line.
-- **Vendored `miniz*`** — third-party; only modifications are `#pragma once`
-  guards and the hand-written `miniz_export.h` stub.
+- **Vendored `miniz*`** — third-party; modifications include the `gea_tinfl_*`
+  rename (avoids an ESP-IDF ROM symbol collision), a version bump to 11.3.1,
+  and the hand-written `miniz_export.h` stub. The `#pragma once` guards are
+  upstream's own.
 - **`ble master` / `bluetooth master`** strings in `FILTER_KEYWORDS` —
   appliance-protocol data, not code identifiers.
 
