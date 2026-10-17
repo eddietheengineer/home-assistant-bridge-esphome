@@ -140,7 +140,7 @@ Once guards pass, the method MUST set `feature_bit_reading_started_` to `true`, 
 
 When no active ERD client is available (autodiscovery skipped) and no GEA3 UART is configured (`uart_` is `nullptr`), the method MUST set `gea2_protocol_active_` to `true`.
 
-**Rationale:** Manual `device_id` configurations with only a GEA2 UART bypass autodiscovery. This flag ensures `run_protocol_stack_()` enables the GEA2 tight loop before autodiscovery runs.
+**Rationale:** Manual `device_id` configurations with only a GEA2 UART bypass autodiscovery. This flag ensures `run_protocol_stack_()` enables the GEA2 burst before autodiscovery runs.
 
 **Implementation:** `geappliances_bridge_bridge_init.cpp` lines 166–170.
 

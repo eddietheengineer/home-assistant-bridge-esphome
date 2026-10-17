@@ -121,7 +121,7 @@ void GeappliancesBridge::initialize_mqtt_client_()
 
   // For manual device_id configs where autodiscovery is skipped (gea2_uart only,
   // no GEA3 uart), mark the protocol as GEA2 so run_protocol_stack_() enables
-  // the GEA2 tight loop even before autodiscovery runs.
+  // the GEA2 burst even before autodiscovery runs.
   if (this->autodiscovery_manager_.get_active_erd_client() == nullptr) {
     if (this->uart_ == nullptr) {
       this->gea2_protocol_active_ = true;

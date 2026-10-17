@@ -64,7 +64,7 @@ The main ESPHome component class that orchestrates the entire GE Appliances brid
 | `should_route_to_feature_bits_(erd)` | Decide whether an ERD read goes to FeatureBitManager or DeviceIdentityManager |
 | `initialize_mqtt_client_()` | Create and configure the MQTT client adapter |
 | `initialize_erd_bridge_()` | Initialize subscription or polling bridge based on mode |
-| `run_protocol_stack_()` | Drive GEA2/GEA3 hardware (one iteration per loop() call) |
+| `run_protocol_stack_()` | Drive GEA2/GEA3 hardware (10 ms burst per loop() call) |
 | `start_feature_bit_reading_()` | Start the feature bit read sequence |
 | `handle_subscription_failed()` | Handle subscription bridge failure; trigger polling fallback in AUTO mode |
 | `handle_polling_failed()` | Handle polling bridge failure; clean up or recover |

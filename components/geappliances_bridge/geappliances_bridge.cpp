@@ -339,7 +339,7 @@ void GeappliancesBridge::run_gea2_iteration_()
   // tiny_timer_group_run on its own timer group (which uses real millis(),
   // so the 6 ms interbyte / 8 ms ack timers advance by the wall-clock delta
   // since the last call) and signals signal_send_ready for packets queued
-  // in the background.  Publishing once per loop() call (~50 ms) is
+  // in the background.  Publishing once per burst iteration is
   // sufficient because tiny_timer_group_run computes the delta between
   // calls — the timers do not need 1 ms granularity.
   tiny_event_publish(&this->gea2_msec_interrupt_, nullptr);
