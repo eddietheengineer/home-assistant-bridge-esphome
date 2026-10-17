@@ -232,6 +232,8 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
     // the 0xFF sentinel to the detected host address. A segment whose address
     // or ERD field is not valid hex is dropped; a secondary board at 0x00
     // parses as 0x00 and stays distinct from the 0xFF primary sentinel.
+    // The segment includes the trailing "/write" topic level, so the ERD
+    // field is terminated by '/' (or end-of-string), not just '\0'.
     uint8_t board_address = tiny_gea_broadcast_address;
     unsigned erd = 0;
     const char* underscore = strchr(segment, '_');
@@ -242,12 +244,12 @@ extern "C" void esphome_mqtt_client_adapter_subscribe_write_topic(
       if (addr_cursor != underscore) return;
       const char* erd_cursor = underscore + 1;
       if (!parse_hex_uint(&erd_cursor, &erd)) return;
-      if (*erd_cursor != '\0') return;
+      if (*erd_cursor != '\0' && *erd_cursor != '/') return;
       board_address = static_cast<uint8_t>(addr);
     } else {
       const char* erd_cursor = segment;
       if (!parse_hex_uint(&erd_cursor, &erd)) return;
-      if (*erd_cursor != '\0') return;
+      if (*erd_cursor != '\0' && *erd_cursor != '/') return;
     }
 
     // Decode hex payload to a local stack buffer to avoid race condition:

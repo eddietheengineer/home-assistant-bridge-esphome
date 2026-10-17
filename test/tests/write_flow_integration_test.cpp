@@ -277,3 +277,63 @@ TEST(write_flow_integration, should_route_secondary_board_write_to_secondary_add
 
   tiny_gea3_erd_client_double_trigger_activity_event(&erd_client, &args);
 }
+
+TEST(write_flow_integration, should_route_primary_write_despite_write_suffix_in_topic)
+{
+  // Regression: the sscanf->parse_hex_uint refactor added a strict end-of-
+  // string check, but the subscribed topic includes the trailing "/write"
+  // level, so the ERD field is terminated by '/' not '\0'. The check dropped
+  // every write. Verify a primary-board write is actually routed; the
+  // checkExpectations() call avoids the mock().clear() teardown trap that
+  // would otherwise silently discard an unmet expectation.
+  uint8_t host = 0xC0;
+  init_all(host);
+
+  uint8_t value = 0x01;
+  tiny_erd_t erd = 0x7701;
+  tiny_gea3_erd_client_request_id_t mock_request_id{1};
+
+  mock()
+    .expectOneCall("write")
+    .onObject(&erd_client)
+    .withParameter("address", host)
+    .withParameter("erd", erd)
+    .withMemoryBufferParameter("data", &value, 1)
+    .withOutputParameterReturning("request_id", &mock_request_id, sizeof(mock_request_id))
+    .andReturnValue(true);
+
+  when_home_assistant_publishes_write(erd, "01");
+
+  mock().checkExpectations();
+}
+
+TEST(write_flow_integration, should_route_secondary_write_despite_write_suffix_in_topic)
+{
+  // Regression (secondary-board form 0x{addr}_0x{erd}/write): the strict
+  // end-of-string check dropped every write because the ERD field is
+  // terminated by '/' not '\0'. Verify a secondary-board write is actually
+  // routed to the parsed address; checkExpectations() avoids the
+  // mock().clear() teardown trap.
+  uint8_t host = 0xC0;
+  init_all(host);
+
+  uint8_t value = 0x01;
+  tiny_erd_t erd = 0x7701;
+  uint8_t secondary = 0xA1;
+  tiny_gea3_erd_client_request_id_t mock_request_id{1};
+
+  mock()
+    .expectOneCall("write")
+    .onObject(&erd_client)
+    .withParameter("address", secondary)
+    .withParameter("erd", erd)
+    .withMemoryBufferParameter("data", &value, 1)
+    .withOutputParameterReturning("request_id", &mock_request_id, sizeof(mock_request_id))
+    .andReturnValue(true);
+
+  char topic[128];
+  snprintf(topic, sizeof(topic), "geappliances/test_device/erd/0x%02x_0x%04x/write", secondary, erd);
+  mqtt_double.simulate_message(topic, "01");
+
+  mock().checkExpectations();
+}
