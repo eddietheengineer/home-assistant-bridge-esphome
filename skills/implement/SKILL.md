@@ -9,7 +9,7 @@ If the user passes a ticket reference, read it (`.scratch/<feature>/issues/<NN>-
 
 Work the **frontier**: any ticket whose blockers are all done. One ticket at a time; mark each done (checkboxes in the ticket file) before starting the next.
 
-Drive `tdd` (read and follow `skill://tdd`) at the seams agreed in the spec.
+Drive `tdd` (read and follow `skills/tdd/SKILL.md`) at the seams agreed in the spec.
 
 ## Verification gauntlet
 
@@ -23,6 +23,6 @@ Run as each applies, per ticket:
 
 Run single test files regularly while iterating; the full gauntlet once at the end of each ticket.
 
-Once all tickets are done, run `code-review` (read and follow `skill://code-review`) against the branch's fixed point and resolve findings before committing.
+Once all tickets are done, run `code-review` (read and follow `skills/code-review/SKILL.md`) against the branch's fixed point and resolve findings before committing.
 
 Commit your work to the current branch (branch from `develop`, one branch per feature/issue).

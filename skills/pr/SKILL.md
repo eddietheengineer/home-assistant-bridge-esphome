@@ -23,7 +23,7 @@ Use this template for the PR body:
 
 ## Device Verification
 
-<evidence from the test bench (topics observed, values, benchmark numbers), or: "Exempt — <reason: change touches only scripts/, docs/, or CI.">>
+<evidence from the test bench: the five canary metrics (loop time, min heap, ERDs in cache, ERD publish rate, MQTT publish rate) vs the develop baseline, topics observed, values, log excerpt — per the `device-verify` skill. Or: "Exempt — <reason: change touches only scripts/, docs/, or CI.">>
 
 Closes #<issue>
 ```

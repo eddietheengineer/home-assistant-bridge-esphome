@@ -18,7 +18,7 @@ This skill takes the current conversation context and codebase understanding and
 
    Check with the user that these seams match their expectations.
 
-3. Write the spec to `.scratch/<feature-slug>/SPEC.md` using the template below. If the session's `gh` account can write to the tracker, also post the spec as a comment on the originating issue and apply the `ready-for-agent` label; otherwise note that for the user.
+3. Write the spec to `.scratch/<feature-slug>/SPEC.md` using the template below. If the session's `gh` account can write to the tracker, also post the spec as a comment on the originating issue; otherwise note that for the user. (The `ready-for-agent` label is applied after the tickets stage, per the `factory` skill's label discipline.)
 
 4. List the **affected module specs** in `docs/spec/` (the spec is the single source of truth for module contracts; CONTRIBUTING requires them updated before committing a behavioral change). The implement stage updates them.
 
@@ -39,6 +39,10 @@ The solution, from the user's perspective.
 ## User Stories
 
 A long, numbered list. Format: `As a <actor>, I want a <feature>, so that <benefit>.` Cover all aspects of the feature, including failure modes.
+
+## Acceptance Requirements
+
+Numbered, testable, in SHALL form: "The system SHALL publish a write_result for every admitted write." Each requirement maps to at least one test or device-verification check; ticket acceptance criteria cite these numbers.
 
 ## Implementation Decisions
 
