@@ -1,6 +1,5 @@
 
-#ifndef erd_write_bridge_h
-#define erd_write_bridge_h
+#pragma once
 
 #include "i_mqtt_client.h"
 #include "i_tiny_gea3_erd_client.h"
@@ -45,6 +44,4 @@ void erd_write_bridge_set_host_address(
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

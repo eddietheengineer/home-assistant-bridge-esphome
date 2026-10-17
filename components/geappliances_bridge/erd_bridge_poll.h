@@ -1,6 +1,5 @@
 
-#ifndef erd_bridge_poll_h
-#define erd_bridge_poll_h
+#pragma once
 
 extern "C" {
 #include "i_tiny_gea3_erd_client.h"
@@ -110,5 +109,3 @@ void erd_bridge_poll_init(
   erd_cache_t* cache);
 
 void erd_bridge_poll_destroy(erd_bridge_poll_t* self);
-
-#endif

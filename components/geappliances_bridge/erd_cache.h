@@ -9,8 +9,7 @@
 // Every accessor takes the lock for a short read/copy or write, never across
 // the slow MQTT publish.
 
-#ifndef erd_cache_h
-#define erd_cache_h
+#pragma once
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -147,6 +146,4 @@ uint8_t erd_cache_get_arena_usage_percent(const erd_cache_t* self);
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

@@ -3,8 +3,7 @@
  * or buffers.
  */
 
-#ifndef ha_discovery_cleanup_h
-#define ha_discovery_cleanup_h
+#pragma once
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -96,5 +95,3 @@ void cleanup_start(ha_discovery_cleanup_t* self);
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* ha_discovery_cleanup_h */

@@ -1,7 +1,6 @@
 
 
-#ifndef erd_bridge_subscribe_h
-#define erd_bridge_subscribe_h
+#pragma once
 
 struct erd_cache_t;
 
@@ -53,5 +52,3 @@ void erd_bridge_subscribe_destroy(
 void erd_bridge_subscribe_set_erd_registry(
   erd_bridge_subscribe_t* self,
   void* erd_registry);
-
-#endif

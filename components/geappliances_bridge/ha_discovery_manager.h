@@ -11,8 +11,7 @@
  * buffers + the sorted ERD array (~1.3 KB).
  */
 
-#ifndef ha_discovery_manager_h
-#define ha_discovery_manager_h
+#pragma once
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -220,6 +219,4 @@ bool ha_discovery_test_build_payload(ha_discovery_manager_t* self, const char* l
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

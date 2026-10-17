@@ -1,7 +1,6 @@
 
 
-#ifndef startup_hsm_h
-#define startup_hsm_h
+#pragma once
 
 #include "i_bridge_services.h"
 
@@ -70,5 +69,3 @@ extern const tiny_hsm_configuration_t startup_hsm_configuration;
 
 }  // namespace geappliances_bridge
 }  // namespace esphome
-
-#endif

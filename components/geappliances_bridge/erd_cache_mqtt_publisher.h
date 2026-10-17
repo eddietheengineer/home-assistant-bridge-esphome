@@ -1,8 +1,7 @@
 /* With the ESP-IDF framework, publishing runs in a FreeRTOS background task
  * to avoid blocking the ESPHome main loop on the IDF MQTT mutex. */
 
-#ifndef erd_cache_mqtt_publisher_h
-#define erd_cache_mqtt_publisher_h
+#pragma once
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -130,6 +129,4 @@ uint32_t erd_cache_mqtt_publisher_get_last_disconnect_duration_ms(erd_cache_mqtt
 
 #ifdef __cplusplus
 }
-#endif
-
 #endif

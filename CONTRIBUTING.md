@@ -59,9 +59,6 @@ oversights):
 - **`GEA_TAG` macro** instead of `ESPHOME_LOG_TAG` — the latter does not
   exist in the supported ESPHome version (2026.6.2); `GEA_TAG` expands to
   the same `static const char* const` form.
-- **`#ifndef` include guards** instead of `#pragma once` in data-path
-  headers — C-style convention shared with the `lib/tiny*` protocol
-  libraries.
 - **C-style `typedef struct` / `extern "C"`** in data-path files — kept for
   compatibility with the C protocol libraries; C++-only files use `using`.
 - **`AUTO_LOAD = ["sensor", "button"]`** in `__init__.py` — required because
@@ -77,7 +74,8 @@ oversights):
 - **`HA_CLEANUP_TOPIC_BUF_SIZE` conditional `#define`** — the test build
   overrides the size via `-DHA_CLEANUP_TEST_BUF_SIZE=512`; a `constexpr`
   cannot be overridden from the command line.
-- **Vendored `miniz*`** — third-party, untouched.
+- **Vendored `miniz*`** — third-party; only modifications are `#pragma once`
+  guards and the hand-written `miniz_export.h` stub.
 - **`ble master` / `bluetooth master`** strings in `FILTER_KEYWORDS` —
   appliance-protocol data, not code identifiers.
 

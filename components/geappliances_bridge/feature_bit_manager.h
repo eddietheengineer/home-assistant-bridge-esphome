@@ -6,8 +6,7 @@
  * the ESP32 Task Watchdog Timer.
  */
 
-#ifndef FEATURE_BIT_MANAGER_H
-#define FEATURE_BIT_MANAGER_H
+#pragma once
 
 #include <cstdint>
 #include <string>
@@ -120,5 +119,3 @@ class FeatureBitManager {
 
 }  // namespace geappliances_bridge
 }  // namespace esphome
-
-#endif  // FEATURE_BIT_MANAGER_H

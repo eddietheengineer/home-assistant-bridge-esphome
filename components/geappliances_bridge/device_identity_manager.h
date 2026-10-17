@@ -6,8 +6,7 @@
  * never moves on until all three read successfully.
  */
 
-#ifndef DEVICE_IDENTITY_MANAGER_H
-#define DEVICE_IDENTITY_MANAGER_H
+#pragma once
 
 #include <string>
 #include <cstdint>
@@ -73,5 +72,3 @@ class DeviceIdentityManager {
 
 }  // namespace geappliances_bridge
 }  // namespace esphome
-
-#endif  // DEVICE_IDENTITY_MANAGER_H

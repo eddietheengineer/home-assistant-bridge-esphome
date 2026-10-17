@@ -1,6 +1,5 @@
 
-#ifndef i_mqtt_client_h
-#define i_mqtt_client_h
+#pragma once
 
 #include <stddef.h>
 
@@ -84,5 +83,3 @@ static inline void mqtt_client_unsubscribe(i_mqtt_client_t* self, const char* to
 {
   self->api->unsubscribe(self, topic);
 }
-
-#endif
