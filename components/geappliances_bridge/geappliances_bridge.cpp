@@ -331,11 +331,20 @@ void GeappliancesBridge::update_publisher_state_()
 void GeappliancesBridge::run_gea2_iteration_()
 {
   // Service the shared timer group (drives the GEA2 UART adapter poll, which
-  // reads RX bytes and publishes send-complete) and the GEA2 interface FSM.
-  // The GEA2 interface's internal timer group uses real millis(), so its
-  // 6 ms interbyte / 8 ms ack timers track wall-clock time across the ~50 ms
-  // gap between loop() calls (tiny_timer_group_run computes the delta).
+  // reads RX bytes and publishes send-complete).
   tiny_timer_group_run(&this->timer_group_);
+
+  // Publish the msec interrupt to service the GEA2 interface's internal
+  // timer group.  The interface's msec_interrupt_callback calls
+  // tiny_timer_group_run on its own timer group (which uses real millis(),
+  // so the 6 ms interbyte / 8 ms ack timers advance by the wall-clock delta
+  // since the last call) and signals signal_send_ready for packets queued
+  // in the background.  Publishing once per loop() call (~50 ms) is
+  // sufficient because tiny_timer_group_run computes the delta between
+  // calls — the timers do not need 1 ms granularity.
+  tiny_event_publish(&this->gea2_msec_interrupt_, nullptr);
+
+  // Run the GEA2 interface FSM (publishes received packets, completes sends).
   tiny_gea2_interface_run(&this->gea2_interface_);
 }
 
