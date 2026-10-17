@@ -66,10 +66,11 @@ oversights):
   compatibility with the C protocol libraries; C++-only files use `using`.
 - **`AUTO_LOAD = ["sensor", "button"]`** in `__init__.py` — required because
   diagnostic entities are published as sensor/button platforms.
-- **GEA2 tight loop (100 ms, 200 ms hard cap)** in `run_protocol_stack_()` —
-  exceeds the 50 ms `WARN_IF_BLOCKING_OVER_CS` threshold; the loop feeds
-  `esp_task_wdt_reset()` each iteration, so the task watchdog stays
-  satisfied.
+- **GEA2 10 ms burst loop** in `run_protocol_stack_()` — services the GEA2
+  interface at ~1 ms intervals during the TX→RX cycle (~4 ms at 19200 baud)
+  to keep the 6 ms interbyte timeout from firing. 10 ms is under the 50 ms
+  `WARN_IF_BLOCKING_OVER_CS` threshold; the loop feeds `esp_task_wdt_reset()`
+  each iteration.
 - **~44 KB heap allocation** in `ha_discovery_manager_start()` — discovery
   buffers are allocated once at startup, freed in the same run, and the
   device reboots immediately after discovery completes.
