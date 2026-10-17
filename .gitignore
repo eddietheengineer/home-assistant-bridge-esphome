@@ -24,6 +24,7 @@ custom_json/
 coverage/
 
 # IDE
+.omp/
 .vscode/
 .DS_Store
 .venv
