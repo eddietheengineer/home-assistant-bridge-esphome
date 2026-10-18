@@ -127,7 +127,7 @@ The regular `test` target runs 440 unit tests on CI (the full 537-test suite min
 
 ## Software Factory
 
-Features and bugs flow through a staged lifecycle: issue → triage → grill → spec → tickets → implement → review (five sub-agent axes) → device verify → PR. The lifecycle source of truth is `docs/factory.md`; the stage skills are in `skills/` (`grilling`, `grill-with-docs`, `triage`, `to-spec`, `to-tickets`, `implement`, `code-review`, `tdd`, `diagnosing-bugs`, `pr`, `domain-modeling`, `factory`).
+Features and bugs flow through a staged lifecycle: issue → triage → grill → spec → tickets → implement → review (five sub-agent axes) → device verify → PR. The lifecycle source of truth is `docs/factory.md`; the stage skills are in `skills/` (`grilling`, `grill-with-docs`, `triage`, `to-spec`, `to-tickets`, `implement`, `code-review`, `tdd`, `diagnosing-bugs`, `pr`, `domain-modeling`, `codebase-design`, `improve-codebase-architecture`, `factory`).
 
 - When working a factory stage, read and follow `skills/<stage>/SKILL.md` — the skills are agent-agnostic markdown; Copilot follows them directly from the files.
 - Use the terminology from `docs/GLOSSARY.md` in all code, specs, issues, and PRs. When code and glossary disagree, the code wins — fix the glossary.

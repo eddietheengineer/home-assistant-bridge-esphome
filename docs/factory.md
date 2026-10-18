@@ -121,4 +121,4 @@ The skills are agent-agnostic markdown: OMP and Claude Code load them as skills;
 
 ## Provenance
 
-The stage skills adapt the discipline from [mattpocock/skills](https://github.com/mattpocock/skills) (grilling, triage, to-spec, to-tickets, implement, code-review, tdd, diagnosing-bugs, pr, domain-modeling), rebound to this repo's conventions: CppUTest + simulation doubles, `docs/spec/` module contracts, the five-axis review, and the physical test-bench gate. `factory` and `device-verify` are original to this repo.
+The stage skills adapt the discipline from [mattpocock/skills](https://github.com/mattpocock/skills) (grilling, triage, to-spec, to-tickets, implement, code-review, tdd, diagnosing-bugs, pr, domain-modeling, codebase-design, improve-codebase-architecture), rebound to this repo's conventions: CppUTest + simulation doubles, `docs/spec/` module contracts, the five-axis review, and the physical test-bench gate. `factory` and `device-verify` are original to this repo.
