@@ -30,7 +30,13 @@ In this order:
 
 ### 3. Identify the standards sources
 
-`CONTRIBUTING.md` (Code Style section), `docs/style-guide.md`, and `.github/copilot-instructions.md` (Global Protocol Rules section). On top of whatever the repo documents, the Standards axis always carries the **smell baseline** below (Fowler, _Refactoring_ ch.3). Two rules bind it: **the repo overrides** (a documented standard wins; suppress the smell where it endorses what the baseline flags) and **always a judgement call** (labelled heuristic, never a hard violation; skip anything tooling enforces).
+`CONTRIBUTING.md` (Code Style section), `docs/style-guide.md`, and
+`.github/copilot-instructions.md` (Global Protocol Rules section). On top of
+whatever the repo documents, the Standards axis always carries the **smell
+baseline** below (Fowler, _Refactoring_ ch.3). Two rules bind it: **the repo
+overrides** (a documented standard wins; suppress the smell where it endorses
+what the baseline flags) and **always a judgement call** (labelled heuristic,
+never a hard violation; skip anything tooling enforces).
 
 - **Mysterious Name**: a name that doesn't reveal what it does or holds. → rename; if no honest name comes, the design's murky.
 - **Duplicated Code**: the same logic shape in more than one hunk or file. → extract the shared shape.
@@ -57,7 +63,20 @@ One sub-agent per axis (parallel batch when available; sequential passes otherwi
 
 **Invariants** — a general-purpose reviewer. Include: the **Critical Invariants** and **Global Protocol Rules** sections of `.github/copilot-instructions.md` pasted in full; the list of ADRs in `docs/adr/` (accepted) relevant to the touched area. Brief: "Check the diff against each invariant and protocol rule: (erd, board_address) keying everywhere a cache key appears; 0xFF never stored as a physical board address; no mutex held across an MQTT publish; no data_size above 248; generated files (erd_lists, appliance_api_feature_lists, appliance_type_map.h, ha_discovery_data, ha_discovery/*.jsonl, processed JSON) not hand-edited; no file-scope .cpp variables referenced from headers. Report each violation with the invariant cited and the hunk quoted. Under 300 words."
 
-**Performance** — a general-purpose reviewer. Include: the canary-metrics definition from `docs/GLOSSARY.md` (loop time, min heap, ERDs in cache, ERD publish rate, MQTT publish rate) and the develop-baseline rule from `docs/factory.md`. Brief: "A diff is firmware-facing iff it touches `components/` or `lib/`. Report: (a) new heap allocations on the loop or publish path (the repo rule is no avoidable allocation); (b) work added to the main loop or publisher task that can lengthen loop time or pressure the watchdog; (c) changes to poll rates, publish rates, or rate limits that move a canary metric; (d) for firmware-facing diffs, whether device verification is marked required in the spec/tickets and the canary benchmark against the develop baseline is planned — the benchmark table itself is produced at the device-verify stage, which runs after review, so report its absence as expected-pending, not a finding; the table is enforced by the definition of done and the PR body. Quote the hunk for each finding. Under 300 words."
+**Performance** — a general-purpose reviewer. Include: the canary-metrics
+definition from `docs/GLOSSARY.md` (loop time, min heap, ERDs in cache, ERD
+publish rate, MQTT publish rate) and the develop-baseline rule from
+`docs/factory.md`. Brief: "A diff is firmware-facing iff it touches
+`components/` or `lib/`. Report: (a) new heap allocations on the loop or
+publish path (the repo rule is no avoidable allocation); (b) work added to the
+main loop or publisher task that can lengthen loop time or pressure the
+watchdog; (c) changes to poll rates, publish rates, or rate limits that move a
+canary metric; (d) for firmware-facing diffs, whether device verification is
+marked required in the spec/tickets and the canary benchmark against the
+develop baseline is planned — the benchmark table itself is produced at the
+device-verify stage, which runs after review, so report its absence as
+expected-pending, not a finding; the table is enforced by the definition of
+done and the PR body. Quote the hunk for each finding. Under 300 words."
 
 ### 5. Aggregate
 

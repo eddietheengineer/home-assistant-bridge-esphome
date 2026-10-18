@@ -102,6 +102,7 @@ Detailed behavioral contracts for each module. Each spec covers purpose, interfa
 | [Review Checklist](./review-checklist.md) | Pre-commit quality checklist |
 
 ## Process
+How work moves through the repo, the shared vocabulary, and the decisions behind it.
 
 | Document | Description |
 |---|---|

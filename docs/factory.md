@@ -9,7 +9,7 @@ This document is the lifecycle source of truth. The skills in `skills/` are the 
 The feature lifecycle: from a filed issue to a merge-ready PR, with a user confirmation gate at every stage boundary.
 
 ```mermaid
-%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","clusterBkg":"#f5f5f5","clusterBorder":"#aaaaaa","fontFamily":"monospace","nodeBorder":"#888888","edgeLabelBackground":"#ffffff"}}}%%
+%%{init: {"theme":"neutral","themeVariables":{"primaryColor":"#4a90d9","primaryBorderColor":"#2c6a9e","primaryTextColor":"#1a1a1a","secondaryColor":"#d9e8f5","tertiaryColor":"#f0f0f0","lineColor":"#999999","fontFamily":"monospace","nodeBorder":"#888888"}}}%%
 graph LR
   A[Feature/bug filed<br/>issue template] --> B[Triage<br/>skills/triage]
   B --> C[Grill<br/>skills/grill-with-docs<br/>→ ADRs + glossary]
@@ -68,7 +68,11 @@ The checks that must be green before a PR, as they apply:
 | Device verification | `device-verify` skill | Diff touches `components/` or `lib/` |
 | TLA+ model check | CI (TLC over `formal/`) | Concurrency-core `docs/spec/` module changed (cache, publisher, write bridge, startup HSM); model and spec commit together (ADR-0003) |
 
-CI (`.github/workflows/`) runs `make test` and the pipeline pytest on every push/PR, and the ESPHome compile on pushes to `main`/`develop`; the full integration suite is local-only by design (CppUTest `TestMemoryAllocator` false positives on CI). Device verification is a manual, in-session loop — it needs the physical test bench and the tailnet, which CI runners don't have.
+CI (`.github/workflows/`) runs `make test` and the pipeline pytest on every
+push/PR, and the ESPHome compile on pushes to `main`/`develop`; the full
+integration suite is local-only by design (CppUTest `TestMemoryAllocator` false
+positives on CI). Device verification is a manual, in-session loop — it needs
+the physical test bench and the tailnet, which CI runners don't have.
 
 ## Device verification gate
 
